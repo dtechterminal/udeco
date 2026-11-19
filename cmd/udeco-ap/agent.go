@@ -219,6 +219,9 @@ type options struct {
 	sntp func(ctx context.Context, server string, now func() time.Time) (time.Duration, error)
 	// setClock steps the system clock; nil = settimeofday (clock.go)
 	setClock func(time.Time) error
+	// staMon follows hostapd's station events; nil = hapdmon on
+	// bcmwifi.CtrlDir (staevents.go)
+	staMon staSource
 }
 
 type agent struct {
@@ -287,8 +290,12 @@ type agent struct {
 	scanHold atomic.Value
 	wifiBusy atomic.Bool
 
-	scans  *scanner
-	sta    staEvents     // station events for the controller (staevents.go); loop goroutine
+	scans *scanner
+	sta   staEvents // station events for the controller (staevents.go); loop goroutine
+	// hapd follows the hostapd control sockets' station events (nil: not
+	// running; staevents.go); readAt: when the reading in use started
+	hapd   staSource
+	readAt time.Time
 	mcast  *mcastInspect // multicast inspection (mcinspect.go); loop goroutine only
 	mdns   *mdnsState    // mDNS service bridge (mdnsbr.go); loop goroutine only
 	wake   chan struct{}
@@ -462,6 +469,7 @@ func (a *agent) run(parent context.Context) error {
 			go func() { defer a.bg.Done(); a.portsWatchLoop(ctx) }() // ports.go
 		}
 		a.startHomeListen(ctx)
+		a.startStaMonitor(ctx) // staevents.go
 		a.startupJobs()
 	} else if a.x.S.Adopted {
 		a.provisionIfNew("startup")
@@ -865,7 +873,11 @@ func (a *agent) loop(ctx context.Context) {
 // fields reads the unit and returns the inform fields (the last reading
 // when this one fails).
 func (a *agent) fields(ctx context.Context) map[string]any {
+	readAt := time.Now()
 	s, err := a.collect(ctx)
+	if err == nil {
+		a.readAt = readAt
+	}
 	if err != nil {
 		if err.Error() != a.collectErr {
 			a.logf("reading the unit: %v (reporting the last reading)", err)
@@ -937,7 +949,7 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 	if a.x.S.Adopted {
 		a.sta.attach(f)
 	}
-	a.sta.observe(f)
+	a.sta.observe(f, a.staFeed(&c, f))
 	a.rateJoins(f)
 	a.mcastMerge(ctx, f, &c, info, time.Now())
 	a.mdnsReconcile(ctx, &c, info)

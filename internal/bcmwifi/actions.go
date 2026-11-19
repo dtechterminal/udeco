@@ -20,12 +20,16 @@ func (a *Applier) ourVifs() []string {
 	}
 	var out []string
 	for _, e := range ents {
-		if strings.HasPrefix(e.Name(), "wl") && !isBackhaul(e.Name()) {
+		if ServedVif(e.Name()) {
 			out = append(out, e.Name())
 		}
 	}
 	return out
 }
+
+// ServedVif reports whether a control socket under CtrlDir is a BSS the
+// agent serves clients on (not the backhaul placeholder wlN1).
+func ServedVif(name string) bool { return strings.HasPrefix(name, "wl") && !isBackhaul(name) }
 
 func (a *Applier) hostapdCLI(ctx context.Context, vif string, args ...string) error {
 	argv := append([]string{"-p", CtrlDir, "-i", vif}, args...)

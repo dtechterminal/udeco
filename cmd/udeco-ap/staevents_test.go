@@ -2,7 +2,14 @@
 
 package main
 
-import "testing"
+import (
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
+)
 
 func staReading(up int64, vaps map[string][][2]any) map[string]any {
 	var vt []map[string]any
@@ -19,12 +26,12 @@ func staReading(up int64, vaps map[string][][2]any) map[string]any {
 func TestStaEvents(t *testing.T) {
 	var e staEvents
 	// startup: clients already there get no event
-	e.observe(staReading(100, map[string][][2]any{"rai1": {{"A6:7B:63:9F:25:40", -60}}, "ra0": {{"f4:cf:a2:1e:72:64", -70}}}))
+	e.observe(staReading(100, map[string][][2]any{"rai1": {{"A6:7B:63:9F:25:40", -60}}, "ra0": {{"f4:cf:a2:1e:72:64", -70}}}), nil)
 	if len(e.queue) != 0 {
 		t.Fatalf("seed queued %v", e.queue)
 	}
 	// the Pixel leaves rai1, a new client joins ra0, the inverter stays
-	e.observe(staReading(110, map[string][][2]any{"rai1": {}, "ra0": {{"f4:cf:a2:1e:72:64", -71}, {"c8:5c:cc:d1:2e:c7", -55}}}))
+	e.observe(staReading(110, map[string][][2]any{"rai1": {}, "ra0": {{"f4:cf:a2:1e:72:64", -71}, {"c8:5c:cc:d1:2e:c7", -55}}}), nil)
 	if len(e.queue) != 2 {
 		t.Fatalf("queue %v", e.queue)
 	}
@@ -72,7 +79,7 @@ func TestStaEvents(t *testing.T) {
 
 	// a client moving between VAPs of this AP: leave on the old one, then
 	// association on the new one
-	e.observe(staReading(120, map[string][][2]any{"rai0": {{"f4:cf:a2:1e:72:64", -65}}, "ra0": {{"c8:5c:cc:d1:2e:c7", -55}}}))
+	e.observe(staReading(120, map[string][][2]any{"rai0": {{"f4:cf:a2:1e:72:64", -65}}, "ra0": {{"c8:5c:cc:d1:2e:c7", -55}}}), nil)
 	if len(e.queue) != 2 || e.queue[0]["event_type"] != "sta_leave" || e.queue[0]["vap"] != "ra0" ||
 		e.queue[1]["event_type"] != "association" || e.queue[1]["vap"] != "rai0" {
 		t.Fatalf("move %v", e.queue)
@@ -81,17 +88,17 @@ func TestStaEvents(t *testing.T) {
 
 func TestStaEventsRename(t *testing.T) {
 	var e staEvents
-	e.observe(staReading(1, map[string][][2]any{"wifi1": {{"a6:7b:63:9f:25:40", -60}}, "wifi0": {{"f4:cf:a2:1e:72:64", -70}}}))
+	e.observe(staReading(1, map[string][][2]any{"wifi1": {{"a6:7b:63:9f:25:40", -60}}, "wifi0": {{"f4:cf:a2:1e:72:64", -70}}}), nil)
 	// the controller renamed the VAPs: same clients, new names
-	e.observe(staReading(2, map[string][][2]any{"rai1": {{"a6:7b:63:9f:25:40", -60}}, "ra0": {{"f4:cf:a2:1e:72:64", -70}}}))
+	e.observe(staReading(2, map[string][][2]any{"rai1": {{"a6:7b:63:9f:25:40", -60}}, "ra0": {{"f4:cf:a2:1e:72:64", -70}}}), nil)
 	// a VAP missing from one reading (an apply): no events either way
-	e.observe(staReading(3, map[string][][2]any{"rai1": {{"a6:7b:63:9f:25:40", -60}}}))
-	e.observe(staReading(4, map[string][][2]any{"rai1": {{"a6:7b:63:9f:25:40", -60}}, "ra0": {{"f4:cf:a2:1e:72:64", -70}}}))
+	e.observe(staReading(3, map[string][][2]any{"rai1": {{"a6:7b:63:9f:25:40", -60}}}), nil)
+	e.observe(staReading(4, map[string][][2]any{"rai1": {{"a6:7b:63:9f:25:40", -60}}, "ra0": {{"f4:cf:a2:1e:72:64", -70}}}), nil)
 	if len(e.queue) != 0 {
 		t.Fatalf("rename or a missing VAP made events: %v", e.queue)
 	}
 	// a real leave after that is still reported
-	e.observe(staReading(5, map[string][][2]any{"rai1": {}, "ra0": {{"f4:cf:a2:1e:72:64", -70}}}))
+	e.observe(staReading(5, map[string][][2]any{"rai1": {}, "ra0": {{"f4:cf:a2:1e:72:64", -70}}}), nil)
 	if len(e.queue) != 1 || e.queue[0]["event_type"] != "sta_leave" || e.queue[0]["vap"] != "rai1" {
 		t.Fatalf("leave after rename: %v", e.queue)
 	}
@@ -99,7 +106,7 @@ func TestStaEventsRename(t *testing.T) {
 
 func TestStaEventsQueueBound(t *testing.T) {
 	var e staEvents
-	e.observe(staReading(1, nil))
+	e.observe(staReading(1, nil), nil)
 	for i := 0; i < staQueueMax+10; i++ {
 		e.push(map[string]any{"n": i})
 	}
@@ -110,5 +117,220 @@ func TestStaEventsQueueBound(t *testing.T) {
 	e.push(map[string]any{"n": "new"})
 	if e.queue[0]["n"] != 10 {
 		t.Fatalf("dropped the event on the wire: %v", e.queue[0])
+	}
+}
+
+// staLive builds a hostapd monitor event.
+func staLive(vif, mac string, k hapdmon.Kind, at time.Time) hapdmon.Event {
+	return hapdmon.Event{Vif: vif, MAC: mac, Kind: k, At: at}
+}
+
+// The hostapd socket reports what two readings cannot see: the iPhone on
+// the Bedroom unit's 5 GHz BSS disassociated and associated again between
+// two readings (live 2026-11-19, 22:58:40). The controller gets the leave,
+// then the association, once each, in that order; the reading that follows
+// adds nothing.
+func TestStaEventsLiveQuickReconnect(t *testing.T) {
+	const iphone, other = "d2:f7:e5:58:6f:89", "a6:7b:00:00:00:01"
+	t0 := time.Date(2026, 11, 19, 22, 58, 30, 0, time.UTC)
+	vifs := map[string]string{"wl12": "wifi1ap1", "wl02": "wifi0ap1"}
+	since := map[string]time.Time{"wl12": t0.Add(-time.Minute)} // wl02 has no socket
+	var e staEvents
+	e.observe(staReading(100, map[string][][2]any{"wifi1ap1": {{iphone, -76}}, "wifi0ap1": {{other, -50}}}),
+		&staFeed{read: t0, now: t0, since: since, vifs: vifs})
+	if len(e.queue) != 0 {
+		t.Fatalf("seed queued %v", e.queue)
+	}
+	t1 := t0.Add(10 * time.Second)
+	e.observe(staReading(110, map[string][][2]any{"wifi1ap1": {{iphone, -70}}, "wifi0ap1": {{other, -50}}}),
+		&staFeed{read: t1, now: t1, since: since, vifs: vifs, evs: []hapdmon.Event{
+			staLive("wl12", iphone, hapdmon.Disconnected, t0.Add(4*time.Second)),
+			staLive("wl12", iphone, hapdmon.Connected, t0.Add(4*time.Second)),
+		}})
+	if len(e.queue) != 2 {
+		t.Fatalf("queue %v", e.queue)
+	}
+	l, a := e.queue[0], e.queue[1]
+	if l["event_type"] != "sta_leave" || l["mac"] != iphone || l["vap"] != "wifi1ap1" || l["avg_rssi"] != -76 || l["last_seen"] != int64(104) {
+		t.Errorf("leave %v", l)
+	}
+	if a["event_type"] != "association" || a["mac"] != iphone || a["vap"] != "wifi1ap1" || a["auth_rssi"] != -70 ||
+		a["assoc_status"] != 0 || a["last_seen"] != int64(104) {
+		t.Errorf("association %v", a)
+	}
+	// the next reading agrees: nothing more
+	t2 := t1.Add(10 * time.Second)
+	e.observe(staReading(120, map[string][][2]any{"wifi1ap1": {{iphone, -71}}, "wifi0ap1": {{other, -50}}}),
+		&staFeed{read: t2, now: t2, since: since, vifs: vifs})
+	if len(e.queue) != 2 {
+		t.Fatalf("reported twice: %v", e.queue)
+	}
+	// an event after the reading started waits for the next reading (the
+	// reading may or may not show it yet), and is reported once
+	t3 := t2.Add(10 * time.Second)
+	e.observe(staReading(130, map[string][][2]any{"wifi1ap1": {{iphone, -71}}, "wifi0ap1": {{other, -50}}}),
+		&staFeed{read: t3, now: t3.Add(time.Second), since: since, vifs: vifs, evs: []hapdmon.Event{
+			staLive("wl12", iphone, hapdmon.Disconnected, t3.Add(500*time.Millisecond)),
+		}})
+	if len(e.queue) != 2 {
+		t.Fatalf("an event newer than the reading was used: %v", e.queue)
+	}
+	t4 := t3.Add(10 * time.Second)
+	e.observe(staReading(140, map[string][][2]any{"wifi1ap1": {}, "wifi0ap1": {{other, -50}}}),
+		&staFeed{read: t4, now: t4, since: since, vifs: vifs})
+	if len(e.queue) != 3 || e.queue[2]["event_type"] != "sta_leave" || e.queue[2]["last_seen"] != int64(130) {
+		t.Fatalf("held leave %v", e.queue)
+	}
+	t5 := t4.Add(10 * time.Second)
+	e.observe(staReading(150, map[string][][2]any{"wifi1ap1": {}, "wifi0ap1": {{other, -50}}}),
+		&staFeed{read: t5, now: t5, since: since, vifs: vifs})
+	if len(e.queue) != 3 {
+		t.Fatalf("leave reported twice: %v", e.queue)
+	}
+
+	// a BSS without a socket keeps the reading diff, and its events (none
+	// should come) are not used
+	t6 := t5.Add(10 * time.Second)
+	e.observe(staReading(160, map[string][][2]any{"wifi1ap1": {}, "wifi0ap1": {}}),
+		&staFeed{read: t6, now: t6, since: since, vifs: vifs, evs: []hapdmon.Event{
+			staLive("wl02", other, hapdmon.Disconnected, t5.Add(time.Second)),
+		}})
+	if len(e.queue) != 4 || e.queue[3]["event_type"] != "sta_leave" || e.queue[3]["mac"] != other || e.queue[3]["last_seen"] != int64(150) {
+		t.Fatalf("fallback leave %v", e.queue)
+	}
+}
+
+// A CONNECTED for a station the agent has on that BSS already means the
+// drop between went unseen: still a leave, then an association. A
+// DISCONNECTED for a station not on that BSS (told already) is nothing.
+func TestStaEventsLiveMissedDrop(t *testing.T) {
+	const sta = "aa:bb:cc:00:00:09"
+	t0 := time.Date(2026, 11, 19, 23, 0, 0, 0, time.UTC)
+	vifs := map[string]string{"wl12": "wifi1ap1", "wl02": "wifi0ap1"}
+	since := map[string]time.Time{"wl12": t0.Add(-time.Minute), "wl02": t0.Add(-time.Minute)}
+	var e staEvents
+	e.observe(staReading(100, map[string][][2]any{"wifi1ap1": {{sta, -60}}, "wifi0ap1": {}}), &staFeed{read: t0, now: t0, since: since, vifs: vifs})
+	t1 := t0.Add(10 * time.Second)
+	e.observe(staReading(110, map[string][][2]any{"wifi1ap1": {{sta, -61}}, "wifi0ap1": {}}),
+		&staFeed{read: t1, now: t1, since: since, vifs: vifs, evs: []hapdmon.Event{
+			staLive("wl02", sta, hapdmon.Disconnected, t0.Add(time.Second)),
+			staLive("wl12", sta, hapdmon.Connected, t0.Add(2*time.Second)),
+		}})
+	if len(e.queue) != 2 || e.queue[0]["event_type"] != "sta_leave" || e.queue[1]["event_type"] != "association" ||
+		e.queue[1]["auth_rssi"] != -61 {
+		t.Fatalf("queue %v", e.queue)
+	}
+	// it moves to the 2.4 GHz BSS: leave on 5 GHz, association on 2.4 GHz,
+	// whatever order the two sockets' events came in
+	t2 := t1.Add(10 * time.Second)
+	e.observe(staReading(120, map[string][][2]any{"wifi1ap1": {}, "wifi0ap1": {{sta, -50}}}),
+		&staFeed{read: t2, now: t2, since: since, vifs: vifs, evs: []hapdmon.Event{
+			staLive("wl02", sta, hapdmon.Connected, t1.Add(time.Second)),
+			staLive("wl12", sta, hapdmon.Disconnected, t1.Add(time.Second)),
+		}})
+	if len(e.queue) != 4 || e.queue[2]["event_type"] != "sta_leave" || e.queue[2]["vap"] != "wifi1ap1" ||
+		e.queue[3]["event_type"] != "association" || e.queue[3]["vap"] != "wifi0ap1" || e.queue[3]["auth_rssi"] != -50 {
+		t.Fatalf("move %v", e.queue)
+	}
+}
+
+// A socket that missed an event (hostapd restarted between readings,
+// a datagram lost) is caught up by the reading, but only once the
+// reading has disagreed for staSettle readings in a row: a station in the
+// association list that has not finished its handshake yet is no
+// association.
+func TestStaEventsLiveReconcile(t *testing.T) {
+	const a1, a2 = "aa:bb:cc:00:00:0a", "aa:bb:cc:00:00:0b"
+	t0 := time.Date(2026, 11, 19, 23, 0, 0, 0, time.UTC)
+	vifs := map[string]string{"wl12": "wifi1ap1"}
+	since := map[string]time.Time{"wl12": t0.Add(-time.Minute)}
+	var e staEvents
+	e.observe(staReading(100, map[string][][2]any{"wifi1ap1": {{a1, -60}}}), &staFeed{read: t0, now: t0, since: since, vifs: vifs})
+	for i := 1; i < staSettle; i++ {
+		ti := t0.Add(time.Duration(i) * 10 * time.Second)
+		e.observe(staReading(100+int64(i)*10, map[string][][2]any{"wifi1ap1": {{a2, -65}}}), &staFeed{read: ti, now: ti, since: since, vifs: vifs})
+		if len(e.queue) != 0 {
+			t.Fatalf("reading %d: reconciled too early: %v", i, e.queue)
+		}
+	}
+	ti := t0.Add(time.Duration(staSettle) * 10 * time.Second)
+	e.observe(staReading(100+int64(staSettle)*10, map[string][][2]any{"wifi1ap1": {{a2, -65}}}), &staFeed{read: ti, now: ti, since: since, vifs: vifs})
+	if len(e.queue) != 2 {
+		t.Fatalf("queue %v", e.queue)
+	}
+	got := map[string]string{}
+	for _, ev := range e.queue {
+		got[ev["mac"].(string)] = ev["event_type"].(string)
+	}
+	if got[a1] != "sta_leave" || got[a2] != "association" {
+		t.Fatalf("reconciled %v", e.queue)
+	}
+}
+
+func TestStaVifNames(t *testing.T) {
+	s := testSnapshot()
+	s.Radios[0].VAPs = []apstate.Radio{{Iface: "wl02", BSSID: "AA:A7:B9:3E:15:F8"}, {Iface: "wl03"}}
+	f := map[string]any{"vap_table": []map[string]any{
+		{"name": "wifi1ap1", "bssid": "b2:a7:b9:00:00:07"},
+		{"name": "wifi0ap1", "bssid": "aa:a7:b9:3e:15:f8"},
+	}}
+	got := staVifNames(s, f)
+	if len(got) != 2 || got["wl12"] != "wifi1ap1" || got["wl02"] != "wifi0ap1" {
+		t.Fatalf("vif names %v", got)
+	}
+}
+
+// fakeStaMon is a hostapd socket monitor that has had wl12 attached for
+// long and hands over events once armed.
+type fakeStaMon struct {
+	mu  sync.Mutex
+	evs []hapdmon.Event
+}
+
+func (m *fakeStaMon) Take() ([]hapdmon.Event, int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e := m.evs
+	m.evs = nil
+	return e, 0
+}
+
+func (m *fakeStaMon) Attached() map[string]time.Time {
+	return map[string]time.Time{"wl12": time.Unix(1, 0)}
+}
+
+// End to end: a quick reconnect hostapd reports between two readings
+// reaches the controller as a sta_leave and then an association, each in
+// a notification inform of its own.
+func TestStaEventsFromHostapd(t *testing.T) {
+	mon := &fakeStaMon{}
+	h := newHarness(t, func(c *Config, o *options) { c.Takeover, c.Apply = true, true; o.staMon = mon })
+	h.ctl.queue(adoptReply, provisionReply(testCfg))
+	h.start()
+	defer h.stop()
+	eventually(t, "provisioned", func() bool { return cfgversionOf(h.ctl.last()) == "00000000000000c1" })
+	n := h.ctl.count()
+	eventually(t, "two more informs", func() bool { return h.ctl.count() >= n+2 })
+	at := time.Now()
+	mon.mu.Lock()
+	mon.evs = []hapdmon.Event{
+		{Vif: "wl12", MAC: staMAC, Kind: hapdmon.Disconnected, At: at},
+		{Vif: "wl12", MAC: staMAC, Kind: hapdmon.Connected, At: at},
+	}
+	mon.mu.Unlock()
+	var got []map[string]any
+	eventually(t, "both events", func() bool {
+		got = got[:0]
+		for _, m := range h.ctl.all() {
+			if p, ok := m["notif_payload"].(map[string]any); ok && p["message_type"] == staTracker {
+				got = append(got, p)
+			}
+		}
+		return len(got) >= 2
+	})
+	if len(got) != 2 || got[0]["event_type"] != "sta_leave" || got[1]["event_type"] != "association" ||
+		got[0]["mac"] != staMAC || got[1]["mac"] != staMAC || got[0]["vap"] == "" || got[0]["vap"] != got[1]["vap"] ||
+		got[1]["auth_rssi"] != float64(-55) {
+		t.Fatalf("events %v", got)
 	}
 }
