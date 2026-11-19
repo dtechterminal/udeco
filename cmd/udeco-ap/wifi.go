@@ -201,6 +201,7 @@ func (a *agent) startupJobs() {
 	for _, mac := range a.authorizedGuests(time.Now()) {
 		a.submit("guest-auth "+mac, func(ctx context.Context) { a.guestAuth(ctx, mac, true) })
 	}
+	a.pushClientRates("startup") // also clears a list left in RunDir
 	a.provisionIfNew("startup")
 }
 

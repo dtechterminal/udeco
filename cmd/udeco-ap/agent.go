@@ -274,6 +274,12 @@ type agent struct {
 	bg     sync.WaitGroup
 	worker workerState // Wi-Fi worker goroutine only
 	rs     radsecState // RadSec proxy (radsec.go); Wi-Fi worker goroutine only
+
+	// rateSeen: the limited clients (State.ClientRates) associated at the
+	// last reading (ratelimit.go); loop goroutine
+	rateSeen map[string]bool
+	// rateNoted: the not-supported note for rate-update was logged
+	rateNoted bool
 }
 
 func newAgent(cfg *Config, o options) (*agent, error) {
@@ -846,6 +852,7 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 		a.sta.attach(f)
 	}
 	a.sta.observe(f)
+	a.rateJoins(f)
 	a.mcastMerge(ctx, f, &c, info, time.Now())
 	a.mdnsReconcile(ctx, &c, info)
 	a.snmpFollow(ctx, f, &c)

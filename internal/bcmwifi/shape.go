@@ -37,9 +37,14 @@ import (
 // non-accelerable, so only vifs with a limited station carry a tree; it is
 // removed when the last limited station leaves.
 //
+// A station the controller gave its own limit (cmd rate-update,
+// clientrate.go) is shaped the same way on any SSID vif it is associated on,
+// at its own limit in each direction it has one and the SSID's in the other.
+//
 // Stations are the driver's association list (`wl -i <vif> assoclist`), read
 // at each sync: a station that joins between syncs is unlimited until the
-// next one (Tick runs it).
+// next one (Tick runs it; the agent also syncs when a client with its own
+// limit joins).
 
 // tcState is what the agent built on one device (RunDir/tc-state.json).
 type tcState struct {
@@ -98,8 +103,11 @@ func parseAssoclist(out string) []string {
 	return macs
 }
 
-// wantShaping computes the wanted trees for l, reading each limited vif's
-// association list.
+// wantShaping computes the wanted trees for l, reading the association
+// list of each vif that has a limited SSID or, while there are per-client
+// limits (clientrate.go), of every SSID vif. A station's limit in each
+// direction is its own entry's when the entry limits that way, else its
+// SSID's.
 func (a *Applier) wantShaping(ctx context.Context, l *layout) (map[string]*tcWant, error) {
 	want := map[string]*tcWant{}
 	get := func(dev, dir string) *tcWant {
@@ -110,29 +118,80 @@ func (a *Applier) wantShaping(ctx context.Context, l *layout) (map[string]*tcWan
 		}
 		return w
 	}
+	per := a.loadClientRates()
+	var tc map[string]*tcState // loaded only when a read fails
 	for _, rl := range l.Radios {
 		for _, u := range rl.Used {
-			rlim := u.SSID.RateLimit
-			if rlim == nil || rlim.DownKbps <= 0 && rlim.UpKbps <= 0 {
+			var ssid RateLimit
+			if r := u.SSID.RateLimit; r != nil {
+				ssid = *r
+			}
+			ssidLimited := ssid.DownKbps > 0 || ssid.UpKbps > 0
+			// never the backhaul (TP-Link's mesh uplink between units)
+			if !ssidLimited && (len(per) == 0 || isBackhaul(u.Vif)) {
 				continue
 			}
 			out, err := a.wlGet(ctx, u.Vif, "assoclist")
 			if err != nil {
+				if !ssidLimited {
+					// per-client only: this vif keeps what it has until
+					// the next sync; the SSID-wide limits elsewhere are
+					// still synced
+					a.o.Logf("bcmwifi: per-client limits on %s: %v (kept as built)", u.Vif, err)
+					if tc == nil {
+						tc = a.loadTC()
+					}
+					keepShaping(tc, u.Vif, a.netdevExists(u.Vif), get)
+					continue
+				}
 				return nil, err
 			}
 			for _, m := range parseAssoclist(out) {
-				if rlim.DownKbps > 0 {
-					get(u.Vif, "dst").Root[m] = rlim.DownKbps
+				down, up := ssid.DownKbps, ssid.UpKbps
+				if pc, ok := per[m]; ok {
+					if pc.DownKbps > 0 {
+						down = pc.DownKbps
+					}
+					if pc.UpKbps > 0 {
+						up = pc.UpKbps
+					}
 				}
-				if rlim.UpKbps > 0 {
+				if down > 0 {
+					get(u.Vif, "dst").Root[m] = down
+				}
+				if up > 0 {
 					ifb := ifbFor(rl.Primary)
 					get(u.Vif, "dst").Redir[m] = ifb
-					get(ifb, "src").Root[m] = rlim.UpKbps
+					get(ifb, "src").Root[m] = up
 				}
 			}
 		}
 	}
 	return want, nil
+}
+
+// keepShaping wants again what was built for the stations of vif (its
+// download classes, upload redirects and their IFB classes), so a vif whose
+// association list could not be read is left as it is. A vif that is gone
+// keeps nothing.
+func keepShaping(tc map[string]*tcState, vif string, exists bool, get func(dev, dir string) *tcWant) {
+	st := tc[vif]
+	if st == nil || !exists || st.Dirty {
+		return
+	}
+	if st.Root && st.Dir == "dst" {
+		for m, kbps := range st.Rate {
+			get(vif, "dst").Root[m] = kbps
+		}
+	}
+	if st.Ingress {
+		for m, ifb := range st.To {
+			if ist := tc[ifb]; ist != nil && ist.Root && ist.Rate[m] > 0 {
+				get(vif, "dst").Redir[m] = ifb
+				get(ifb, "src").Root[m] = ist.Rate[m]
+			}
+		}
+	}
 }
 
 // SyncRateLimits brings the tc trees in line with the applied Desired and

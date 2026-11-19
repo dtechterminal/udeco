@@ -21,6 +21,8 @@ func (a *agent) action(ctx context.Context, act string) {
 	if !a.takeover.Load() {
 		switch verb {
 		case "unblock", "guest-auth", "guest-unauth":
+		case "rate-update":
+			a.logf("observe mode: per-client speed limit for %s kept, applied at takeover", arg)
 		default:
 			a.logf("observe mode: %s logged only, nothing on the unit changes", act)
 		}
@@ -69,6 +71,8 @@ func (a *agent) action(ctx context.Context, act string) {
 	case "guest-auth", "guest-unauth":
 		mac, on := arg, verb == "guest-auth"
 		a.submit(verb+" "+mac, func(ctx context.Context) { a.guestAuth(ctx, mac, on) })
+	case "rate-update":
+		a.pushClientRates("rate-update " + arg)
 	default:
 		a.logf("action %q: ignored", act)
 	}
