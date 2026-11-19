@@ -1,0 +1,40 @@
+
+BSS[00]:     0
+BSS[01]:     3
+BSS[02]:     0
+BSS[03]:     0
+
+HT Operating Mode : 3
+
+
+MAC                AID TxPackets   RxPackets   TxBytes     RxBytes     TP(Tx)      TP(Rx)      
+FC:3C:D7:31:00:CD  1   386         413         23892       88619       23892886190Mbps       0Mbps       
+C0:F8:53:17:23:A7  2   120         93          11664       12589       11664125890Mbps       0Mbps       
+E8:FD:F8:8B:CE:10  3   227         203         13988       28962       13988289620Mbps       0Mbps       
+Show_MacTable_Proc(): arg=
+Dump MacTable entries info, EntType=0x20001
+
+
+MAC                MODE  AID  BSS PSM WMM MIMOPS RSSI0/1/2/3         PhMd        BW       MCS         SGI      STBC      Idle   Rate      QosMap 
+sta_cnt=0
+apcli_cnt=0
+rept_cnt=0
+HTC_ICV_Err_TH=5
+
+ Background scan support = 1
+===== Configuration =====
+ Channel busy time Threshold = 600000
+ Noisy Threshold = 85
+ IPI Idle Threshold (*8us) = 80000
+ Scan Duration = 200 ms
+ Partial Scan Interval = 10 second
+ DriverTrigger support= 0
+===== Status / Statistic =====
+ One sec channel busy time = 5996
+ One sec primary channel busy time = 1322
+ One sec My Tx Airtime = 4818
+ One sec My Rx Airtime = 0
+ IPI Idle time = 1042235167
+ Noisy = 0
+ Current state = 0
+ Scan type = 0

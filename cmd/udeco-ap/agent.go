@@ -548,10 +548,16 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	// bridge, Hotspot 2.0) need the agent to own Wi-Fi: observe mode
 	// claims none of them, and a drop to observe clears them (fields).
 	own := a.takeover.Load()
-	// hostapd/wl features (scans, PPSK, Lock to AP, RADIUS filter,
-	// multicast inspect, RadSec) exist on the Deco only
+	// hostapd/wl features (PPSK, RADIUS filter, multicast inspect, RadSec)
+	// exist on the Deco only
 	deco := own && !a.cfg.jio()
-	p, ok := models.DecoAgentProfileWith(m, heAX, models.DecoAgentFeatures{BandSteer: canSteer, RFScan: deco,
+	// RF_SCAN: wl scans on the Deco; a collector that says whether it can
+	// scan (jio-mtk: only with fresh site surveys enabled) decides itself
+	rfScan := deco
+	if sc, ok := a.o.col.(interface{ ScanSupported() bool }); ok {
+		rfScan = own && sc.ScanSupported()
+	}
+	p, ok := models.DecoAgentProfileWith(m, heAX, models.DecoAgentFeatures{BandSteer: canSteer, RFScan: rfScan,
 		MinRate: own && a.cfg.MinRates, PPSK: deco, LockAP: own, RoamAssist: own && canRoam,
 		RadiusFilter: deco, MulticastInspect: deco, WPA3: own && a.cfg.WPA3, WPA3FT: own && a.cfg.WPA3 && canFTSAE,
 		RadSec: deco, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2,
