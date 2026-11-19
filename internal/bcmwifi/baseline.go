@@ -411,7 +411,12 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		}
 		if v.Rateset != "" {
 			if out, err := a.wlGet(ctx, v.Vif, "rateset"); err != nil || parseRateset(out) != v.Rateset {
-				st = append(st, onVif(v.Vif, optStep("restore "+v.Vif+" rateset", append([]string{"wl", "-i", v.Vif, "rateset"}, strings.Fields(v.Rateset)...)...)))
+				// refused while the radio is up, like dwds and rrm
+				r := radioOf(v.Vif)
+				if _, seen := downOnly[r]; !seen {
+					downOrder = append(downOrder, r)
+				}
+				downOnly[r] = append(downOnly[r], onVif(v.Vif, optStep("restore "+v.Vif+" rateset", append([]string{"wl", "-i", v.Vif, "rateset"}, strings.Fields(v.Rateset)...)...)))
 			}
 		}
 		if v.Macmode != "" {
@@ -425,7 +430,7 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		}
 	}
 	for _, r := range downOrder {
-		st = append(st, optStep("radio "+r+" down to restore dwds/rrm", "wl", "-i", r, "down"))
+		st = append(st, optStep("radio "+r+" down to restore dwds/rrm/rateset", "wl", "-i", r, "down"))
 		st = append(st, downOnly[r]...)
 		st = append(st, optStep("radio "+r+" up", "wl", "-i", r, "up"))
 	}
