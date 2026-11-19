@@ -76,3 +76,33 @@ func TestTakeoverClaimsWithKeys(t *testing.T) {
 		t.Errorf("takeover with mdns_bridge and hotspot2: fw %v fw2 %v", m["fw_caps"], m["fw2_caps"])
 	}
 }
+
+// scanGateCol is a collector that says whether it can scan (jio-mtk:
+// mtkwifi.Collector.ScanSupported, true only with fresh site surveys).
+type scanGateCol struct {
+	*fakeCol
+	can bool
+}
+
+func (c scanGateCol) ScanSupported() bool { return c.can }
+
+// TestRFScanFollowsCollector: a collector that says it cannot scan keeps
+// RF_SCAN unclaimed in takeover (the other takeover bits stay); one that
+// can claims it.
+func TestRFScanFollowsCollector(t *testing.T) {
+	for _, can := range []bool{false, true} {
+		h := newHarness(t, func(c *Config, o *options) {
+			c.Takeover = true
+			o.col = scanGateCol{fakeCol: o.col.(*fakeCol), can: can}
+		})
+		h.start()
+		eventually(t, "takeover claims", func() bool {
+			m := h.ctl.last()
+			return m != nil && int(num(m["wifi_caps"]))&models.WifiCapLockAP != 0
+		})
+		if got := int(num(h.ctl.last()["wifi_caps"]))&models.WifiCapRFScan != 0; got != can {
+			t.Errorf("ScanSupported %v: RF_SCAN claimed %v", can, got)
+		}
+		h.stop()
+	}
+}
