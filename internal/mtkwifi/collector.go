@@ -55,6 +55,9 @@ type Collector struct {
 	survey map[string]*surveyAcc    // by band
 	// counts: the last station counters per radio (kept over Invalidate)
 	counts map[string]map[string]staCount
+	// countsAt: when counts were read, per radio (the receive airtime
+	// estimate's interval)
+	countsAt map[string]time.Time
 	// mib: the last `show mibinfo` busy time per radio (by its first BSS),
 	// asked at most every mibInterval
 	mib map[string]*mibReading
@@ -117,7 +120,7 @@ func NewCollector(o CollectorOptions) *Collector {
 	}
 	return &Collector{o: o, sys: wl.New(wl.Options{Root: o.Root, Run: runnerAdapter{o.Run}, Bridge: o.Bridge, Ports: portRE}),
 		cache: map[string]*radioReading{}, survey: map[string]*surveyAcc{}, seen: map[string]*surveySeen{},
-		counts:  map[string]map[string]staCount{},
+		counts: map[string]map[string]staCount{}, countsAt: map[string]time.Time{},
 		mib:     map[string]*mibReading{},
 		scanSem: make(chan struct{}, 1)}
 }
@@ -211,7 +214,7 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 			r.SSID, r.BSSID = r.VAPs[0].SSID, r.VAPs[0].BSSID
 		}
 		var ok bool
-		r.Survey, ok = c.integrate(rd.Band, rr.busy, now)
+		r.Survey, ok = c.integrate(rd.Band, withRxAir(rr.busy, rr.rxAir), now)
 		r.NoSurvey = !ok
 		s.Radios = append(s.Radios, r)
 	}
@@ -226,7 +229,10 @@ type radioReading struct {
 	essid   map[string]string // iwconfig per BSS
 	stas    []sta
 	busy    *busySample // nil: the driver gives no busy time for this radio
-	stale   bool        // Invalidate, or the radio went down: read again when the driver may be read
+	// rxAir: the stations' receive airtime estimated from their byte
+	// counters and rates (rxAirtime), µs per second; 0 = none
+	rxAir int64
+	stale bool // Invalidate, or the radio went down: read again when the driver may be read
 }
 
 // restartKeep: how old a reading may be to stand in for one the radio
@@ -371,7 +377,11 @@ func (c *Collector) klogRead(ctx context.Context, main string, rr *radioReading,
 			st := &rr.stas[i].Station
 			st.TxPackets, st.RxPackets, st.TxBytes, st.RxBytes = n.txPkts, n.rxPkts, n.txBytes, n.rxBytes
 		}
+		if at := c.countsAt[main]; !at.IsZero() && now.After(at) {
+			rr.rxAir = rxAirtime(rr.stas, last, next, now.Sub(at))
+		}
 		c.counts[main] = next
+		c.countsAt[main] = now
 	}
 	if wantBusy {
 		if log, _, ok := ask("bgndscaninfo"); ok {
@@ -686,6 +696,40 @@ func parseBgndScanInfo(log string) (busySample, bool) {
 	}
 	b.busy = max(b.busy, b.tx+b.rx)
 	return b, true
+}
+
+// rxAirtime estimates the stations' receive airtime, µs per second, from
+// what each received in dt (its byte counters, last and next) at its rate.
+// The MT7603's `show mibinfo` "My Rx Airtime" reads 0 at all times (also
+// with ApEnableRadioChStats, 2026-11-20), so cu_self_rx is estimated the
+// way the counters allow; preambles and contention are left out, so it
+// runs low. The rate is the station table's one rate (st.RxRate).
+func rxAirtime(stas []sta, last, next map[string]staCount, dt time.Duration) int64 {
+	if dt <= 0 {
+		return 0
+	}
+	var sec float64
+	for _, st := range stas {
+		p, ok := last[st.MAC]
+		n, ok2 := next[st.MAC]
+		if !ok || !ok2 || st.RxRate <= 0 || n.rxBytes <= p.rxBytes {
+			continue // new, re-associated (counters went down) or idle
+		}
+		sec += float64(n.rxBytes-p.rxBytes) * 8 / (float64(st.RxRate) * 1000)
+	}
+	return min(int64(sec/dt.Seconds()*1e6), 1_000_000)
+}
+
+// withRxAir fills a busy reading's own receive airtime from the estimate
+// when the driver gives none, within what the busy time leaves after the
+// AP's own transmissions.
+func withRxAir(b *busySample, rxAir int64) *busySample {
+	if b == nil || b.rx != 0 || rxAir <= 0 {
+		return b
+	}
+	e := *b
+	e.rx = min(rxAir, max(e.busy-e.tx, 0))
+	return &e
 }
 
 // --------------------------------------------- busy time (MT7603 mibinfo)
