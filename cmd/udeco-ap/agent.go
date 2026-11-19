@@ -220,6 +220,7 @@ type agent struct {
 	takeover atomic.Bool // current mode: false = observe
 	shed     atomic.Bool // R4: memory is short, no scans and no steering
 	events   *eventLog
+	alive    aliveState                 // the alive record on flash (alive.go)
 	acks     chan string                // cfgversions whose configuration is live (any goroutine -> loop)
 	creds    atomic.Pointer[sshCreds]   // what ssh-adopt checks once adopted
 	site     siteSSH                    // site SSH logins on sshd_port (sitessh.go)
@@ -377,6 +378,10 @@ func (a *agent) run(parent context.Context) error {
 	ctx, cancel := context.WithCancelCause(parent)
 	defer cancel(nil)
 	a.checkReboot()
+	a.markAlive("running", false, "")
+	aliveDone := make(chan struct{})
+	go func() { defer close(aliveDone); a.aliveLoop(ctx) }()
+	defer func() { cancel(nil); <-aliveDone; a.markAlive("stopped", false, "") }()
 	if a.o.forceObserve != "" && a.cfg.Takeover {
 		a.event(fmt.Sprintf("OBSERVE MODE FORCED (%s): takeover is configured but nothing on the unit changes until %s is removed",
 			a.o.forceObserve, filepath.Join(a.o.base, observeMarker)))

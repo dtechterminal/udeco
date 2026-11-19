@@ -178,6 +178,10 @@ func (a *agent) runJob(ctx context.Context, j job) {
 		a.logf("observe mode: %s not done", j.what)
 		return
 	}
+	if aliveJob(j.what) {
+		a.markAlive("running", true, j.what)
+		defer a.markAlive("running", true, "")
+	}
 	jctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), a.t.jobTimeout)
 	defer cancel()
 	j.fn(jctx)

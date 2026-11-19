@@ -487,6 +487,13 @@ baseline raises an event. A failed read skips the check (logged once).
 reboot detected (kernel `boot_id` differs from `/tp_data/udeco/boot_id`), forced observe, hand-back, health
 rollback, R8a/R9/R11 alarms, uplink change. Not done: the inform 'rebooted' field.
 
+**R13 alive record.** `/tp_data/udeco/alive` (one JSON line, 0600): boot id, uptime, wall time (once the clock
+is set), pid, state `running`/`stopped` and the worker job in progress. Rewritten at start, every 5 min, before
+and after every worker job except the routine `enforce`/`schedules` ticks, and with state `stopped` when the
+agent exits. The reboot event names how the previous boot ended: the agent had stopped cleanly (a userland
+stop or reboot: procd sends SIGTERM), or it was still running when last seen (power loss, kernel panic or
+SIGKILL, within 5 min of that time), and in which job; or there is no record from that boot (alive.go).
+
 **R8a address watch and R11 reset button** are decosys's, inside every `Enforce`, with the unit IP the agent
 hands over through `SetLAN` (the agent's earlier copies were removed to keep one owner). Findings come back
 as `Report.Foreign` (kinds `addr`, `button`), which the self-check logs and counts. `decosys.Restore` puts
