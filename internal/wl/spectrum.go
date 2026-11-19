@@ -250,6 +250,8 @@ func (e *incompleteError) Is(target error) bool { return target == ErrIncomplete
 //	res.Diag         // per channel classes, calls, BSSes, airtime, drops
 //	r.Status()       // the same status at any time; Status().Age(now) in seconds
 //	r.ClearTable()   // a manual spectrum-scan clears both radios first (§7)
+//	r.RestoreTable(rows, at) // a table saved before an agent restart, into an empty runner
+//	r.FitRestored(ctx)       // drops its rows the radio does not list now (after a caps change)
 //	col.WithoutScan(ctx, fn) // run fn (health check) when no scan is running
 //
 // One runner exists per radio and lives as long as the Collector; it keeps
@@ -294,6 +296,7 @@ type SpectrumRunner struct {
 	abnormal  bool
 	tableTime time.Time
 	rows      map[int][]SpectrumRow
+	restored  bool         // rows are a RestoreTable's, not measured here (FitRestored)
 	sticky    map[int]bool // unmeasured channels, until restart
 	sweep     bool         // fallback mode, until restart
 }
@@ -354,8 +357,92 @@ func copyRows(rows map[int][]SpectrumRow) map[int][]SpectrumRow {
 // clearing every radio's table, §7). Abnormal is left as it is.
 func (s *SpectrumRunner) ClearTable() {
 	s.mu.Lock()
-	s.rows, s.tableTime = nil, time.Time{}
+	s.rows, s.tableTime, s.restored = nil, time.Time{}, false
 	s.mu.Unlock()
+}
+
+// RestoreTable puts back a table measured at at before the agent
+// restarted (cmd/udeco-ap keeps the last good one per band on flash). It
+// goes in only when the runner has no table, so a band measured since (or
+// running now and finishing later) wins; Status then reports it as any
+// table, with Age counting from at. Abnormal and the phase are left as
+// they are. It reports whether the table went in; rows are copied.
+func (s *SpectrumRunner) RestoreTable(rows map[int][]SpectrumRow, at time.Time) bool {
+	n := 0
+	for _, rs := range rows {
+		n += len(rs)
+	}
+	if n == 0 || at.IsZero() {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.tableTime.IsZero() || s.rows != nil {
+		return false
+	}
+	s.rows, s.tableTime, s.restored = copyRows(rows), at, true
+	return true
+}
+
+// FitRestored keeps of a restored table (RestoreTable) only the rows the
+// radio lists now: a live band builds its rows from `wl chanspecs` (a block
+// per listed chanspec at each width, clamped to the widths listed), so a
+// table saved under another country or width cap may hold rows a live one
+// never would. A row stays when a listed chanspec of its width has its
+// lowest channel and centre frequency. It is meant to run again whenever
+// the caps may have changed (they are cached until Invalidate): the table
+// stays "restored" until a band or ClearTable replaces it. A table with no
+// row left is dropped. A measured table, or none, is not touched (0, 0).
+// When the radio lists no 20 MHz channel of its band (caps read mid-change)
+// the table is kept and err says so.
+func (s *SpectrumRunner) FitRestored(ctx context.Context) (kept, dropped int, err error) {
+	s.mu.Lock()
+	restored := s.restored
+	s.mu.Unlock()
+	if !restored {
+		return 0, 0, nil
+	}
+	st, err := s.c.static(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	var specs []chanspec
+	for _, r := range st.radios {
+		if r.name == s.radio {
+			specs = r.specs
+		}
+	}
+	if len(blocksFor(specs, s.band, 20)) == 0 {
+		return 0, 0, fmt.Errorf("wl -i %s: no %s channel listed", s.radio, s.band)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.restored { // a band or a clear replaced it meanwhile
+		return 0, 0, nil
+	}
+	type key struct{ ch, freq int }
+	out := map[int][]SpectrumRow{}
+	for w, rs := range s.rows {
+		listed := map[key]bool{}
+		for _, bl := range blocksFor(specs, s.band, w) {
+			listed[key{bl.Parts[0], chanFreq(bl.Center, s.band)}] = true
+		}
+		for _, r := range rs {
+			if r.Width == w && listed[key{r.Channel, r.CenterFreq}] {
+				out[w] = append(out[w], r)
+				kept++
+			} else {
+				dropped++
+			}
+		}
+	}
+	switch {
+	case kept == 0:
+		s.rows, s.tableTime, s.restored = nil, time.Time{}, false
+	case dropped > 0:
+		s.rows = out
+	}
+	return kept, dropped, nil
 }
 
 func (s *SpectrumRunner) isSticky(ch int) bool {
@@ -434,7 +521,7 @@ func (s *SpectrumRunner) Run(ctx context.Context, req SpectrumRequest) (*Spectru
 	switch {
 	case err == nil:
 		// the runner keeps its own copy: the caller owns the returned rows
-		s.rows, s.tableTime, s.abnormal = copyRows(rows), d.Done, false
+		s.rows, s.tableTime, s.abnormal, s.restored = copyRows(rows), d.Done, false, false
 	case !errors.Is(err, ErrRadioSkipped):
 		s.abnormal = true
 	}

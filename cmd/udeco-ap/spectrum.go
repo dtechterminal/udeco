@@ -24,7 +24,8 @@ package main
 // result standing).
 //
 // Observe mode runs neither (actions.go logs them only) and does not claim
-// RF_SCAN. Nothing is stored on flash: the tables live in the runners.
+// RF_SCAN. The tables live in the runners; the last good one per band is
+// also kept on flash so it survives a restart or reboot (specsave.go).
 //
 // A collector without a spectrum runner (jio-mtk) runs neither: with
 // site_survey both run its neighbour survey instead (sitesurvey.go).
@@ -134,14 +135,18 @@ func (a *agent) spectrumScan(ctx context.Context) {
 		defer a.wakeLoop()
 		defer a.scans.end()
 		bands := []string{"na", "ng"} // 5 GHz first, as the real AP
-		// the real spectrum_scan resets every rftable to {} first (CE §2.2)
+		// the real spectrum_scan resets every rftable to {} first (CE §2.2);
+		// a saved table not restored yet goes too, and the copy on flash
+		// follows (specsave.go)
 		a.scans.dropEvents()
+		a.scans.dropSaved()
 		for _, band := range bands {
 			if r, err := a.o.col.Spectrum(ctx, band); err == nil {
 				r.ClearTable()
 				a.scans.addRunner(band, r)
 			}
 		}
+		a.saveSpectrum()
 		a.wakeLoop() // spectrum_scanning, tables cleared
 		for _, band := range bands {
 			if ctx.Err() != nil {
@@ -209,6 +214,7 @@ func (a *agent) spectrumBand(ctx context.Context, band string, req wl.SpectrumRe
 		if row, ok := eventRow(res.Rows, d.HomeControl, d.HomeWidth); ok {
 			a.scans.queueEvent(band, row)
 		}
+		a.saveSpectrum() // the new table on flash (specsave.go)
 	case errors.Is(err, wl.ErrRadioSkipped):
 		a.logf("%s: %v (table left as it was)%s", what, err, extra)
 	default:

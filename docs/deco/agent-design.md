@@ -324,9 +324,19 @@ below). `cmd/udeco-ap/spectrum.go` drives `internal/wl`'s per-radio `SpectrumRun
   still STALE after its retry is *unheard*: unmeasured for that band only (no row, no block containing it; not
   sticky), never `ErrIncomplete`. On .205 under IN (03:30 run, `t9_wl1_dfs_in.txt`) 56 kept a non-zero record
   that pass 2 did not rewrite and stopped the whole 5 GHz band; 52/60/64 are all-zero (ZERO, sticky) as UNII-3.
-- Nothing is stored on flash or in /tmp: the tables live in the runners, so an agent restart starts with
-  none (spectrum-design §9's /tmp mirror is not implemented). The controller keeps the last `spectrum_table` it
-  saw across informs that carry none, but not `spectrum_table_time`, so after a restart its table shows no time.
+- The tables live in the runners; since 2026-11-20 the last good one per band is also kept on flash
+  (`/tp_data/udeco/state/spectrum.json`, `cmd/udeco-ap/specsave.go`), written only when a band gets a new table
+  or a spectrum-scan clears them, and restored at start: reported as a live table with its true age, without an
+  `EVT_AP_QuickScanEvent`. Usually the controller then keeps it in its in-memory `radio_table_stats` only, but a
+  quick-scan the controller sent that ends without a new table of ours (the agent restarted during it, or the
+  restarted agent skipped it: shed, an apply, a hold, busy) ends with the controller's `quickscan_scanning`
+  true -> false, and that saves the restored table to the database as the quick-scan's result (INFERENCE: as a
+  real AP's kept rftable would be). Whether that save also stamps `spectrum_scan_timestamp` (Radio AI's freshData) is
+  UNVERIFIED. Only the rows the radio lists now are kept (`wl.SpectrumRunner.FitRestored`), re-checked while it is
+  reported, so after the first apply (a driver country set before the restart) too. Not restored while an apply
+  runs. Dropped when older than 7 days, of another model or radio layout, unparsable, or measured after a clock
+  that is set; held while the clock is not set (before `device.ClockSane`). jio-mtk: none of this. scan_table is
+  not saved.
 - Not wired: `SpectrumRequest.Guard` is not set, so a band that has started is not stopped by a Wi-Fi apply
   or by a firmware upgrade that begins meanwhile (the worker's hold check covers applies, not scans).
 

@@ -10,8 +10,10 @@ package main
 // back, then a manual spectrum-scan.
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"sort"
 	"strconv"
@@ -534,6 +536,9 @@ func TestE2ESpectrumScanPartial(t *testing.T) {
 		return ""
 	}
 	notif := func(in e2eInform) bool { return in.payload["inform_as_notif"] == true }
+	// a 5 GHz table saved before a restart: restored at start, then
+	// cleared by the spectrum-scan like a measured one
+	writeSaved(t, e.unit.root, savedNA("UAL6", "wl1", time.Now().Add(-time.Hour)))
 	e.adopt()
 	eventually(t, "the 2.4 GHz event", func() bool { return e.ctl.countWhere(notif) >= 1 })
 	time.Sleep(300 * time.Millisecond)
@@ -556,7 +561,133 @@ func TestE2ESpectrumScanPartial(t *testing.T) {
 	if len(tableOf(last, "ng")) == 0 || radioField(last, "ng", "spectrum_scanning_abnormal") != false || last["spectrum_scanning"] != false {
 		t.Errorf("ng: table %d rows abnormal %v scanning %v", len(tableOf(last, "ng")), radioField(last, "ng", "spectrum_scanning_abnormal"), last["spectrum_scanning"])
 	}
-	if logs := e.logs.all(); !strings.Contains(logs, "spectrum-scan na: wl: spectrum scan missed channels") || strings.Contains(logs, "EVT_AP_QuickScanEvent sent (na") {
+	if logs := e.logs.all(); !strings.Contains(logs, "spectrum-scan na: wl: spectrum scan missed channels") || strings.Contains(logs, "EVT_AP_QuickScanEvent sent (na") ||
+		!strings.Contains(logs, "spectrum: restored the na table") {
 		t.Errorf("logs:\n%s", logs)
+	}
+	// the restored table was reported before the scan cleared it
+	if !slices.ContainsFunc(all, func(in e2eInform) bool { return len(tableOf(in.payload, "na")) == 2 }) {
+		t.Error("the restored 5 GHz table was never reported")
+	}
+	// the saved copy follows: the cleared 5 GHz table is gone (its band
+	// failed), the new 2.4 GHz one is there
+	var saved struct {
+		Bands map[string]struct {
+			Radio string                   `json:"radio"`
+			Rows  map[int][]wl.SpectrumRow `json:"rows"`
+		} `json:"bands"`
+	}
+	b, err := os.ReadFile(savedFilePath(e.unit.root))
+	if err == nil {
+		err = json.Unmarshal(b, &saved)
+	}
+	if _, na := saved.Bands["na"]; err != nil || na || saved.Bands["ng"].Radio != "wl0" || len(saved.Bands["ng"].Rows[40]) == 0 {
+		t.Errorf("saved after the spectrum-scan: %v %s", err, b)
+	}
+}
+
+// TestE2ESpectrumSurvivesRestart: a quick-scan's 5 GHz table is saved under
+// the state directory; a restarted agent reports it from its first inform
+// as the live table it was (same rows, spectrum_table_time = the true age),
+// without scanning, without an EVT_AP_QuickScanEvent and without writing
+// the file again.
+func TestE2ESpectrumSurvivesRestart(t *testing.T) {
+	cfg, _ := u6proSystemCfg(t)
+	e := newE2E(t, cfg, true, func(c *Config, o *options) { o.spectrumPlan = fastPlan() })
+	sf := newSpecFake()
+	e.unit.spec = sf
+	e.ctl.reply = func(in e2eInform) string {
+		if in.payload["inform_as_notif"] == true {
+			return `{"_type":"noop","interval":1}`
+		}
+		if e.ctlStep == 0 && in.live() {
+			e.ctlStep = 1
+			return `{"_type":"cmd","cmd":"quick-scan","scan-band":1,"scan-bw":80}`
+		}
+		return ""
+	}
+	notif := func(in e2eInform) bool { return in.payload["inform_as_notif"] == true }
+	e.adopt()
+	eventually(t, "the 5 GHz event", func() bool { return e.ctl.countWhere(notif) >= 1 })
+	e.stop()
+	var measured []map[string]any
+	for _, in := range e.ctl.snapshot() {
+		if tb := tableOf(in.payload, "na"); tb != nil {
+			measured = tb
+		}
+	}
+	if len(measured) != 2 {
+		t.Fatalf("quick-scan table %v", measured)
+	}
+
+	// what is on flash
+	p := savedFilePath(e.unit.root)
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved map[string]any
+	if err := json.Unmarshal(b, &saved); err != nil {
+		t.Fatal(err)
+	}
+	bands, _ := saved["bands"].(map[string]any)
+	na, _ := bands["na"].(map[string]any)
+	if saved["version"] != 1.0 || saved["model"] != "UAL6" || len(bands) != 1 || na["radio"] != "wl1" {
+		t.Fatalf("saved %s", b)
+	}
+	// two hours pass before the restart
+	at, err := time.Parse(time.RFC3339Nano, na["time"].(string))
+	if err != nil || time.Since(at) > time.Minute {
+		t.Fatalf("saved time %v %v", na["time"], err)
+	}
+	na["time"] = at.Add(-2 * time.Hour).Format(time.RFC3339Nano)
+	writeSaved(t, e.unit.root, saved)
+	before, _ := os.ReadFile(p)
+
+	n, scans := len(e.ctl.snapshot()), len(sf.scanList())
+	e.rebuild()
+	e.ctl.reply = func(e2eInform) string { return "" }
+	e.start()
+	eventually(t, "informs of the restarted agent", func() bool { return len(e.ctl.snapshot()) >= n+5 })
+	e.stop()
+
+	after := e.ctl.snapshot()[n:]
+	first := -1
+	for i, in := range after {
+		if in.key != "device" { // the restored table rides every inform from the first
+			continue
+		}
+		if first < 0 {
+			first = i
+			tb := tableOf(in.payload, "na")
+			if len(tb) != len(measured) {
+				t.Fatalf("first inform after the restart: na table %v", tb)
+			}
+			for j := range tb {
+				for _, k := range spectrumKeys {
+					if a, b := tb[j][k], measured[j][k]; k != "interference_type" && a != b {
+						t.Errorf("row %d %s: %v, measured %v", j, k, a, b)
+					}
+				}
+			}
+			if age := num(radioField(in.payload, "na", "spectrum_table_time")); age < 7200 || age > 7230 {
+				t.Errorf("spectrum_table_time %v, want the 2 h since it was measured", age)
+			}
+			if tableOf(in.payload, "ng") != nil {
+				t.Error("a 2.4 GHz table nobody measured")
+			}
+		}
+		if notif(in) {
+			t.Errorf("inform %d: an event for the restored table: %v", n+i, in.payload["notif_payload"])
+		}
+	}
+	if first < 0 {
+		t.Fatal("no inform after the restart")
+	}
+	if len(sf.scanList()) != scans {
+		t.Errorf("scanned after the restart: %v", sf.scanList()[scans:])
+	}
+	if now, _ := os.ReadFile(p); string(now) != string(before) {
+		t.Errorf("the file was written again:\n%s\n%s", before, now)
 	}
 }
