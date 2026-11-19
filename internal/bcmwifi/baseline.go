@@ -187,6 +187,9 @@ func (a *Applier) handback(ctx context.Context) error {
 	a.o.Logf("bcmwifi: handing Wi-Fi back to TP-Link (%d steps)", len(st))
 	err = a.executeAll(ctx, st)
 	a.applied = nil
+	// TP-Link learns flows: the cache goes back on whoever turned it off
+	// (the tc trees went with the steps above)
+	a.flowCacheOn(ctx, "hand-back to TP-Link")
 	if err != nil {
 		return err
 	}

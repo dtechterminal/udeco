@@ -33,9 +33,13 @@ import (
 // changed are flushed from the flow cache (R21/R24). TP-Link's htb on br-lan
 // is never touched (decosys owns it).
 //
-// Cost (audit D2, unverified): one htb enqueue makes a vif's flows
-// non-accelerable, so only vifs with a limited station carry a tree; it is
-// removed when the last limited station leaves.
+// Cost: tc only sees what the Broadcom flow cache does not accelerate.
+// Measured on .205 (2026-11-19), accelerated flows bypass the trees
+// entirely (512 kbit/s limit, 4.9 Mbit/s measured), so the flow cache is
+// turned off on the unit while any tree is wanted and back on when none is
+// (fcache.go): no hardware acceleration on that unit while limits are set.
+// Only vifs with a limited station carry a tree; it is removed when the
+// last limited station leaves.
 //
 // A station the controller gave its own limit (cmd rate-update,
 // clientrate.go) is shaped the same way on any SSID vif it is associated on,
@@ -108,8 +112,9 @@ func parseAssoclist(out string) []string {
 // limits (clientrate.go), of every SSID vif. A station's limit in each
 // direction is its own entry's when the entry limits that way, else its
 // SSID's.
-func (a *Applier) wantShaping(ctx context.Context, l *layout) (map[string]*tcWant, error) {
+func (a *Applier) wantShaping(ctx context.Context, l *layout) (map[string]*tcWant, shapeNeed, error) {
 	want := map[string]*tcWant{}
+	need := shapeNeed{perClient: map[string]bool{}, ssid: map[string]bool{}}
 	get := func(dev, dir string) *tcWant {
 		w := want[dev]
 		if w == nil {
@@ -141,20 +146,26 @@ func (a *Applier) wantShaping(ctx context.Context, l *layout) (map[string]*tcWan
 					if tc == nil {
 						tc = a.loadTC()
 					}
-					keepShaping(tc, u.Vif, a.netdevExists(u.Vif), get)
+					for _, m := range keepShaping(tc, u.Vif, a.netdevExists(u.Vif), get) {
+						need.perClient[m] = true
+					}
 					continue
 				}
-				return nil, err
+				return nil, need, err
 			}
 			for _, m := range parseAssoclist(out) {
+				pc := per[m] // zero: no entry
 				down, up := ssid.DownKbps, ssid.UpKbps
-				if pc, ok := per[m]; ok {
-					if pc.DownKbps > 0 {
-						down = pc.DownKbps
-					}
-					if pc.UpKbps > 0 {
-						up = pc.UpKbps
-					}
+				if pc.DownKbps > 0 {
+					down = pc.DownKbps
+					need.perClient[m] = true
+				}
+				if pc.UpKbps > 0 {
+					up = pc.UpKbps
+					need.perClient[m] = true
+				}
+				if pc.DownKbps <= 0 && ssid.DownKbps > 0 || pc.UpKbps <= 0 && ssid.UpKbps > 0 {
+					need.ssid[u.SSID.ID] = true
 				}
 				if down > 0 {
 					get(u.Vif, "dst").Root[m] = down
@@ -167,21 +178,23 @@ func (a *Applier) wantShaping(ctx context.Context, l *layout) (map[string]*tcWan
 			}
 		}
 	}
-	return want, nil
+	return want, need, nil
 }
 
 // keepShaping wants again what was built for the stations of vif (its
 // download classes, upload redirects and their IFB classes), so a vif whose
 // association list could not be read is left as it is. A vif that is gone
-// keeps nothing.
-func keepShaping(tc map[string]*tcState, vif string, exists bool, get func(dev, dir string) *tcWant) {
+// keeps nothing. It returns the stations kept.
+func keepShaping(tc map[string]*tcState, vif string, exists bool, get func(dev, dir string) *tcWant) []string {
 	st := tc[vif]
 	if st == nil || !exists || st.Dirty {
-		return
+		return nil
 	}
+	var kept []string
 	if st.Root && st.Dir == "dst" {
 		for m, kbps := range st.Rate {
 			get(vif, "dst").Root[m] = kbps
+			kept = append(kept, m)
 		}
 	}
 	if st.Ingress {
@@ -189,9 +202,11 @@ func keepShaping(tc map[string]*tcState, vif string, exists bool, get func(dev, 
 			if ist := tc[ifb]; ist != nil && ist.Root && ist.Rate[m] > 0 {
 				get(vif, "dst").Redir[m] = ifb
 				get(ifb, "src").Root[m] = ist.Rate[m]
+				kept = append(kept, m)
 			}
 		}
 	}
+	return kept
 }
 
 // SyncRateLimits brings the tc trees in line with the applied Desired and
@@ -210,14 +225,17 @@ func (a *Applier) SyncRateLimits(ctx context.Context) (int, error) {
 }
 
 // syncShaping applies wantShaping(l) (l nil: remove every tree).
+// The flow cache follows: off while anything is shaped, else back on
+// (syncFlowCache).
 func (a *Applier) syncShaping(ctx context.Context, l *layout) (int, error) {
 	want := map[string]*tcWant{}
+	var need shapeNeed
 	if l != nil {
-		w, err := a.wantShaping(ctx, l)
+		w, n, err := a.wantShaping(ctx, l)
 		if err != nil {
 			return 0, err
 		}
-		want = w
+		want, need = w, n
 	}
 	state := a.loadTC()
 	var devs []string
@@ -263,6 +281,7 @@ func (a *Applier) syncShaping(ctx context.Context, l *layout) (int, error) {
 		}
 	}
 	macs := sortedKeys(changed)
+	a.syncFlowCache(ctx, need)
 	for _, m := range macs {
 		if err := a.flushFlows(ctx, FlowScope{MAC: m}); err != nil {
 			a.o.Logf("%v", err)

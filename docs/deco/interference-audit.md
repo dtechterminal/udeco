@@ -408,7 +408,10 @@ Each needs the user's go-ahead where it changes state or reboots.
 7. **Q7 Persistence across SYNC_CONFIG (B11).** Does the master's user-config blob contain the firewall include?
    Is the include in .241's flash?
 8. **Q8 HTB de-acceleration (D2).** A whole-vif htb versus a prio root with an htb child; read brlist and
-   loadavg.
+   loadavg. *Answered the other way round on .205 (2026-11-19):* an htb on the vif does **not** take flows off the
+   accelerated path; accelerated flows bypass it (4.9 Mbit/s through a 512 kbit/s class). Limits only hold with
+   `fc disable`, which bcmwifi now does while any limit is built
+   ([features/client-rate-limit.md](features/client-rate-limit.md#flow-cache-off-while-limits-are-set)).
 9. **Q9 VLAN remap of a live flow (D1/R21).** Without `fc flush`, does the old flow keep leaving untagged? With
    the flush, does it stop at once?
 10. **Q10 Uplink move eth1 → eth0 (D7).** Check tpbr typing, ping, DHCP, mDNS and broadcast counters.

@@ -40,6 +40,8 @@ type fakeDev struct {
 	eb      *fakeEbtables
 	tc      map[string][]string // dev -> qdisc show lines
 	tcCalls [][]string
+	fcOff   bool // the flow cache is not learning (fc disable)
+	noFC    bool // the unit has no fc binary
 }
 
 // TP-Link's driver deny lists as found on .205 (topology-and-tplink-scrub.md;
@@ -393,14 +395,34 @@ func (f *fakeDev) Run(ctx context.Context, name string, args ...string) ([]byte,
 			f.write("/sys/class/net/"+args[0]+"/flags", map[bool]string{true: "0x1003\n", false: "0x1002\n"}[args[1] == "up"])
 		}
 		return nil, nil
-	case "ubus", "fc":
+	case "ubus":
 		return nil, nil
+	case "fc":
+		return f.fc(args)
 	case "ebtables":
 		return f.eb.run(args)
 	case "tc":
 		return f.tcRun(args)
 	}
 	return nil, fmt.Errorf("fake: unknown command %q", name)
+}
+
+// fc is the Broadcom flow cache tool as seen on .205 (2026-11-19): status
+// prints the learning state first, enable/disable flip it.
+func (f *fakeDev) fc(args []string) ([]byte, error) {
+	if f.noFC {
+		return nil, errors.New(`exec: "fc": executable file not found in $PATH`)
+	}
+	switch args[0] {
+	case "status":
+		st := map[bool]string{false: "enabled", true: "disabled"}[f.fcOff]
+		return []byte("Broadcom Packet Flow Cache learning via BLOG " + st + ".\nFlow Learning Enabled\nAcceleration Mode: <L3>\n"), nil
+	case "enable":
+		f.fcOff = false
+	case "disable":
+		f.fcOff = true
+	}
+	return nil, nil
 }
 
 func (f *fakeDev) wl(args []string) ([]byte, error) {
@@ -776,6 +798,10 @@ func (f *fakeDev) mutating() [][]string {
 			}
 		case "tc":
 			if len(c) > 2 && c[2] == "show" {
+				continue
+			}
+		case "fc":
+			if c[1] == "status" {
 				continue
 			}
 		}
