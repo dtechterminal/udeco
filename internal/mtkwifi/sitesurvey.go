@@ -89,7 +89,14 @@ func (c *Collector) HomeScan(ctx context.Context, band string) (*apstate.ScanRes
 		return nil, err
 	}
 	defer c.unlockScan()
+	done, ok := c.driverRead()
+	if !ok {
+		// a radio restart: the last survey as it stands, no driver read
+		// (restartgate.go)
+		return c.lastSurvey(band, c.o.now()), nil
+	}
 	table, err := c.readSurvey(ctx, main)
+	done()
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +119,18 @@ func (c *Collector) HomeScan(ctx context.Context, band string) (*apstate.ScanRes
 	return res, nil
 }
 
+// lastSurvey is HomeScan's answer from the band's last survey table,
+// without reading the driver.
+func (c *Collector) lastSurvey(band string, now time.Time) *apstate.ScanResult {
+	res := &apstate.ScanResult{Band: band, Time: now}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if s := c.seen[band]; s != nil && !s.at.IsZero() && now.Sub(s.at) < surveyKeep {
+		res.BSS = append([]apstate.BSS(nil), s.bss...)
+	}
+	return res
+}
+
 // Scan runs a fresh site survey of the band's radio (the controller's `cmd
 // scan`; FreshScan only): `iwpriv <radio> set SiteSurvey=1`, then the table
 // is read every scanPoll until it differs from the one before the scan and
@@ -129,6 +148,12 @@ func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult,
 		return nil, err
 	}
 	defer c.unlockScan()
+	// held through the scan: a radio restart waits for it to end
+	done, ok := c.driverRead()
+	if !ok {
+		return nil, ErrRadioRestart
+	}
+	defer done()
 	before, err := c.readSurvey(ctx, main)
 	if err != nil {
 		return nil, err

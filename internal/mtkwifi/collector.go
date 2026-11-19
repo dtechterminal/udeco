@@ -60,6 +60,9 @@ type Collector struct {
 	scanSem  chan struct{}
 	scanning atomic.Bool
 	seen     map[string]*surveySeen // by band: the cached survey's first sighting
+	// gate: the Wi-Fi applier's radio restarts (FollowRestarts,
+	// restartgate.go); nil = none (observe mode)
+	gate atomic.Pointer[RestartGate]
 }
 
 // ErrUnsupported: scans and spectrum runs are not implemented on this driver.
@@ -160,7 +163,11 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 		}
 		r.TxPower = dbmOf(pct, rd.MaxTxDBm)
 		if !c.isUp(main) {
-			delete(c.cache, main)
+			// kept, not dropped: a radio coming back from a restart is
+			// not read until the settle time is over (restartgate.go)
+			if rr := c.cache[main]; rr != nil {
+				rr.stale = true
+			}
 			delete(c.survey, rd.Band)
 			s.Radios = append(s.Radios, r)
 			continue
@@ -204,7 +211,31 @@ type radioReading struct {
 	essid   map[string]string // iwconfig per BSS
 	stas    []sta
 	busy    *busySample // nil: the driver gives no busy time for this radio
+	stale   bool        // Invalidate, or the radio went down: read again when the driver may be read
 }
+
+// restartKeep: how old a reading may be to stand in for one the radio
+// restart's gate skips; an older one (a radio that was off for long) gives
+// an empty reading instead.
+const restartKeep = 5 * time.Minute
+
+// FollowRestarts makes the driver reads keep away from the applier's radio
+// restarts (restartgate.go): while g says no, Collect gives the last
+// reading and HomeScan the last survey, without asking the driver, and
+// Scan refuses.
+func (c *Collector) FollowRestarts(g RestartGate) { c.gate.Store(&g) }
+
+// driverRead: may the driver be read now (see RestartGate); never blocks.
+func (c *Collector) driverRead() (func(), bool) {
+	g := c.gate.Load()
+	if g == nil {
+		return func() {}, true
+	}
+	return (*g).DriverRead()
+}
+
+// ErrRadioRestart: a radio restart is under way or just ended (Scan).
+var ErrRadioRestart = errors.New("mtkwifi: a radio was just restarted: the driver is not read for a while")
 
 // driverReads says which kernel-log readings a radio's driver answers at
 // the vendor's debug level (read on the unit, 2026-11-19): the MT7603
@@ -221,13 +252,23 @@ func driverReads(rd RadioDef) (counts, busy bool) {
 // reading returns the radio's cached driver reading, read again when it is
 // older than CacheTTL, when the set of BSSes up changed, or after
 // Invalidate. During a site survey (Scan) the old reading stands: iwconfig
-// may show the scan channel then. c.mu is held.
+// may show the scan channel then. While the applier restarts a radio, and
+// for its settle time after, the old reading stands too (restartgate.go);
+// without one the reading is empty and not kept. c.mu is held.
 func (c *Collector) reading(ctx context.Context, rd RadioDef, up []string, now time.Time) *radioReading {
 	main := rd.Ifaces[0]
 	old := c.cache[main]
-	if old != nil && (c.scanning.Load() || (now.Sub(old.at) < c.o.CacheTTL && now.Sub(old.at) >= 0 && slices.Equal(old.up, up))) {
+	if old != nil && (c.scanning.Load() || (!old.stale && now.Sub(old.at) < c.o.CacheTTL && now.Sub(old.at) >= 0 && slices.Equal(old.up, up))) {
 		return old
 	}
+	done, ok := c.driverRead()
+	if !ok {
+		if old != nil && now.Sub(old.at) < restartKeep {
+			return old
+		}
+		return &radioReading{at: now, up: up, essid: map[string]string{}}
+	}
+	defer done()
 	rr := &radioReading{at: now, up: up, essid: map[string]string{}}
 	if out, err := c.o.Run.Run(ctx, "iwconfig", main); err == nil {
 		if m := chanRE.FindSubmatch(out); m != nil {
@@ -384,11 +425,15 @@ func (c *Collector) WithoutScan(ctx context.Context, fn func(context.Context) er
 	return fn(ctx)
 }
 
-// Invalidate drops the cached driver readings (after an apply: SSIDs,
-// channel and the BSSes up may have changed).
+// Invalidate marks the cached driver readings stale (after an apply:
+// SSIDs, channel and the BSSes up may have changed): they are read again
+// at the next Collect the radio restarts' gate lets through, and stand
+// until then.
 func (c *Collector) Invalidate() {
 	c.mu.Lock()
-	clear(c.cache)
+	for _, rr := range c.cache {
+		rr.stale = true
+	}
 	c.mu.Unlock()
 }
 

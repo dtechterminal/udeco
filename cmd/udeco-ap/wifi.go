@@ -41,6 +41,7 @@ import (
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
+	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
@@ -481,6 +482,21 @@ func (a *agent) wifiOwned() bool {
 		}
 	}
 	return false
+}
+
+// followRestarts keeps the collector's driver reads away from the Wi-Fi
+// applier's radio restarts and their settle time (jio-mtk: mtkwifi
+// restartgate.go): the inform loop, the live view and the home listen
+// serve the last reading meanwhile, never probing a driver mid-restart and
+// never waiting for the apply.
+func (a *agent) followRestarts() {
+	g, ok := a.wifi.(mtkwifi.RestartGate)
+	if !ok {
+		return
+	}
+	if c, ok := a.o.col.(interface{ FollowRestarts(mtkwifi.RestartGate) }); ok {
+		c.FollowRestarts(g)
+	}
 }
 
 // dropToObserve gives the unit back to TP-Link and stops changing it. The

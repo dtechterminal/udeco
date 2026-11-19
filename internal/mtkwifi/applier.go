@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
@@ -40,8 +41,12 @@ type Options struct {
 	Layout   []RadioDef // nil = JCOW414
 	// VerifyTimeout bounds the wait for the BSSes after an apply (20 s).
 	VerifyTimeout time.Duration
-	sleep         func(context.Context, time.Duration) error
-	writeLED      func(path, s string) error // one LED table row (tests record them)
+	// Settle: how long after a radio restart the collector's driver reads
+	// stay off (20 s; restartgate.go).
+	Settle   time.Duration
+	sleep    func(context.Context, time.Duration) error
+	now      func() time.Time
+	writeLED func(path, s string) error // one LED table row (tests record them)
 }
 
 // Applier implements the agent's Wi-Fi applier on the MediaTek driver.
@@ -63,6 +68,11 @@ type Applier struct {
 	ledMu    sync.Mutex
 	ledOn    bool // led_enabled; the controller's last word
 	locating bool
+	// the collector's driver reads against radio restarts (restartgate.go):
+	// gate's write side is held through Apply and Rollback; quietUntil
+	// (unix ns) is the end of the last restart's settle time
+	gate       sync.RWMutex
+	quietUntil atomic.Int64
 }
 
 const (
@@ -89,6 +99,12 @@ func New(o Options) *Applier {
 	}
 	if o.VerifyTimeout <= 0 {
 		o.VerifyTimeout = 20 * time.Second
+	}
+	if o.Settle <= 0 {
+		o.Settle = defaultSettle
+	}
+	if o.now == nil {
+		o.now = time.Now
 	}
 	if o.sleep == nil {
 		o.sleep = func(ctx context.Context, d time.Duration) error {
@@ -223,6 +239,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 		a.o.Logf("mtkwifi: dry run: %d step(s) not applied", len(p.Steps))
 		return nil
 	}
+	defer a.changingRadios()() // no driver reads by the collector meanwhile
 	if err := a.captureBaseline(ctx); err != nil {
 		return fmt.Errorf("%w: %v", bcmwifi.ErrNoBaseline, err)
 	}
@@ -280,6 +297,7 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 	if err != nil {
 		return fmt.Errorf("baseline profile: %w", err)
 	}
+	defer a.restarted() // the collector leaves the driver alone a while longer
 	for i := len(rd.Ifaces) - 1; i >= 0; i-- {
 		if err := a.run(ctx, "ifconfig", rd.Ifaces[i], "down"); err != nil {
 			return err
@@ -583,6 +601,7 @@ func (a *Applier) captureBaseline(ctx context.Context) error {
 func (a *Applier) Rollback(ctx context.Context) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	defer a.changingRadios()() // no driver reads by the collector meanwhile
 	return a.rollback(ctx)
 }
 
@@ -612,6 +631,7 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 	if err := json.Unmarshal(j, &st); err != nil {
 		return err
 	}
+	defer a.restarted() // the collector leaves the driver alone a while longer
 	for _, rd := range a.o.Layout {
 		for i := len(rd.Ifaces) - 1; i >= 0; i-- {
 			_ = a.run(ctx, "ifconfig", rd.Ifaces[i], "down")
