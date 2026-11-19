@@ -148,6 +148,9 @@ type timing struct {
 	lldpEvery     time.Duration // LLDP transmit interval (30 s)
 	selfCheck     time.Duration // R10 self-check summary (5 min)
 	informTO      time.Duration // one inform POST, connect to last byte (10 s)
+	clockFirst    time.Duration // first clock check after the start (30 s; clock.go)
+	clockEvery    time.Duration // clock re-check (1 h)
+	clockRetry    time.Duration // clock re-check after no time source answered (1 min)
 	logPoll       time.Duration // remote syslog on jio-mtk: log file poll (1 s; logfollow.go)
 }
 
@@ -175,6 +178,9 @@ func (t *timing) fill() {
 	def(&t.lldpEvery, 30*time.Second)
 	def(&t.selfCheck, 5*time.Minute)
 	def(&t.informTO, 10*time.Second)
+	def(&t.clockFirst, clockFirst)
+	def(&t.clockEvery, clockEvery)
+	def(&t.clockRetry, clockRetry)
 	def(&t.logPoll, logPoll)
 }
 
@@ -204,6 +210,10 @@ type options struct {
 	snmpListen func(context.Context) (net.PacketConn, error)
 	// ftOpen opens the FT-SAE peer announcement sockets; nil = AF_PACKET (ftsae.go)
 	ftOpen ftpeer.Opener
+	// sntp asks an NTP server for the clock offset; nil = sntpOffset (clock.go)
+	sntp func(ctx context.Context, server string, now func() time.Time) (time.Duration, error)
+	// setClock steps the system clock; nil = settimeofday (clock.go)
+	setClock func(time.Time) error
 }
 
 type agent struct {
@@ -279,6 +289,8 @@ type agent struct {
 	// selfLog hands the agent's own log lines to remote syslog (platform
 	// jio-mtk, logfollow.go)
 	selfLog logTap
+	// ctlClock is the clock offset the last inform reply showed (clock.go)
+	ctlClock atomic.Pointer[clockSample]
 }
 
 func newAgent(cfg *Config, o options) (*agent, error) {
@@ -409,6 +421,7 @@ func (a *agent) run(parent context.Context) error {
 	a.startLLDP(ctx, s)
 	a.startPathmon(ctx)
 	a.startFTPeers(ctx)
+	a.startClock(ctx)
 	if a.takeover.Load() {
 		a.bg.Add(1)
 		go func() { defer a.bg.Done(); a.workerLoop(ctx) }()
@@ -914,7 +927,9 @@ func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 		a.logf("encode: %v", err)
 		return device.Outcome{}, false
 	}
+	sent := time.Now()
 	status, body, err := a.o.post(ctx, x.S.InformURL, pkt)
+	answered := time.Now()
 	if err != nil {
 		if ctx.Err() == nil {
 			a.logf("POST: %v", err)
@@ -949,6 +964,7 @@ func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 		a.logf("reply did not decode: %v", err)
 		return device.Outcome{}, false
 	}
+	a.noteControllerTime(plain, sent, answered) // clock.go
 	o, err := x.Handle(plain, time.Now())
 	if err != nil {
 		a.logf("%v", err)
