@@ -142,7 +142,7 @@ func TestJioPlatformConfig(t *testing.T) {
 	if c, err := parseConfig([]byte(base + `,"model":"U7LT"}`)); err != nil || !c.jio() {
 		t.Fatalf("jio config refused: %v", err)
 	}
-	for _, bad := range []string{`}`, `,"model":"U7LT","wpa3":true}`, `,"model":"U7LT","egress":true}`, `,"model":"UAL6"}`} {
+	for _, bad := range []string{`}`, `,"model":"U7LT","min_rates":true}`, `,"model":"U7LT","egress":true}`, `,"model":"UAL6"}`} {
 		if _, err := parseConfig([]byte(base + bad)); err == nil {
 			t.Errorf("accepted %s", bad)
 		}

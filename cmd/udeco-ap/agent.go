@@ -303,7 +303,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		if o.newWifi == nil {
 			o.newWifi = func(bo bcmwifi.Options) wifiApplier {
 				return mtkwifi.New(mtkwifi.Options{Root: bo.Root, Run: bo.Run, StateDir: bo.StateDir, RunDir: bo.RunDir,
-					Uplink: bo.Uplink, DryRun: bo.DryRun, Logf: bo.Logf})
+					Uplink: bo.Uplink, DryRun: bo.DryRun, WPA3: bo.WPA3, Logf: bo.Logf})
 			}
 		}
 	}

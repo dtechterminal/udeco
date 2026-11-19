@@ -307,8 +307,8 @@ func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (i
 		WifiCaps: DecoAgentWifiCaps, FWCaps: DecoAgentFWCaps, FW3Caps: DecoAgentFW3Caps,
 		Radios: map[string]inform.RadioProfile{}}
 	if m.Code == "U7LT" {
-		// the JCOW414 (UAP-AC-Lite profile): no SAE in its driver, so WPA3
-		// is claimed only when the feature says so
+		// the JCOW414 (UAP-AC-Lite profile): SAE only in its 5 GHz driver,
+		// so WPA3 is claimed only when the feature says so, and on na only
 		p.WifiCaps = 0
 		if f.WPA3 {
 			p.WifiCaps = WifiCapWPA3
@@ -333,8 +333,9 @@ func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (i
 	for _, r := range m.Radios {
 		rp := inform.RadioProfile{NSS: r.NSS, MinTx: r.MinTx, MaxTx: r.MaxTx, Is11ac: r.Band == "na",
 			RadioCaps: RadioCapsMIMO(r.NSS)}
-		set(f.WPA3, &rp.RadioCaps2, DecoAgentRadioCaps2)
-		set(f.WPA3 && f.WPA3FT, &rp.RadioCaps2, RadioCap2WPA3FT)
+		wpa3 := f.WPA3 && !(m.Code == "U7LT" && r.Band == "ng")
+		set(wpa3, &rp.RadioCaps2, DecoAgentRadioCaps2)
+		set(wpa3 && f.WPA3FT, &rp.RadioCaps2, RadioCap2WPA3FT)
 		ax := heAX == nil || heAX[r.Band]
 		switch {
 		case r.Band == "ng" && ax:

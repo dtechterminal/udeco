@@ -123,7 +123,8 @@ func (c *Config) validate() error {
 		if c.Model != "U7LT" {
 			return fmt.Errorf("config: model %q: platform %s is reported as U7LT (UAP-AC-Lite): set \"model\": \"U7LT\"", c.Model, c.Platform)
 		}
-		for name, on := range map[string]bool{"wpa3": c.WPA3, "min_rates": c.MinRates, "mdns_bridge": c.MdnsBridge,
+		// wpa3: SAE on the 5 GHz radio only (the MT7663 driver has it)
+		for name, on := range map[string]bool{"min_rates": c.MinRates, "mdns_bridge": c.MdnsBridge,
 			"hotspot2": c.Hotspot2, "egress": c.Egress} {
 			if on {
 				return fmt.Errorf("config: %s is not supported on platform %s", name, c.Platform)

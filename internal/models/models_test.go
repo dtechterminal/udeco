@@ -182,7 +182,12 @@ func TestU7LTAgentProfile(t *testing.T) {
 	if p.Radios["ng"].IEEEModes != decoAgentIEEEModesNGn || p.Radios["na"].IEEEModes != decoAgentIEEEModesNAn || !p.Radios["na"].Is11ac {
 		t.Errorf("radios %+v", p.Radios)
 	}
-	if p, _ := DecoAgentProfileWith(m, heAX, DecoAgentFeatures{WPA3: true}); p.WifiCaps&WifiCapWPA3 == 0 {
+	p, _ = DecoAgentProfileWith(m, heAX, DecoAgentFeatures{WPA3: true})
+	if p.WifiCaps&WifiCapWPA3 == 0 {
 		t.Errorf("WPA3 feature not claimed")
+	}
+	// SAE is in the MT7663 (5 GHz) driver only
+	if p.Radios["na"].RadioCaps2&RadioCap2WPA3 == 0 || p.Radios["ng"].RadioCaps2&RadioCap2WPA3 != 0 {
+		t.Errorf("WPA3 radio caps: ng %#x na %#x", p.Radios["ng"].RadioCaps2, p.Radios["na"].RadioCaps2)
 	}
 }

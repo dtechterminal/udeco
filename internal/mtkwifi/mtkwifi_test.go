@@ -91,7 +91,7 @@ func home() bcmwifi.Desired {
 }
 
 func TestPlans(t *testing.T) {
-	ps, notes := plans(home(), JCOW414)
+	ps, notes := plans(home(), JCOW414, false)
 	ng, na := ps["ng"], ps["na"]
 	if !ng.On || len(ng.BSS) != 3 || ng.BSS[1].SSID != "ORCHID" || ng.Channel != 6 || ng.Width != 20 {
 		t.Errorf("ng plan %+v", ng)
@@ -105,8 +105,42 @@ func TestPlans(t *testing.T) {
 	}
 	d := home()
 	d.Radios["na"] = bcmwifi.Radio{Enabled: false}
-	if ps, _ := plans(d, JCOW414); ps["na"].On || len(ps["na"].BSS) != 0 {
+	if ps, _ := plans(d, JCOW414, false); ps["na"].On || len(ps["na"].BSS) != 0 {
 		t.Errorf("disabled radio planned on: %+v", ps["na"])
+	}
+}
+
+// TestPlansSAE: with WPA3 on, 5 GHz serves WPA2/WPA3 transition and
+// WPA3-only with PMF; 2.4 GHz (MT7603, no SAE) stays WPA2.
+func TestPlansSAE(t *testing.T) {
+	d := home()
+	d.SSIDs = append(d.SSIDs, bcmwifi.SSID{ID: "f", SSID: "wpa3 5", Bands: []string{"5g"}, Enabled: true, Security: "wpa3", Passphrase: "secret-y123"})
+	ps, notes := plans(d, JCOW414, true)
+	ng, na := ps["ng"], ps["na"]
+	if ng.BSS[0].Auth != "WPA2PSK" || ng.BSS[0].PMF != 0 || len(ng.BSS) != 3 {
+		t.Errorf("ng %+v", ng.BSS)
+	}
+	if len(na.BSS) != 3 || na.BSS[0].Auth != "WPA2PSKWPA3PSK" || na.BSS[0].PMF != 1 ||
+		na.BSS[1].Auth != "WPA2PSK" || na.BSS[2].Auth != "WPA3PSK" || na.BSS[2].PMF != 2 {
+		t.Errorf("na %+v", na.BSS)
+	}
+	j := strings.Join(notes, "\n")
+	if !strings.Contains(j, `ng: SSID "wpa3 only": security wpa3 is not supported`) || !strings.Contains(j, `ng: SSID "Example Network": served as WPA2 only`) ||
+		strings.Contains(j, `na: SSID "Example Network": served as WPA2`) {
+		t.Errorf("notes %q", notes)
+	}
+	p := profile([]byte(baseDat), JCOW414[1], na)
+	for k, v := range map[string]string{"AuthMode": "WPA2PSKWPA3PSK;WPA2PSK;WPA3PSK;WPA2PSK", "PMFMFPC": "1;0;1;0", "PMFMFPR": "0;0;1;0", "PMFSHA256": "0;0;0;0"} {
+		if got, _ := getKey(p, k); got != v {
+			t.Errorf("%s = %q, want %q", k, got, v)
+		}
+	}
+	// 2.4 GHz profile gets no PMF keys; WPA3 off serves 5 GHz as WPA2
+	if _, ok := getKey(profile([]byte(baseDat), JCOW414[0], ng), "PMFMFPC"); ok {
+		t.Errorf("PMF keys written to the 2.4 GHz profile")
+	}
+	if ps, _ := plans(d, JCOW414, false); ps["na"].BSS[0].Auth != "WPA2PSK" || len(ps["na"].BSS) != 2 {
+		t.Errorf("WPA3 off: na %+v", ps["na"].BSS)
 	}
 }
 
@@ -133,7 +167,7 @@ IEEE8021X=0;0;0;0
 `
 
 func TestProfile(t *testing.T) {
-	ps, _ := plans(home(), JCOW414)
+	ps, _ := plans(home(), JCOW414, false)
 	p := profile([]byte(baseDat), JCOW414[0], ps["ng"])
 	want := map[string]string{"AutoChannelSelect": "0", "Channel": "6", "HT_BW": "0", "TxPower": "100",
 		"SSID1": "Example Network", "SSID2": "ORCHID", "SSID3": "Example Network(2.4GHz)", "SSID4": "Jio_3",

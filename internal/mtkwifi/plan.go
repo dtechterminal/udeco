@@ -15,8 +15,11 @@
 //   - iwpriv <bss> set SSID / HideSSID / NoForwarding / MaxStaNum work live.
 //   - VLAN N reaches the gateway as <port>.N on the switch port device
 //     (eth0.4.N), not on the bridge member eth0.4.1 (which is VID 1).
-//   - The MT7603 build has no WPA3/SAE: WPA2/WPA3 WLANs are served as
-//     WPA2-PSK, WPA3-only ones are not served.
+//   - The MT7603 module (2.4 GHz) has no WPA3/SAE: WPA2/WPA3 WLANs are
+//     served there as WPA2-PSK, WPA3-only ones are not served.
+//   - The MT7663 driver (5 GHz, built into the kernel) has SAE: AuthMode
+//     WPA2PSKWPA3PSK (transition, needs PMFMFPC=1) and WPA3PSK (PMF
+//     required). It is used only when the agent claims WPA3 (config wpa3).
 package mtkwifi
 
 import (
@@ -40,6 +43,7 @@ type RadioDef struct {
 	MaxStaKey string   // per-BSS client limit list in the profile
 	MaxTxDBm  int      // TxPower=100 (%)
 	HWName    string
+	SAE       bool // the driver serves WPA3-Personal (SAE)
 }
 
 // JCOW414 is the JioFiber JCOW414 layout.
@@ -47,7 +51,7 @@ var JCOW414 = []RadioDef{
 	{Band: "ng", Ifaces: []string{"ra0", "ra1", "ra2", "ra3"}, Dat: "/etc/Wireless/RT2860AP/RT2860AP.dat",
 		MaxStaKey: "MaxStaNum", MaxTxDBm: 20, HWName: "MT7603E"},
 	{Band: "na", Ifaces: []string{"rai0", "rai1", "rai2", "rai3"}, Dat: "/etc/Wireless/RT2860AP_AC/RT2860AP.dat",
-		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, HWName: "MT7663"},
+		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, HWName: "MT7663", SAE: true},
 }
 
 // Channels the units' country (IN, CountryRegion 0 / CountryRegionABand 10)
@@ -63,8 +67,9 @@ const maxStaDefault = 32 // per BSS when the controller sets no limit
 type BSS struct {
 	ID      string
 	SSID    string
-	Auth    string // OPEN, WPA2PSK
+	Auth    string // OPEN, WPA2PSK, WPA2PSKWPA3PSK, WPA3PSK
 	Encr    string // NONE, AES
+	PMF     int    // 0 off, 1 capable (PMFMFPC), 2 required (PMFMFPR too)
 	PSK     string `json:",omitempty"`
 	Hidden  bool
 	Isolate bool
@@ -113,7 +118,8 @@ func normBand(b string) string {
 }
 
 // plans builds each radio's plan from d. Notes say what is not served.
-func plans(d bcmwifi.Desired, layout []RadioDef) (map[string]RadioPlan, []string) {
+// sae: WPA3 may be served on the radios whose driver has it.
+func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan, []string) {
 	var notes []string
 	note := func(f string, a ...any) { notes = append(notes, fmt.Sprintf(f, a...)) }
 	out := map[string]RadioPlan{}
@@ -155,7 +161,19 @@ func plans(d bcmwifi.Desired, layout []RadioDef) (map[string]RadioPlan, []string
 			switch s.Security {
 			case "open", "":
 				b.Auth, b.Encr = "OPEN", "NONE"
-			case "wpa2", "wpa2wpa3":
+			case "wpa2wpa3":
+				if sae && rd.SAE {
+					b.Auth, b.Encr, b.PSK, b.PMF = "WPA2PSKWPA3PSK", "AES", s.Passphrase, 1
+				} else {
+					b.Auth, b.Encr, b.PSK = "WPA2PSK", "AES", s.Passphrase
+				}
+			case "wpa3":
+				if !sae || !rd.SAE {
+					note("%s: SSID %q: security wpa3 is not supported by this driver: not served", rd.Band, s.SSID)
+					continue
+				}
+				b.Auth, b.Encr, b.PSK, b.PMF = "WPA3PSK", "AES", s.Passphrase, 2
+			case "wpa2":
 				b.Auth, b.Encr, b.PSK = "WPA2PSK", "AES", s.Passphrase
 			default:
 				note("%s: SSID %q: security %s is not supported by this driver: not served", rd.Band, s.SSID, s.Security)
@@ -169,7 +187,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef) (map[string]RadioPlan, []string
 				note("%s: SSID %q: VLAN %d cannot be served: not served", rd.Band, s.SSID, b.VLAN)
 				continue
 			}
-			if b.Auth == "WPA2PSK" && (len(b.PSK) < 8 || len(b.PSK) > 64) {
+			if b.Auth != "OPEN" && (len(b.PSK) < 8 || len(b.PSK) > 64) {
 				note("%s: SSID %q: no valid passphrase: not served", rd.Band, s.SSID)
 				continue
 			}
@@ -181,7 +199,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef) (map[string]RadioPlan, []string
 				note("%s: SSID %q: this radio serves at most %d SSIDs: not served", rd.Band, s.SSID, len(rd.Ifaces))
 				continue
 			}
-			if s.Security == "wpa2wpa3" {
+			if s.Security == "wpa2wpa3" && b.Auth == "WPA2PSK" {
 				note("%s: SSID %q: served as WPA2 only (no SAE in this driver)", rd.Band, s.SSID)
 			}
 			rp.BSS = append(rp.BSS, b)
@@ -280,8 +298,10 @@ func getKey(b []byte, key string) (string, bool) {
 // listKey replaces the first len(vals) entries of a ;-list key of base,
 // keeping the vendor's values for the slots not served.
 func listKey(base []byte, key string, n int, vals []string, def string) string {
-	cur, _ := getKey(base, key)
-	parts := strings.Split(cur, ";")
+	var parts []string
+	if cur, _ := getKey(base, key); cur != "" {
+		parts = strings.Split(cur, ";")
+	}
 	for len(parts) < n {
 		parts = append(parts, def)
 	}
@@ -318,7 +338,7 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 		}
 	}
 	kv["TxPower"] = strconv.Itoa(rp.TxPct)
-	var auth, encr, hide, nofw, maxsta []string
+	var auth, encr, hide, nofw, maxsta, mfpc, mfpr []string
 	for i, b := range rp.BSS {
 		kv[fmt.Sprintf("SSID%d", i+1)] = b.SSID
 		if b.PSK != "" {
@@ -327,12 +347,19 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 		auth, encr = append(auth, b.Auth), append(encr, b.Encr)
 		hide, nofw = append(hide, b01(b.Hidden)), append(nofw, b01(b.Isolate))
 		maxsta = append(maxsta, strconv.Itoa(b.MaxSta))
+		mfpc, mfpr = append(mfpc, b01(b.PMF >= 1)), append(mfpr, b01(b.PMF == 2))
 	}
 	kv["AuthMode"] = listKey(base, "AuthMode", n, auth, "WPA2PSK")
 	kv["EncrypType"] = listKey(base, "EncrypType", n, encr, "AES")
 	kv["HideSSID"] = listKey(base, "HideSSID", n, hide, "0")
 	kv["NoForwarding"] = listKey(base, "NoForwarding", n, nofw, "0")
 	kv[rd.MaxStaKey] = listKey(base, rd.MaxStaKey, n, maxsta, strconv.Itoa(maxStaDefault))
+	if rd.SAE {
+		// per-BSS lists; the slots not served keep PMF off
+		kv["PMFMFPC"] = listKey(nil, "PMFMFPC", n, mfpc, "0")
+		kv["PMFMFPR"] = listKey(nil, "PMFMFPR", n, mfpr, "0")
+		kv["PMFSHA256"] = listKey(nil, "PMFSHA256", n, nil, "0")
+	}
 	kv["IEEE8021X"] = listKey(base, "IEEE8021X", n, []string{"0", "0", "0", "0"}[:len(rp.BSS)], "0")
 	return setKeys(base, kv)
 }

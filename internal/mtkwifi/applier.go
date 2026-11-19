@@ -35,6 +35,7 @@ type Options struct {
 	Bridge   string // the LAN bridge (bdg2)
 	Uplink   string // the uplink bridge port (eth0.4.1); VLAN devices go on its parent
 	DryRun   bool
+	WPA3     bool // serve SAE where the driver has it (5 GHz); the agent claims WPA3 on that radio only
 	Logf     func(string, ...any)
 	Layout   []RadioDef // nil = JCOW414
 	// VerifyTimeout bounds the wait for the BSSes after an apply (20 s).
@@ -132,7 +133,7 @@ func (a *Applier) Owned() bool {
 func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	want, notes := plans(d, a.o.Layout)
+	want, notes := plans(d, a.o.Layout, a.o.WPA3)
 	p := bcmwifi.Plan{Desired: d, Notes: notes}
 	cur := a.live
 	if cur == nil {
@@ -177,7 +178,7 @@ func chanText(c int) string {
 func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	want, _ := plans(p.Desired, a.o.Layout)
+	want, _ := plans(p.Desired, a.o.Layout, a.o.WPA3)
 	h := plansHash(want)
 	if h == a.failed {
 		return bcmwifi.ErrDesiredFailed
@@ -488,7 +489,7 @@ func (a *Applier) waitLive(ctx context.Context, want map[string]RadioPlan) error
 func (a *Applier) Verify(ctx context.Context, d bcmwifi.Desired) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	want, _ := plans(d, a.o.Layout)
+	want, _ := plans(d, a.o.Layout, a.o.WPA3)
 	return a.check(ctx, want)
 }
 
