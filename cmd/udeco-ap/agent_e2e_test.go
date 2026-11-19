@@ -53,6 +53,7 @@ const (
 	u6proCfg    = "../../docs/reference/u6pro/config-apply/tmp_system.cfg.redacted"
 	e2eAuthkey  = "00112233445566778899aabbccddeeff" // made up
 	e2eUnitIP   = "192.168.0.205"
+	e2eCfgVer   = "00000000000000c1" // the cfgversion the controller provisions
 )
 
 // ---------------------------------------------------------------- device
@@ -378,8 +379,8 @@ func (c *e2eCtl) inform(w http.ResponseWriter, req *http.Request) {
 	case 0:
 		reply = `{"_type":"setparam","mgmt_cfg":"cfgversion=0000000000000001\nauthkey=` + e2eAuthkey + `\nuse_aes_gcm=true\nled_enabled=true\n"}`
 	case 1:
-		b, _ := json.Marshal(map[string]string{"_type": "setparam", "cfgversion": "00000000000000c1",
-			"mgmt_cfg": "cfgversion=00000000000000c1\nauthkey=" + e2eAuthkey + "\nuse_aes_gcm=true\nled_enabled=true\n", "system_cfg": c.systemCfg})
+		b, _ := json.Marshal(map[string]string{"_type": "setparam", "cfgversion": e2eCfgVer,
+			"mgmt_cfg": "cfgversion=" + e2eCfgVer + "\nauthkey=" + e2eAuthkey + "\nuse_aes_gcm=true\nled_enabled=true\n", "system_cfg": c.systemCfg})
 		reply = string(b)
 	default:
 		reply = `{"_type":"noop","interval":1}`
@@ -400,6 +401,16 @@ func (c *e2eCtl) inform(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	w.Write(pkt)
+}
+
+// live reports whether the inform shows the provisioned cfgversion. The
+// agent reports it only once the system_cfg is live, after the Wi-Fi apply
+// finished (cfgack.go), and Network sends a device commands only once it is
+// out of provisioning. A script that sends a scan before that races the
+// apply, which aborts the band (scanBlock: "a Wi-Fi apply or rollback is
+// running").
+func (in e2eInform) live() bool {
+	return in.key == "device" && in.payload["cfgversion"] == e2eCfgVer
 }
 
 func (c *e2eCtl) snapshot() []e2eInform {
@@ -591,6 +602,11 @@ func newE2E(t *testing.T, systemCfg string, takeover bool, mods ...func(*Config,
 		t.Fatal(err)
 	}
 	e.a = a
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("agent log:\n%s", e.logs.all())
+		}
+	})
 	return e
 }
 
