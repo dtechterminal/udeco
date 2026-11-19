@@ -45,12 +45,16 @@ type RadioDef struct {
 	HWName    string
 	SAE       bool // the driver serves WPA3-Personal (SAE)
 	UAPSD     bool // the driver has U-APSD (APSDCapable, per BSS)
+	// Spectrum is the radio's spectrum backend: SpectrumOffChan (the
+	// MT7603's ApOffChanScan sweep, offchan.go), or "" for none (the band's
+	// spectrum commands run the neighbour survey: SpectrumBySurvey)
+	Spectrum string
 }
 
 // JCOW414 is the JioFiber JCOW414 layout.
 var JCOW414 = []RadioDef{
 	{Band: "ng", Ifaces: []string{"ra0", "ra1", "ra2", "ra3"}, Dat: "/etc/Wireless/RT2860AP/RT2860AP.dat",
-		MaxStaKey: "MaxStaNum", MaxTxDBm: 20, HWName: "MT7603E"},
+		MaxStaKey: "MaxStaNum", MaxTxDBm: 20, HWName: "MT7603E", Spectrum: SpectrumOffChan},
 	{Band: "na", Ifaces: []string{"rai0", "rai1", "rai2", "rai3"}, Dat: "/etc/Wireless/RT2860AP_AC/RT2860AP.dat",
 		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, HWName: "MT7663", SAE: true, UAPSD: true},
 }

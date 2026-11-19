@@ -29,8 +29,10 @@ import (
 //     one with that first sighting (its age grows, the controller lists rows
 //     younger than 30 s only), and nothing once that is surveyKeep old.
 //   - Scan (a controller command only: `cmd scan`, and spectrum-scan and
-//     quick-scan, which have no spectrum runner here: SpectrumBySurvey)
+//     quick-scan of a band without a spectrum runner: SpectrumBySurvey)
 //     starts a fresh survey when FreshScan is set, else it is unsupported.
+//     The MT7603's off-channel sweep (offchan.go) runs one after its
+//     visits (freshSurvey).
 
 // surveyKeep: how long an unchanged cached survey is still reported.
 const surveyKeep = 10 * time.Minute
@@ -162,6 +164,12 @@ func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult,
 		return nil, err
 	}
 	defer c.unlockScan()
+	return c.freshSurvey(ctx, band, main)
+}
+
+// freshSurvey is Scan's survey of radio main; the caller holds the scan
+// lock (Scan, or the off-channel sweep after its visits).
+func (c *Collector) freshSurvey(ctx context.Context, band, main string) (*apstate.ScanResult, error) {
 	// held through the scan: a radio restart waits for it to end
 	done, ok := c.driverRead()
 	if !ok {
@@ -175,7 +183,7 @@ func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult,
 	if err != nil {
 		return nil, err
 	}
-	c.scanning.Store(true)
+	c.startScanning()
 	defer c.scanning.Store(false)
 	// run before scanning ends: the next `show mibinfo` ask would measure
 	// Prim CCA Time over an interval that held the scan, off the channel
@@ -212,6 +220,30 @@ func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult,
 	return &apstate.ScanResult{Band: band, Time: now, BSS: append([]apstate.BSS(nil), bss...)}, nil
 }
 
+// startScanning sets scanning once no Collect is reading the driver: one
+// that has already passed reading's check (it holds c.mu throughout) would
+// still ask `show mibinfo`, whose read-clear of Prim CCA Time would land in
+// the scan (in an off-channel visit's dwell: a busy time too low, trusted).
+// From here on no Collect asks the driver until scanning ends.
+func (c *Collector) startScanning() {
+	c.mu.Lock()
+	c.scanning.Store(true)
+	c.mu.Unlock()
+}
+
+// ownUplink is our stations' receive airtime (µs a second) from the
+// radio's last reading, when it is fresh and was not invalidated by an
+// apply (0: none).
+func (c *Collector) ownUplink(main string, now time.Time) int64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	rr := c.cache[main]
+	if rr == nil || rr.stale || now.Sub(rr.at) < 0 || now.Sub(rr.at) > ownAirKeep {
+		return 0
+	}
+	return max(rr.staRx, 0)
+}
+
 // mibGap: the radio left its channel (a site survey) since its last `show
 // mibinfo` ask, so the next ask has no previous one to measure from
 // (mibReading.gap); the reading from before stands until then.
@@ -223,11 +255,15 @@ func (c *Collector) mibGap(main string) {
 	}
 }
 
-// SpectrumBySurvey: this driver has no spectrum runner (Spectrum is
-// ErrUnsupported), so the agent answers the controller's spectrum commands
-// (spectrum-scan, quick-scan) with Scan of their band(s) when this is true
-// (FreshScan), and with nothing when it is false.
-func (c *Collector) SpectrumBySurvey() bool { return c.o.FreshScan }
+// SpectrumBySurvey says how the controller's spectrum commands
+// (spectrum-scan, quick-scan) run for band: noRunner when Spectrum has no
+// runner for it (the MT7663, or no FreshScan); the agent then runs Scan of
+// the band instead when bySurvey (FreshScan), and nothing otherwise.
+func (c *Collector) SpectrumBySurvey(band string) (noRunner, bySurvey bool) {
+	rd, ok := c.radioDef(band)
+	noRunner = !c.o.FreshScan || !ok || rd.Spectrum != SpectrumOffChan
+	return noRunner, noRunner && c.o.FreshScan
+}
 
 // ErrRadioDown: Scan of a radio whose interfaces are down (off, or no SSID
 // served on it); the driver is not asked.

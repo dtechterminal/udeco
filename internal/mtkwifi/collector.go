@@ -39,6 +39,11 @@ type CollectorOptions struct {
 	CacheTTL time.Duration
 	// klog reads the kernel log (test hook; nil = klogctl).
 	klog func() ([]byte, error)
+	// priv opens the driver's private ioctls (test hook; nil = a socket,
+	// priv_linux.go); offChan is the sweep's timing (test hook; nil =
+	// defaultOffChanPlan)
+	priv    func() (privIO, error)
+	offChan *offChanPlan
 	// now and sleep are test hooks.
 	now   func() time.Time
 	sleep func(context.Context, time.Duration) error
@@ -69,6 +74,11 @@ type Collector struct {
 	// gate: the Wi-Fi applier's radio restarts (FollowRestarts,
 	// restartgate.go); nil = none (observe mode)
 	gate atomic.Pointer[RestartGate]
+	// spec: the spectrum runners by band, made at their first use
+	// (offchan.go), and their backends
+	specMu  sync.Mutex
+	spec    map[string]*wl.SpectrumRunner
+	offChan map[string]*offChan
 }
 
 // ErrUnsupported: scans and spectrum runs are not implemented on this driver.
@@ -153,15 +163,9 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 	for _, rd := range c.o.Layout {
 		main := rd.Ifaces[0]
 		r := apstate.Radio{Iface: main, Phy: main, Mode: "Master", Band: rd.Band,
-			NSS: 2, HWName: rd.HWName, VHT: rd.Band == "na", TxMin: 5, TxMax: rd.MaxTxDBm, Noise: -95}
+			NSS: 2, HWName: rd.HWName, VHT: rd.Band == "na", TxMin: 5, TxMax: rd.MaxTxDBm, Noise: noiseFloor}
 		dat, _ := os.ReadFile(c.path(rd.Dat))
-		r.Width = 20
-		if v, _ := getKey(dat, "HT_BW"); v == "1" {
-			r.Width = 40
-			if v, _ := getKey(dat, "VHT_BW"); rd.Band == "na" && v == "1" {
-				r.Width = 80
-			}
-		}
+		r.Width = c.radioWidth(rd)
 		pct := 100
 		if v, ok := getKey(dat, "TxPower"); ok {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
@@ -278,14 +282,22 @@ func driverReads(rd RadioDef) (counts, busy, mib bool) {
 
 // reading returns the radio's cached driver reading, read again when it is
 // older than CacheTTL, when the set of BSSes up changed, or after
-// Invalidate. During a site survey (Scan) the old reading stands: iwconfig
-// may show the scan channel then. While the applier restarts a radio, and
+// Invalidate. During a site survey (Scan) or an off-channel sweep the old
+// reading stands, or an empty one without it, and the driver is not asked:
+// iwconfig may show the scan channel then, and `show mibinfo` would clear
+// the busy counter a visit is measuring. While the applier restarts a radio, and
 // for its settle time after, the old reading stands too (restartgate.go);
 // without one the reading is empty and not kept. c.mu is held.
 func (c *Collector) reading(ctx context.Context, rd RadioDef, up []string, now time.Time) *radioReading {
 	main := rd.Ifaces[0]
 	old := c.cache[main]
-	if old != nil && (c.scanning.Load() || (!old.stale && now.Sub(old.at) < c.o.CacheTTL && now.Sub(old.at) >= 0 && slices.Equal(old.up, up))) {
+	if c.scanning.Load() {
+		if old != nil {
+			return old
+		}
+		return &radioReading{at: now, up: up, essid: map[string]string{}}
+	}
+	if old != nil && !old.stale && now.Sub(old.at) < c.o.CacheTTL && now.Sub(old.at) >= 0 && slices.Equal(old.up, up) {
 		return old
 	}
 	done, ok := c.driverRead()
@@ -493,9 +505,52 @@ func (c *Collector) Caps(context.Context) (wl.Caps, error) {
 // claims RF_SCAN on it).
 func (c *Collector) ScanSupported() bool { return c.o.FreshScan }
 
-// Spectrum: the MT76x3 drivers have no spectrum runner here.
-func (c *Collector) Spectrum(context.Context, string) (*wl.SpectrumRunner, error) {
-	return nil, ErrUnsupported
+// Spectrum is the band's spectrum runner: the MT7603's off-channel sweep
+// (offchan.go) on a radio that has it (RadioDef.Spectrum), with FreshScan
+// only (site_survey: the controller's scans run on this unit). Others, and
+// without FreshScan, ErrUnsupported (SpectrumBySurvey says what runs
+// instead). The same runner is returned on every call.
+func (c *Collector) Spectrum(_ context.Context, band string) (*wl.SpectrumRunner, error) {
+	rd, ok := c.radioDef(band)
+	if !c.o.FreshScan || !ok || rd.Spectrum != SpectrumOffChan {
+		return nil, ErrUnsupported
+	}
+	c.specMu.Lock()
+	defer c.specMu.Unlock()
+	if c.spec == nil {
+		c.spec, c.offChan = map[string]*wl.SpectrumRunner{}, map[string]*offChan{}
+	}
+	r := c.spec[band]
+	if r == nil {
+		b := newOffChan(c, rd)
+		r = wl.NewSpectrumRunner(rd.Ifaces[0], band, b)
+		c.spec[band], c.offChan[band] = r, b
+	}
+	return r, nil
+}
+
+// radioDef is the layout's radio of band.
+func (c *Collector) radioDef(band string) (RadioDef, bool) {
+	for _, rd := range c.o.Layout {
+		if rd.Band == band {
+			return rd, true
+		}
+	}
+	return RadioDef{}, false
+}
+
+// radioWidth is the radio's operating width from its profile (HT_BW,
+// VHT_BW), as Collect reports it.
+func (c *Collector) radioWidth(rd RadioDef) int {
+	dat, _ := os.ReadFile(c.path(rd.Dat))
+	w := 20
+	if v, _ := getKey(dat, "HT_BW"); v == "1" {
+		w = 40
+		if v, _ := getKey(dat, "VHT_BW"); rd.Band == "na" && v == "1" {
+			w = 80
+		}
+	}
+	return w
 }
 
 // WithoutScan runs fn while no site survey runs.
@@ -517,6 +572,11 @@ func (c *Collector) Invalidate() {
 		rr.stale = true
 	}
 	c.mu.Unlock()
+	c.specMu.Lock()
+	for _, b := range c.offChan {
+		b.forget() // the channel list is read again at the next band
+	}
+	c.specMu.Unlock()
 }
 
 func (c *Collector) lockScan(ctx context.Context) error {

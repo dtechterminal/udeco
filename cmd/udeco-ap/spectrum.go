@@ -27,8 +27,12 @@ package main
 // RF_SCAN. The tables live in the runners; the last good one per band is
 // also kept on flash so it survives a restart or reboot (specsave.go).
 //
-// A collector without a spectrum runner (jio-mtk) runs neither: with
-// site_survey both run its neighbour survey instead (sitesurvey.go).
+// A band without a spectrum runner runs neither: with site_survey its
+// neighbour survey runs instead (sitesurvey.go). On jio-mtk with
+// site_survey the MT7603 (2.4 GHz) has a runner (mtkwifi offchan.go) and
+// the MT7663 (5 GHz) has none: a quick-scan of 5 GHz surveys, and a
+// spectrum-scan surveys 5 GHz and measures 2.4 GHz, as one spectrum-scan
+// (spectrum_scanning, the tables cleared first).
 
 import (
 	"context"
@@ -89,7 +93,7 @@ func (a *agent) quickScan(ctx context.Context, band string, bw int) {
 		a.logf("[quick-scan] %s: skipped, %s", what, why)
 		return
 	}
-	if ok, on := a.spectrumBySurvey(); ok {
+	if noRunner, on := a.spectrumBySurvey(band); noRunner {
 		a.surveyForSpectrum(ctx, "quick-scan", []string{band}, on)
 		return
 	}
@@ -120,8 +124,26 @@ func (a *agent) spectrumScan(ctx context.Context) {
 		a.logf("%s: skipped, %s", what, why)
 		return
 	}
-	if ok, on := a.spectrumBySurvey(); ok {
-		a.surveyForSpectrum(ctx, what, []string{"na", "ng"}, on) // 5 GHz first, as below
+	bands := []string{"na", "ng"} // 5 GHz first, as the real AP
+	// how each band runs: its spectrum runner, else the neighbour survey
+	// (site_survey), else nothing
+	var runners, surveys []string
+	for _, band := range bands {
+		switch noRunner, on := a.spectrumBySurvey(band); {
+		case !noRunner:
+			runners = append(runners, band)
+		case on:
+			surveys = append(surveys, band)
+		}
+	}
+	if len(runners) == 0 {
+		// no spectrum table can come: the survey alone, with no spectrum
+		// flags (sitesurvey.go), or nothing
+		if len(surveys) > 0 {
+			a.surveyForSpectrum(ctx, what, surveys, true)
+		} else {
+			a.surveyForSpectrum(ctx, what, bands, false)
+		}
 		return
 	}
 	if busy, ok := a.scans.begin(what, false, true); !ok {
@@ -134,13 +156,12 @@ func (a *agent) spectrumScan(ctx context.Context) {
 		defer a.bg.Done()
 		defer a.wakeLoop()
 		defer a.scans.end()
-		bands := []string{"na", "ng"} // 5 GHz first, as the real AP
 		// the real spectrum_scan resets every rftable to {} first (CE §2.2);
 		// a saved table not restored yet goes too, and the copy on flash
 		// follows (specsave.go)
 		a.scans.dropEvents()
 		a.scans.dropSaved()
-		for _, band := range bands {
+		for _, band := range runners {
 			if r, err := a.o.col.Spectrum(ctx, band); err == nil {
 				r.ClearTable()
 				a.scans.addRunner(band, r)
@@ -156,7 +177,16 @@ func (a *agent) spectrumScan(ctx context.Context) {
 				a.logf("%s %s: not started, %s", what, band, why)
 				return
 			}
-			a.spectrumBand(ctx, band, req, what+" "+band)
+			switch {
+			case slices.Contains(runners, band):
+				a.spectrumBand(ctx, band, req, what+" "+band)
+			case slices.Contains(surveys, band):
+				// a band without a runner (jio-mtk 5 GHz): its neighbours only
+				a.logf("%s %s: no spectrum runner for this band: neighbour site survey instead (scan_table only)", what, band)
+				a.scans.surveyBand(ctx, a.o.col, what, band, a.t.scanTO, a.logf)
+			default:
+				a.logf("%s %s: no spectrum runner for this band and site_survey is off: not scanned", what, band)
+			}
 			a.wakeLoop()
 		}
 	}()

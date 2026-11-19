@@ -8,7 +8,8 @@ package main
 // Environment section stayed empty until the next scan).
 //
 // Saved: filepath.Join(base, wifiStateSub, spectrumFile), on the Deco
-// /tp_data/udeco/state/spectrum.json (ubifs flash, mounted sync), one small
+// /tp_data/udeco/state/spectrum.json (ubifs flash, mounted sync), on the
+// JioFiber (Garage) /flash2/udeco/state/spectrum.json, one small
 // versioned JSON file (spectrumSave: model, and per band the radio, the
 // wall-clock time the table was measured and its rows; about 1.5 kB for a
 // quick-scan of both bands, under 6 kB for a manual all-widths scan). It is
@@ -19,7 +20,8 @@ package main
 // the file, as it was (CE §6). A failed write is logged; the table stays in
 // memory.
 //
-// Restored: read at start (setup, takeover on the Deco only) and put into
+// Restored: read at start (setup, when RF_SCAN is claimed: takeover on the
+// Deco, takeover with site_survey on jio-mtk) and put into
 // the band's spectrum runner (wl.SpectrumRunner.RestoreTable) at the next
 // inform that finds no Wi-Fi apply or rollback running; from then on it is
 // reported exactly as a live table: spectrum_table rows and
@@ -90,10 +92,13 @@ package main
 // outlasts keepSeen anyway; and the list changes at almost every listen
 // (signal, age), so keeping it on flash would mean a write a minute.
 //
-// jio-mtk has no spectrum runners: nothing is read, restored or written
-// there (setup loads only with RF_SCAN claimed; saveSpectrum returns at
-// once). Observe mode runs no scans and claims no RF_SCAN: nothing is
-// loaded either, and a file left from takeover stays as it is.
+// jio-mtk: only the 2.4 GHz band has a runner (the MT7603's off-channel
+// sweep, with site_survey), so only its table is saved and restored; a
+// saved table of a band that has no runner now (site_survey turned off
+// since) is dropped at the first inform, and the file follows at the next
+// write. Without site_survey RF_SCAN is not claimed and nothing is loaded.
+// Observe mode runs no scans and claims no RF_SCAN: nothing is loaded
+// either, and a file left from takeover stays as it is.
 
 import (
 	"bytes"
@@ -137,7 +142,7 @@ func (a *agent) spectrumPath() string {
 	return a.dev(filepath.Join(a.o.base, wifiStateSub, spectrumFile))
 }
 
-// loadSpectrum reads the saved tables at start (takeover on the Deco); the
+// loadSpectrum reads the saved tables at start (RF_SCAN claimed); the
 // next informs restore them (restoreSpectrum).
 func (a *agent) loadSpectrum() {
 	if a.o.base == "" { // a bare agent in a unit test: no flash
@@ -256,6 +261,13 @@ func (a *agent) restoreSpectrum(ctx context.Context, now time.Time) {
 			a.logf("spectrum: saved %s table dropped: measured %s ago, older than 7 days", band, age.Round(time.Minute))
 			continue
 		}
+		if noRunner, _ := a.spectrumBySurvey(band); noRunner {
+			// jio-mtk: the band has no runner (5 GHz; or site_survey
+			// turned off since the table was saved)
+			a.scans.forgetSaved(band, t)
+			a.logf("spectrum: saved %s table dropped: this unit has no spectrum runner for the band now", band)
+			continue
+		}
 		r, err := a.o.col.Spectrum(ctx, band)
 		if err != nil {
 			if a.specNoted[band] != err.Error() {
@@ -329,7 +341,7 @@ func (a *agent) noteSpectrum(band, s string) {
 // saveSpectrum writes the tables to flash when they changed (the band
 // goroutine of a spectrum command, after a new good table or a clear).
 func (a *agent) saveSpectrum() {
-	if a.o.base == "" || a.cfg.jio() {
+	if a.o.base == "" {
 		return
 	}
 	sc := a.scans

@@ -2,14 +2,21 @@
 
 package main
 
-// The controller's spectrum commands on a collector without a spectrum
-// runner (platform jio-mtk: mtkwifi.Collector.Spectrum is ErrUnsupported).
+// The controller's spectrum commands for a band without a spectrum runner
+// (platform jio-mtk: mtkwifi.Collector.SpectrumBySurvey; with site_survey
+// the MT7603's 2.4 GHz band has one, the off-channel sweep of mtkwifi
+// offchan.go, run as the Deco's in spectrum.go; the MT7663's 5 GHz band
+// has none, and without site_survey neither has).
 //
-// With site_survey on (mtkwifi FreshScan), `cmd spectrum-scan` (the
-// Environment page's button: 5 GHz, then 2.4 GHz) and `cmd quick-scan`
-// (nightly, one band per command) run the driver's site survey of their
-// band(s) instead, the same path as `cmd scan` (scanner.neighbourScan),
-// and report scan_table only. Nothing of the spectrum path is sent:
+// With site_survey on (mtkwifi FreshScan), `cmd quick-scan` (nightly, one
+// band per command) of a band without a runner runs the driver's site
+// survey of the band instead, the same path as `cmd scan`
+// (scanner.neighbourScan), and reports scan_table only; so does `cmd
+// spectrum-scan` (the Environment page's button: 5 GHz, then 2.4 GHz) when
+// no band has a runner. When one band has a runner, the spectrum-scan runs
+// as on the Deco (spectrum.go: tables cleared, spectrum_scanning) and the
+// band without one is surveyed in its turn. A survey alone sends nothing
+// of the spectrum path:
 //
 //   - no spectrum_scanning true (the controller sets it itself when it
 //     sends spectrum-scan; the next inform's false ends it);
@@ -43,14 +50,17 @@ import (
 	"fmt"
 )
 
-// spectrumBySurvey: ok says the collector has no spectrum runner; on says
-// its spectrum commands run the neighbour survey instead (site_survey).
-func (a *agent) spectrumBySurvey() (ok, on bool) {
-	s, ok := a.o.col.(interface{ SpectrumBySurvey() bool })
+// spectrumBySurvey: noRunner says the collector has no spectrum runner for
+// band; on says its spectrum commands run the neighbour survey instead
+// (site_survey). A collector that does not say (wl) has runners.
+func (a *agent) spectrumBySurvey(band string) (noRunner, on bool) {
+	s, ok := a.o.col.(interface {
+		SpectrumBySurvey(band string) (noRunner, bySurvey bool)
+	})
 	if !ok {
 		return false, false
 	}
-	return true, s.SpectrumBySurvey()
+	return s.SpectrumBySurvey(band)
 }
 
 // surveyForSpectrum answers spectrum command what (loop goroutine) with

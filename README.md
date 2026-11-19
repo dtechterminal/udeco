@@ -222,24 +222,41 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 - **Partial:** WPA3 on 5 GHz only (the 2.4 GHz driver has no SAE). The driver
   accepts the profile, but no SAE client has been seen yet.
 - **Not on this platform:** speed limits.
-- **Neighbour scans (`"site_survey": true`, off by default; needs
-  `takeover`):** UniFi's scan commands run the driver's site survey (`iwpriv
-  <radio> set SiteSurvey=1`), which takes the radio off its channel for a
-  few seconds, and the unit then claims RF scan. A scan from UniFi surveys
-  both bands; the Environment page's spectrum scan (both bands) and the
-  nightly quick scan (one band) have no spectrum measurement on this driver,
-  so they run the same survey and fill only the neighbour list: no
-  channel-utilisation table is reported. A quick scan reports itself running
-  until its survey ends, as a real AP does: UniFi then asks for the next
-  band (inferred from the real AP's logs). Surveys run only on a command
-  from UniFi, one at a time, never during a Wi-Fi apply, a radio restart or
-  the 20 s after it, and never on a radio that is down. Off, the neighbour
-  list comes only from the driver's cached survey. Not yet measured on the
-  unit: how long clients stall during a survey, and whether the survey's end
-  is detected correctly (the agent takes a table that changed and then
-  stayed the same for 2 s as finished; a driver that refills its table
-  channel by channel could look finished early on the quiet 5 GHz DFS
-  channels). Check both before turning it on.
+- **RF scans (`"site_survey": true`, off by default; needs `takeover`):**
+  the controller's scan commands run on the unit, and it claims RF scan.
+  A scan from UniFi runs the driver's site survey of both bands (`iwpriv
+  <radio> set SiteSurvey=1`, the radio off its channel for a few seconds)
+  and fills the neighbour list. On 2.4 GHz the nightly quick scan and the
+  Environment page's spectrum scan measure each channel: the MT7603 visits
+  channels 1-11 one at a time (200 ms each, one a second, about 11 s for
+  the band; the radio returns to its own channel after each visit and never
+  restarts) and reads how long the channel was busy, then surveys the
+  neighbours. The unit then reports a per-channel table (utilisation from
+  the busy time, on its own channel less its own clients' estimated
+  traffic; interference from the strongest neighbour on the channel;
+  20 and 40 MHz rows), as a real AP does, so the Environment page shows
+  2.4 GHz charts; the last table is kept in `/flash2/udeco/state/` and
+  comes back after a restart. The 5 GHz radio (MT7663) has no such
+  command: its quick scan and its part of the spectrum scan run the site
+  survey and fill only the neighbour list. A quick scan reports itself
+  running until it ends, as a real AP does: UniFi then asks for the next
+  band (inferred from the real AP's logs). Scans run only on a command from
+  UniFi, one at a time, never during a Wi-Fi apply, a radio restart or the
+  20 s after it, and never on a radio that is down; a sweep that cannot
+  confirm a visit (in the kernel log) stops and keeps the previous table.
+  Off, the neighbour list comes only from the driver's cached survey. Not
+  yet measured on the unit: how long clients stall during a 5 GHz survey,
+  whether the survey's end is detected correctly on the quiet 5 GHz DFS
+  channels, and a sweep run by the agent itself (the visits were verified
+  with a probe; the agent confirms each visit's end from the driver's
+  "time_diff" log line, which the unit prints at its default debug level,
+  and from iwconfig that the radio was not restarted or moved; `iwpriv ra0
+  set Debug=0` or `1` silences that line and every 2.4 GHz sweep then
+  stops). A sweep waits for, or stops on, an off-channel scan it did not
+  start, and does not trust a visit another running scan took over when
+  that scan's end comes before the visit's could; an ACS scan (400 ms a
+  channel) can still end one later, unseen. Check these before turning it
+  on.
 - **LAN ports (`"model": "UHDIW"`):** the unit can instead report as a
   UAP-IW-HD: LAN ports 1-3, port 4 absent, the uplink as rear port 5. With
   Enable Port VLAN on, the controller's port VLANs apply to ports 2 and 3
