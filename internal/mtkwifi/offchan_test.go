@@ -18,15 +18,19 @@ import (
 )
 
 // fakeMT7603 is mt7603eap.ko's private ioctls on the test unit, as the
-// module does them (offchan.go top; Ghidra and the 2026-11-20 live test):
+// module does them (offchan.go top; Ghidra and the 2026-11-20 live tests):
 // `show mibinfo` prints the MIB block to the kernel log; ApOffChanScan for
-// a listed channel prints the visit's start line (ApSiteSurveyNew_by_wdev),
-// the MLME's "start offchannel scan" line (APMlmeScanReqAction) and its
-// stay-time line (ScanNextChannel), writes the visit's score into the
-// channel's slot and prints the end line on the way back home; an unlisted
-// channel is refused without a line, and the ioctl fails with EINVAL
-// (Set_ApOffChanScan_Proc returns 0 on ChannelSanity, RTMPAPPrivIoctlSet
-// maps 0 to -EINVAL); 0x2014 answers the slots, 0x8999 the channel list.
+// a listed channel prints the visit's start line (ApSiteSurveyNew_by_wdev,
+// any debug level), writes the visit's score into the channel's slot and
+// prints UpdateChannelInfo's time_diff line at the end of the dwell (level
+// 2, the module's default: exactly the two lines the unit printed live);
+// at level 3 also the MLME's "start offchannel scan" line
+// (APMlmeScanReqAction), the stay-time line (ScanNextChannel), the
+// busytime line and the "End of SCAN" line on the way back home. An
+// unlisted channel is refused without a line, and the ioctl fails with
+// EINVAL (Set_ApOffChanScan_Proc returns 0 on ChannelSanity,
+// RTMPAPPrivIoctlSet maps 0 to -EINVAL); 0x2014 answers the slots, 0x8999
+// the channel list; iwconfig ra0 reports op once a visit moved it.
 type fakeMT7603 struct {
 	d     *klogDev
 	ck    *clock
@@ -36,14 +40,18 @@ type fakeMT7603 struct {
 	extra map[int]int // channel -> visits overlapped by another channel's request
 	// hijack: channel -> visits ended by a scan already running (one that
 	// prints no start line): our start line, a slot written with that
-	// scan's busy time (hijackBusy), its end line, and no visit of ours
+	// scan's busy time (hijackBusy), no time_diff, its "End of SCAN" line
+	// (level 3), and no visit of ours
 	hijack     map[int]int
 	hijackBusy int
 	silent     map[int]int           // channel -> sets that succeed with no visit and no line ("Network is down")
 	slowShow   map[int]time.Duration // channel -> the pre-clear before its visit takes this long (once)
-	noEnd      bool                  // no level-3 lines: no "start offchannel scan", stay-time or "End of SCAN" (a debug level below 3)
-	away       int                   // the end line restores to this channel (0: home)
+	timeDiff   map[int]int           // channel -> the time_diff its next visit prints (once; default: as live, 44 at 50 ms)
+	moveTo     map[int]int           // channel -> the operating channel after its visit (an AP restart on another channel)
+	level      int                   // RTDebugLevel: 2 (the module's default) prints time_diff, 3 the other lines too, below 2 neither
+	away       int                   // the "End of SCAN" line restores to this channel (0: home)
 	home       int                   // the radio's channel
+	op         int                   // iwconfig's channel once a visit moved it (0: the fake device's)
 	slots      [55][2]uint32
 	calls      []string // "<t> show mibinfo", "<t> set ...", "<t> oid 0x2014"
 	hook       func(call string)
@@ -54,7 +62,8 @@ type fakeMT7603 struct {
 
 func newFakeMT7603(d *klogDev, ck *clock) *fakeMT7603 {
 	f := &fakeMT7603{d: d, ck: ck, list: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, busy: map[int]int{}, stale: map[int]int{}, extra: map[int]int{},
-		hijack: map[int]int{}, silent: map[int]int{}, slowShow: map[int]time.Duration{}, home: 6}
+		hijack: map[int]int{}, silent: map[int]int{}, slowShow: map[int]time.Duration{}, timeDiff: map[int]int{}, moveTo: map[int]int{},
+		level: 2, home: 6}
 	// slots past the list hold heap garbage
 	for i := 11; i < 55; i++ {
 		f.slots[i] = [2]uint32{0xdeadbeef, uint32(i * 7)}
@@ -108,13 +117,18 @@ func (f *fakeMT7603) Set(ifname string, b []byte) error {
 		return nil
 	}
 	fmt.Fprintf(&f.d.log, "<4>ApSiteSurveyNew_by_wdev channel_index:%d channel:%d time:%d\n", idx, ch, ms)
+	if to, ok := f.moveTo[ch]; ok {
+		f.op = to
+	}
 	if f.hijack[ch] > 0 {
 		f.hijack[ch]--
 		f.slots[idx] = [2]uint32{uint32(max(0, 100-f.hijackBusy/4000)), uint32(ch)}
-		fmt.Fprintf(&f.d.log, "<4>SYNC - End of SCAN, restore to 20MHz channel %d, Total BSS[03]\n", f.home)
+		if f.level >= 3 {
+			fmt.Fprintf(&f.d.log, "<4>SYNC - End of SCAN, restore to 20MHz channel %d, Total BSS[03]\n", f.home)
+		}
 		return nil
 	}
-	if !f.noEnd {
+	if f.level >= 3 {
 		fmt.Fprintf(&f.d.log, "<4>[APMlmeScanReqAction][2098] start offchannel scan on %d : channel list index = 0\n", ch)
 		fmt.Fprintf(&f.d.log, "<4>[ScanNextChannel][696] stay time configured of channel index = 0 time = %d\n", ms)
 	}
@@ -128,7 +142,19 @@ func (f *fakeMT7603) Set(ifname string, b []byte) error {
 		score := max(0, 100-f.busy[ch]/4000)
 		f.slots[idx] = [2]uint32{uint32(score), uint32(ch)}
 	}
-	if !f.noEnd {
+	if f.level >= 3 {
+		fmt.Fprintf(&f.d.log, "<4>channel %d busytime %d\n", ch, f.busy[ch]/4)
+	}
+	if f.level >= 2 {
+		td, ok := f.timeDiff[ch]
+		if ok {
+			delete(f.timeDiff, ch)
+		} else {
+			td = (ms/10-1)*10 + 4 // the timer's ms/10 jiffies end 41..50 ms in at 50 ms; live: 44
+		}
+		fmt.Fprintf(&f.d.log, "<4>time_diff:%d Busytime:%d AvgNF:-89\n", td&0xff, 7017)
+	}
+	if f.level >= 3 {
 		back := f.home
 		if f.away != 0 {
 			back = f.away
@@ -180,9 +206,25 @@ func (f *fakeMT7603) sets() []int {
 // mibFixtureLines is what one `show mibinfo` adds to the kernel log.
 var mibFixtureLines = "<4>MIB Status Control=0x7fffffff\n<4>===Phy/Timing Related Counters===\n<4>\tPrim CCA Time=0x45b5af\n"
 
+// offChanRun answers iwconfig ra0 with the fake MT7603's channel once a
+// visit moved it.
+type offChanRun struct {
+	*klogDev
+	f *fakeMT7603
+}
+
+func (r offChanRun) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	if name == "iwconfig" && len(args) > 0 && args[0] == "ra0" && r.f.op != 0 {
+		r.klogDev.fakeDev.log = append(r.klogDev.fakeDev.log, name+" "+strings.Join(args, " "))
+		return []byte(fmt.Sprintf("ra0  RTWIFI SoftAP  ESSID:\"x\"  \n  Mode:Master  Channel=%d\n", r.f.op)), nil
+	}
+	return r.klogDev.Run(ctx, name, args...)
+}
+
 // offChanUnit is a FreshScan collector of the JCOW414 with the fake
-// MT7603, a survey that changes once SiteSurvey=1 is set, and a wall clock
-// the collector's sleeps move on.
+// MT7603 (at the module's default debug level, 2), a survey that changes
+// once SiteSurvey=1 is set, and a wall clock the collector's sleeps move
+// on.
 func offChanUnit(t *testing.T) (*Collector, *fakeMT7603, *klogDev, *clock) {
 	t.Helper()
 	d := newKlogDev(t)
@@ -194,6 +236,7 @@ func offChanUnit(t *testing.T) (*Collector, *fakeMT7603, *klogDev, *clock) {
 	d.after = 1 // the survey's own reads: the new table from the second on
 	c := newTestCollector(d, ck, true)
 	c.o.priv = func() (privIO, error) { return f, nil }
+	c.o.Run = offChanRun{klogDev: d, f: f}
 	return c, f, d, ck
 }
 
@@ -386,45 +429,101 @@ func TestOffChanUnconfirmedVisit(t *testing.T) {
 	}
 }
 
-// parseVisitLog counts this radio's start and end lines around the visit.
-func TestParseVisitLog(t *testing.T) {
-	log := "<4>x\n<4>ApSiteSurveyNew_by_wdev channel_index:3 channel:4 time:200\n" + mibFixtureLines +
+// The two lines the unit printed for `ApOffChanScan=passive:1:50` at the
+// module's own debug level (2026-11-20 03:4x), and the same visit at debug
+// level 3.
+const (
+	liveVisitLevel2 = "ApSiteSurveyNew_by_wdev channel_index:0 channel:1 time:50\n" +
+		"time_diff:44 Busytime:7017 AvgNF:-89\n"
+	liveVisitLevel3 = "<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:1 time:50\n" +
+		"<4>[APMlmeScanReqAction][2098] start offchannel scan on 1 : channel list index = 0\n" +
+		"<4>[ScanNextChannel][696] stay time configured of channel index = 0 time = 50\n" +
+		"<4>channel 1 busytime 6101\n" +
+		"<4>time_diff:44 Busytime:7017 AvgNF:-89\n" +
 		"<4>SYNC - End of SCAN, restore to 20MHz channel 6, Total BSS[02]\n"
-	v := parseVisitLog(log, "ng", 4)
-	if v.starts != 1 || v.idx != 3 || v.ms != 200 || v.ends != 1 || !slices.Equal(v.restore, []int{6}) || v.others != 0 || v.endsBefore != 0 {
-		t.Errorf("visit %+v", v)
+)
+
+// parseVisitLog counts the start, time_diff and level-3 lines around the
+// visit.
+func TestParseVisitLog(t *testing.T) {
+	v := parseVisitLog(mibFixtureLines+liveVisitLevel2, "ng", 1)
+	if v.starts != 1 || v.idx != 0 || v.ms != 50 || !slices.Equal(v.done, []int{44}) || v.doneBefore != 0 || v.others != 0 ||
+		v.mib != 1 || v.level3() || !dwellOK(v.done[0], 50) {
+		t.Errorf("live visit at debug level 2: %+v", v)
 	}
-	// the 5 GHz radio's own scans are not this radio's
-	v = parseVisitLog("<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:36 time:0\n<4>SYNC - End of SCAN, restore to 80MHz channel 157, Total BSS[02]\n"+log, "ng", 4)
-	if v.starts != 1 || v.others != 0 || v.ends != 1 || v.endsBefore != 0 {
-		t.Errorf("with a 5 GHz scan: %+v", v)
+	v = parseVisitLog(mibFixtureLines+liveVisitLevel3, "ng", 1)
+	if v.starts != 1 || !slices.Equal(v.done, []int{44}) || v.begun != 1 || !slices.Equal(v.restore, []int{6}) ||
+		v.restoreBefore != 0 || v.others != 0 || !v.level3() {
+		t.Errorf("live visit at debug level 3: %+v", v)
 	}
-	// an end before the start: another scan was running
-	v = parseVisitLog("<4>SYNC - End of SCAN, restore to 20MHz channel 6, Total BSS[02]\n"+log, "ng", 4)
-	if v.endsBefore != 1 {
+	log := liveVisitLevel2
+	// the 5 GHz radio's "End of SCAN" is not this radio's; its start lines
+	// are another scan (the time_diff line names no radio)
+	v = parseVisitLog("<4>SYNC - End of SCAN, restore to 80MHz channel 157, Total BSS[02]\n"+log, "ng", 1)
+	if v.starts != 1 || v.others != 0 || len(v.restore) != 0 || v.restoreBefore != 0 || v.level3() {
+		t.Errorf("with a 5 GHz end line: %+v", v)
+	}
+	v = parseVisitLog("<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:36 time:50\n"+log, "ng", 1)
+	if v.others != 1 {
+		t.Errorf("with a 5 GHz visit: %+v", v)
+	}
+	// a time_diff before the start: another off-channel visit ended in
+	// the window
+	v = parseVisitLog("time_diff:194 Busytime:1 AvgNF:-90\n"+log, "ng", 1)
+	if v.doneBefore != 1 || !slices.Equal(v.done, []int{44}) {
+		t.Errorf("time_diff before the start: %+v", v)
+	}
+	// an "End of SCAN" before the start: another scan was running
+	v = parseVisitLog("<4>SYNC - End of SCAN, restore to 20MHz channel 6, Total BSS[02]\n"+log, "ng", 1)
+	if v.restoreBefore != 1 || !v.level3() {
 		t.Errorf("end before the start: %+v", v)
 	}
-	v = parseVisitLog("<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:1 time:200\n"+log, "ng", 4)
-	if v.others != 1 {
+	v = parseVisitLog("<4>ApSiteSurveyNew_by_wdev channel_index:3 channel:4 time:50\n"+log, "ng", 1)
+	if v.others != 1 || v.starts != 1 {
 		t.Errorf("another channel's visit: %+v", v)
 	}
 	// channel 0 is a full-band survey of either radio: a foreign scan, not
 	// nothing
-	v = parseVisitLog(log+"<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:0 time:0\n", "ng", 4)
+	v = parseVisitLog(log+"<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:0 time:0\n", "ng", 1)
 	if v.others != 1 {
 		t.Errorf("a full-band survey's start line: %+v", v)
 	}
+	// a hijacked visit at level 3: our start line, the running scan's end,
+	// no time_diff and no "start offchannel scan"
+	v = parseVisitLog("<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:1 time:50\n<4>SYNC - End of SCAN, restore to 20MHz channel 6, Total BSS[02]\n", "ng", 1)
+	if v.starts != 1 || len(v.done) != 0 || v.begun != 0 || !slices.Equal(v.restore, []int{6}) {
+		t.Errorf("hijacked at level 3: %+v", v)
+	}
 }
 
-// Without the end line (the driver's debug level below 3) no visit can be
-// confirmed to have ended: the band stops at the first visit, before any
-// other channel is visited or the survey runs.
+// dwellOK: time_diff is ms + 1 as a u8, after a ms/10-jiffy timer (HZ
+// 100) and the MLME's delay.
+func TestDwellOK(t *testing.T) {
+	for _, c := range []struct {
+		t, ms int
+		ok    bool
+	}{
+		{44, 50, true}, // live
+		{40, 50, true}, {39, 50, false}, {110, 50, true}, {111, 50, false},
+		{194, 200, true}, {190, 200, true}, {255, 200, true}, {4, 200, true}, {5, 200, false}, {150, 200, false},
+		{(291) & 0xff, 250, true}, {(317) & 0xff, 250, false}, {200, 250, false},
+		{3, 5, true}, {0, 10, true},
+	} {
+		if got := dwellOK(c.t, c.ms); got != c.ok {
+			t.Errorf("dwellOK(%d, %d) = %v, want %v", c.t, c.ms, got, c.ok)
+		}
+	}
+}
+
+// Without the time_diff line (the driver's debug level below 2) no visit
+// can be confirmed to have ended: the band stops at the first visit,
+// before any other channel is visited or the survey runs.
 func TestOffChanNoEndLine(t *testing.T) {
 	c, f, d, _ := offChanUnit(t)
-	f.noEnd = true
+	f.level = 1
 	r, _ := c.Spectrum(context.Background(), "ng")
 	_, err := r.Run(context.Background(), wl.SpectrumRequest{})
-	if err == nil || !strings.Contains(err.Error(), "End of SCAN") {
+	if !errors.Is(err, errNoEnd) || !strings.Contains(err.Error(), "time_diff") {
 		t.Fatalf("Run: %v", err)
 	}
 	if got := f.sets(); len(got) != 1 {
@@ -438,14 +537,48 @@ func TestOffChanNoEndLine(t *testing.T) {
 	}
 }
 
-// The radio restored to a channel that is not its own: the band stops.
-func TestOffChanNotBackHome(t *testing.T) {
+// At debug level 3 the band runs as at 2, the extra lines agreeing.
+func TestOffChanLevel3Sweep(t *testing.T) {
 	c, f, _, _ := offChanUnit(t)
-	f.away = 3
+	f.level = 3
+	f.busy[1] = 24000
 	r, _ := c.Spectrum(context.Background(), "ng")
-	if _, err := r.Run(context.Background(), wl.SpectrumRequest{}); !errors.Is(err, wl.ErrChanspecChanged) || len(f.sets()) != 1 {
-		t.Errorf("Run: %v after %v", err, f.sets())
+	res, err := r.Run(context.Background(), wl.SpectrumRequest{})
+	if err != nil {
+		t.Fatalf("Run: %v (diag %+v)", err, res.Diag.Calls)
 	}
+	if got := f.sets(); !slices.Equal(got, f.list) {
+		t.Errorf("visits %v", got)
+	}
+	if len(res.Rows[20]) != 11 || res.Rows[20][0].Utilization != 12 {
+		t.Errorf("rows %+v", res.Rows[20])
+	}
+}
+
+// The radio restored to a channel that is not its own (the "End of SCAN"
+// line, debug level 3), or iwconfig names another channel after a visit
+// (any level): the band stops.
+func TestOffChanNotBackHome(t *testing.T) {
+	t.Run("end line", func(t *testing.T) {
+		c, f, _, _ := offChanUnit(t)
+		f.level, f.away = 3, 3
+		r, _ := c.Spectrum(context.Background(), "ng")
+		if _, err := r.Run(context.Background(), wl.SpectrumRequest{}); !errors.Is(err, wl.ErrChanspecChanged) || len(f.sets()) != 1 {
+			t.Errorf("Run: %v after %v", err, f.sets())
+		}
+	})
+	t.Run("iwconfig", func(t *testing.T) {
+		c, f, d, _ := offChanUnit(t)
+		f.moveTo[3] = 11
+		r, _ := c.Spectrum(context.Background(), "ng")
+		_, err := r.Run(context.Background(), wl.SpectrumRequest{})
+		if !errors.Is(err, wl.ErrChanspecChanged) || !strings.Contains(err.Error(), "channel 11 after the visit to 3") || !slices.Equal(f.sets(), []int{1, 2, 3}) {
+			t.Errorf("Run: %v after %v", err, f.sets())
+		}
+		if slices.Contains(d.iwpriv(), "iwpriv ra0 set SiteSurvey=1") {
+			t.Error("surveyed after the band stopped")
+		}
+	})
 }
 
 // Gates: a radio restart (or its settle time) stops the band before the
@@ -613,28 +746,88 @@ func TestOffChanSilentSet(t *testing.T) {
 }
 
 // A scan already running when the request comes (a driver scan through
-// ApSiteSurvey prints no start line) takes our list index and ends with its
-// own end line: our start line and one end line, the slot naming our
-// channel, but the MLME never started our visit ("start offchannel scan"
-// missing) and the slot holds that scan's busy time. Not trusted: visited
-// again.
+// ApSiteSurvey prints no start line) takes our list index and ends: our
+// start line, the slot naming our channel with that scan's busy time, and
+// no time_diff (the MLME never ran our visit). At debug level 3 its "End
+// of SCAN" line shows the radio back with no visit of ours: not trusted,
+// visited again. At level 2 nothing tells it from a visit that never
+// ended: the band stops.
 func TestOffChanHijackedVisit(t *testing.T) {
-	c, f, _, _ := offChanUnit(t)
-	ctx := context.Background()
-	f.busy[4] = 8000
-	f.hijack[4], f.hijackBusy = 1, 160000
-	r, _ := c.Spectrum(ctx, "ng")
-	res, err := r.Run(ctx, wl.SpectrumRequest{})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if got := f.sets(); len(got) != 12 || got[11] != 4 {
-		t.Errorf("visits %v: want 1..11 and 4 again", got)
-	}
-	for _, row := range res.Rows[20] {
-		if row.Channel == 4 && row.Utilization != 4 {
-			t.Errorf("ch 4 utilization %d, want 4 (the real visit, not the other scan's 80)", row.Utilization)
+	t.Run("level 3", func(t *testing.T) {
+		c, f, _, _ := offChanUnit(t)
+		ctx := context.Background()
+		f.level = 3
+		f.busy[4] = 8000
+		f.hijack[4], f.hijackBusy = 1, 160000
+		r, _ := c.Spectrum(ctx, "ng")
+		res, err := r.Run(ctx, wl.SpectrumRequest{})
+		if err != nil {
+			t.Fatalf("Run: %v", err)
 		}
+		if got := f.sets(); len(got) != 12 || got[11] != 4 {
+			t.Errorf("visits %v: want 1..11 and 4 again", got)
+		}
+		for _, row := range res.Rows[20] {
+			if row.Channel == 4 && row.Utilization != 4 {
+				t.Errorf("ch 4 utilization %d, want 4 (the real visit, not the other scan's 80)", row.Utilization)
+			}
+		}
+	})
+	t.Run("level 2", func(t *testing.T) {
+		c, f, _, _ := offChanUnit(t)
+		ctx := context.Background()
+		f.hijack[4], f.hijackBusy = 1, 160000
+		r, _ := c.Spectrum(ctx, "ng")
+		if _, err := r.Run(ctx, wl.SpectrumRequest{}); !errors.Is(err, errNoEnd) || !slices.Equal(f.sets(), []int{1, 2, 3, 4}) {
+			t.Errorf("Run: %v after %v", err, f.sets())
+		}
+	})
+}
+
+// A visit whose time_diff does not fit the dwell (the timer ran far
+// late), or another off-channel visit's time_diff in the window (before
+// our start line), or the other radio's visit (its time_diff could be the
+// one we see): not trusted, visited again.
+func TestOffChanForeignOrLateEnd(t *testing.T) {
+	// a line written once, when the request for channel 5 comes (before
+	// its start line)
+	once := func(f *fakeMT7603, line string) {
+		f.hook = func(call string) {
+			if strings.Contains(call, "passive:5:") {
+				f.hook = nil
+				f.d.log.WriteString(line)
+			}
+		}
+	}
+	for name, tc := range map[string]struct {
+		set func(f *fakeMT7603)
+		why string
+	}{
+		"late":        {func(f *fakeMT7603) { f.timeDiff[5] = (200 + 80) & 0xff }, "dwell ended at time_diff 24, asked 200 ms"},
+		"before":      {func(f *fakeMT7603) { once(f, "<4>time_diff:194 Busytime:100 AvgNF:-90\n") }, "1 time_diff line(s) after its start, 1 before"},
+		"5 GHz visit": {func(f *fakeMT7603) { once(f, "<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:36 time:200\n") }, "1 other scan line(s)"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c, f, _, _ := offChanUnit(t)
+			tc.set(f)
+			r, _ := c.Spectrum(context.Background(), "ng")
+			res, err := r.Run(context.Background(), wl.SpectrumRequest{})
+			if err != nil {
+				t.Fatalf("Run: %v", err)
+			}
+			if got := f.sets(); len(got) != 12 || got[11] != 5 {
+				t.Errorf("visits %v: want 1..11 and 5 again", got)
+			}
+			var why string
+			for _, cd := range res.Diag.Calls {
+				if cd.Channel == 5 && !cd.Retry {
+					why = cd.Err
+				}
+			}
+			if !strings.Contains(why, tc.why) {
+				t.Errorf("untrusted visit's reason %q, want %q", why, tc.why)
+			}
+		})
 	}
 }
 

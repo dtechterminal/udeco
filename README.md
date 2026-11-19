@@ -248,9 +248,11 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   yet measured on the unit: how long clients stall during a 5 GHz survey,
   whether the survey's end is detected correctly on the quiet 5 GHz DFS
   channels, and a sweep run by the agent itself (the visits were verified
-  with a probe; the agent also needs the driver's "start offchannel scan"
-  log line for each visit, read from the module but not yet seen on the
-  unit). Check these before turning it on.
+  with a probe; the agent confirms each visit's end from the driver's
+  "time_diff" log line, which the unit prints at its default debug level,
+  and its channel from iwconfig; `iwpriv ra0 set Debug=0` or `1` silences
+  that line and every 2.4 GHz sweep then stops). Check these before turning
+  it on.
 - **LAN ports (`"model": "UHDIW"`):** the unit can instead report as a
   UAP-IW-HD: LAN ports 1-3, port 4 absent, the uplink as rear port 5. With
   Enable Port VLAN on, the controller's port VLANs apply to ports 2 and 3

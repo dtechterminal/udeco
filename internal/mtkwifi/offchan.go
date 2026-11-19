@@ -31,22 +31,32 @@ import (
 //     channel ch for one dwell of ms (u8, 10 ms timer) and back to its own
 //     channel. It never changes the operating channel or restarts the AP
 //     (live: the radio stayed on channel 6; a client pinged through a
-//     13-visit sweep at 100 ms). ApSiteSurveyNew_by_wdev prints, at any
-//     debug level, "ApSiteSurveyNew_by_wdev channel_index:<i> channel:<ch>
-//     time:<ms>" when the visit starts; ScanNextChannel prints "SYNC - End
-//     of SCAN, restore to <bw>MHz channel <home>, ..." when it is back, at
-//     debug level 3 and up (the unit runs at the vendor's level: the live
-//     test saw it on every visit). In between, at the same level,
-//     APMlmeScanReqAction prints "start offchannel scan on <ch> : channel
-//     list index = 0" when the MLME takes the request up: a scan already
-//     running (the driver's own channel check, or any scan through
-//     ApSiteSurvey, which prints no start line) ends with the same end
-//     line, after writing its own busy time into our slot (the request
-//     moved the list index), and never prints it. A channel off the
-//     driver's list is refused by ChannelSanity: no visit, no start line,
-//     and the ioctl fails with EINVAL (the handler returns 0, which
-//     RTMPAPPrivIoctlSet maps to -EINVAL). Its "Network is down" return
-//     reads as success with no visit.
+//     13-visit sweep at 100 ms). The kernel log, at the module's own debug
+//     level (RTDebugLevel starts at 2 in its .data; the live tests of
+//     2026-11-20 03:4x printed exactly these two lines for a 50 ms visit):
+//     ApSiteSurveyNew_by_wdev prints "ApSiteSurveyNew_by_wdev
+//     channel_index:<i> channel:<ch> time:<ms>" (at any level) when the
+//     request is queued, and at the end of the dwell UpdateChannelInfo
+//     prints "time_diff:<t> Busytime:<x> AvgNF:<dBm>" (level 2 and up),
+//     t = ms since ScanNextChannel armed the dwell timer, + 1, as a u8
+//     (live: 44 for 50 ms: the timer is armed for ms/10 jiffies at HZ 100;
+//     Busytime is the CCA/NAV/TX register, not the score's unit). It
+//     prints it only while an ApOffChanScan runs (ScanCtrl state 1 or 2,
+//     set by APMlmeScanReqAction when the MLME takes our request up), never
+//     for a full-band survey, and APScanTimeoutAction restores the radio
+//     to its channel right after it in the same call. A scan already
+//     running when the request comes (the driver's own channel check, any
+//     scan through ApSiteSurvey: no start line) takes the request's list
+//     index, writes its own busy time into our slot and ends without a
+//     time_diff: our visit never ran. At level 3 there is more: "start
+//     offchannel scan on <ch> : channel list index = 0"
+//     (APMlmeScanReqAction) and "SYNC - End of SCAN, restore to <bw>MHz
+//     channel <home>, ..." (scan_ch_restore); used when present, never
+//     needed. A channel off the driver's list is refused by ChannelSanity:
+//     no visit, no start line, and the ioctl fails with EINVAL (the
+//     handler returns 0, which RTMPAPPrivIoctlSet maps to -EINVAL; live:
+//     channel 13). Its "Network is down" return reads as success with no
+//     visit.
 //   - At the end of the dwell UpdateChannelInfo reads MIB 0x2c048 "Prim CCA
 //     Time" (read-clear, 24 bits, µs) and stores score = max(0, 100 -
 //     busy/4000) with the channel in the slot of the channel's list index.
@@ -80,19 +90,27 @@ import (
 // must be up; any of them stops the band (old table kept, abnormal). Each
 // visit: kernel log read, the request's buffer built, pre-clear, the
 // request (nothing between the two syscalls), Dwell + Settle (250 ms),
-// kernel log read, slot read. The visit is trusted only when the log added
-// since the first read (anchored, newLogAnchored) holds exactly one start
-// line of this radio, for this channel with this dwell, one "start
-// offchannel scan" line for it after that, then one end line back on the
-// home channel, no other scan's start line (a channel-0 start line, a
-// full-band survey of either radio, counts as one), no MIB block but the
-// pre-clear's (another `show mibinfo` would have cleared the counter in
-// the dwell), the pre-clear-to-request time within PreClearMax, and the
-// start line's slot names the channel. With a start and no end within
-// EndWait more, the radio's state is unknown and the band stops; an end on
-// another channel stops it too (wl.ErrChanspecChanged). A visit not
-// trusted otherwise (another scan's lines, a slot from an earlier visit, a
-// request that started no visit) is retried once after the last channel;
+// kernel log read, the radio's channel (iwconfig), slot read. The visit
+// is trusted only when the log added since the first read (anchored,
+// newLogAnchored) holds exactly one start line, of this radio's band, for
+// this channel with this dwell, then exactly one time_diff line and none
+// before it, its time fitting the dwell (dwellOK: (dwell/10 - 1) × 10 to
+// dwell + 60 ms), no other scan's start line (another channel's, a
+// channel-0 one of a full-band survey of either radio, or one of the
+// other radio: the time_diff line names neither channel nor radio), the
+// level-3 lines, when there are any, agreeing (one "start offchannel
+// scan" for it, one "End of SCAN" after it, none before), no MIB block
+// but the pre-clear's (another `show mibinfo` would have cleared the
+// counter in the dwell), the pre-clear-to-request time within
+// PreClearMax, and the start line's slot names the channel. With a start
+// and neither a time_diff nor an "End of SCAN" within EndWait more, the
+// visit's end is unknown and the band stops (errNoEnd: also what a debug
+// level below 2 gives, and a visit hijacked at level 2, which nothing
+// tells from one that never ended); an operating channel other than the band's home
+// after a visit, or an "End of SCAN" on another channel, stops it too
+// (wl.ErrChanspecChanged). A visit not trusted otherwise (another scan's
+// lines, a slot from an earlier visit, a request that started no visit, a
+// hijacked visit seen at level 3) is retried once after the last channel;
 // still not trusted, the channel is missing and the band fails
 // (wl.ErrIncomplete). A refused channel (EINVAL, and no start line for it
 // in the anchored log) is unmeasured: no row, nor any 40 MHz block
@@ -293,25 +311,38 @@ func parseScores(b []byte) []slot {
 
 var (
 	visitStart = regexp.MustCompile(`ApSiteSurveyNew_by_wdev channel_index:(\d+) channel:(\d+) time:(\d+)`)
-	// APMlmeScanReqAction, when the MLME takes an off-channel request up
-	// (debug level 3, as the end line)
+	// UpdateChannelInfo at the end of an ApOffChanScan dwell: ms from the
+	// dwell's start + 1, as a u8 (debug level 2 and up, the module's
+	// default); it names no channel and no radio
+	visitDone = regexp.MustCompile(`time_diff:(\d+) Busytime:`)
+	// debug level 3 only, extra evidence when present (never required):
+	// APMlmeScanReqAction when the MLME takes an off-channel request up,
+	// and scan_ch_restore when the radio is back
 	visitBegun = regexp.MustCompile(`start offchannel scan on (\d+) : channel list index`)
 	visitEnd   = regexp.MustCompile(`SYNC - End of SCAN, restore to \d+MHz channel (\d+)`)
 )
 
-// visitLog is what one visit's kernel-log lines say (of this radio's
-// band only).
+// visitLog is what one visit's kernel-log lines say.
 type visitLog struct {
+	// start lines for other channels of the band, for channel 0 (a
+	// full-band survey, either radio), or for a channel of the other band
+	// (the end line names no radio); "start offchannel scan" lines for
+	// another channel, or for this one before its start line
+	others     int
 	starts     int   // start lines for the channel
-	others     int   // start lines for other channels of the band, or for channel 0 (a full-band survey, either radio)
-	begun      int   // "start offchannel scan" lines for the channel after its start line
-	mib        int   // MIB blocks (Prim CCA Time lines): the pre-clear's, and any other reader's
 	idx, ms    int   // the channel's (last) start line: list index, dwell
-	ends       int   // end lines after the last start line of the band
-	endsBefore int   // end lines of the band before it
-	restore    []int // the channels the ends after it name
-	any        bool  // any start or end line of the band
+	mib        int   // MIB blocks (Prim CCA Time lines): the pre-clear's, and any other reader's
+	done       []int // the time_diff values after the channel's start line
+	doneBefore int   // time_diff lines before it (another off-channel visit's)
+	// debug level 3 lines (none at the module's default level)
+	begun         int   // "start offchannel scan" lines for the channel after its start line
+	restore       []int // the channels the "End of SCAN" lines after the band's last start line name
+	restoreBefore int   // "End of SCAN" lines of the band before it
 }
+
+// level3: the log holds debug-level-3 lines of the band (then they must
+// agree with the visit).
+func (v visitLog) level3() bool { return v.begun > 0 || len(v.restore) > 0 || v.restoreBefore > 0 }
 
 // parseVisitLog reads the lines a visit to ch added to the kernel log.
 func parseVisitLog(log, band string, ch int) visitLog {
@@ -319,17 +350,14 @@ func parseVisitLog(log, band string, ch int) visitLog {
 	last, own := -1, -1
 	for _, m := range visitStart.FindAllStringSubmatchIndex(log, -1) {
 		c, _ := strconv.Atoi(log[m[4]:m[5]])
-		if c == 0 {
-			// ApSiteSurveyNew_by_wdev of a full-band survey: of this
-			// radio or the other, a scan that is not ours either way
-			v.any = true
+		if c == 0 || !inBand(c, band) {
+			// a full-band survey (ApSiteSurveyNew_by_wdev with channel 0,
+			// this radio or the other) or the other radio's visit: a scan
+			// that is not ours, whose end line could pass for ours
 			v.others++
 			continue
 		}
-		if !inBand(c, band) {
-			continue
-		}
-		v.any, last = true, m[1]
+		last = m[1]
 		if c != ch {
 			v.others++
 			continue
@@ -339,13 +367,21 @@ func parseVisitLog(log, band string, ch int) visitLog {
 		v.idx, _ = strconv.Atoi(log[m[2]:m[3]])
 		v.ms, _ = strconv.Atoi(log[m[6]:m[7]])
 	}
+	for _, m := range visitDone.FindAllStringSubmatchIndex(log, -1) {
+		if own >= 0 && m[0] > own {
+			t, _ := strconv.Atoi(log[m[2]:m[3]])
+			v.done = append(v.done, t)
+		} else {
+			v.doneBefore++
+		}
+	}
 	for _, m := range visitBegun.FindAllStringSubmatchIndex(log, -1) {
 		c, _ := strconv.Atoi(log[m[2]:m[3]])
 		switch {
 		case !inBand(c, band):
-		case c != ch:
+		case c != ch || own < 0 || m[0] < own:
 			v.others++
-		case own >= 0 && m[0] > own:
+		default:
 			v.begun++
 		}
 	}
@@ -354,16 +390,34 @@ func parseVisitLog(log, band string, ch int) visitLog {
 		if !inBand(c, band) {
 			continue
 		}
-		v.any = true
 		if last >= 0 && m[0] > last {
-			v.ends++
 			v.restore = append(v.restore, c)
 		} else {
-			v.endsBefore++
+			v.restoreBefore++
 		}
 	}
 	return v
 }
+
+// dwellOK: time_diff t (UpdateChannelInfo: (ms since ScanNextChannel armed
+// the dwell timer) + 1, kept as a u8) fits a dwell of ms. The timer is
+// armed for ms/10 jiffies (RTMP_OS_Add_Timer: ms × 100 / 1000, HZ 100), so
+// it fires more than (ms/10 - 1) × 10 ms after the start, and the MLME
+// runs APScanTimeoutAction after it: from (ms/10 - 1) × 10 to ms + 60
+// (dwellLate) is accepted (live: 44 at 50 ms).
+func dwellOK(t, ms int) bool {
+	lo, hi := max(0, (ms/10-1)*10), ms+dwellLate
+	for x := t; x <= hi; x += 256 {
+		if x >= lo {
+			return true
+		}
+	}
+	return false
+}
+
+// dwellLate: how much later than the asked dwell its end may be printed
+// (the timer's last jiffy and the MLME task's delay).
+const dwellLate = 60
 
 // visit classes (wl.CallDiag.Class)
 const (
@@ -380,9 +434,13 @@ type visitResult struct {
 	gap   time.Duration // from the pre-clear's start to the request's return
 }
 
-var errNoEnd = errors.New("mtkwifi: no \"End of SCAN\" line after an off-channel visit: the radio's return to its channel is not confirmed")
+// errNoEnd: a visit started and no end of its dwell was logged. The
+// time_diff line needs the driver's debug level 2 or more (the module's
+// default; `iwpriv ra0 set Debug=0` or 1 silences it, and every band then
+// stops here).
+var errNoEnd = errors.New("mtkwifi: no \"time_diff\" line (UpdateChannelInfo, the end of the dwell) after an off-channel visit's start: its end is not confirmed (the line needs the driver's debug level 2, the module's default)")
 
-// homeOK: the end line's channel is the radio's own: its control channel,
+// homeOK: the "End of SCAN" line's channel is the radio's own: its control channel,
 // or at 40 MHz the centre the driver restores to (control ± 2).
 func homeOK(restore, home, width int) bool {
 	return restore == home || (width == 40 && (restore == home-2 || restore == home+2))
@@ -438,6 +496,22 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 		c.o.sleep(context.Background(), pl.EndWait)
 		return visitResult{gap: gap}, err
 	}
+	// the radio's operating channel (iwconfig) after the visit: the
+	// dwell's end path (APScanTimeoutAction) restores the radio to its
+	// configured channel right after the time_diff line, and at debug
+	// level 2 nothing logs which one; iwconfig stayed on the home channel
+	// through the live visits, and an AP restart or a channel change moves
+	// it
+	backHome := func() error {
+		now, err := b.opChannel(ctx)
+		if err != nil {
+			return err
+		}
+		if now != home {
+			return fmt.Errorf("%w: on channel %d after the visit to %d, was %d", wl.ErrChanspecChanged, now, ch, home)
+		}
+		return nil
+	}
 	v, anchored, err := read()
 	if err != nil {
 		return visitResult{gap: gap}, err
@@ -445,7 +519,12 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 	if !anchored {
 		// the ring wrapped past the anchor: nothing in the log can be
 		// placed; give a visit that may run time to end
-		c.o.sleep(ctx, pl.EndWait)
+		if err := c.o.sleep(ctx, pl.EndWait); err != nil {
+			return visitResult{gap: gap}, err
+		}
+		if err := backHome(); err != nil {
+			return visitResult{gap: gap}, err
+		}
 		return visitResult{class: visitUnconfirmed, why: "kernel log not anchored", gap: gap}, nil
 	}
 	if v.starts == 0 {
@@ -454,7 +533,11 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 		// refused channel
 		return visitResult{class: visitUnconfirmed, why: "the request started no visit (no start line)", gap: gap}, nil
 	}
-	for waited := time.Duration(0); v.ends == 0 && waited < pl.EndWait; waited += pl.EndPoll {
+	// ended: our dwell's time_diff, or (debug level 3) an "End of SCAN"
+	// after our start line (a scan already running that took our request
+	// up ends with one and prints no time_diff)
+	ended := func(v visitLog) bool { return len(v.done) > 0 || len(v.restore) > 0 }
+	for waited := time.Duration(0); !ended(v) && waited < pl.EndWait; waited += pl.EndPoll {
 		if err := c.o.sleep(ctx, pl.EndPoll); err != nil {
 			return visitResult{}, err
 		}
@@ -462,7 +545,7 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 			return visitResult{}, err
 		}
 	}
-	if v.ends == 0 {
+	if !ended(v) {
 		return visitResult{}, fmt.Errorf("%w (channel %d)", errNoEnd, ch)
 	}
 	for _, r := range v.restore {
@@ -470,18 +553,27 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 			return visitResult{}, fmt.Errorf("%w: back on channel %d after the visit to %d, not %d", wl.ErrChanspecChanged, r, ch, home)
 		}
 	}
+	if err := backHome(); err != nil {
+		return visitResult{}, err
+	}
 	unconfirmed := func(format string, a ...any) (visitResult, error) {
 		return visitResult{class: visitUnconfirmed, why: fmt.Sprintf(format, a...), gap: gap}, nil
 	}
 	switch {
-	case v.starts != 1 || v.others > 0 || v.ends != 1 || v.endsBefore > 0:
-		return unconfirmed("%d start(s) for it, %d for others, %d end(s), %d earlier end(s)",
-			v.starts, v.others, v.ends, v.endsBefore)
-	case v.begun != 1:
-		// a scan already running (one that prints no start line, such as
-		// the driver's own channel check) ended with its own end line and
-		// left its busy time in our slot; or our request was dropped
-		return unconfirmed("%d \"start offchannel scan\" line(s) for it: the driver did not run this visit", v.begun)
+	case v.starts != 1 || v.others > 0:
+		return unconfirmed("%d start(s) for it, %d other scan line(s)", v.starts, v.others)
+	case len(v.done) != 1 || v.doneBefore > 0:
+		// none: a scan already running (one that prints no start line,
+		// such as the driver's own channel check) took the request up,
+		// ended with its own "End of SCAN" and left its busy time in our
+		// slot; our visit never ran. More, or one before our start:
+		// another off-channel visit's
+		return unconfirmed("%d time_diff line(s) after its start, %d before: the driver did not run this visit alone", len(v.done), v.doneBefore)
+	case v.level3() && (v.begun != 1 || len(v.restore) != 1 || v.restoreBefore > 0):
+		return unconfirmed("debug level 3: %d \"start offchannel scan\" line(s) for it, %d \"End of SCAN\" line(s) after it, %d before",
+			v.begun, len(v.restore), v.restoreBefore)
+	case !dwellOK(v.done[0], ms):
+		return unconfirmed("dwell ended at time_diff %d, asked %d ms", v.done[0], ms)
 	case v.ms != ms:
 		return unconfirmed("dwell %d ms, asked %d", v.ms, ms)
 	case v.mib > 1:
@@ -513,19 +605,28 @@ func (b *offChan) homeChannel(ctx context.Context) (home, width int, err error) 
 	if !c.isUp(b.main()) {
 		return 0, 0, ErrRadioDown
 	}
-	out, err := c.o.Run.Run(ctx, "iwconfig", b.main())
+	if home, err = b.opChannel(ctx); err != nil {
+		return 0, 0, err
+	}
+	return home, c.radioWidth(b.rd), nil
+}
+
+// opChannel reads the radio's operating channel (iwconfig); the caller
+// holds the restart gate.
+func (b *offChan) opChannel(ctx context.Context) (int, error) {
+	out, err := b.c.o.Run.Run(ctx, "iwconfig", b.main())
 	if err != nil {
-		return 0, 0, fmt.Errorf("iwconfig %s: %w", b.main(), err)
+		return 0, fmt.Errorf("iwconfig %s: %w", b.main(), err)
 	}
 	m := chanRE.FindSubmatch(out)
 	if m == nil {
-		return 0, 0, fmt.Errorf("iwconfig %s: no channel", b.main())
+		return 0, fmt.Errorf("iwconfig %s: no channel", b.main())
 	}
-	home, _ = strconv.Atoi(string(m[1]))
-	if home <= 0 {
-		return 0, 0, fmt.Errorf("iwconfig %s: channel %d", b.main(), home)
+	ch, _ := strconv.Atoi(string(m[1]))
+	if ch <= 0 {
+		return 0, fmt.Errorf("iwconfig %s: channel %d", b.main(), ch)
 	}
-	return home, c.radioWidth(b.rd), nil
+	return ch, nil
 }
 
 // listOf reads the channel list under the restart gate.
