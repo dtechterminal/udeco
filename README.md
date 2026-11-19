@@ -250,9 +250,13 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   channels, and a sweep run by the agent itself (the visits were verified
   with a probe; the agent confirms each visit's end from the driver's
   "time_diff" log line, which the unit prints at its default debug level,
-  and its channel from iwconfig; `iwpriv ra0 set Debug=0` or `1` silences
-  that line and every 2.4 GHz sweep then stops). Check these before turning
-  it on.
+  and from iwconfig that the radio was not restarted or moved; `iwpriv ra0
+  set Debug=0` or `1` silences that line and every 2.4 GHz sweep then
+  stops). A sweep waits for, or stops on, an off-channel scan it did not
+  start, and does not trust a visit another running scan took over when
+  that scan's end comes before the visit's could; an ACS scan (400 ms a
+  channel) can still end one later, unseen. Check these before turning it
+  on.
 - **LAN ports (`"model": "UHDIW"`):** the unit can instead report as a
   UAP-IW-HD: LAN ports 1-3, port 4 absent, the uplink as rear port 5. With
   Enable Port VLAN on, the controller's port VLANs apply to ports 2 and 3

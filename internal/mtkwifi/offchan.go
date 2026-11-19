@@ -41,22 +41,31 @@ import (
 //     t = ms since ScanNextChannel armed the dwell timer, + 1, as a u8
 //     (live: 44 for 50 ms: the timer is armed for ms/10 jiffies at HZ 100;
 //     Busytime is the CCA/NAV/TX register, not the score's unit). It
-//     prints it only while an ApOffChanScan runs (ScanCtrl state 1 or 2,
-//     set by APMlmeScanReqAction when the MLME takes our request up), never
-//     for a full-band survey, and APScanTimeoutAction restores the radio
-//     to its channel right after it in the same call. A scan already
-//     running when the request comes (the driver's own channel check, any
-//     scan through ApSiteSurvey: no start line) takes the request's list
-//     index, writes its own busy time into our slot and ends without a
+//     prints it only while the ScanCtrl state is 1 or 2, which
+//     Set_ApOffChanScan_Proc sets in the ioctl itself (state 1, one
+//     channel), never for a full-band survey, and APScanTimeoutAction
+//     restores the radio to its channel right after it in the same call.
+//     The start line's only caller is Set_ApOffChanScan_Proc: every other
+//     scan (`set SiteSurvey`, ACS, the driver's own scans) goes through
+//     ApSiteSurvey and prints nothing at level 2. A scan already
+//     running when the request comes (the ioctl does not check) takes it
+//     over: the MLME drops our request (APInvalidStateWhenScan), and the
+//     running scan's next channel timeout sees the off-channel state, ends
+//     the scan with our list index, writes its own busy time into our slot
+//     labelled with our channel and prints one time_diff, timed from the
+//     last real off-channel dwell's start (stale: any value, a fitting one
+//     too), then restores the radio. Our start line, then exactly one
 //     time_diff: our visit never ran. At level 3 there is more: "start
 //     offchannel scan on <ch> : channel list index = 0"
-//     (APMlmeScanReqAction) and "SYNC - End of SCAN, restore to <bw>MHz
-//     channel <home>, ..." (scan_ch_restore); used when present, never
-//     needed. A channel off the driver's list is refused by ChannelSanity:
-//     no visit, no start line, and the ioctl fails with EINVAL (the
-//     handler returns 0, which RTMPAPPrivIoctlSet maps to -EINVAL; live:
-//     channel 13). Its "Network is down" return reads as success with no
-//     visit.
+//     (APMlmeScanReqAction: none for a request taken over) and "SYNC - End
+//     of SCAN, restore to <bw>MHz channel <home>, ..." (scan_ch_restore);
+//     used when present, never needed. An off-channel scan of more than
+//     one channel (never ours) prints "Next OFFChannel scan for : ..." at
+//     any level as it moves on. A channel off the driver's list is
+//     refused by ChannelSanity: no visit, no start line, and the ioctl
+//     fails with EINVAL (the handler returns 0, which RTMPAPPrivIoctlSet
+//     maps to -EINVAL; live: channel 13). Its "Network is down" return
+//     reads as success with no visit.
 //   - At the end of the dwell UpdateChannelInfo reads MIB 0x2c048 "Prim CCA
 //     Time" (read-clear, 24 bits, µs) and stores score = max(0, 100 -
 //     busy/4000) with the channel in the slot of the channel's list index.
@@ -83,35 +92,58 @@ import (
 // One band: under the collector's scan lock (one sweep, site survey or
 // survey read at a time), read the radio's channel (iwconfig) and width
 // (profile HT_BW) and the channel list, then one visit per channel, one
-// visit start every Every (1 s, so about 11 s for the band); before each
-// visit the guard (the agent's scanBlock: observe mode, an apply or
-// rollback, a TP-Link hold) and the restart gate (DriverRead, held for the
-// visit only: an apply waits at most one visit) are checked, and the radio
-// must be up; any of them stops the band (old table kept, abnormal). Each
-// visit: kernel log read, the request's buffer built, pre-clear, the
-// request (nothing between the two syscalls), Dwell + Settle (250 ms),
-// kernel log read, the radio's channel (iwconfig), slot read. The visit
-// is trusted only when the log added since the first read (anchored,
-// newLogAnchored) holds exactly one start line, of this radio's band, for
-// this channel with this dwell, then exactly one time_diff line and none
-// before it, its time fitting the dwell (dwellOK: (dwell/10 - 1) × 10 to
-// dwell + 60 ms), no other scan's start line (another channel's, a
-// channel-0 one of a full-band survey of either radio, or one of the
-// other radio: the time_diff line names neither channel nor radio), the
-// level-3 lines, when there are any, agreeing (one "start offchannel
-// scan" for it, one "End of SCAN" after it, none before), no MIB block
-// but the pre-clear's (another `show mibinfo` would have cleared the
-// counter in the dwell), the pre-clear-to-request time within
-// PreClearMax, and the start line's slot names the channel. With a start
-// and neither a time_diff nor an "End of SCAN" within EndWait more, the
-// visit's end is unknown and the band stops (errNoEnd: also what a debug
-// level below 2 gives, and a visit hijacked at level 2, which nothing
-// tells from one that never ended); an operating channel other than the band's home
-// after a visit, or an "End of SCAN" on another channel, stops it too
-// (wl.ErrChanspecChanged). A visit not trusted otherwise (another scan's
-// lines, a slot from an earlier visit, a request that started no visit, a
-// hijacked visit seen at level 3) is retried once after the last channel;
-// still not trusted, the channel is missing and the band fails
+// visit start every Every (1 s, so about 11 s for the band). Before each
+// visit (quiet): the kernel log since the sweep's last read (all of it
+// before the first band) must hold no off-channel scan the agent did not
+// start: no start line, of any channel or radio, and no "Next OFFChannel
+// scan" line (foreignScans; every line of the sweep's own is in a visit's
+// log, and the agent starts no other scan while the lock is held), and the
+// last visit's log no other scan's line. Else that scan may still run and
+// would take the visit over: the sweep waits ForeignQuiet (2 s; one
+// ApOffChanScan visit is 255 ms at most) and looks at what came in the
+// wait: nothing, and it goes on; more, and the band stops
+// (errForeignScan). Then the guard (the agent's scanBlock: observe mode,
+// an apply or rollback, a TP-Link hold) and the restart gate (DriverRead,
+// held for the visit only: an apply waits at most one visit) are checked,
+// and the radio must be up; any of them stops the band (old table kept,
+// abnormal). Each visit: the request's buffer built, pre-clear, the
+// request (nothing between the two syscalls), the early kernel-log read
+// EarlyLead (20 ms) before the dwell could end (dwellEarliest: 190 ms at
+// 200), the log read again at Dwell + Settle (250 ms), the radio's channel
+// (iwconfig), slot read. The visit's log is everything after quiet's read
+// (anchored, newLogAnchored). An end line (time_diff, or at level 3 "End
+// of SCAN") after our start line by the early read is not our dwell's: a
+// scan the agent did not start (most print no line at all) was running
+// and took the request over, and its value can fit ours; the visit is not
+// trusted, nor is one whose early read ended too late to tell. Otherwise
+// the visit is trusted only when its log holds exactly one start line, of
+// this radio's band, for this channel with this dwell, then exactly one
+// time_diff line and none before it, its time fitting the dwell (dwellOK:
+// (dwell/10 - 1) × 10 to dwell + 60 ms), no other scan's line (another
+// channel's start line, a channel-0 one, one of the other radio: the
+// time_diff line names neither channel nor radio; a "Next OFFChannel scan"
+// line), the level-3 lines, when there are any, agreeing (one "start
+// offchannel scan" for it, one "End of SCAN" after it, none before), no
+// MIB block but the pre-clear's (another `show mibinfo` would have cleared
+// the counter in the dwell), the pre-clear-to-request time within
+// PreClearMax, and the start line's slot names the channel. Not caught:
+// a scan with no line whose channel timer fires after the early read. Only
+// ACS scans dwell that long (400 ms a channel: `set AutoChannelSel`, or
+// the driver's periodic check, which runs only with a check period set
+// and no station associated; other scans dwell 140 ms at most); one that
+// takes a visit over at level 2 ends it with a time_diff in the dwell's
+// window roughly one time in six, and its busy time is trusted. With a
+// start and neither a time_diff nor an "End of SCAN" within EndWait more,
+// the visit's end is unknown and the band stops (errNoEnd: also what a
+// debug level below 2 gives); an operating channel other than the band's
+// home after a visit (iwconfig: the configured channel, which a visit
+// never changes, so this catches an AP restart or a channel change; the
+// radio's return itself is the time_diff, after which APScanTimeoutAction
+// restores it in the same call), or an "End of SCAN" on another channel,
+// stops it too (wl.ErrChanspecChanged). A visit not trusted otherwise
+// (another scan's lines, a slot from an earlier visit, a request that
+// started no visit, a visit taken over) is retried once after the last
+// channel; still not trusted, the channel is missing and the band fails
 // (wl.ErrIncomplete). A refused channel (EINVAL, and no start line for it
 // in the anchored log) is unmeasured: no row, nor any 40 MHz block
 // containing it; any other ioctl error stops the band.
@@ -163,13 +195,21 @@ type offChanPlan struct {
 	// request's return a visit may take (the home channel's busy time in
 	// between counts as the visit's; live with the probe: ~1.2 ms)
 	PreClearMax time.Duration
+	// ForeignQuiet: how long the sweep waits after an off-channel scan it
+	// did not start shows in the kernel log, before it looks again (one
+	// ApOffChanScan visit is at most 255 ms; a list scan prints a "Next
+	// OFFChannel scan" line per channel)
+	ForeignQuiet time.Duration
+	// EarlyLead: the early log read is made this long before the dwell's
+	// earliest end (dwellEarliest)
+	EarlyLead time.Duration
 }
 
 // defaultOffChanPlan: the live test's 200 ms dwell and dwell + 250 ms
 // wait; a visit a second.
 var defaultOffChanPlan = offChanPlan{Dwell: 200 * time.Millisecond, Settle: 250 * time.Millisecond,
 	EndWait: 2 * time.Second, EndPoll: 100 * time.Millisecond, Every: time.Second, Budget: time.Minute,
-	PreClearMax: 10 * time.Millisecond}
+	PreClearMax: 10 * time.Millisecond, ForeignQuiet: 2 * time.Second, EarlyLead: 20 * time.Millisecond}
 
 const (
 	oidACSScore = 0x2014 // OID_802_11_GET_ACS_CHANNEL_SCORE
@@ -194,6 +234,13 @@ type offChan struct {
 	mu    sync.Mutex
 	chans []int  // the channel list last read (nil: read it again)
 	src   string // where it came from
+
+	// the kernel log as the sweep last read it (its tail: the anchor of
+	// the next read; "" before the first band), and whether what it read
+	// last held another scan's lines. Used under the collector's scan lock
+	// only (Measure).
+	seen  string
+	dirty bool
 }
 
 // newOffChan returns the radio's backend.
@@ -320,14 +367,28 @@ var (
 	// and scan_ch_restore when the radio is back
 	visitBegun = regexp.MustCompile(`start offchannel scan on (\d+) : channel list index`)
 	visitEnd   = regexp.MustCompile(`SYNC - End of SCAN, restore to \d+MHz channel (\d+)`)
+	// APScanTimeoutAction, at any debug level, when an off-channel scan of
+	// more than one channel moves on to its next one (never for ours: one
+	// channel a request)
+	nextOffChan = regexp.MustCompile(`Next OFFChannel scan for :`)
 )
+
+// foreignScans counts the lines of off-channel scans in log, a part of the
+// kernel log that holds none of the sweep's own visits: every start line
+// (ApSiteSurveyNew_by_wdev, whose only caller is Set_ApOffChanScan_Proc:
+// someone else's `set ApOffChanScan`, channel 0 included, on either radio)
+// and every "Next OFFChannel scan" line.
+func foreignScans(log string) int {
+	return len(visitStart.FindAllStringIndex(log, -1)) + len(nextOffChan.FindAllStringIndex(log, -1))
+}
 
 // visitLog is what one visit's kernel-log lines say.
 type visitLog struct {
-	// start lines for other channels of the band, for channel 0 (a
-	// full-band survey, either radio), or for a channel of the other band
-	// (the end line names no radio); "start offchannel scan" lines for
-	// another channel, or for this one before its start line
+	// start lines for other channels of the band, for channel 0 (someone
+	// else's ApOffChanScan with no channel, either radio), or for a channel
+	// of the other band (the end line names no radio); "start offchannel
+	// scan" lines for another channel, or for this one before its start
+	// line; "Next OFFChannel scan" lines (a list scan that is not ours)
 	others     int
 	starts     int   // start lines for the channel
 	idx, ms    int   // the channel's (last) start line: list index, dwell
@@ -346,14 +407,14 @@ func (v visitLog) level3() bool { return v.begun > 0 || len(v.restore) > 0 || v.
 
 // parseVisitLog reads the lines a visit to ch added to the kernel log.
 func parseVisitLog(log, band string, ch int) visitLog {
-	v := visitLog{idx: -1, mib: strings.Count(log, "Prim CCA Time")}
+	v := visitLog{idx: -1, mib: strings.Count(log, "Prim CCA Time"), others: len(nextOffChan.FindAllStringIndex(log, -1))}
 	last, own := -1, -1
 	for _, m := range visitStart.FindAllStringSubmatchIndex(log, -1) {
 		c, _ := strconv.Atoi(log[m[4]:m[5]])
 		if c == 0 || !inBand(c, band) {
-			// a full-band survey (ApSiteSurveyNew_by_wdev with channel 0,
-			// this radio or the other) or the other radio's visit: a scan
-			// that is not ours, whose end line could pass for ours
+			// someone else's ApOffChanScan with no channel (this radio or
+			// the other) or the other radio's visit: a scan that is not
+			// ours, whose end line could pass for ours
 			v.others++
 			continue
 		}
@@ -419,6 +480,17 @@ func dwellOK(t, ms int) bool {
 // (the timer's last jiffy and the MLME task's delay).
 const dwellLate = 60
 
+// dwellEarliest: no dwell of ms ends sooner after its request: the timer is
+// armed (ScanNextChannel, after the request) for ms/10 jiffies and fires
+// more than (ms/10 - 1) jiffies later (dwellOK's lower bound).
+func dwellEarliest(ms int) time.Duration {
+	return time.Duration(max(0, (ms/10-1)*10)) * time.Millisecond
+}
+
+// errForeignScan: an off-channel scan the sweep did not start is in the
+// kernel log and still comes after the wait for it to end.
+var errForeignScan = errors.New("mtkwifi: an off-channel scan the sweep did not start (an ApSiteSurveyNew_by_wdev or \"Next OFFChannel scan\" line) is in the kernel log, and more of it came while waiting for it to end: a visit now could be taken over by it")
+
 // visit classes (wl.CallDiag.Class)
 const (
 	visitOK          = "ok"
@@ -432,6 +504,7 @@ type visitResult struct {
 	busy  int           // µs over the dwell (visitOK)
 	why   string        // visitUnconfirmed
 	gap   time.Duration // from the pre-clear's start to the request's return
+	early time.Duration // from the pre-clear's start to the early log read's end (0: none)
 }
 
 // errNoEnd: a visit started and no end of its dwell was logged. The
@@ -439,6 +512,60 @@ type visitResult struct {
 // default; `iwpriv ra0 set Debug=0` or 1 silences it, and every band then
 // stops here).
 var errNoEnd = errors.New("mtkwifi: no \"time_diff\" line (UpdateChannelInfo, the end of the dwell) after an off-channel visit's start: its end is not confirmed (the line needs the driver's debug level 2, the module's default)")
+
+// logTail is the end of a kernel-log read that anchors the next read
+// (newLogAnchored compares no more).
+func logTail(b []byte) string {
+	if len(b) > 256 {
+		b = b[len(b)-256:]
+	}
+	return string(b)
+}
+
+// quiet runs before each visit: the kernel log since the sweep's last read
+// (all of it before the first band, or when the ring wrapped past that
+// read: a line of an earlier sweep then costs one wait) must hold no
+// off-channel scan the sweep did not start (foreignScans), and the last
+// visit's log no other scan's line. The agent starts no other scan of the
+// radio while the sweep holds the scan lock,
+// and every one of the sweep's own lines is in a visit's log, so such a
+// scan is someone else's and may still run: a visit now would be taken
+// over by it. The log lines carry no time, so the sweep waits ForeignQuiet
+// (longer than any off-channel visit, 255 ms at most; a list scan prints a
+// line per channel) and looks at what came in the wait: nothing, and the
+// scan has ended; more, and the band stops (errForeignScan). It returns
+// how many lines it waited for (0: no wait).
+func (b *offChan) quiet(ctx context.Context, pl offChanPlan) (int, error) {
+	c := b.c
+	now, err := c.o.klog()
+	if err != nil {
+		return 0, fmt.Errorf("mtkwifi: kernel log: %w", err)
+	}
+	added, _ := newLogAnchored(b.seen, string(now))
+	n := foreignScans(added)
+	if b.dirty {
+		n = max(n, 1)
+	}
+	b.seen = logTail(now)
+	if n == 0 {
+		return 0, nil
+	}
+	if err := c.o.sleep(ctx, pl.ForeignQuiet); err != nil {
+		return n, fmt.Errorf("%w: %v", wl.ErrScanAborted, err)
+	}
+	again, err := c.o.klog()
+	if err != nil {
+		return n, fmt.Errorf("mtkwifi: kernel log: %w", err)
+	}
+	added, anchored := newLogAnchored(b.seen, string(again))
+	b.seen = logTail(again)
+	if m := foreignScans(added); m > 0 || !anchored {
+		b.dirty = true
+		return n, fmt.Errorf("%w (%d line(s) before a %v wait, %d in it)", errForeignScan, n, pl.ForeignQuiet, m)
+	}
+	b.dirty = false
+	return n, nil
+}
 
 // homeOK: the "End of SCAN" line's channel is the radio's own: its control channel,
 // or at 40 MHz the centre the driver restores to (control ± 2).
@@ -458,10 +585,9 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 	if !c.isUp(main) {
 		return visitResult{}, ErrRadioDown
 	}
-	before, err := c.o.klog()
-	if err != nil {
-		return visitResult{}, fmt.Errorf("mtkwifi: kernel log: %w", err)
-	}
+	// the visit's log is what came after the sweep's last read (quiet's,
+	// right before this visit): a line in between is in it too
+	before := b.seen
 	ms := int(pl.Dwell / time.Millisecond)
 	// built before the pre-clear: nothing between it and the request but
 	// the two syscalls
@@ -471,8 +597,10 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 		if err != nil {
 			return visitLog{}, false, fmt.Errorf("mtkwifi: kernel log: %w", err)
 		}
-		added, anchored := newLogAnchored(string(before), string(after))
-		return parseVisitLog(added, b.rd.Band, ch), anchored, nil
+		added, anchored := newLogAnchored(before, string(after))
+		v := parseVisitLog(added, b.rd.Band, ch)
+		b.seen, b.dirty = logTail(after), v.others > 0 || !anchored
+		return v, anchored, nil
 	}
 	t0 := c.o.now()
 	if err := p.Show(main, "mibinfo"); err != nil {
@@ -491,17 +619,46 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 		}
 		return visitResult{gap: gap}, fmt.Errorf("mtkwifi: %s set ApOffChanScan %d: %w", main, ch, setErr)
 	}
-	if err := c.o.sleep(ctx, pl.Dwell+pl.Settle); err != nil {
-		// the visit runs on in the driver: let it end before the lock goes
-		c.o.sleep(context.Background(), pl.EndWait)
-		return visitResult{gap: gap}, err
+	sleep := func(d time.Duration) error {
+		if err := c.o.sleep(ctx, d); err != nil {
+			// the visit runs on in the driver: let it end before the lock goes
+			c.o.sleep(context.Background(), pl.EndWait)
+			return err
+		}
+		return nil
 	}
-	// the radio's operating channel (iwconfig) after the visit: the
-	// dwell's end path (APScanTimeoutAction) restores the radio to its
-	// configured channel right after the time_diff line, and at debug
-	// level 2 nothing logs which one; iwconfig stayed on the home channel
-	// through the live visits, and an AP restart or a channel change moves
-	// it
+	// the early read, just before the dwell could end: an end line after
+	// our start line then is not our dwell's. A scan already running when
+	// the request came (one the agent did not start; at level 2 most print
+	// no line at all) takes it over: Set_ApOffChanScan_Proc sets the
+	// off-channel state in the ioctl, the MLME drops our request
+	// (APInvalidStateWhenScan), and the running scan's next channel timeout
+	// ends with our list index: one time_diff, timed from the last real
+	// off-channel dwell, and its busy time in our slot
+	var early time.Duration
+	hijacked := false
+	earliest := dwellEarliest(ms)
+	earlyRead := earliest > 2*pl.EarlyLead
+	if earlyRead {
+		if err := sleep(earliest - pl.EarlyLead - c.o.now().Sub(t0)); err != nil {
+			return visitResult{gap: gap}, err
+		}
+		v, anchored, err := read()
+		if err != nil {
+			return visitResult{gap: gap}, err
+		}
+		early = c.o.now().Sub(t0)
+		hijacked = anchored && early < earliest && (len(v.done) > 0 || len(v.restore) > 0)
+	}
+	if err := sleep(pl.Dwell + pl.Settle - c.o.now().Sub(t0)); err != nil {
+		return visitResult{gap: gap, early: early}, err
+	}
+	// the radio's operating channel (iwconfig) after the visit: an AP
+	// restart or a channel change moves it. It is the configured channel,
+	// which an off-channel visit never changes, not proof of the radio's
+	// return: that is the time_diff line, after which APScanTimeoutAction
+	// restores the radio in the same call (at debug level 2 nothing logs
+	// it)
 	backHome := func() error {
 		now, err := b.opChannel(ctx)
 		if err != nil {
@@ -533,9 +690,8 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 		// refused channel
 		return visitResult{class: visitUnconfirmed, why: "the request started no visit (no start line)", gap: gap}, nil
 	}
-	// ended: our dwell's time_diff, or (debug level 3) an "End of SCAN"
-	// after our start line (a scan already running that took our request
-	// up ends with one and prints no time_diff)
+	// ended: a time_diff after our start line, or (debug level 3) an "End
+	// of SCAN" after it
 	ended := func(v visitLog) bool { return len(v.done) > 0 || len(v.restore) > 0 }
 	for waited := time.Duration(0); !ended(v) && waited < pl.EndWait; waited += pl.EndPoll {
 		if err := c.o.sleep(ctx, pl.EndPoll); err != nil {
@@ -557,17 +713,22 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 		return visitResult{}, err
 	}
 	unconfirmed := func(format string, a ...any) (visitResult, error) {
-		return visitResult{class: visitUnconfirmed, why: fmt.Sprintf(format, a...), gap: gap}, nil
+		return visitResult{class: visitUnconfirmed, why: fmt.Sprintf(format, a...), gap: gap, early: early}, nil
 	}
 	switch {
+	case hijacked:
+		// its time_diff is timed from an older dwell and may fit ours
+		return unconfirmed("an end line by the early read (%v after the pre-clear), before the dwell could end (%v): a scan already running took the request over",
+			early, earliest)
+	case earlyRead && early >= earliest:
+		// read too late to tell a running scan's end from the dwell's
+		return unconfirmed("the early log read ended %v after the pre-clear, not before the dwell's earliest end (%v)", early, earliest)
 	case v.starts != 1 || v.others > 0:
 		return unconfirmed("%d start(s) for it, %d other scan line(s)", v.starts, v.others)
 	case len(v.done) != 1 || v.doneBefore > 0:
-		// none: a scan already running (one that prints no start line,
-		// such as the driver's own channel check) took the request up,
-		// ended with its own "End of SCAN" and left its busy time in our
-		// slot; our visit never ran. More, or one before our start:
-		// another off-channel visit's
+		// none (debug level 3: an "End of SCAN" and no time_diff): not an
+		// off-channel dwell's end. More, or one before our start: another
+		// off-channel visit's
 		return unconfirmed("%d time_diff line(s) after its start, %d before: the driver did not run this visit alone", len(v.done), v.doneBefore)
 	case v.level3() && (v.begun != 1 || len(v.restore) != 1 || v.restoreBefore > 0):
 		return unconfirmed("debug level 3: %d \"start offchannel scan\" line(s) for it, %d \"End of SCAN\" line(s) after it, %d before",
@@ -590,7 +751,7 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 	if v.idx < 0 || v.idx >= len(slots) || slots[v.idx].ch != ch || slots[v.idx].score < 0 || slots[v.idx].score > 100 {
 		return unconfirmed("slot %d does not hold channel %d", v.idx, ch)
 	}
-	return visitResult{class: visitOK, busy: (100 - slots[v.idx].score) * busyStep, gap: gap}, nil
+	return visitResult{class: visitOK, busy: (100 - slots[v.idx].score) * busyStep, gap: gap, early: early}, nil
 }
 
 // homeChannel reads the radio's channel (iwconfig) and width (profile
@@ -699,7 +860,7 @@ func (b *offChan) Measure(ctx context.Context, req wl.SpectrumRequest, phase fun
 
 	res := map[int]visitResult{}
 	var lastStart time.Time
-	var maxGap time.Duration
+	var maxGap, maxEarly time.Duration
 	calls := 0
 	run := func(ch int, retry bool) error {
 		calls++
@@ -709,6 +870,14 @@ func (b *offChan) Measure(ctx context.Context, req wl.SpectrumRequest, phase fun
 		}
 		if c.o.now().Sub(start) > pl.Budget {
 			return fmt.Errorf("%w: over the %v budget", wl.ErrScanAborted, pl.Budget)
+		}
+		n, err := b.quiet(ctx, pl)
+		if n > 0 {
+			d.Notes = append(d.Notes, fmt.Sprintf("before the visit to %d: %d line(s) of an off-channel scan the sweep did not start; waited %v", ch, n, pl.ForeignQuiet))
+		}
+		if err != nil {
+			d.Calls = append(d.Calls, wl.CallDiag{Pass: 1, Channel: ch, Retry: retry, Err: err.Error()})
+			return err
 		}
 		if req.Guard != nil {
 			if err := req.Guard(ctx, step); err != nil {
@@ -724,7 +893,7 @@ func (b *offChan) Measure(ctx context.Context, req wl.SpectrumRequest, phase fun
 		}
 		lastStart = c.o.now()
 		v, err := b.visit(ctx, p, ch, home, width, pl)
-		maxGap = max(maxGap, v.gap)
+		maxGap, maxEarly = max(maxGap, v.gap), max(maxEarly, v.early)
 		cd := wl.CallDiag{Pass: 1, Channel: ch, Retry: retry, Class: v.class, Took: c.o.now().Sub(lastStart)}
 		if err != nil {
 			cd.Err = err.Error()
@@ -813,7 +982,8 @@ func (b *offChan) Measure(ctx context.Context, req wl.SpectrumRequest, phase fun
 		d.Channels = append(d.Channels, st)
 	}
 	d.Notes = append(d.Notes, fmt.Sprintf("busy ms of %d by channel %s", ms, strings.Join(busy, " ")),
-		fmt.Sprintf("pre-clear to request: longest %v", maxGap))
+		fmt.Sprintf("pre-clear to request: longest %v", maxGap),
+		fmt.Sprintf("pre-clear to the early log read's end: longest %v (the dwell ends %v after its request at the earliest)", maxEarly, dwellEarliest(ms)))
 	rows := map[int][]wl.SpectrumRow{}
 	for _, w := range d.Widths {
 		rs, omitted, err := wl.BuildSpectrumRows(band, w, blockLows(chans, w), vals)
