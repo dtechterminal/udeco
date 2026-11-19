@@ -153,6 +153,7 @@ type timing struct {
 	clockEvery    time.Duration // clock re-check (1 h)
 	clockRetry    time.Duration // clock re-check after no time source answered (1 min)
 	logPoll       time.Duration // remote syslog on jio-mtk: log file poll (1 s; logfollow.go)
+	portsRetry    time.Duration // the longest inform wait while a port change waits for confirmation (15 s)
 }
 
 func (t *timing) fill() {
@@ -184,6 +185,7 @@ func (t *timing) fill() {
 	def(&t.clockEvery, clockEvery)
 	def(&t.clockRetry, clockRetry)
 	def(&t.logPoll, logPoll)
+	def(&t.portsRetry, 15*time.Second)
 }
 
 // options are the agent's environment; tests replace the edges.
@@ -805,9 +807,14 @@ func (a *agent) loop(ctx context.Context) {
 		if errs > 0 {
 			// like a real AP: keep informing, further and further apart
 			wait = min(max(interval, 5*time.Second)*time.Duration(1<<min(errs-1, 4)), time.Minute)
-			if errs == 1 || errs%10 == 0 {
-				a.logf("%d bad answer(s) in a row: next inform in %s", errs, wait)
-			}
+		}
+		// a port change waits for an answered inform (ports.go): no
+		// backing off past portsRetry until it has one
+		if d := a.portsRetry(); d > 0 {
+			wait = min(wait, d)
+		}
+		if errs > 0 && (errs == 1 || errs%10 == 0) {
+			a.logf("%d bad answer(s) in a row: next inform in %s", errs, wait)
 		}
 		t := time.NewTimer(wait)
 		select {

@@ -162,6 +162,32 @@ func TestRevert(t *testing.T) {
 	}
 }
 
+// TestRevertNeverToNoBridge: a port in no bridge (without tagged VLANs)
+// that Apply moves reports the plain LAN as its earlier setting, and
+// Revert never keeps a port in no bridge; a native-none trunk with tagged
+// VLANs is a setting and is kept.
+func TestRevertNeverToNoBridge(t *testing.T) {
+	ctx := context.Background()
+	b := newFakeBridger()
+	m := New(Options{B: b})
+	b.br["eth0.2.1"] = ""
+	r := m.Apply(ctx, want(map[int]PortWant{2: {Native: 5}}))
+	if r.Before[2].String() != "native LAN" {
+		t.Fatalf("before %v", r.Before)
+	}
+	m.Revert(ctx, map[int]PortWant{2: {Native: -1}}, map[int]string{2: "native VLAN 5"})
+	if b.br["eth0.2.1"] != "bdg2" {
+		t.Fatalf("reverted into %q", b.br["eth0.2.1"])
+	}
+	if r = m.Settle(ctx); r.Steps != 0 || b.br["eth0.2.1"] != "bdg2" {
+		t.Errorf("settle: port 2 in %q, %+v", b.br["eth0.2.1"], r)
+	}
+	m.Apply(ctx, want(map[int]PortWant{3: {Native: -1, Tagged: []int{7}}}))
+	if r = m.Apply(ctx, want(map[int]PortWant{3: {Native: 9}})); r.Before[3].String() != "native none, tagged 7" {
+		t.Errorf("trunk before %v", r.Before)
+	}
+}
+
 // TestRestoreLeavesLockedAndUplink: Restore and OffLAN never look at the
 // locked port 1 or the uplink, wherever they are.
 func TestRestoreLeavesLockedAndUplink(t *testing.T) {

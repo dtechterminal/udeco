@@ -91,8 +91,9 @@ type Config struct {
 	// the uplink and is never changed (beyond the VLAN devices on it).
 	PortsUnlocked []int `json:"ports_unlocked,omitempty"`
 	// PortsConfirmS (model UHDIW) is how long a port change waits for an
-	// inform the controller answers before it is reverted (30-900 s; 0 =
-	// 90). PortsLossS is how long the controller may stay unreachable
+	// inform the controller answers before it is reverted (60-900 s; 0 =
+	// 90; under 60 s a healthy controller can miss it: an inform in flight
+	// and the next one each take up to collectTO + informTO, 30 s). PortsLossS is how long the controller may stay unreachable
 	// before every port the agent may change goes back on the LAN
 	// (60-3600 s; 0 = 300). The port monitor: ports.go.
 	PortsConfirmS int `json:"ports_confirm_s,omitempty"`
@@ -166,8 +167,8 @@ func (c *Config) validate() error {
 		if (c.PortsConfirmS != 0 || c.PortsLossS != 0) && c.Model != "UHDIW" {
 			return fmt.Errorf("config: ports_confirm_s and ports_loss_s need model UHDIW (the only model reported with LAN ports)")
 		}
-		if c.PortsConfirmS != 0 && (c.PortsConfirmS < 30 || c.PortsConfirmS > 900) {
-			return fmt.Errorf("config: ports_confirm_s %d: want 30-900 seconds (default 90)", c.PortsConfirmS)
+		if c.PortsConfirmS != 0 && (c.PortsConfirmS < 60 || c.PortsConfirmS > 900) {
+			return fmt.Errorf("config: ports_confirm_s %d: want 60-900 seconds (default 90)", c.PortsConfirmS)
 		}
 		if c.PortsLossS != 0 && (c.PortsLossS < 60 || c.PortsLossS > 3600) {
 			return fmt.Errorf("config: ports_loss_s %d: want 60-3600 seconds (default 300)", c.PortsLossS)

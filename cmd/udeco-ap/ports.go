@@ -20,18 +20,25 @@ package main
 // undo itself):
 //
 //   - confirm or revert: a change Apply makes to a port's live setting
-//     (other than back to the plain LAN) is pending until an inform that
-//     STARTED after the change got a valid reply from the controller. With
-//     none within ports_confirm_s (90 s) the ports of that change go back
-//     to the settings they had before, the setting is marked failed
-//     (jioports: not applied again until the controller sends another one
-//     for the port) and "EVENT: PORTS REVERTED" goes to the event ring;
+//     (to a VLAN, back to the plain LAN, or onto the LAN by a failed
+//     change's rollback) is pending until an inform that STARTED after the
+//     change got a valid reply from the controller. The change wakes the
+//     inform loop, and while one is pending a failing inform is retried
+//     every portsRetry (15 s) at most instead of backing off further. With
+//     no confirmation within ports_confirm_s (90 s) the ports of that
+//     change go back to the settings they had before, the setting is
+//     marked failed (jioports: not applied again until the controller sends
+//     another one for the port) and "EVENT: PORTS REVERTED" goes to the
+//     event ring;
 //   - controller loss: with no inform answered for ports_loss_s (300 s)
 //     every port the agent may change goes back on the plain LAN (the
 //     uplink and locked ports untouched) and port settings are held off
 //     until an inform is answered again; the controller's settings then
 //     apply again, each through the confirm window. A setting the loss
-//     watchdog takes off twice in a row is marked failed;
+//     watchdog takes off twice in a row is marked failed; "in a row" ends
+//     once informs have been answered for 2 x ports_loss_s after the
+//     resume (the setting kept the unit reachable: a later outage is
+//     another one);
 //   - startup: no port setting is applied before the first answered
 //     inform; the loss watchdog covers ports a previous run left off the LAN.
 //
@@ -73,6 +80,7 @@ type portWatch struct {
 	lastOK  time.Time     // the last inform the controller answered (setup: the start)
 	ok      bool          // an inform was answered since the start or the loss revert: settings may apply
 	lost    bool          // the loss watchdog put the ports on the LAN: held there until an inform is answered
+	resumed time.Time     // the first answered inform after the last loss revert
 	pending map[int]portPending
 	// lossWant: what the last loss revert took off each port
 	lossWant map[int]string
@@ -81,7 +89,8 @@ type portWatch struct {
 // portPending is a port change the controller has not confirmed.
 type portPending struct {
 	since time.Time         // when the change finished
-	want  string            // the setting made live
+	want  string            // the controller's setting (marked failed on a revert)
+	live  string            // what the change made live: want, or the LAN when want failed
 	back  jioports.PortWant // the setting before (the revert's target)
 }
 
@@ -218,9 +227,13 @@ func (a *agent) portsApply(ctx context.Context, why string) {
 }
 
 // portsPending starts the confirm window for the ports Apply changed
-// (ports.mu held). A port changed again before it was confirmed keeps the
-// setting it had before the first change as its revert target; a change
-// back to the plain LAN needs no confirmation.
+// (ports.mu held), moves back to the plain LAN included (the LAN can cut
+// the unit off too: a loop through a downstream switch). A port changed
+// again before it was confirmed keeps the setting it had before the first
+// change as its revert target; a port back on that setting has nothing to
+// confirm. A port whose change failed was rolled back onto the LAN: that
+// is the change waiting, unless the LAN is where it was. A new change
+// wakes the inform loop, so the confirmation comes at once.
 func (a *agent) portsPending(r jioports.Report) {
 	if len(r.Before) == 0 {
 		return
@@ -228,25 +241,54 @@ func (a *agent) portsPending(r jioports.Report) {
 	w := &a.ports.w
 	now := a.o.now()
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	added := false
 	for _, p := range jioports.LANPorts {
 		before, ok := r.Before[p]
 		if !ok {
 			continue
 		}
 		want := a.ports.want.Port(jioports.Idx(p))
-		if want.Default() {
-			delete(w.pending, p)
-			continue
+		live := want.String()
+		if r.Failed[p] != nil {
+			live = jioports.PortWant{}.String()
 		}
 		pd, was := w.pending[p]
 		if !was {
 			pd.back = before
 		}
-		pd.since, pd.want = now, want.String()
+		if pd.back.String() == live {
+			delete(w.pending, p)
+			continue
+		}
+		pd.since, pd.want, pd.live = now, want.String(), live
 		w.pending[p] = pd
-		a.logf("ports: port %d: %s is waiting for the controller: back to %s in %s unless an inform reaches the controller", p, pd.want, pd.back, w.confirm)
+		added = true
+		if r.Failed[p] != nil {
+			a.logf("ports: port %d: %s failed and the rollback put the port on the LAN (it was %s): back to %s in %s unless an inform reaches the controller", p, pd.want, pd.back, pd.back, w.confirm)
+			continue
+		}
+		a.logf("ports: port %d: %s is waiting for the controller: back to %s in %s unless an inform reaches the controller", p, pd.live, pd.back, w.confirm)
 	}
+	w.mu.Unlock()
+	if added {
+		a.wakeLoop()
+	}
+}
+
+// portsRetry is the longest the inform loop may wait between informs
+// while a port change waits for its confirmation (0: none waits), so a
+// short outage does not back the informs off past the confirm window.
+func (a *agent) portsRetry() time.Duration {
+	if a.ports.mgr == nil {
+		return 0
+	}
+	w := &a.ports.w
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.pending) == 0 {
+		return 0
+	}
+	return a.t.portsRetry
 }
 
 // portsInformed: an inform that started at start got a valid reply (loop
@@ -262,12 +304,18 @@ func (a *agent) portsInformed(start time.Time) {
 	for _, p := range jioports.LANPorts {
 		if pd, ok := w.pending[p]; ok && start.After(pd.since) {
 			delete(w.pending, p)
-			a.logf("ports: port %d: %s confirmed (an inform reached the controller after the change)", p, pd.want)
+			a.logf("ports: port %d: %s confirmed (an inform reached the controller after the change)", p, pd.live)
 		}
 	}
 	resume := !w.ok || w.lost
 	if w.lost {
+		w.resumed = w.lastOK
 		a.logf("ports: informs reach the controller again: its port settings apply again, each change waiting for its confirmation")
+	}
+	if len(w.lossWant) > 0 && w.lastOK.Sub(w.resumed) >= 2*w.loss {
+		// the settings came back and kept the unit reachable: the next
+		// loss is another outage, not the same setting cutting it off
+		w.lossWant = map[int]string{}
 	}
 	w.ok, w.lost = true, false
 	w.mu.Unlock()
@@ -306,10 +354,10 @@ func (a *agent) portsWatch(ctx context.Context) {
 	m, w := a.ports.mgr, &a.ports.w
 	now := a.o.now()
 	w.mu.Lock()
-	back, failed := map[int]jioports.PortWant{}, map[int]string{}
+	back, failed, was := map[int]jioports.PortWant{}, map[int]string{}, map[int]string{}
 	for p, pd := range w.pending {
 		if now.Sub(pd.since) >= w.confirm {
-			back[p], failed[p] = pd.back, pd.want
+			back[p], failed[p], was[p] = pd.back, pd.want, pd.live
 			delete(w.pending, p)
 		}
 	}
@@ -323,7 +371,7 @@ func (a *agent) portsWatch(ctx context.Context) {
 		var what []string
 		for _, p := range jioports.LANPorts {
 			if b, ok := back[p]; ok {
-				what = append(what, fmt.Sprintf("port %d %s -> %s", p, failed[p], b))
+				what = append(what, fmt.Sprintf("port %d %s -> %s", p, was[p], b))
 			}
 		}
 		a.event(fmt.Sprintf("PORTS REVERTED (no inform reached the controller within %s of the change): %s; not applied again until the controller sends another setting for the port",

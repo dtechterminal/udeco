@@ -29,6 +29,13 @@ func (c *fakeClock) now() time.Time {
 	return c.t
 }
 
+// tick is now, moved on by a millisecond at every reading (each reading
+// is later than the one before, as on the unit).
+func (c *fakeClock) tick() time.Time {
+	c.add(time.Millisecond)
+	return c.now()
+}
+
 func (c *fakeClock) add(d time.Duration) {
 	c.mu.Lock()
 	c.t = c.t.Add(d)
@@ -374,11 +381,11 @@ func TestPortsRevertRetried(t *testing.T) {
 	}
 }
 
-// TestPortsConfigKeys: ports_confirm_s 30-900 and ports_loss_s 60-3600,
+// TestPortsConfigKeys: ports_confirm_s 60-900 and ports_loss_s 60-3600,
 // on jio-mtk as UHDIW only; 0 (absent) is the default.
 func TestPortsConfigKeys(t *testing.T) {
 	base := `{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","platform":"jio-mtk"`
-	for _, good := range []string{`,"model":"UHDIW"}`, `,"model":"UHDIW","ports_confirm_s":30,"ports_loss_s":60}`,
+	for _, good := range []string{`,"model":"UHDIW"}`, `,"model":"UHDIW","ports_confirm_s":60,"ports_loss_s":60}`,
 		`,"model":"UHDIW","ports_confirm_s":900,"ports_loss_s":3600}`} {
 		c, err := parseConfig([]byte(base + good))
 		if err != nil {
@@ -389,7 +396,7 @@ func TestPortsConfigKeys(t *testing.T) {
 			t.Errorf("defaults %s %s", c.portsConfirm(), c.portsLoss())
 		}
 	}
-	for _, bad := range []string{`,"model":"UHDIW","ports_confirm_s":29}`, `,"model":"UHDIW","ports_confirm_s":901}`,
+	for _, bad := range []string{`,"model":"UHDIW","ports_confirm_s":59}`, `,"model":"UHDIW","ports_confirm_s":30}`, `,"model":"UHDIW","ports_confirm_s":901}`,
 		`,"model":"UHDIW","ports_loss_s":59}`, `,"model":"UHDIW","ports_loss_s":3601}`, `,"model":"UHDIW","ports_confirm_s":-1}`,
 		`,"model":"U7LT","ports_confirm_s":90}`} {
 		if _, err := parseConfig([]byte(base + bad)); err == nil {
@@ -524,4 +531,328 @@ func TestAliveMarksTickChanges(t *testing.T) {
 	if job := r.aliveJob(); job != "-" {
 		t.Errorf("a change outside the worker marked the alive record: %q", job)
 	}
+}
+
+// switchCfgLAN2: port 2 back on the plain LAN (native LAN only).
+var switchCfgLAN2 = strings.Replace(switchCfg,
+	"switch.port.2.pvid=2\nswitch.vlan.1.port.2.mode=exclude\nswitch.vlan.2.port.2.mode=untagged\nswitch.vlan.3.port.2.mode=exclude\n",
+	"switch.vlan.1.port.2.mode=untagged\nswitch.vlan.2.port.2.mode=exclude\nswitch.vlan.3.port.2.mode=exclude\n", 1)
+
+// confirmed brings switchCfg live and has the controller confirm it.
+func (r *portsRig) confirmed() {
+	r.t.Helper()
+	r.inform(r.clk.now())
+	r.provision(switchCfg)
+	r.clk.add(time.Second)
+	r.inform(r.clk.now())
+	if !r.live() || r.a.portsRetry() != 0 {
+		r.t.Fatalf("switchCfg not live and confirmed: %v", r.pw.br)
+	}
+}
+
+// TestPortsMoveToLANWatched: a move back to the plain LAN is a change too
+// (the LAN can cut the unit off: a loop through a downstream switch). With
+// no inform it goes back to the VLAN it was on, and the LAN is not applied
+// again until the controller sends another setting; with an inform it
+// stays.
+func TestPortsMoveToLANWatched(t *testing.T) {
+	r := newPortsRig(t, nil)
+	r.confirmed()
+	r.provision(switchCfgLAN2)
+	if r.pw.BridgeOf("eth0.2.1") != "bdg2" {
+		t.Fatalf("port 2 not moved to the LAN: %v", r.pw.br)
+	}
+	if r.a.portsRetry() == 0 {
+		t.Fatalf("the move to the LAN is not waiting for the controller:\n%s", r.logs.all())
+	}
+	r.after(90 * time.Second)
+	if r.pw.BridgeOf("eth0.2.1") != "br-v2" || !strings.Contains(r.logs.all(), "EVENT: PORTS REVERTED (no inform reached the controller within 1m30s of the change): port 2 native LAN -> native VLAN 2") {
+		t.Fatalf("not reverted to VLAN 2: %v\n%s", r.pw.br, r.logs.all())
+	}
+	r.inform(r.clk.now())
+	ops := len(r.pw.opsList())
+	r.provision(switchCfgLAN2)
+	if r.pw.BridgeOf("eth0.2.1") != "br-v2" || len(r.pw.opsList()) != ops {
+		t.Errorf("the reverted LAN setting re-applied: %q", r.pw.opsList()[ops:])
+	}
+	r.untouched()
+
+	r = newPortsRig(t, nil)
+	r.confirmed()
+	r.provision(switchCfgLAN2)
+	r.clk.add(time.Second)
+	r.inform(r.clk.now())
+	r.after(4 * time.Minute)
+	if r.pw.BridgeOf("eth0.2.1") != "bdg2" || !strings.Contains(r.logs.all(), "port 2: native LAN confirmed") {
+		t.Errorf("a confirmed move to the LAN: %v\n%s", r.pw.br, r.logs.all())
+	}
+	r.untouched()
+}
+
+// TestPortsRevertNeverToNoBridge: a port found in no bridge (a move cut
+// short by an earlier run) that a change then moves is reverted to the
+// plain LAN, never back into no bridge, and stays there while informs are
+// answered.
+func TestPortsRevertNeverToNoBridge(t *testing.T) {
+	r := newPortsRig(t, nil)
+	r.pw.br["eth0.2.1"] = ""
+	r.inform(r.clk.now())
+	r.provision(switchCfg)
+	if r.pw.BridgeOf("eth0.2.1") != "br-v2" {
+		t.Fatalf("port 2 %q", r.pw.BridgeOf("eth0.2.1"))
+	}
+	r.after(90 * time.Second)
+	if r.pw.BridgeOf("eth0.2.1") != "bdg2" || !strings.Contains(r.logs.all(), "port 2 native VLAN 2 -> native LAN") {
+		t.Fatalf("port 2 in %q:\n%s", r.pw.BridgeOf("eth0.2.1"), r.logs.all())
+	}
+	for i := 0; i < 20; i++ {
+		r.clk.add(5 * time.Second)
+		r.inform(r.clk.now())
+		r.a.portsWatch(r.ctx)
+		r.a.portsApply(r.ctx, "tick")
+	}
+	if r.pw.BridgeOf("eth0.2.1") != "bdg2" {
+		t.Errorf("port 2 left in %q", r.pw.BridgeOf("eth0.2.1"))
+	}
+	r.untouched()
+}
+
+// TestPortsChangedTwiceUnconfirmed: LAN -> VLAN 2 -> VLAN 3 with no
+// confirmation in between goes back to the LAN, not to the unconfirmed
+// VLAN 2; the window runs from the second change.
+func TestPortsChangedTwiceUnconfirmed(t *testing.T) {
+	r := newPortsRig(t, nil)
+	r.inform(r.clk.now())
+	r.provision(switchCfg)
+	r.after(60 * time.Second)
+	r.provision(switchCfg3)
+	r.after(60 * time.Second)
+	if r.pw.BridgeOf("eth0.2.1") != "br-v3" {
+		t.Fatalf("reverted 60 s after the second change: %v", r.pw.br)
+	}
+	r.after(30 * time.Second)
+	if r.pw.BridgeOf("eth0.2.1") != "bdg2" || !strings.Contains(r.logs.all(), "port 2 native VLAN 3 -> native LAN") {
+		t.Fatalf("not back on the LAN: %v\n%s", r.pw.br, r.logs.all())
+	}
+	r.untouched()
+}
+
+// TestPortsFailedApplyPending: a change that failed and was rolled back
+// onto the LAN the port was on has nothing to confirm (no "waiting", no
+// "confirmed"); one rolled back onto the LAN from a VLAN waits, and goes
+// back to the VLAN without an inform, the failed setting still not retried.
+func TestPortsFailedApplyPending(t *testing.T) {
+	r := newPortsRig(t, nil)
+	r.pw.fail["eth0.2.1 2"] = true
+	r.inform(r.clk.now())
+	r.provision(switchCfg)
+	if r.pw.BridgeOf("eth0.2.1") != "bdg2" {
+		t.Fatalf("port 2 %q", r.pw.BridgeOf("eth0.2.1"))
+	}
+	r.clk.add(time.Second)
+	r.inform(r.clk.now())
+	if logs := r.logs.all(); strings.Contains(logs, "port 2: native VLAN 2 is waiting") || strings.Contains(logs, "port 2: native VLAN 2 confirmed") ||
+		!strings.Contains(logs, "port 3: native LAN, tagged 2,3 confirmed") {
+		t.Errorf("a failed change waits or is confirmed:\n%s", logs)
+	}
+
+	r = newPortsRig(t, nil)
+	r.confirmed()
+	r.pw.mu.Lock()
+	r.pw.fail["eth0.2.1 3"] = true
+	r.pw.mu.Unlock()
+	r.provision(switchCfg3)
+	if r.pw.BridgeOf("eth0.2.1") != "bdg2" || !strings.Contains(r.logs.all(), "port 2: native VLAN 3 failed and the rollback put the port on the LAN (it was native VLAN 2)") {
+		t.Fatalf("port 2 %q:\n%s", r.pw.BridgeOf("eth0.2.1"), r.logs.all())
+	}
+	r.after(90 * time.Second)
+	if r.pw.BridgeOf("eth0.2.1") != "br-v2" || !strings.Contains(r.logs.all(), "port 2 native LAN -> native VLAN 2") {
+		t.Fatalf("not back on VLAN 2: %v\n%s", r.pw.br, r.logs.all())
+	}
+	r.pw.mu.Lock()
+	delete(r.pw.fail, "eth0.2.1 3")
+	r.pw.mu.Unlock()
+	r.inform(r.clk.now())
+	ops := len(r.pw.opsList())
+	r.a.portsApply(r.ctx, "tick")
+	if r.pw.BridgeOf("eth0.2.1") != "br-v2" || len(r.pw.opsList()) != ops {
+		t.Errorf("the failed setting retried: %q", r.pw.opsList()[ops:])
+	}
+	r.untouched()
+}
+
+// TestPortsDoubleLossApart: two outages a day apart, the setting re-applied
+// and confirmed in between, are not "twice in a row": the setting comes
+// back after the second one too.
+func TestPortsDoubleLossApart(t *testing.T) {
+	r := newPortsRig(t, nil)
+	r.confirmed()
+	r.after(300 * time.Second)
+	if !r.onLAN() {
+		t.Fatalf("first loss: %v", r.pw.br)
+	}
+	r.inform(r.clk.now())
+	r.clk.add(time.Second)
+	r.inform(r.clk.now())
+	if !r.live() {
+		t.Fatalf("not re-applied: %v", r.pw.br)
+	}
+	for i := 0; i < 24*60; i++ { // a day of answered informs
+		r.after(time.Minute)
+		r.inform(r.clk.now())
+	}
+	r.after(300 * time.Second)
+	if !r.onLAN() || strings.Contains(r.logs.all(), "taken off twice in a row") {
+		t.Fatalf("second loss: %v\n%s", r.pw.br, r.logs.all())
+	}
+	r.inform(r.clk.now())
+	if !r.live() {
+		t.Errorf("not re-applied after the second outage: %v", r.pw.br)
+	}
+	r.untouched()
+}
+
+// TestPortsChangeWakesInform: a port change asks the inform loop for an
+// inform at once, and while it waits the loop's backoff is capped.
+func TestPortsChangeWakesInform(t *testing.T) {
+	r := newPortsRig(t, nil)
+	r.a.wake = make(chan struct{}, 1)
+	r.inform(r.clk.now())
+	if r.a.portsRetry() != 0 {
+		t.Fatalf("retry cap with nothing pending")
+	}
+	r.provision(switchCfg)
+	select {
+	case <-r.a.wake:
+	default:
+		t.Fatal("the change did not wake the inform loop")
+	}
+	if r.a.portsRetry() != r.a.t.portsRetry {
+		t.Errorf("retry cap %s while a change waits", r.a.portsRetry())
+	}
+	r.clk.add(time.Second)
+	r.inform(r.clk.now())
+	if r.a.portsRetry() != 0 {
+		t.Errorf("retry cap after the confirmation")
+	}
+}
+
+// TestJioPortsInformInFlight: the whole agent: a port change that finishes
+// while an inform is on the wire is not confirmed by that inform's reply
+// (the inform started before it), and with the controller gone after that
+// it is reverted at 90 s.
+func TestJioPortsInformInFlight(t *testing.T) {
+	clk := newFakeClock()
+	var phase atomic.Int32
+	dead := make(chan struct{}, 1)
+	h, pw := jioPortsHarness(t)
+	real := httpPoster(time.Second)
+	h.a.o.now = clk.tick
+	h.a.events.clock = clk.now
+	h.a.t.portsWatch = 5 * time.Millisecond
+	h.a.o.post = func(ctx context.Context, u string, b []byte) (int, []byte, error) {
+		switch phase.Load() {
+		case 1: // the change finishes while this inform is on the wire
+			clk.add(time.Second)
+			h.a.portsPrepare(provision{systemCfg: testCfg + switchCfg3})
+			h.a.portsApply(ctx, "test")
+			clk.add(time.Second)
+			phase.Store(2)
+		case 2:
+			select {
+			case dead <- struct{}{}:
+			default:
+			}
+			<-ctx.Done()
+			return 0, nil, errors.New("controller down")
+		}
+		return real(ctx, u, b)
+	}
+	h.ctl.queue(adoptReply, provisionReply(testCfg+switchCfg))
+	h.start()
+	eventually(t, "the first change confirmed", func() bool { return strings.Contains(h.logs.all(), "port 2: native VLAN 2 confirmed") })
+	phase.Store(1)
+	<-dead // the inform the change overlapped is handled, the next hangs
+	if pw.BridgeOf("eth0.2.1") != "br-v3" {
+		t.Fatalf("port 2 %q", pw.BridgeOf("eth0.2.1"))
+	}
+	if logs := h.logs.all(); strings.Contains(logs, "port 2: native VLAN 3 confirmed") {
+		t.Fatalf("confirmed by an inform that started before the change:\n%s", logs)
+	}
+	clk.add(91 * time.Second)
+	eventually(t, "port 2 back on VLAN 2", func() bool {
+		return pw.BridgeOf("eth0.2.1") == "br-v2" && strings.Contains(h.logs.all(), "port 2 native VLAN 3 -> native VLAN 2")
+	})
+}
+
+// TestJioPortsRetryWhilePending: the whole agent: informs that fail right
+// after a port change are retried every portsRetry, not backed off 5, 10,
+// 20 s, so the controller can still confirm the change in its window.
+func TestJioPortsRetryWhilePending(t *testing.T) {
+	clk := newFakeClock() // a millisecond a reading: the confirm window does not run out
+	var fails atomic.Int32
+	h, _ := jioPortsHarness(t)
+	real := httpPoster(time.Second)
+	h.a.o.now = clk.tick
+	h.a.events.clock = clk.now
+	h.a.t.portsRetry = 5 * time.Millisecond
+	h.a.o.post = func(ctx context.Context, u string, b []byte) (int, []byte, error) {
+		if h.a.portsRetry() > 0 && fails.Load() < 4 {
+			fails.Add(1)
+			return 0, nil, errors.New("connection refused")
+		}
+		return real(ctx, u, b)
+	}
+	h.ctl.queue(adoptReply, provisionReply(testCfg+switchCfg))
+	h.start()
+	eventually(t, "the change confirmed after four failed informs", func() bool {
+		return fails.Load() == 4 && strings.Contains(h.logs.all(), "port 2: native VLAN 2 confirmed")
+	})
+}
+
+// TestJioPortsRevertWaitsForWifiApply: a Wi-Fi apply holds the applier's
+// lock, which every bridge change takes: the monitor's revert waits for it
+// (at most one Wi-Fi apply, jobTimeout) and runs as soon as it ends.
+func TestJioPortsRevertWaitsForWifiApply(t *testing.T) {
+	clk := newFakeClock()
+	var down atomic.Bool
+	posts := make(chan struct{}, 100)
+	h, pw := jioPortsHarness(t)
+	real := httpPoster(time.Second)
+	h.a.o.now = clk.now
+	h.a.events.clock = clk.now
+	h.a.o.post = func(ctx context.Context, u string, b []byte) (int, []byte, error) {
+		if down.Load() {
+			select {
+			case posts <- struct{}{}:
+			default:
+			}
+			<-ctx.Done()
+			return 0, nil, errors.New("controller down")
+		}
+		return real(ctx, u, b)
+	}
+	h.a.t.portsWatch = 5 * time.Millisecond
+	h.ctl.queue(adoptReply, provisionReply(testCfg+switchCfg))
+	h.start()
+	eventually(t, "ports applied", func() bool { return pw.BridgeOf("eth0.2.1") == "br-v2" })
+	down.Store(true)
+	<-posts
+	busy, release := make(chan struct{}), make(chan struct{})
+	h.a.submit("wifi apply", func(context.Context) {
+		pw.mu.Lock() // the applier's lock, as mtkwifi.Applier.Apply holds it
+		close(busy)
+		<-release
+		pw.mu.Unlock()
+	})
+	<-busy
+	clk.add(91 * time.Second)
+	time.Sleep(100 * time.Millisecond)
+	if strings.Contains(h.logs.all(), "PORTS REVERTED") {
+		t.Fatalf("reverted while the Wi-Fi apply held the applier")
+	}
+	close(release)
+	eventually(t, "reverted once the Wi-Fi apply ended", func() bool {
+		return strings.Contains(h.logs.all(), "EVENT: PORTS REVERTED") && pw.BridgeOf("eth0.2.1") == "bdg2"
+	})
 }

@@ -188,8 +188,9 @@ type Report struct {
 	Failed map[int]error  // by unit port: the change failed and the port was put back on the LAN
 	Ports  map[int]string // by unit port: what the port is now (changed ports only)
 	// Before: by unit port, the setting the port had before Apply changed
-	// it (changed and failed ports; a state no setting describes counts as
-	// the plain LAN). Not set by a dry run.
+	// it (changed and failed ports; a state no setting describes, and a
+	// port in no bridge without tagged VLANs, count as the plain LAN). Not
+	// set by a dry run.
 	Before map[int]PortWant
 }
 
@@ -242,7 +243,9 @@ func (m *Manager) Apply(ctx context.Context, w Want) Report {
 		before, ok := m.setting(l)
 		if f, failed := m.failed[p]; failed {
 			before = f.back // where the port belongs, whatever it is now
-		} else if !ok {
+		} else if !ok || nativeOf(before) < 0 && len(before.Tagged) == 0 {
+			// in no bridge at all (a move cut short, a rescue that
+			// failed): never a place to revert to
 			before = PortWant{}
 		}
 		delete(m.failed, p)
@@ -424,6 +427,9 @@ func (m *Manager) Revert(ctx context.Context, back map[int]PortWant, failed map[
 		b, ok := back[p]
 		if !ok || !m.managed(p) {
 			continue
+		}
+		if nativeOf(b) < 0 && len(b.Tagged) == 0 {
+			b = PortWant{} // no bridge at all is never where a port is kept
 		}
 		f := failure{want: failed[p], back: b}
 		if !m.is(m.live(p), f.back) {

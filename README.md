@@ -232,20 +232,27 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 - **Port monitor:** a port change that cuts the unit off from the
   controller undoes itself, since telnet over the LAN is the only way in.
   - *Confirm or revert:* every change to a port waits for an inform the
-    controller answers that started after the change. With none within
-    `ports_confirm_s` (default 90 s, 30-900), the ports of that change go
+    controller answers that started after the change. That includes a move
+    back to the plain LAN (a loop through a downstream switch can cut the
+    unit off too) and a failed change whose rollback took the port off a
+    VLAN. The change triggers an inform at once, and while it waits, failed
+    informs are retried at least every 15 s. With none answered within
+    `ports_confirm_s` (default 90 s, 60-900), the ports of that change go
     back to their previous settings, and the agent logs
-    `EVENT: PORTS REVERTED (no inform reached the controller ...)`. The
-    reverted setting is not applied again until the controller sends a
-    different one for that port. Moves back to the plain LAN need no
-    confirmation.
+    `EVENT: PORTS REVERTED (no inform reached the controller ...)`. A port
+    that was in no bridge goes back on the plain LAN, never into no bridge
+    again. The reverted setting is not applied again until the controller
+    sends a different one for that port. A running Wi-Fi apply holds the
+    bridges, so a revert can wait for it (at most one Wi-Fi apply).
   - *Controller loss:* when no inform is answered for `ports_loss_s`
     (default 300 s, 60-3600), every port the agent may change goes back on
     the plain LAN, and the agent logs
     `EVENT: PORTS REVERTED (controller unreachable ...)`. Port settings
     stay off until informs are answered again, then come back through the
     confirm window. A setting taken off this way twice in a row is not
-    applied again until the controller sends a different one.
+    applied again until the controller sends a different one. Once informs
+    have been answered for twice `ports_loss_s` after the controller came
+    back, the count starts over, so two unrelated outages do not count.
   - *Startup:* no port setting is applied before the first answered inform.
   - A port that cannot be put back is retried every 5 s until it is on the
     LAN. Port 1 (when locked) and the uplink are never touched. Events also
