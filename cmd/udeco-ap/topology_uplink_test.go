@@ -74,3 +74,38 @@ func TestUplinkFieldsNoPortReading(t *testing.T) {
 		}
 	}
 }
+
+// Platform jio-mtk: the ports are the switch port devices (eth0.N.1, see
+// mtkwifi TestPortsAreSwitchPortDevices) and the uplink is eth0.4.1. The
+// if_table eth0 row carries eth0.4.1's 64-bit counters as they are, never
+// those of another port, and they keep counting across readings (a total
+// above 4 GiB is no 32-bit wrap).
+func TestUplinkFieldsJioPortCounters(t *testing.T) {
+	root := t.TempDir()
+	writeIfindex(t, root, "eth0.4.1", "26")
+	a := counterAgent(t, root)
+	a.cfg = &Config{Platform: PlatformJio}
+	a.topo.uplink = "eth0.4.1"
+	s := &apstate.Snapshot{MAC: "b4:a7:c6:17:e3:f3", IP: "192.168.0.51", Netmask: "255.255.255.0"}
+	read := func(uptime int64, rx, tx int64) map[string]any {
+		t.Helper()
+		ports := map[string]apstate.Port{
+			"eth0.1.1": {Name: "eth0.1.1", Up: true, Speed: 1000, RxBytes: 20752742692, TxBytes: 45666909354},
+			"eth0.2.1": {Name: "eth0.2.1", Up: true, Speed: 0, RxBytes: 0, TxBytes: 18976856502},
+			"eth0.4.1": {Name: "eth0.4.1", Up: true, Speed: 1000, FullDuplex: true, RxBytes: rx, TxBytes: tx},
+		}
+		a.ctr.Begin(uptime)
+		f := map[string]any{}
+		a.uplinkFields(f, s, ports, "1c:6a:1b:c5:04:c1")
+		a.monoIfTable(f)
+		return ifRow(f)
+	}
+	r := read(8207676, 48216226929, 28955672443)
+	if r["rx_bytes"] != int64(48216226929) || r["tx_bytes"] != int64(28955672443) || r["name"] != "eth0" {
+		t.Fatalf("first reading %v", r)
+	}
+	r = read(8207736, 48216426627, 28955812289)
+	if r["rx_bytes"] != int64(48216426627) || r["tx_bytes"] != int64(28955812289) {
+		t.Errorf("second reading %v, want eth0.4.1's counters", r)
+	}
+}
