@@ -37,6 +37,15 @@ var DefaultKeepDown = []string{"omci", "ponmgr", "ont_dc", "ont_stb_bind", "dms"
 	"pon.svc", "wan.svc", "wan_related.svc", "central_ctrl.svc", "other.svc", "voip.svc", "mesh.svc", "easyMeshd",
 	"lighttpd"} // the web UI: the owner asked for it down too (2026-11-19)
 
+// DefaultKeepOnly is the dumb-AP set (the owner, 2026-11-19: "stop
+// everything except telnet"): init, telnet, the serial console, the agent
+// and its supervisor, and the owner's boot script while it runs. Whatever
+// these started (telnet sessions, the agent's commands) stays too. The
+// radios need no daemon: their firmware is in the drivers (no
+// /lib/firmware, no hotplug helper); the bridge, address and routes are
+// kernel state. syslogd stays because init respawns it (inittab).
+var DefaultKeepOnly = []string{"init", "telnetd", "getty", "syslogd", "udeco-ap", "/flash2/udeco/start.sh", "customInit"}
+
 // protected are never signalled, whatever the patterns say.
 var protected = []string{"telnetd", "getty", "init", "udeco-ap", "cfg.svc", "dnsmasq"}
 
@@ -47,6 +56,11 @@ const KindStop = "stop-jio"
 type Options struct {
 	Root     string   // "/" on the device; a test tree in tests
 	KeepDown []string // nil = DefaultKeepDown
+	// KeepOnly, when set, stops every userland process except those
+	// matching an entry (program name, an argument's base name, or an
+	// argument equal to an entry holding a "/") and their descendants.
+	// KeepDown is then unused.
+	KeepOnly []string
 	Logf     func(string, ...any)
 	// kill and self are test hooks.
 	kill func(pid int, sig syscall.Signal) error
@@ -115,8 +129,42 @@ func match(argv []string, patterns []string) string {
 }
 
 type proc struct {
-	pid  int
-	argv []string
+	pid, ppid int
+	argv      []string
+}
+
+// keeps reports whether argv matches a KeepOnly entry.
+func keeps(argv []string, list []string) bool {
+	if len(argv) == 0 {
+		return false
+	}
+	prog := path.Base(argv[0])
+	for _, k := range list {
+		if prog == k {
+			return true
+		}
+		for _, a := range argv[1:] {
+			if a == k || !strings.Contains(k, "/") && path.Base(a) == k {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ppidOf reads the parent pid from /proc/<pid>/stat (0 when unknown).
+func ppidOf(b []byte) int {
+	s := string(b)
+	i := strings.LastIndexByte(s, ')')
+	if i < 0 {
+		return 0
+	}
+	f := strings.Fields(s[i+1:])
+	if len(f) < 2 {
+		return 0
+	}
+	n, _ := strconv.Atoi(f[1])
+	return n
 }
 
 func (m *Manager) procs() ([]proc, error) {
@@ -135,7 +183,8 @@ func (m *Manager) procs() ([]proc, error) {
 			continue // kernel thread or gone
 		}
 		argv := strings.Split(strings.TrimRight(string(b), "\x00"), "\x00")
-		out = append(out, proc{pid, argv})
+		st, _ := os.ReadFile(filepath.Join(m.o.Root, "proc", e.Name(), "stat"))
+		out = append(out, proc{pid: pid, ppid: ppidOf(st), argv: argv})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].pid < out[j].pid })
 	return out, nil
@@ -152,14 +201,26 @@ func (m *Manager) Enforce(ctx context.Context) (decosys.Report, error) {
 	if err != nil {
 		return rep, err
 	}
+	var kept map[int]bool
+	if m.o.KeepOnly != nil {
+		kept = m.keptSet(ps)
+	}
 	alive := map[int]bool{}
 	for _, p := range ps {
-		pat := match(p.argv, m.o.KeepDown)
-		if pat == "" {
+		var pat string
+		if kept != nil {
+			if kept[p.pid] {
+				continue
+			}
+			pat = path.Base(p.argv[0])
+		} else if pat = match(p.argv, m.o.KeepDown); pat == "" {
 			continue
 		}
 		alive[p.pid] = true
 		sig, why := syscall.SIGTERM, "Jio service kept down while UniFi manages the AP"
+		if kept != nil {
+			why = "dumb AP: only telnet and the agent run"
+		}
 		if _, ok := m.termed[p.pid]; ok {
 			sig, why = syscall.SIGKILL, "ignored SIGTERM"
 		}
@@ -191,6 +252,27 @@ func (m *Manager) Enforce(ctx context.Context) (decosys.Report, error) {
 		}
 	}
 	return rep, err
+}
+
+// keptSet is the KeepOnly roots and every process descended from one.
+func (m *Manager) keptSet(ps []proc) map[int]bool {
+	parent := map[int]int{}
+	kept := map[int]bool{m.o.self: true, os.Getppid(): true}
+	for _, p := range ps {
+		parent[p.pid] = p.ppid
+		if keeps(p.argv, m.o.KeepOnly) {
+			kept[p.pid] = true
+		}
+	}
+	for _, p := range ps {
+		for q, n := p.ppid, 0; q > 1 && n < 64; q, n = parent[q], n+1 {
+			if kept[q] {
+				kept[p.pid] = true
+				break
+			}
+		}
+	}
+	return kept
 }
 
 // Egress, Ingress, Restore, RestoreLoopGuard and FlushFlows change nothing:

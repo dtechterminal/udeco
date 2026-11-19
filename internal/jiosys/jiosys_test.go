@@ -86,3 +86,46 @@ func TestEnforceTermThenKill(t *testing.T) {
 		t.Errorf("respawn: %d steps, %d foreign", len(rep.Steps), len(rep.Foreign))
 	}
 }
+
+// TestKeepOnly: in dumb-AP mode everything stops except the kept programs
+// and what they started (a telnet session's commands, the agent's tools).
+func TestKeepOnly(t *testing.T) {
+	root := t.TempDir()
+	proc := func(pid, ppid int, argv ...string) {
+		fakeProc(t, root, pid, argv...)
+		st := strconv.Itoa(pid) + " (" + filepath.Base(argv[0]) + ") S " + strconv.Itoa(ppid) + " 0 0"
+		if err := os.WriteFile(filepath.Join(root, "proc", strconv.Itoa(pid), "stat"), []byte(st), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	proc(1, 0, "init")
+	proc(119, 1, "/userfs/bin/svchost", "-c", "/etc/cfg.svc")
+	proc(893, 1, "/usr/sbin/telnetd")
+	proc(900, 893, "-sh")
+	proc(901, 900, "ps")
+	proc(1033, 1, "/pfrm2.0/bin/lighttpd", "-f", "/pfrm2.0/etc/lighttpd.conf")
+	proc(4411, 1, "/pfrm2.0/bin/udevd", "--daemon")
+	proc(4825, 1, "/sbin/getty", "-L", "ttyS0")
+	proc(6204, 1, "/pfrm2.0/bin/dnsmasq", "-x", "/var/run/dnsmasq.pid.IF1")
+	proc(7000, 1, "/bin/sh", "/flash2/pfrm2.0/etc/customInit")
+	proc(7001, 7000, "sleep", "1")
+	proc(8000, 1, "sh", "/tmp/other.sh")
+	proc(9126, 1, "sh", "/flash2/udeco/start.sh")
+	proc(9134, 9126, "/tmp/udeco-bin/udeco-ap", "-config", "/flash2/udeco/udeco-ap.json")
+	proc(9200, 9134, "iwpriv", "ra0", "show", "stainfo")
+	var got []string
+	m := New(Options{Root: root, self: 9134, KeepOnly: DefaultKeepOnly, kill: func(pid int, sig syscall.Signal) error {
+		got = append(got, strconv.Itoa(pid))
+		return nil
+	}})
+	rep, err := m.Enforce(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "119 1033 4411 6204 8000"; strings.Join(got, " ") != want {
+		t.Errorf("stopped %q, want %q", strings.Join(got, " "), want)
+	}
+	if len(rep.Steps) != 5 || !strings.Contains(rep.Steps[0].Reason, "dumb AP") {
+		t.Errorf("steps %+v", rep.Steps)
+	}
+}

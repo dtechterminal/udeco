@@ -296,7 +296,9 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 			o.col = mtkwifi.NewCollector(mtkwifi.CollectorOptions{Root: o.root, Run: o.run, Model: "JCOW414"})
 		}
 		if o.newSys == nil {
-			o.newSys = func(so decosys.Options) sysManager { return jiosys.New(jiosys.Options{Root: so.Root, Logf: so.Logf}) }
+			o.newSys = func(so decosys.Options) sysManager {
+				return jiosys.New(jiosys.Options{Root: so.Root, Logf: so.Logf, KeepOnly: jiosys.DefaultKeepOnly})
+			}
 		}
 		if o.newWifi == nil {
 			o.newWifi = func(bo bcmwifi.Options) wifiApplier {
