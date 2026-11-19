@@ -526,6 +526,12 @@ func (a *agent) dropToObserve(ctx context.Context, why string) {
 	if err := a.sys.Restore(ctx); err != nil {
 		a.logf("decosys: restore: %v (reboot the unit for a clean stock state)", err)
 	}
+	// jio-mtk: the vendor daemons that set the front LED stay stopped, and
+	// observe mode runs no LED job, so a Locate blink would never end: the
+	// LED goes back to the controller's last led_enabled (led.go)
+	if a.cfg.jio() {
+		a.led(ctx, bcmwifi.LEDLocateOff)
+	}
 	// the hand-back turned the flow cache on; this retries a failure
 	a.restoreFlowCache(ctx, a.wifi)
 	// Restore put the loop guard's ports back (and removed the record):
