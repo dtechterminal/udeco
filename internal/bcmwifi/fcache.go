@@ -237,10 +237,10 @@ func (a *Applier) fcStatus(ctx context.Context) (on, ok bool) {
 func (a *Applier) fcOwned() bool { return a.fcOff || a.exists(a.fcOffPath()) }
 
 func (a *Applier) setFCOwned(on bool) {
-	a.fcOff = on
 	if a.o.DryRun {
-		return
+		return // nothing was turned off: owning it would log every later sync as drift
 	}
+	a.fcOff = on
 	if on {
 		if err := writeFileAtomic(a.fsPath(a.fcOffPath()), []byte("flow cache turned off by udeco-ap while tc limits are set\n"), 0o644); err != nil {
 			a.o.Logf("bcmwifi: flow cache: recording %s: %v", a.fcOffPath(), err)
@@ -293,15 +293,22 @@ func (a *Applier) syncFlowCache(ctx context.Context, need shapeNeed) {
 		}
 		return
 	}
+	// Recorded before the disable: a crash right after it (a crash loop
+	// ends in observe mode, whose start restores only what fc-off records)
+	// must not leave an off cache nobody turns back on.
+	if !owned {
+		a.setFCOwned(true)
+	}
 	if err := a.fc(ctx, "disable"); err != nil {
+		if !owned {
+			a.setFCOwned(false)
+		}
 		a.o.Logf("bcmwifi: flow cache off: %v (limits are bypassed by accelerated flows; retried at the next sync)", err)
 		return
 	}
 	drift := ""
 	if owned {
 		drift = " (it had been turned back on)"
-	} else {
-		a.setFCOwned(true)
 	}
 	a.o.Logf("bcmwifi: flow cache off: %d per-client / %d SSID limits need the slow path%s", len(need.perClient), len(need.ssid), drift)
 	// flows learnt before take the slow path too (the per-station

@@ -138,6 +138,10 @@ runs at the end of every shaping sync (Apply, Tick, `SetClientRates`,
   stations limited by their own entry, M the limited SSIDs with a station on
   the SSID's limit. From then on the agent owns the off state
   (`/tmp/udeco/fc-off` and in memory), also when it found the cache already off.
+  The record is written before `fc disable` runs (and removed again if the
+  disable fails), so an agent killed between the two, for example in a crash
+  loop that ends in observe mode, still leaves a record that the observe-mode
+  start restores.
 - **Drift**: Tick runs the sync every 60 s, so a cache turned back on (by
   TP-Link or by hand) is turned off again, logged with "(it had been turned
   back on)". An idle sync runs only `fc status`.
@@ -162,7 +166,8 @@ runs at the end of every shaping sync (Apply, Tick, `SetClientRates`,
 - **No fc** (`fc status` fails or its first line is not the flow-cache line):
   nothing is done, logged once; the trees are still built. jio-mtk never runs
   bcmwifi.
-- Dry-run: `fc status` is read, the flip only logged.
+- Dry-run: `fc status` is read, the flip only logged; the agent takes no
+  ownership, so a later dry-run sync is not reported as drift.
 
 **Trade-off**: while any station on the unit is limited, **no flow on that
 unit is accelerated** (fc and Archer HW forwarding off, every packet on the

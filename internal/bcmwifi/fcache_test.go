@@ -323,3 +323,49 @@ func TestFlowCacheDisableFails(t *testing.T) {
 		t.Errorf("retry: off=%v logs %q", f.fcOff, logs.lines)
 	}
 }
+
+// fc-off is on disk before `fc disable` runs: an agent killed between the
+// two (a crash loop drops to observe, whose start restores only what fc-off
+// records) must not leave the cache off with nothing to turn it back on.
+func TestFlowCacheRecordedBeforeDisable(t *testing.T) {
+	ctx := context.Background()
+	f := newFakeDev(t)
+	a, _ := fcApplier(t, f)
+	applyOK(t, a, limitedDesired())
+	f.state["wl12 assoclist"] = "assoclist " + strings.ToUpper(sta1)
+	recorded, ran := false, false
+	f.failOn = func(argv []string) bool {
+		if argv[0] == "fc" && argv[1] == "disable" {
+			ran, recorded = true, f.exists(a.fcOffPath())
+		}
+		return false
+	}
+	if _, err := a.SyncRateLimits(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !ran || !recorded || !f.fcOff {
+		t.Errorf("fc disable ran=%v with fc-off recorded=%v (off=%v)", ran, recorded, f.fcOff)
+	}
+}
+
+// Dry run, synced twice: nothing was turned off, so the second sync is not
+// reported as the cache having been turned back on.
+func TestFlowCacheDryRunNoDrift(t *testing.T) {
+	ctx := context.Background()
+	f := newFakeDev(t)
+	a, logs := fcApplier(t, f)
+	applyOK(t, a, limitedDesired())
+	f.state["wl12 assoclist"] = "assoclist " + strings.ToUpper(sta1)
+	a.o.DryRun = true
+	for i := 0; i < 2; i++ {
+		if _, err := a.SetClientRates(ctx, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := logs.count("dry-run: fc disable"); n != 2 {
+		t.Errorf("dry-run disable logged %d times, want 2", n)
+	}
+	if n := logs.count("turned back on"); n != 0 || f.fcOff || a.fcOff {
+		t.Errorf("dry run: off=%v owned=%v, %d drift lines", f.fcOff, a.fcOff, n)
+	}
+}
