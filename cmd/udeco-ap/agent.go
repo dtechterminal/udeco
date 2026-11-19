@@ -554,6 +554,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 			a.logf("uplink port: not found from the gateway's FDB entry (bcmwifi picks the only br-lan port with carrier)")
 		}
 		a.followRestarts()
+		a.watchChanges() // routine ticks' changes in the alive record (alive.go)
 	}
 	st, found, err := device.Load(a.statePath)
 	if err != nil {

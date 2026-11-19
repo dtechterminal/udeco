@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -292,5 +293,81 @@ func TestHandBackRemovesPortVLANs(t *testing.T) {
 		if f.exists(dev) {
 			t.Errorf("%s left behind after the hand-back", dev)
 		}
+	}
+}
+
+type changeKey struct{}
+
+// TestOnChangeBeforeChanges: the change hook runs, with the caller's
+// context, before each command that changes the unit (a port moved, a
+// VLAN bridge pruned, a BSS put back in its bridge) and never for an idle
+// Tick, Verify or PruneVLANs, nor in a dry run.
+func TestOnChangeBeforeChanges(t *testing.T) {
+	f := newPortsDev(t)
+	a := newApplier(f)
+	ctx := context.Background()
+	p, _ := a.Plan(ctx, home())
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	var calls []int // len(f.log) at each call
+	var tags []any
+	a.OnChange(func(ctx context.Context) {
+		calls = append(calls, len(f.log))
+		tags = append(tags, ctx.Value(changeKey{}))
+	})
+	tctx := context.WithValue(ctx, changeKey{}, "tick")
+	m := portsManager(a)
+
+	// idle: nothing to change
+	if _, err := a.Tick(tctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Verify(tctx, home()); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.PruneVLANs(tctx); err != nil {
+		t.Fatal(err)
+	}
+	m.Apply(tctx, jioports.Want{})
+	if len(calls) != 0 {
+		t.Fatalf("hook called %d time(s) with nothing to change: %v", len(calls), f.log)
+	}
+
+	// a BSS out of its bridge, a port moved, an unused bridge pruned: the
+	// hook runs right before each change, never before a read (iwconfig)
+	for _, step := range []func(){
+		func() { f.link("rai1", "bdg2"); a.Tick(tctx) },
+		func() { m.Apply(tctx, jioports.Want{VLAN: true, Ports: map[int]jioports.PortWant{2: {Native: 7}}}) },
+		func() { f.mkdev("br-v8", 1); a.PruneVLANs(tctx) },
+	} {
+		n, c := len(f.log), len(calls)
+		step()
+		var changes []int
+		for i := n; i < len(f.log); i++ {
+			if !strings.HasPrefix(f.log[i], "iwconfig ") {
+				changes = append(changes, i)
+			}
+		}
+		if len(changes) == 0 {
+			t.Fatalf("the step changed nothing: %v", f.log[n:])
+		}
+		if got := calls[c:]; !slices.Equal(got, changes) {
+			t.Errorf("hook called at %v, the changes are at %v: %v", got, changes, f.log[n:])
+		}
+	}
+	for _, tag := range tags {
+		if tag != "tick" {
+			t.Errorf("hook got another context: %v", tag)
+		}
+	}
+
+	// dry run: nothing runs, no hook
+	d := New(Options{Root: f.root, Run: f, RunDir: "/tmp/udeco", Uplink: "eth0.4.1", DryRun: true})
+	hooked := false
+	d.OnChange(func(context.Context) { hooked = true })
+	d.PortToBridge(ctx, "eth0.3.1", 9)
+	if hooked {
+		t.Error("hook called in a dry run")
 	}
 }

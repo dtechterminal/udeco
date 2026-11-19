@@ -29,6 +29,23 @@ type portsWifi struct {
 	// fail: PortToBridge("dev vid") fails, leaving dev in no bridge
 	// (brctl delif done, addif failed)
 	fail map[string]bool
+	// change: mtkwifi's OnChange hook, called before each change
+	change func(context.Context)
+}
+
+func (p *portsWifi) OnChange(f func(context.Context)) {
+	p.mu.Lock()
+	p.change = f
+	p.mu.Unlock()
+}
+
+func (p *portsWifi) changing(ctx context.Context) {
+	p.mu.Lock()
+	f := p.change
+	p.mu.Unlock()
+	if f != nil {
+		f(ctx)
+	}
 }
 
 func newPortsWifi(w *fakeWifi) *portsWifi {
@@ -53,7 +70,8 @@ func (p *portsWifi) Exists(dev string) bool {
 	_, ok := p.br[dev]
 	return ok
 }
-func (p *portsWifi) PortToBridge(_ context.Context, dev string, vid int) error {
+func (p *portsWifi) PortToBridge(ctx context.Context, dev string, vid int) error {
+	p.changing(ctx)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if strings.HasPrefix(dev, "eth0.4") {
@@ -74,7 +92,8 @@ func (p *portsWifi) PortToBridge(_ context.Context, dev string, vid int) error {
 	p.op("bridge %s %d", dev, vid)
 	return nil
 }
-func (p *portsWifi) EnsurePortVLAN(_ context.Context, parent string, vid int) (string, error) {
+func (p *portsWifi) EnsurePortVLAN(ctx context.Context, parent string, vid int) (string, error) {
+	p.changing(ctx)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	d := parent + "." + strconv.Itoa(vid)
@@ -82,7 +101,8 @@ func (p *portsWifi) EnsurePortVLAN(_ context.Context, parent string, vid int) (s
 	p.op("vlan %s", d)
 	return d, nil
 }
-func (p *portsWifi) DelPortVLAN(_ context.Context, dev string) error {
+func (p *portsWifi) DelPortVLAN(ctx context.Context, dev string) error {
+	p.changing(ctx)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	delete(p.br, dev)

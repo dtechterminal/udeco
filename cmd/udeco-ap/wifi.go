@@ -179,12 +179,21 @@ func (a *agent) runJob(ctx context.Context, j job) {
 		a.logf("observe mode: %s not done", j.what)
 		return
 	}
+	jctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), a.t.jobTimeout)
+	defer cancel()
 	if aliveJob(j.what) {
 		a.markAlive("running", true, j.what)
 		defer a.markAlive("running", true, "")
+	} else {
+		// a routine tick: marked only once it changes the unit (aliveLazy)
+		lz := &aliveLazy{what: j.what}
+		jctx = context.WithValue(jctx, aliveLazyKey{}, lz)
+		defer func() {
+			if lz.marked.Load() {
+				a.markAlive("running", true, "")
+			}
+		}()
 	}
-	jctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), a.t.jobTimeout)
-	defer cancel()
 	j.fn(jctx)
 }
 

@@ -73,6 +73,7 @@ type Applier struct {
 	// (unix ns) is the end of the last restart's settle time
 	gate       sync.RWMutex
 	quietUntil atomic.Int64
+	onChange   atomic.Pointer[func(context.Context)] // OnChange
 }
 
 const (
@@ -124,10 +125,19 @@ func New(o Options) *Applier {
 
 func (a *Applier) dev(p string) string { return filepath.Join(a.o.Root, p) }
 
+// OnChange has f called, with the caller's context, before each command
+// that changes the unit (ifconfig, iwpriv set, brctl, ip: everything run
+// goes through; the reads, iwconfig and sysfs, do not). The agent marks
+// its alive record from it.
+func (a *Applier) OnChange(f func(context.Context)) { a.onChange.Store(&f) }
+
 func (a *Applier) run(ctx context.Context, name string, args ...string) error {
 	if a.o.DryRun {
 		a.o.Logf("mtkwifi: dry run: %s %s", name, strings.Join(redactArgs(args), " "))
 		return nil
+	}
+	if f := a.onChange.Load(); f != nil {
+		(*f)(ctx)
 	}
 	out, err := a.o.Run.Run(ctx, name, args...)
 	if err != nil {

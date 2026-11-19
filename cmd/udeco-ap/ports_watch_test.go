@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -445,5 +446,82 @@ func TestJioPortsRevertWhileBlocked(t *testing.T) {
 	}
 	if pw.BridgeOf("eth0.1.1") != "bdg2" || pw.BridgeOf("eth0.4.1") != "bdg2" {
 		t.Errorf("port 1 or the uplink changed: %v", pw.br)
+	}
+}
+
+// aliveJob is the job in the rig's alive record ("-" = no record).
+func (r *portsRig) aliveJob() string {
+	b, err := os.ReadFile(r.a.alivePath())
+	if err != nil {
+		return "-"
+	}
+	var rec aliveRec
+	if err := json.Unmarshal(b, &rec); err != nil {
+		r.t.Fatalf("alive %q: %v", b, err)
+	}
+	return rec.Job
+}
+
+// TestAliveMarksTickChanges: a routine tick (the "enforce" job) that puts
+// a moved port back is in the alive record while it changes the unit, as
+// a provision job is, and the mark is cleared after; an idle tick writes
+// nothing to flash; changes made outside the worker (a provision called
+// directly, the port monitor's revert) mark no tick.
+func TestAliveMarksTickChanges(t *testing.T) {
+	r := newPortsRig(t, nil)
+	r.a.watchChanges()
+	var during []string
+	hook := r.pw.change
+	if hook == nil {
+		t.Fatal("the Wi-Fi backend got no change hook")
+	}
+	r.pw.OnChange(func(ctx context.Context) {
+		hook(ctx)
+		during = append(during, r.aliveJob())
+	})
+	tick := func() {
+		r.a.runJob(r.ctx, job{"enforce", func(ctx context.Context) { r.a.portsApply(ctx, "tick") }})
+	}
+	r.inform(r.clk.now())
+	r.provision(switchCfg)
+	r.clk.add(time.Second)
+	r.inform(r.clk.now()) // confirmed
+	if !r.live() {
+		t.Fatalf("not applied: %v", r.pw.br)
+	}
+
+	// idle tick: no flash write
+	os.Remove(r.a.alivePath())
+	during = nil
+	tick()
+	if job := r.aliveJob(); job != "-" || len(during) != 0 {
+		t.Errorf("idle tick wrote the alive record (%q) or changed %v", job, during)
+	}
+
+	// someone put port 2 back on the LAN: the tick moves it, marked
+	r.pw.mu.Lock()
+	r.pw.br["eth0.2.1"] = "bdg2"
+	r.pw.mu.Unlock()
+	tick()
+	if !r.live() {
+		t.Fatalf("port 2 not put back: %v", r.pw.br)
+	}
+	if len(during) == 0 || during[0] != "enforce" {
+		t.Errorf("alive job while the tick changed the unit: %q, want enforce", during)
+	}
+	if job := r.aliveJob(); job != "" {
+		t.Errorf("alive job after the tick: %q, want none", job)
+	}
+
+	// outside the worker: no mark
+	os.Remove(r.a.alivePath())
+	during = nil
+	r.provision(switchCfg3)
+	r.after(90 * time.Second) // unconfirmed: the port monitor reverts it
+	if len(during) == 0 {
+		t.Fatal("no change made outside the worker")
+	}
+	if job := r.aliveJob(); job != "-" {
+		t.Errorf("a change outside the worker marked the alive record: %q", job)
 	}
 }
