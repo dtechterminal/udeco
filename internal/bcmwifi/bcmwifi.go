@@ -149,8 +149,10 @@ type Applier struct {
 	failed  *failedApply               // the last Desired whose Apply failed and rolled back
 	ph      map[string]hapdPlaceholder // anchor vif -> hostapd placeholder BSS (secret)
 	anchors map[string]string          // primary -> hostapd's interface= vif as last seen (anchor.go)
-	ftPeers []ftpeer.Peer              // other units' FT key holders (SetFTPeers)
-	ftLive  map[string]*ftLiveState    // primary -> entries added to its running hostapd (ftpeers.go)
+	nbr     nbrState                   // 802.11k neighbor scans (neighbors.go)
+	now     func() time.Time
+	ftPeers []ftpeer.Peer           // other units' FT key holders (SetFTPeers)
+	ftLive  map[string]*ftLiveState // primary -> entries added to its running hostapd (ftpeers.go)
 
 	sleep func(time.Duration)
 	poll  time.Duration
@@ -180,6 +182,7 @@ func New(o Options) *Applier {
 		anchors: map[string]string{},
 		ledOn:   true,
 		sleep:   time.Sleep,
+		now:     time.Now,
 		poll:    2 * time.Second,
 	}
 }

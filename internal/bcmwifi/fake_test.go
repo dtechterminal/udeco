@@ -455,6 +455,26 @@ func (f *fakeDev) wl(args []string) ([]byte, error) {
 		return nil, nil
 	case rest[0] == "deauthenticate":
 		return nil, nil
+	case rest[0] == "scan":
+		f.state[iface+" scans"] += "x"
+		return nil, nil
+	case rest[0] == "rrm_nbr_list":
+		return []byte("RRM Neighbor Report List:\n" + f.state[iface+" nbr"]), nil
+	case rest[0] == "rrm_nbr_del_nbr" && len(rest) == 2:
+		var keep []string
+		for _, l := range strings.SplitAfter(f.state[iface+" nbr"], "\n") {
+			if l != "" && !strings.Contains(l, "bssid "+strings.ToUpper(rest[1])+" ") {
+				keep = append(keep, l)
+			}
+		}
+		f.state[iface+" nbr"] = strings.Join(keep, "")
+		return nil, nil
+	case rest[0] == "rrm_nbr_add_nbr" && len(rest) >= 6:
+		// As .205 prints it (2026-11-19).
+		n := func(s string) uint64 { v, _ := strconv.ParseUint(s, 0, 32); return v }
+		f.state[iface+" nbr"] += fmt.Sprintf("AP %2d: bssid %s bssid_info 0x%08x reg 0x%02x channel 0x%02x phytype 0x%02x ssid  chanspec 0x0000 preference 0x00\n",
+			strings.Count(f.state[iface+" nbr"], "\n")+1, strings.ToUpper(rest[1]), n(rest[2]), n(rest[3]), n(rest[4]), n(rest[5]))
+		return nil, nil
 	}
 	if rest[0] == "country" && len(rest) == 2 {
 		cc, _, _ := strings.Cut(rest[1], "/")

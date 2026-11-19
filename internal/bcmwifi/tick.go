@@ -23,6 +23,9 @@ type TickReport struct {
 	// RateLimitChanges is the number of stations whose tc limit was added,
 	// changed or removed.
 	RateLimitChanges int
+	// NeighborChanges is the number of 802.11k neighbor list entries added
+	// or removed (neighbors.go).
+	NeighborChanges int
 	// Problems lists repairs that failed.
 	Problems []string
 }
@@ -89,5 +92,8 @@ func (a *Applier) Tick(ctx context.Context) (TickReport, error) {
 	if err != nil {
 		r.Problems = append(r.Problems, err.Error())
 	}
+	nc, probs := a.syncNeighbors(ctx, a.layout(*d), a.now())
+	r.NeighborChanges = nc
+	r.Problems = append(r.Problems, probs...)
 	return r, nil
 }

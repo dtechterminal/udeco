@@ -291,6 +291,7 @@ func (a *agent) wifiTick(ctx context.Context) {
 	a.count("wifi-foreign", len(r.Foreign))
 	a.count("wifi-repair", r.Steps)
 	a.count("rate-limit", r.RateLimitChanges)
+	a.count("wifi-11k-neighbor", r.NeighborChanges)
 	for _, p := range r.Problems {
 		a.logf("wifi: tick: %s", p)
 	}
