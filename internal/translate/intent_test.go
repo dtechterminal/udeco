@@ -621,8 +621,23 @@ func TestIntentBands(t *testing.T) {
 	if w := in.WLANs[0]; w.Hidden || w.Passphrase != "good-pass-1" {
 		t.Errorf("first band's settings not used: %v", w)
 	}
-	if !contains(notes, `wlan "home": hidden, passphrase differ on na: the ng settings are used`) {
+	// hidden is a per-band setting: kept for na as sent; the passphrase is not
+	if w := in.WLANs[0]; !w.PerBand["na"].Hidden || w.PerBand["ng"].Hidden {
+		t.Errorf("per-band hidden: %+v", w.PerBand)
+	}
+	if !contains(notes, `wlan "home": passphrase differ on na: the ng settings are used`) {
 		t.Errorf("notes %q", notes)
+	}
+	// WPA3 on one radio only (an AP that claims SAE on 5 GHz alone): each
+	// band keeps the controller's own security, PMF and 802.11r/k
+	in, notes = IntentFromCfg(two("aaa.2.wpa3.support=enabled", "aaa.2.wpa3.transition=enabled",
+		"aaa.2.wpa.key.1.mgmt=SAE", "aaa.2.pmf.status=enabled", "aaa.2.pmf.mode=1", "aaa.2.11k.status=enabled"))
+	if w := in.WLANs[0]; w.Security != "wpa2" || w.PerBand["na"].Security != "wpa2wpa3" || w.PerBand["na"].PMF != "optional" ||
+		!w.PerBand["na"].RRM || w.PerBand["ng"].Security != "wpa2" || w.PerBand["ng"].RRM {
+		t.Errorf("per-band security: %+v", w.PerBand)
+	}
+	if hasNote(notes, "differ") {
+		t.Errorf("per-band settings noted as dropped: %q", notes)
 	}
 	assertNoSecrets(t, in, notes, []string{"good-pass-1", "other-pass-2"})
 	// an unsupported band is left off; the other still comes up

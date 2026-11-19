@@ -16,7 +16,8 @@
 //
 // Safety: SSH adoption listens on sshd_port (2222) and only accepts
 // console_ip; port 22 (the unit's dropbear, used by TP-Link's mesh) is never
-// touched. SIGTERM stops informing and leaves Wi-Fi as it is. When an apply
+// touched. SIGTERM stops informing and leaves Wi-Fi as it is (rate limits
+// and the flow cache off for them included; flowcache.go). When an apply
 // or rollback leaves Wi-Fi with TP-Link, TP-Link's services are restored and
 // the agent observes until the marker /tp_data/udeco/force-observe is
 // removed (it survives reboots); so does a crash loop (5 starts in 10

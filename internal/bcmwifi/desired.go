@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -76,7 +77,12 @@ type SSID struct {
 	UAPSD              bool
 	ProxyARP           bool
 	MulticastToUnicast bool
-	DTIM               map[string]int // band -> period
+	// PerBand: the controller's own values for one band when its bands
+	// differ (translate.WLANIntent.PerBand); ForBand applies them (mtkwifi).
+	// bcmwifi itself serves every band with the SSID-wide fields and notes
+	// the bands that differ (perBandNotes).
+	PerBand map[string]BandSettings
+	DTIM    map[string]int // band -> period
 	// MinRateKbps is the lowest data rate per band (band -> kbps). It is
 	// applied as the BSS rateset (wl rateset, beacons at the lowest basic
 	// rate) only with Options.MinRates; otherwise it is noted.
@@ -550,7 +556,7 @@ func radioNotes(band string, r Radio) []string {
 // normalizeSSID validates s and fills defaults. It returns ok=false (with a
 // note) when the SSID cannot be served safely. Notes never contain secrets.
 func normalizeSSID(s SSID) (SSID, []string, bool) {
-	var notes []string
+	notes := perBandNotes(s)
 	skip := func(why string) (SSID, []string, bool) {
 		return s, append(notes, fmt.Sprintf("ssid %s: %s, skipped", s.ID, why)), false
 	}
@@ -830,4 +836,77 @@ func joinSecrets(pub *Desired, sec secretSet) {
 			}
 		}
 	}
+}
+
+// BandSettings is one band's own security and roaming settings of an SSID
+// (SSID.PerBand).
+type BandSettings struct {
+	Security           string
+	PMF                string
+	FT, FTSAE          bool
+	FTOverDS           bool
+	MobilityDomain     string
+	BSSTransition, RRM bool
+	UAPSD, ProxyARP    bool
+	MulticastToUnicast bool
+	Hidden, Isolation  bool
+	GroupRekey         int
+}
+
+// ForBand is s as the controller sent it for band ("ng"/"na", or
+// "2g"/"5g"): the band's own settings from PerBand when it has them.
+func (s SSID) ForBand(band string) SSID {
+	b, ok := s.PerBand[band]
+	if !ok {
+		alias := map[string]string{"ng": "2g", "na": "5g", "2g": "ng", "5g": "na"}[band]
+		if b, ok = s.PerBand[alias]; !ok {
+			return s
+		}
+	}
+	s.Security, s.PMF, s.FT, s.FTSAE, s.FTOverDS = b.Security, b.PMF, b.FT, b.FTSAE, b.FTOverDS
+	s.MobilityDomain, s.BSSTransition, s.RRM = b.MobilityDomain, b.BSSTransition, b.RRM
+	s.UAPSD, s.ProxyARP, s.MulticastToUnicast = b.UAPSD, b.ProxyARP, b.MulticastToUnicast
+	s.Hidden, s.Isolation, s.GroupRekey = b.Hidden, b.Isolation, b.GroupRekey
+	return s
+}
+
+// bandSettings is s's SSID-wide security and roaming settings (the ones
+// bcmwifi serves on every band).
+func (s SSID) bandSettings() BandSettings {
+	return BandSettings{Security: s.Security, PMF: s.PMF, FT: s.FT, FTSAE: s.FTSAE, FTOverDS: s.FTOverDS,
+		MobilityDomain: s.MobilityDomain, BSSTransition: s.BSSTransition, RRM: s.RRM, UAPSD: s.UAPSD,
+		ProxyARP: s.ProxyARP, MulticastToUnicast: s.MulticastToUnicast, Hidden: s.Hidden,
+		Isolation: s.Isolation, GroupRekey: s.GroupRekey}
+}
+
+// perBandNotes notes each band whose own settings (SSID.PerBand) differ from
+// the SSID-wide ones. bcmwifi does not apply PerBand: it serves every band
+// with the SSID-wide settings (translate takes them from the first band),
+// as it did before PerBand existed, and this keeps the "not carried" note
+// translate gave for such a WLAN until then. Field names only, never values.
+func perBandNotes(s SSID) []string {
+	if len(s.PerBand) == 0 {
+		return nil
+	}
+	bands := make([]string, 0, len(s.PerBand))
+	for b := range s.PerBand {
+		bands = append(bands, b)
+	}
+	sort.Strings(bands)
+	want := reflect.ValueOf(s.bandSettings())
+	var notes []string
+	for _, b := range bands {
+		got := reflect.ValueOf(s.PerBand[b])
+		var diff []string
+		for i := 0; i < want.NumField(); i++ {
+			if !reflect.DeepEqual(want.Field(i).Interface(), got.Field(i).Interface()) {
+				diff = append(diff, strings.ToLower(want.Type().Field(i).Name))
+			}
+		}
+		if len(diff) > 0 {
+			notes = append(notes, fmt.Sprintf("ssid %s: %s differ on %s: bcmwifi serves every band with the SSID-wide settings",
+				s.ID, strings.Join(diff, ", "), b))
+		}
+	}
+	return notes
 }

@@ -227,6 +227,9 @@ func TestE2ESpectrum(t *testing.T) {
 		_, quick := m["quickscan_scanning"]
 		switch e.ctlStep {
 		case 0:
+			if !in.live() {
+				return ""
+			}
 			e.ctlStep = 1
 			return `{"_type":"cmd","cmd":"quick-scan","scan-band":1,"scan-bw":80}`
 		case 1:
@@ -360,6 +363,9 @@ func TestE2EQuickScanInformsAtOnce(t *testing.T) {
 	e := newE2E(t, cfg, true, func(c *Config, o *options) { o.spectrumPlan = fastPlan() })
 	e.unit.spec = newSpecFake()
 	e.ctl.reply = func(in e2eInform) string {
+		if !in.live() {
+			return "" // a 1 s noop: the provisioning's apply is still running
+		}
 		switch e.ctlStep {
 		case 0:
 			e.ctlStep = 1
@@ -397,6 +403,9 @@ func TestE2EQuickScanEvent(t *testing.T) {
 			// Network answers a plain noop; the 1 s interval only lets
 			// this script go on without waiting the 60 s
 			return `{"_type":"noop","interval":1}`
+		}
+		if !in.live() {
+			return ""
 		}
 		switch e.ctlStep {
 		case 0:
@@ -518,7 +527,7 @@ func TestE2ESpectrumScanPartial(t *testing.T) {
 		if in.payload["inform_as_notif"] == true {
 			return `{"_type":"noop","interval":1}`
 		}
-		if e.ctlStep == 0 {
+		if e.ctlStep == 0 && in.live() {
 			e.ctlStep = 1
 			return `{"_type":"cmd","cmd":"spectrum-scan","spectrum-cfg":"","infinite":false}`
 		}

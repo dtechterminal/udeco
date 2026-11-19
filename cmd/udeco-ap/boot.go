@@ -467,14 +467,18 @@ func (e *eventLog) add(msg string) {
 }
 
 // checkReboot compares the kernel's boot id with the one stored last time
-// and records a "rebooted" event when it changed (R13; the cause of the
-// unexplained reboots in X9/Q15 is still open).
+// and records a "rebooted" event when it changed, saying how the previous
+// boot ended as far as its alive record tells (R13, alive.go; the cause of
+// the unexplained reboots in X9/Q15 is still open).
 func (a *agent) checkReboot() {
 	cur, err := os.ReadFile(a.dev("/proc/sys/kernel/random/boot_id"))
 	if err != nil {
 		return
 	}
 	id := strings.TrimSpace(string(cur))
+	a.alive.mu.Lock()
+	a.alive.bootID = id
+	a.alive.mu.Unlock()
 	p := a.dev(filepath.Join(a.o.base, "boot_id"))
 	prev, err := os.ReadFile(p)
 	if err == nil && strings.TrimSpace(string(prev)) == id {
@@ -482,7 +486,7 @@ func (a *agent) checkReboot() {
 	}
 	up, _ := readUptime(a.o.root)
 	if err == nil {
-		a.event(fmt.Sprintf("the unit rebooted (up %.0f s)", up))
+		a.event(fmt.Sprintf("the unit rebooted (up %.0f s): %s", up, a.previousEnd(strings.TrimSpace(string(prev)))))
 	}
 	os.WriteFile(p, []byte(id+"\n"), 0o600)
 }

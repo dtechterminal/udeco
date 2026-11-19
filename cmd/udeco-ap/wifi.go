@@ -178,6 +178,10 @@ func (a *agent) runJob(ctx context.Context, j job) {
 		a.logf("observe mode: %s not done", j.what)
 		return
 	}
+	if aliveJob(j.what) {
+		a.markAlive("running", true, j.what)
+		defer a.markAlive("running", true, "")
+	}
 	jctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), a.t.jobTimeout)
 	defer cancel()
 	j.fn(jctx)
@@ -201,6 +205,7 @@ func (a *agent) startupJobs() {
 	for _, mac := range a.authorizedGuests(time.Now()) {
 		a.submit("guest-auth "+mac, func(ctx context.Context) { a.guestAuth(ctx, mac, true) })
 	}
+	a.pushClientRates("startup") // also clears a list left in RunDir
 	a.provisionIfNew("startup")
 }
 
@@ -496,6 +501,8 @@ func (a *agent) dropToObserve(ctx context.Context, why string) {
 	if err := a.sys.Restore(ctx); err != nil {
 		a.logf("decosys: restore: %v (reboot the unit for a clean stock state)", err)
 	}
+	// the hand-back turned the flow cache on; this retries a failure
+	a.restoreFlowCache(ctx, a.wifi)
 	// Restore put the loop guard's ports back (and removed the record):
 	// the loop goroutine forgets them at its next reading
 	a.loopReload.Store(true)
@@ -596,6 +603,15 @@ func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 			UAPSD: wl.UAPSD, ProxyARP: wl.ProxyARP, MulticastToUnicast: wl.MulticastToUnicast,
 			DTIM: wl.DTIM, MinRateKbps: wl.MinRateKbps, Schedule: wl.Schedule}
 		s.MinRateOpts = minRateOpts(wl.MinRateOpts)
+		for band, b := range wl.PerBand {
+			if s.PerBand == nil {
+				s.PerBand = map[string]bcmwifi.BandSettings{}
+			}
+			s.PerBand[band] = bcmwifi.BandSettings{Security: b.Security, PMF: b.PMF, FT: b.FT, FTSAE: b.FTSAE,
+				FTOverDS: b.FTOverDS, MobilityDomain: b.MobilityDomain, BSSTransition: b.BSSTransition, RRM: b.RRM,
+				UAPSD: b.UAPSD, ProxyARP: b.ProxyARP, MulticastToUnicast: b.MulticastToUnicast, Hidden: b.Hidden,
+				Isolation: b.Isolation, GroupRekey: b.GroupRekey}
+		}
 		for _, b := range wl.Bands {
 			if b == "ng" || b == "na" {
 				s.Bands = append(s.Bands, b)

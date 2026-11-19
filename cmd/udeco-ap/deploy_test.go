@@ -177,7 +177,7 @@ func TestDeployLauncher(t *testing.T) {
 		os.WriteFile(filepath.Join(bin, "md5sum"), []byte("#!/bin/sh\nh=$(md5 -q \"$1\" 2>/dev/null) || exit 1\necho \"$h  $1\"\n"), 0o755)
 	}
 	marker := filepath.Join(root, "started")
-	agent := []byte("#!/bin/sh\necho \"$0 $*\" >" + marker + "\n")
+	agent := []byte("#!/bin/sh\necho \"$0 $*\" >" + marker + "\necho agent-stdout $$\n")
 	sum := md5.Sum(agent)
 	writeGz := func(b []byte) {
 		f, _ := os.Create(filepath.Join(dir, "udeco-ap.gz"))
@@ -210,6 +210,13 @@ func TestDeployLauncher(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(ram, "udeco-ap")); string(b) != string(agent) {
 		t.Fatal("unpacked agent differs")
 	}
+	// its output goes to the RAM log, and agent.pid is the agent's own pid
+	// (the launcher execs it)
+	logb, _ := os.ReadFile(filepath.Join(ram, "agent.log"))
+	pidb, _ := os.ReadFile(filepath.Join(ram, "agent.pid"))
+	if pid := strings.TrimSpace(string(pidb)); pid == "" || strings.TrimSpace(string(logb)) != "agent-stdout "+pid {
+		t.Errorf("agent.log %q, agent.pid %q", logb, pidb)
+	}
 	// an agent runs: nothing happens
 	if got, _ := run(true); got != "" {
 		t.Errorf("started while an agent runs: %q", got)
@@ -225,8 +232,11 @@ func TestDeployLauncher(t *testing.T) {
 	if got, ok := run(false); got != "" || ok {
 		t.Errorf("a bad archive started: %q ok=%v", got, ok)
 	}
-	if ents, _ := os.ReadDir(ram); len(ents) != 0 {
-		t.Errorf("left in ramfs: %v", ents)
+	ents, _ := os.ReadDir(ram)
+	for _, e := range ents {
+		if n := e.Name(); n != "agent.log" && n != "agent.pid" {
+			t.Errorf("left in ramfs: %s", n)
+		}
 	}
 	// plain binary (at or below 6 MiB): started where it is
 	os.Remove(filepath.Join(dir, "udeco-ap.gz"))

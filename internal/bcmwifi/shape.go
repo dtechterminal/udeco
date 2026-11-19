@@ -33,13 +33,22 @@ import (
 // changed are flushed from the flow cache (R21/R24). TP-Link's htb on br-lan
 // is never touched (decosys owns it).
 //
-// Cost (audit D2, unverified): one htb enqueue makes a vif's flows
-// non-accelerable, so only vifs with a limited station carry a tree; it is
-// removed when the last limited station leaves.
+// Cost: tc only sees what the Broadcom flow cache does not accelerate.
+// Measured on .205 (2026-11-19), accelerated flows bypass the trees
+// entirely (512 kbit/s limit, 4.9 Mbit/s measured), so the flow cache is
+// turned off on the unit while any tree is wanted and back on when none is
+// (fcache.go): no hardware acceleration on that unit while limits are set.
+// Only vifs with a limited station carry a tree; it is removed when the
+// last limited station leaves.
+//
+// A station the controller gave its own limit (cmd rate-update,
+// clientrate.go) is shaped the same way on any SSID vif it is associated on,
+// at its own limit in each direction it has one and the SSID's in the other.
 //
 // Stations are the driver's association list (`wl -i <vif> assoclist`), read
 // at each sync: a station that joins between syncs is unlimited until the
-// next one (Tick runs it).
+// next one (Tick runs it; the agent also syncs when a client with its own
+// limit joins).
 
 // tcState is what the agent built on one device (RunDir/tc-state.json).
 type tcState struct {
@@ -98,10 +107,14 @@ func parseAssoclist(out string) []string {
 	return macs
 }
 
-// wantShaping computes the wanted trees for l, reading each limited vif's
-// association list.
-func (a *Applier) wantShaping(ctx context.Context, l *layout) (map[string]*tcWant, error) {
+// wantShaping computes the wanted trees for l, reading the association
+// list of each vif that has a limited SSID or, while there are per-client
+// limits (clientrate.go), of every SSID vif. A station's limit in each
+// direction is its own entry's when the entry limits that way, else its
+// SSID's.
+func (a *Applier) wantShaping(ctx context.Context, l *layout) (map[string]*tcWant, shapeNeed, error) {
 	want := map[string]*tcWant{}
+	need := shapeNeed{perClient: map[string]bool{}, ssid: map[string]bool{}}
 	get := func(dev, dir string) *tcWant {
 		w := want[dev]
 		if w == nil {
@@ -110,29 +123,90 @@ func (a *Applier) wantShaping(ctx context.Context, l *layout) (map[string]*tcWan
 		}
 		return w
 	}
+	per := a.loadClientRates()
+	var tc map[string]*tcState // loaded only when a read fails
 	for _, rl := range l.Radios {
 		for _, u := range rl.Used {
-			rlim := u.SSID.RateLimit
-			if rlim == nil || rlim.DownKbps <= 0 && rlim.UpKbps <= 0 {
+			var ssid RateLimit
+			if r := u.SSID.RateLimit; r != nil {
+				ssid = *r
+			}
+			ssidLimited := ssid.DownKbps > 0 || ssid.UpKbps > 0
+			// never the backhaul (TP-Link's mesh uplink between units)
+			if !ssidLimited && (len(per) == 0 || isBackhaul(u.Vif)) {
 				continue
 			}
 			out, err := a.wlGet(ctx, u.Vif, "assoclist")
 			if err != nil {
-				return nil, err
+				if !ssidLimited {
+					// per-client only: this vif keeps what it has until
+					// the next sync; the SSID-wide limits elsewhere are
+					// still synced
+					a.o.Logf("bcmwifi: per-client limits on %s: %v (kept as built)", u.Vif, err)
+					if tc == nil {
+						tc = a.loadTC()
+					}
+					for _, m := range keepShaping(tc, u.Vif, a.netdevExists(u.Vif), get) {
+						need.perClient[m] = true
+					}
+					continue
+				}
+				return nil, need, err
 			}
 			for _, m := range parseAssoclist(out) {
-				if rlim.DownKbps > 0 {
-					get(u.Vif, "dst").Root[m] = rlim.DownKbps
+				pc := per[m] // zero: no entry
+				down, up := ssid.DownKbps, ssid.UpKbps
+				if pc.DownKbps > 0 {
+					down = pc.DownKbps
+					need.perClient[m] = true
 				}
-				if rlim.UpKbps > 0 {
+				if pc.UpKbps > 0 {
+					up = pc.UpKbps
+					need.perClient[m] = true
+				}
+				if pc.DownKbps <= 0 && ssid.DownKbps > 0 || pc.UpKbps <= 0 && ssid.UpKbps > 0 {
+					need.ssid[u.SSID.ID] = true
+				}
+				if down > 0 {
+					get(u.Vif, "dst").Root[m] = down
+				}
+				if up > 0 {
 					ifb := ifbFor(rl.Primary)
 					get(u.Vif, "dst").Redir[m] = ifb
-					get(ifb, "src").Root[m] = rlim.UpKbps
+					get(ifb, "src").Root[m] = up
 				}
 			}
 		}
 	}
-	return want, nil
+	return want, need, nil
+}
+
+// keepShaping wants again what was built for the stations of vif (its
+// download classes, upload redirects and their IFB classes), so a vif whose
+// association list could not be read is left as it is. A vif that is gone
+// keeps nothing. It returns the stations kept.
+func keepShaping(tc map[string]*tcState, vif string, exists bool, get func(dev, dir string) *tcWant) []string {
+	st := tc[vif]
+	if st == nil || !exists || st.Dirty {
+		return nil
+	}
+	var kept []string
+	if st.Root && st.Dir == "dst" {
+		for m, kbps := range st.Rate {
+			get(vif, "dst").Root[m] = kbps
+			kept = append(kept, m)
+		}
+	}
+	if st.Ingress {
+		for m, ifb := range st.To {
+			if ist := tc[ifb]; ist != nil && ist.Root && ist.Rate[m] > 0 {
+				get(vif, "dst").Redir[m] = ifb
+				get(ifb, "src").Root[m] = ist.Rate[m]
+				kept = append(kept, m)
+			}
+		}
+	}
+	return kept
 }
 
 // SyncRateLimits brings the tc trees in line with the applied Desired and
@@ -151,14 +225,17 @@ func (a *Applier) SyncRateLimits(ctx context.Context) (int, error) {
 }
 
 // syncShaping applies wantShaping(l) (l nil: remove every tree).
+// The flow cache follows: off while anything is shaped, else back on
+// (syncFlowCache).
 func (a *Applier) syncShaping(ctx context.Context, l *layout) (int, error) {
 	want := map[string]*tcWant{}
+	var need shapeNeed
 	if l != nil {
-		w, err := a.wantShaping(ctx, l)
+		w, n, err := a.wantShaping(ctx, l)
 		if err != nil {
 			return 0, err
 		}
-		want = w
+		want, need = w, n
 	}
 	state := a.loadTC()
 	var devs []string
@@ -204,6 +281,7 @@ func (a *Applier) syncShaping(ctx context.Context, l *layout) (int, error) {
 		}
 	}
 	macs := sortedKeys(changed)
+	a.syncFlowCache(ctx, need)
 	for _, m := range macs {
 		if err := a.flushFlows(ctx, FlowScope{MAC: m}); err != nil {
 			a.o.Logf("%v", err)

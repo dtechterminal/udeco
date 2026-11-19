@@ -27,6 +27,13 @@ interface or ran on unused interfaces (`ifb0`, the down primary `wl0`).
   `action mirred egress redirect dev ifb0`, and `police`.
 - So per-client download (htb on the VAP) and upload (ingress, then mirred to ifb, then htb) limits are buildable.
 - TP-Link already runs `htb 2:` with an `sfq 202` default on `br-lan` (its own QoS). Leave it, or remove it in takeover.
+- The Broadcom flow cache carries accelerated flows past every qdisc (measured on .205, 2026-11-19: a 512 kbit/s
+  htb class let 4.9 Mbit/s through and counted ~150 packets; `fc flush --mac` buys ~14 packets before the flow is
+  re-learnt). With `fc disable` the same tree held (473/698 kbit/s). There is no per-station limit in `wl`, no
+  ebtables `skiplog` target, no bridge netfilter (`/proc/sys/net/bridge` absent, so `xt_SKIPLOG` cannot see bridged
+  traffic), and Archer `sysport_tm` queues per port, not per client. bcmwifi therefore turns the flow cache off
+  while any tc limit (per-client or SSID-wide) is built and back on when none is; see
+  [features/client-rate-limit.md](features/client-rate-limit.md#flow-cache-off-while-limits-are-set).
 
 ## Rates
 

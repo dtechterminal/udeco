@@ -40,6 +40,8 @@ type fakeDev struct {
 	eb      *fakeEbtables
 	tc      map[string][]string // dev -> qdisc show lines
 	tcCalls [][]string
+	fcOff   bool // the flow cache is not learning (fc disable)
+	noFC    bool // the unit has no fc binary
 }
 
 // TP-Link's driver deny lists as found on .205 (topology-and-tplink-scrub.md;
@@ -393,14 +395,47 @@ func (f *fakeDev) Run(ctx context.Context, name string, args ...string) ([]byte,
 			f.write("/sys/class/net/"+args[0]+"/flags", map[bool]string{true: "0x1003\n", false: "0x1002\n"}[args[1] == "up"])
 		}
 		return nil, nil
-	case "ubus", "fc":
+	case "ubus":
 		return nil, nil
+	case "fc":
+		return f.fc(args)
 	case "ebtables":
 		return f.eb.run(args)
 	case "tc":
 		return f.tcRun(args)
 	}
 	return nil, fmt.Errorf("fake: unknown command %q", name)
+}
+
+// fcStatusOut is `fc status` stdout as captured on .205 (2026-11-19), with
+// the learning state filled in; "OVS Flow Learning" and "MCast Learning"
+// are other switches the parser must not read.
+func fcStatusOut(learning string) string {
+	return "\tFlow Timer Interval = 10000 millisecs\n" +
+		"\tAcceleration Mode: <L3>\n" +
+		"\tMCast Learning <Disabled>\n" +
+		"\tHW Acceleration <Enabled> \n" +
+		"\tOVS Flow Learning <Disabled> \n" +
+		"\tFlow Learning " + learning + " : Max<16383>, Active<93>, Cummulative [ 172798 - 172705 ]\n"
+}
+
+// fc is the Broadcom flow cache tool as seen on .205 (2026-11-19): status
+// prints the table above, enable/disable flip it and print the BLOG line.
+func (f *fakeDev) fc(args []string) ([]byte, error) {
+	if f.noFC {
+		return nil, errors.New(`exec: "fc": executable file not found in $PATH`)
+	}
+	switch args[0] {
+	case "status":
+		return []byte(fcStatusOut(map[bool]string{false: "Enabled", true: "Disabled"}[f.fcOff])), nil
+	case "enable":
+		f.fcOff = false
+		return []byte("Broadcom Packet Flow Cache learning via BLOG enabled.\n"), nil
+	case "disable":
+		f.fcOff = true
+		return []byte("Broadcom Packet Flow Cache learning via BLOG disabled.\n"), nil
+	}
+	return nil, nil
 }
 
 func (f *fakeDev) wl(args []string) ([]byte, error) {
@@ -438,6 +473,10 @@ func (f *fakeDev) wl(args []string) ([]byte, error) {
 			return []byte(fakeRateset("6(b) 9 12(b) 18 24(b) 36 48 54")), nil
 		}
 		return []byte(fakeRateset("1(b) 2(b) 5.5(b) 6 9 11(b) 12 18 24 36 48 54")), nil
+	case rest[0] == "rateset" && f.state[fakeRadioOf(iface)+" radio"] != "down":
+		// Seen on the X20 2026-11-19 (r10's provision): rateset writes
+		// are refused like dwds and rrm unless the radio is down.
+		return []byte("wl: Not down\n"), errors.New("exit status 211")
 	case rest[0] == "rateset":
 		var toks []string
 		for _, r := range rest[1:] {
@@ -772,6 +811,10 @@ func (f *fakeDev) mutating() [][]string {
 			}
 		case "tc":
 			if len(c) > 2 && c[2] == "show" {
+				continue
+			}
+		case "fc":
+			if c[1] == "status" {
 				continue
 			}
 		}

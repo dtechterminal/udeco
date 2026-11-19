@@ -134,7 +134,10 @@ func (a *Applier) ForgetFailed() {
 //     them), then, as TP-Link's wifi script does after starting hostapd
 //     (which leaves every BSS down and unbridged, F3): ifconfig up and
 //     `wl bss up` for each vif the baseline recorded up, `bss down` for the
-//     others, and brctl addif for each vif it recorded bridged.
+//     others, and brctl addif for each vif it recorded bridged;
+//  6. turn the Broadcom flow cache back on when it is off, whoever turned
+//     it off (stock TP-Link learns flows; the agent turns it off while tc
+//     limits are built, fcache.go). Nothing when the unit has no fc.
 //
 // The hand-back is best effort: every step runs even when an earlier one
 // fails, and the first failure is returned. Steps on a vif that does not

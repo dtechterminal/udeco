@@ -77,9 +77,15 @@ type WLANIntent struct {
 	RRM                bool   // 802.11k
 	UAPSD              bool
 	ProxyARP           bool
-	MulticastToUnicast bool           // multicast enhancement
-	DTIM               map[string]int // by band; absent = driver default
-	MinRateKbps        map[string]int // by band: lowest data rate allowed; absent = band default
+	MulticastToUnicast bool // multicast enhancement
+	// PerBand holds each band's own security and roaming settings when the
+	// controller sends them differently per radio (e.g. WPA2/WPA3 on 5 GHz
+	// and WPA2 on 2.4 GHz for an AP that claims WPA3 on one radio only).
+	// nil when every band's sections agree; the fields above are then the
+	// WLAN's for every band.
+	PerBand     map[string]BandWLAN
+	DTIM        map[string]int // by band; absent = driver default
+	MinRateKbps map[string]int // by band: lowest data rate allowed; absent = band default
 
 	// MinRateOpts: by band, with MinRateKbps: beacon rate, CCK (minrate.go)
 	MinRateOpts map[string]MinRateOpts
@@ -801,8 +807,38 @@ func wlanVLAN(cfg Cfg, a, dev string, vlanNet map[string]string, note func(strin
 	return v
 }
 
+// BandWLAN is one band's own security and roaming settings of a WLAN
+// (WLANIntent.PerBand). Passphrase stays WLAN-wide.
+type BandWLAN struct {
+	Security           string
+	PMF                string
+	FT, FTSAE          bool
+	FTOverDS           bool
+	MobilityDomain     string
+	BSSTransition, RRM bool
+	UAPSD, ProxyARP    bool
+	MulticastToUnicast bool
+	Hidden, Isolation  bool
+	GroupRekey         int
+}
+
+func bandWLAN(v WLANIntent) BandWLAN {
+	return BandWLAN{Security: v.Security, PMF: v.PMF, FT: v.FT, FTSAE: v.FTSAE, FTOverDS: v.FTOverDS,
+		MobilityDomain: v.MobilityDomain, BSSTransition: v.BSSTransition, RRM: v.RRM, UAPSD: v.UAPSD,
+		ProxyARP: v.ProxyARP, MulticastToUnicast: v.MulticastToUnicast, Hidden: v.Hidden,
+		Isolation: v.Isolation, GroupRekey: v.GroupRekey}
+}
+
+// bandFields are the WLANIntent fields BandWLAN carries per band.
+var bandFields = map[string]bool{"security": true, "pmf": true, "ft": true, "ftsae": true, "ftoverds": true,
+	"mobilitydomain": true, "bsstransition": true, "rrm": true, "uapsd": true, "proxyarp": true,
+	"multicasttounicast": true, "hidden": true, "isolation": true, "grouprekey": true}
+
 // mergeVAPs merges one WLAN's per-band VAPs. Band-wide settings are taken
-// from the first VAP; any that differ on another band are noted.
+// from the first VAP. When the bands differ in security or roaming settings,
+// each band's own values are kept in PerBand (a backend that can serves every
+// band exactly as the controller sent it; one that cannot, bcmwifi, notes
+// it); any other difference is noted.
 func mergeVAPs(vaps []WLANIntent, nb *noteList) WLANIntent {
 	x := vaps[0]
 	x.Bands, x.Enabled = nil, false
@@ -838,8 +874,24 @@ func mergeVAPs(vaps []WLANIntent, nb *noteList) WLANIntent {
 			x.Devnames[k] = d
 		}
 		x.RoamAssist = mergeBandInts(x.RoamAssist, v.RoamAssist)
-		if diff := differing(vaps[0], v); len(diff) > 0 {
-			nb.addf("wlan %q: %s differ on %s: the %s settings are used", x.SSID, strings.Join(diff, ", "), b, vaps[0].Bands[0])
+		diff := differing(vaps[0], v)
+		var other []string
+		perBand := false
+		for _, f := range diff {
+			if bandFields[f] {
+				perBand = true
+			} else {
+				other = append(other, f)
+			}
+		}
+		if perBand {
+			if x.PerBand == nil {
+				x.PerBand = map[string]BandWLAN{vaps[0].Bands[0]: bandWLAN(vaps[0])}
+			}
+			x.PerBand[b] = bandWLAN(v)
+		}
+		if len(other) > 0 {
+			nb.addf("wlan %q: %s differ on %s: the %s settings are used", x.SSID, strings.Join(other, ", "), b, vaps[0].Bands[0])
 		}
 	}
 	if !x.Enabled {
@@ -856,7 +908,7 @@ func differing(a, b WLANIntent) []string {
 	var out []string
 	for i := 0; i < t.NumField(); i++ {
 		switch name := t.Field(i).Name; name {
-		case "Bands", "Enabled", "DTIM", "MinRateKbps", "MinRateOpts", "Devnames", "RoamAssist":
+		case "Bands", "Enabled", "DTIM", "MinRateKbps", "MinRateOpts", "Devnames", "RoamAssist", "PerBand":
 		default:
 			if !reflect.DeepEqual(va.Field(i).Interface(), vb.Field(i).Interface()) {
 				out = append(out, strings.ToLower(name))

@@ -220,6 +220,7 @@ type agent struct {
 	takeover atomic.Bool // current mode: false = observe
 	shed     atomic.Bool // R4: memory is short, no scans and no steering
 	events   *eventLog
+	alive    aliveState                 // the alive record on flash (alive.go)
 	acks     chan string                // cfgversions whose configuration is live (any goroutine -> loop)
 	creds    atomic.Pointer[sshCreds]   // what ssh-adopt checks once adopted
 	site     siteSSH                    // site SSH logins on sshd_port (sitessh.go)
@@ -275,6 +276,12 @@ type agent struct {
 	bg     sync.WaitGroup
 	worker workerState // Wi-Fi worker goroutine only
 	rs     radsecState // RadSec proxy (radsec.go); Wi-Fi worker goroutine only
+
+	// rateSeen: the limited clients (State.ClientRates) associated at the
+	// last reading (ratelimit.go); loop goroutine
+	rateSeen map[string]bool
+	// rateNoted: the not-supported note for rate-update was logged
+	rateNoted bool
 }
 
 func newAgent(cfg *Config, o options) (*agent, error) {
@@ -362,7 +369,8 @@ func (a *agent) mode() string {
 }
 
 // run is the agent until ctx ends (SIGTERM): informs stop, the Wi-Fi
-// worker finishes the job it is in, and the unit's Wi-Fi is left as it is.
+// worker finishes the job it is in, and the unit's Wi-Fi is left as it is
+// (tc limits and the flow cache state included: flowcache.go).
 //
 // Order: phase 1 (takeover only: the inbound fence, nothing else), the
 // boot gate (R1/R2: no inform, no Enforce, no apply until TP-Link's boot
@@ -372,6 +380,10 @@ func (a *agent) run(parent context.Context) error {
 	ctx, cancel := context.WithCancelCause(parent)
 	defer cancel(nil)
 	a.checkReboot()
+	a.markAlive("running", false, "")
+	aliveDone := make(chan struct{})
+	go func() { defer close(aliveDone); a.aliveLoop(ctx) }()
+	defer func() { cancel(nil); <-aliveDone; a.markAlive("stopped", false, "") }()
 	if a.o.forceObserve != "" && a.cfg.Takeover {
 		a.event(fmt.Sprintf("OBSERVE MODE FORCED (%s): takeover is configured but nothing on the unit changes until %s is removed",
 			a.o.forceObserve, filepath.Join(a.o.base, observeMarker)))
@@ -384,6 +396,7 @@ func (a *agent) run(parent context.Context) error {
 	}
 	if !a.takeover.Load() {
 		a.observeLoopGuardRestore(ctx)
+		a.observeFlowCacheRestore(ctx)
 	}
 	s, err := a.firstReading(ctx)
 	if err != nil {
@@ -850,6 +863,7 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 		a.sta.attach(f)
 	}
 	a.sta.observe(f)
+	a.rateJoins(f)
 	a.mcastMerge(ctx, f, &c, info, time.Now())
 	a.mdnsReconcile(ctx, &c, info)
 	a.snmpFollow(ctx, f, &c)

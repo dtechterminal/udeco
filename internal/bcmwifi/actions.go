@@ -259,6 +259,12 @@ const (
 //     higher priority than zigbee, so it is cleared for the blink and put
 //     back afterwards when the LED is meant to be off.
 //
+// decosys stops conn-indicator (TP-Link's internet/mesh probe that sets the
+// conn state), so whatever state it set last stays: after a reboot that is
+// often "ap-lost" (red blink, the mesh master not yet seen) or "offline".
+// "on" therefore also sets conn to "online" (verified on .232, 2026-11-19:
+// event [1,2] red blink -> [1,0] steady green).
+//
 // The daemon has no white or blue pattern (green, red, a cyan WPS blink), so
 // UniFi's LED colour is not carried. `leds switch` changes nothing visible on
 // the X20, and a conn call with delay_on/delay_off left the LED dark, so
@@ -271,11 +277,12 @@ func (a *Applier) LED(ctx context.Context, mode string) error {
 	}
 	dark := ev("off", "off")
 	lit := ev("off", "done")
+	online := ev("conn", "online")
 	var calls [][]string
 	switch strings.ToLower(mode) {
 	case LEDOn:
 		a.ledOn = true
-		calls = [][]string{lit}
+		calls = [][]string{online, lit}
 	case LEDOff:
 		a.ledOn = false
 		calls = [][]string{dark}

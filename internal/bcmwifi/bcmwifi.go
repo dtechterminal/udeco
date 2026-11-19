@@ -45,7 +45,8 @@
 //     br-lan.
 //   - Guest SSIDs are isolated with ebtables (guest.go), per-client rate
 //     limits use tc htb/sfq (shape.go), and the Broadcom flow cache is
-//     flushed after each datapath change (fcache.go, audit R21).
+//     flushed after each datapath change (fcache.go, audit R21) and turned
+//     off while any tc limit is built (accelerated flows bypass tc).
 //
 // Nothing here writes Broadcom nvram (user or kernel), runs wlconf, or
 // touches TP-Link's /tmp/wlN*.conf files. Every change is volatile, so a
@@ -153,6 +154,12 @@ type Applier struct {
 	now     func() time.Time
 	ftPeers []ftpeer.Peer           // other units' FT key holders (SetFTPeers)
 	ftLive  map[string]*ftLiveState // primary -> entries added to its running hostapd (ftpeers.go)
+	// clientRates: per-client limits (clientrate.go); nil = not loaded yet
+	clientRates map[string]RateLimit
+	// fcOff: the agent turned the flow cache off for its tc limits (also
+	// RunDir/fc-off); fcNote: the last fc status problem logged (fcache.go)
+	fcOff  bool
+	fcNote string
 
 	sleep func(time.Duration)
 	poll  time.Duration

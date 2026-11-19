@@ -157,6 +157,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			if !s.Enabled || !onBand(s, rd.Band) {
 				continue
 			}
+			s = s.ForBand(rd.Band) // the controller's own values for this radio
 			b := BSS{ID: s.ID, SSID: s.SSID, Hidden: s.Hidden, Isolate: s.Isolation, MaxSta: maxSta, VLAN: s.VLAN}
 			switch s.Security {
 			case "open", "":
@@ -175,6 +176,17 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 				b.Auth, b.Encr, b.PSK, b.PMF = "WPA3PSK", "AES", s.Passphrase, 2
 			case "wpa2":
 				b.Auth, b.Encr, b.PSK = "WPA2PSK", "AES", s.Passphrase
+				// PMF as the controller sets it, where the driver has it
+				// (the MT7663; the MT7603 module has no PMF profile keys)
+				switch {
+				case s.PMF != "optional" && s.PMF != "required":
+				case rd.SAE && s.PMF == "required":
+					b.PMF = 2
+				case rd.SAE:
+					b.PMF = 1
+				default:
+					note("%s: SSID %q: PMF %s is not supported by this driver: served without PMF", rd.Band, s.SSID, s.PMF)
+				}
 			default:
 				note("%s: SSID %q: security %s is not supported by this driver: not served", rd.Band, s.SSID, s.Security)
 				continue

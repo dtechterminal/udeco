@@ -392,19 +392,23 @@ func (c *Counters) finish(vaps []map[string]any) {
 			for _, k := range VAPNetdevFields {
 				row[k] = t.get(k)
 			}
-			r, tx := t.get("sta_retries"), t.get("sta_tx")
-			row["tx_retries"], row["tx_combined_retries"] = r, r
-			row["wifi_tx_attempts"], row["wifi_tx_dropped"] = tx+r, t.get("sta_failed")
-			row["tx_total"], row["tx_success"] = tx, t.get("sta_success")
+			if _, ok := row["wifi_tx_attempts"]; ok { // absent: no TX counters (Radio.NoTxCounters)
+				r, tx := t.get("sta_retries"), t.get("sta_tx")
+				row["tx_retries"], row["tx_combined_retries"] = r, r
+				row["wifi_tx_attempts"], row["wifi_tx_dropped"] = tx+r, t.get("sta_failed")
+				row["tx_total"], row["tx_success"] = tx, t.get("sta_success")
+			}
 		}
 		stas, _ := row["sta_table"].([]map[string]any)
 		for _, st := range stas {
 			mac, _ := st["mac"].(string)
 			if t := c.Acc["sta:"+strings.ToLower(mac)]; t != nil {
-				for _, k := range []string{"tx_bytes", "rx_bytes", "tx_packets", "rx_packets", "tx_retries"} {
+				for _, k := range []string{"tx_bytes", "rx_bytes", "tx_packets", "rx_packets"} {
 					st[k] = t.get(k)
 				}
-				staRetryFields(st, t.get("tx_packets"), t.get("tx_retries"), t.get("tx_failed"), t.get("tx_success"))
+				if _, ok := st["wifi_tx_attempts"]; ok { // absent: no TX counters
+					staRetryFields(st, t.get("tx_packets"), t.get("tx_retries"), t.get("tx_failed"), t.get("tx_success"))
+				}
 			}
 		}
 	}

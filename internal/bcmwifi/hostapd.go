@@ -502,6 +502,8 @@ func driverFor(u vifAssign, bssid string, maxSta int, blocked []string, minRates
 // radio is up, whatever the BSS state and even for an unchanged value; with
 // the radio down they are accepted, and after wl up every BSS is back in its
 // own up/down state and hostapd stays ENABLED.
+// The rateset (Options.MinRates) is refused the same way (r10's provision
+// failed on it at "Not down", 2026-11-19), so it is set here too.
 // extra are further steps that need the radio down (the placeholder's dwds).
 func radioDownSteps(radio string, ds []vifDriver, extra ...Step) []Step {
 	if len(ds) == 0 && len(extra) == 0 {
@@ -513,11 +515,15 @@ func radioDownSteps(radio string, ds []vifDriver, extra ...Step) []Step {
 		st = append(st,
 			cmdStep("set "+d.Vif+" dwds", "wl", "-i", d.Vif, "dwds", itoa(d.DWDS)),
 			cmdStep("set "+d.Vif+" rrm", "wl", "-i", d.Vif, "rrm", d.RRM))
+		if len(d.Rates) > 0 {
+			st = append(st, cmdStep("set "+d.Vif+" rateset", append([]string{"wl", "-i", d.Vif, "rateset"}, d.Rates...)...))
+		}
 	}
 	return append(st, cmdStep("radio "+radio+" up", "wl", "-i", radio, "up"))
 }
 
-// driverSteps sets d on its vif, except dwds and rrm (radioDownSteps).
+// driverSteps sets d on its vif, except dwds, rrm and the rateset
+// (radioDownSteps).
 // Run them while the fresh BSS is down (wl applies some of these, fbt in
 // particular, only then).
 func driverSteps(d vifDriver) []Step {
@@ -545,9 +551,6 @@ func driverSteps(d vifDriver) []Step {
 		st = append(st, wl("fbt_ap", "0"), wl("fbt", "0"))
 	}
 	st = append(st, macSteps(v, d.Macmode, d.Maclist)...)
-	if len(d.Rates) > 0 {
-		st = append(st, wl(append([]string{"rateset"}, d.Rates...)...))
-	}
 	return st
 }
 
