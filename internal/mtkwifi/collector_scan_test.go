@@ -17,9 +17,9 @@ import (
 // Fixtures in testdata were read on the JCOW414 (2026-11-19, read-only):
 // get_site_survey of both radios (neighbours' SSIDs and BSSIDs replaced,
 // columns kept), and the kernel log after `show stacountinfo` (ra0) and
-// `show bgndscaninfo` (rai0), with the lines around them. mibinfo_ra0.klog
-// (2026-11-20): the busy-time lines of `show mibinfo` (ra0) as read; the
-// MIB counter lines after them carry the names read, with zero values.
+// `show bgndscaninfo` (rai0), with the lines around them.
+// mibinfo_ra0_added.klog (2026-11-20): what one `show mibinfo` (ra0) added
+// to the kernel log, verbatim (mibFixture).
 
 func fixture(t *testing.T, name string) string {
 	t.Helper()

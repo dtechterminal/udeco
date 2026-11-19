@@ -55,11 +55,11 @@ type Collector struct {
 	survey map[string]*surveyAcc    // by band
 	// counts: the last station counters per radio (kept over Invalidate)
 	counts map[string]map[string]staCount
-	// countsAt: when counts were read, per radio (the receive airtime
-	// estimate's interval)
+	// countsAt: when counts were read, per radio (the own airtime
+	// estimate's interval, staAirtime)
 	countsAt map[string]time.Time
-	// mib: the last `show mibinfo` busy time per radio (by its first BSS),
-	// asked at most every mibInterval
+	// mib: the last `show mibinfo` ask and busy time per radio (by its
+	// first BSS), asked at most every mibInterval
 	mib map[string]*mibReading
 	// scanSem: one site survey (Scan) or survey read (HomeScan) at a time;
 	// WithoutScan waits for it
@@ -180,8 +180,9 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 			}
 			if m := c.mib[main]; m != nil {
 				// never asked while down; its last reading is not
-				// carried over the gap, but the interval still holds
-				m.busy = nil
+				// carried over the gap, but the interval still holds,
+				// and the next ask has no previous one (mibReading.gap)
+				m.busy, m.gap = nil, true
 			}
 			r.Survey, _ = c.integrate(rd.Band, nil, now)
 			r.NoSurvey = true
@@ -214,7 +215,7 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 			r.SSID, r.BSSID = r.VAPs[0].SSID, r.VAPs[0].BSSID
 		}
 		var ok bool
-		r.Survey, ok = c.integrate(rd.Band, withRxAir(rr.busy, rr.rxAir), now)
+		r.Survey, ok = c.integrate(rd.Band, withStaAir(rr.busy, rr.staTx, rr.staRx), now)
 		r.NoSurvey = !ok
 		s.Radios = append(s.Radios, r)
 	}
@@ -229,10 +230,11 @@ type radioReading struct {
 	essid   map[string]string // iwconfig per BSS
 	stas    []sta
 	busy    *busySample // nil: the driver gives no busy time for this radio
-	// rxAir: the stations' receive airtime estimated from their byte
-	// counters and rates (rxAirtime), µs per second; 0 = none
-	rxAir int64
-	stale bool // Invalidate, or the radio went down: read again when the driver may be read
+	// staTx, staRx: the AP's own transmit and receive airtime estimated
+	// from the stations' byte counters and rates (staAirtime), µs per
+	// second; 0 = none
+	staTx, staRx int64
+	stale        bool // Invalidate, or the radio went down: read again when the driver may be read
 }
 
 // restartKeep: how old a reading may be to stand in for one the radio
@@ -265,8 +267,11 @@ var ErrRadioRestart = errors.New("mtkwifi: a radio was just restarted: the drive
 // prints `show bgndscaninfo` (one-second busy and own airtime) and nothing
 // for `show stacountinfo`. Neither prints per-station retries or failures
 // (`stacountinfo` has none, `show wtbl` holds only the rate-adaptation
-// counters the driver clears as it reads them). The MT7603's busy time is
-// in `show mibinfo` (2026-11-20): asked as mib, at most every mibInterval.
+// counters the driver clears as it reads them). The MT7603 prints no busy
+// or airtime lines at all (the "One sec ..." lines are the MT7663's
+// bgndscaninfo); its busy time is the Prim CCA Time MIB counter of `show
+// mibinfo`, which the read clears (2026-11-20): asked as mib, at most every
+// mibInterval (mibBusy).
 func driverReads(rd RadioDef) (counts, busy, mib bool) {
 	return rd.Band == "ng", rd.Band == "na", rd.Band == "ng"
 }
@@ -285,6 +290,12 @@ func (c *Collector) reading(ctx context.Context, rd RadioDef, up []string, now t
 	}
 	done, ok := c.driverRead()
 	if !ok {
+		if m := c.mib[main]; m != nil {
+			// a radio restart (down, perhaps unseen between two
+			// Collects) may have reset the MIB counters: the next ask
+			// has no previous one
+			m.gap = true
+		}
 		if old != nil && now.Sub(old.at) < restartKeep {
 			return old
 		}
@@ -315,14 +326,15 @@ func (c *Collector) reading(ctx context.Context, rd RadioDef, up []string, now t
 // busy time, each of which it prints to the kernel log, and parses what
 // each request added there. One log read after each request is the next
 // one's "before". wantMib (MT7603) asks `show mibinfo` last, after the
-// station-table reads, so its lines never land between a station-table
-// request and its log read; within mibInterval of the last one the radio
-// keeps that one's reading. The caller holds the restart gate (reading).
+// station-table reads, so its 60-odd lines never land between a
+// station-table request and its log read; within mibInterval of the last
+// ask the radio keeps that one's reading. The caller holds the restart
+// gate (reading).
 func (c *Collector) klogRead(ctx context.Context, main string, rr *radioReading, wantCounts, wantBusy, wantMib bool, now time.Time) {
 	if wantMib {
 		// within mibInterval of the last ask the driver is not asked again
 		// (whatever that one gave stands, nothing included)
-		if m := c.mib[main]; m != nil && now.Sub(m.at) >= 0 && now.Sub(m.at) < mibInterval {
+		if m := c.mib[main]; m != nil && now.Sub(m.asked) >= 0 && now.Sub(m.asked) < mibInterval {
 			rr.busy, wantMib = m.busy, false
 		}
 	}
@@ -331,31 +343,30 @@ func (c *Collector) klogRead(ctx context.Context, main string, rr *radioReading,
 		return
 	}
 	before := string(beforeB)
-	// ask returns what the request added to the log and whether before's
-	// end was found in it (false: all of the log, see newLogAnchored)
-	ask := func(what string) (added string, anchored, ok bool) {
+	// ask returns what the request added to the log
+	ask := func(what string) (added string, ok bool) {
 		if _, err := c.o.Run.Run(ctx, "iwpriv", main, "show", what); err != nil {
-			return "", false, false
+			return "", false
 		}
 		after, err := c.o.klog()
 		if err != nil {
-			return "", false, false
+			return "", false
 		}
-		added, anchored = newLogAnchored(before, string(after))
+		added = newLog(before, string(after))
 		before = string(after)
-		return added, anchored, true
+		return added, true
 	}
 	// "show stainfo" prints the full table at any driver debug level;
 	// get_mac_table prints it only at the vendor's (after a radio restart
 	// it prints a short table without signal or rate). 2026-11-19.
-	log, _, ok := ask("stainfo")
+	log, ok := ask("stainfo")
 	if !ok {
 		return
 	}
 	rr.stas = parseMacTable(log)
 	if wantCounts && len(rr.stas) > 0 {
 		var counts map[string]staCount
-		if log, _, ok := ask("stacountinfo"); ok {
+		if log, ok := ask("stacountinfo"); ok {
 			counts = parseStaCount(log)
 		}
 		// A station's counters going down count as a new association
@@ -378,27 +389,40 @@ func (c *Collector) klogRead(ctx context.Context, main string, rr *radioReading,
 			st.TxPackets, st.RxPackets, st.TxBytes, st.RxBytes = n.txPkts, n.rxPkts, n.txBytes, n.rxBytes
 		}
 		if at := c.countsAt[main]; !at.IsZero() && now.After(at) {
-			rr.rxAir = rxAirtime(rr.stas, last, next, now.Sub(at))
+			rr.staTx, rr.staRx = staAirtime(rr.stas, last, next, now.Sub(at))
 		}
 		c.counts[main] = next
 		c.countsAt[main] = now
 	}
 	if wantBusy {
-		if log, _, ok := ask("bgndscaninfo"); ok {
+		if log, ok := ask("bgndscaninfo"); ok {
 			if b, ok := parseBgndScanInfo(log); ok {
 				rr.busy = &b
 			}
 		}
 	}
 	if wantMib {
-		prev := before
-		m := &mibReading{at: now}
-		if log, anchored, ok := ask("mibinfo"); ok {
-			m.busy = mibBusy(log, anchored, prev)
+		m := c.mib[main]
+		if m == nil {
+			m = &mibReading{gap: true}
+			c.mib[main] = m
 		}
-		// a failed or empty answer counts as asked too: the driver is not
-		// asked again before mibInterval
-		c.mib[main] = m
+		// the read clears the counter: every ask, whatever it answered,
+		// is the next one's start (and is not repeated before mibInterval)
+		var since time.Duration // 0: no previous ask to measure from
+		at := c.o.now()
+		if !m.gap {
+			since = at.Sub(m.at)
+		}
+		m.asked, m.at, m.gap, m.busy = now, at, false, nil
+		if _, err := c.o.Run.Run(ctx, "iwpriv", main, "show", "mibinfo"); err != nil {
+			// whether the driver read (and cleared) the counters is not
+			// known: the next ask does not measure from this one
+			m.gap = true
+		} else if after, err := c.o.klog(); err == nil {
+			added, anchored := newLogAnchored(before, string(after))
+			m.busy = mibBusy(added, anchored, since)
+		}
 		rr.busy = m.busy
 	}
 }
@@ -654,7 +678,10 @@ func parseStaCount(log string) map[string]staCount {
 
 // ------------------------------------------------------------- busy time
 
-// busySample is the driver's last one-second channel reading, in µs.
+// busySample is a channel reading, µs per second: busy time and the AP's
+// own transmit and receive airtime. The MT7663 gives its last second
+// (parseBgndScanInfo), the MT7603 its busy time since its previous
+// `show mibinfo` (mibBusy).
 type busySample struct{ busy, tx, rx int64 }
 
 var bgndRE = regexp.MustCompile(`(?m)One sec (channel busy time|My Tx Airtime|My Rx Airtime) = (\d+)`)
@@ -698,146 +725,154 @@ func parseBgndScanInfo(log string) (busySample, bool) {
 	return b, true
 }
 
-// rxAirtime estimates the stations' receive airtime, µs per second, from
-// what each received in dt (its byte counters, last and next) at its rate.
-// The MT7603's `show mibinfo` "My Rx Airtime" reads 0 at all times (also
-// with ApEnableRadioChStats, 2026-11-20), so cu_self_rx is estimated the
-// way the counters allow; preambles and contention are left out, so it
-// runs low. The rate is the station table's one rate (st.RxRate).
-func rxAirtime(stas []sta, last, next map[string]staCount, dt time.Duration) int64 {
+// staAirtime estimates the AP's own airtime from what each station sent
+// and received in dt (its byte counters, last and next) at its rate, µs
+// per second: tx the bytes sent to it at st.TxRate, rx the bytes it sent
+// at st.RxRate (the station table's one rate). The MT7603 gives no own
+// airtime at all (its `show mibinfo` has only raw MIB counters,
+// 2026-11-20), so cu_self_tx and cu_self_rx are estimated the way the
+// counters allow. Beacons, management frames, preambles, acks, retries
+// and contention are not counted, so it runs low.
+func staAirtime(stas []sta, last, next map[string]staCount, dt time.Duration) (tx, rx int64) {
 	if dt <= 0 {
-		return 0
+		return 0, 0
 	}
-	var sec float64
+	var txSec, rxSec float64
 	for _, st := range stas {
 		p, ok := last[st.MAC]
 		n, ok2 := next[st.MAC]
-		if !ok || !ok2 || st.RxRate <= 0 || n.rxBytes <= p.rxBytes {
-			continue // new, re-associated (counters went down) or idle
+		if !ok || !ok2 {
+			continue // new
 		}
-		sec += float64(n.rxBytes-p.rxBytes) * 8 / (float64(st.RxRate) * 1000)
+		// a counter that went down (re-associated) or did not move adds
+		// nothing
+		if st.TxRate > 0 && n.txBytes > p.txBytes {
+			txSec += float64(n.txBytes-p.txBytes) * 8 / (float64(st.TxRate) * 1000)
+		}
+		if st.RxRate > 0 && n.rxBytes > p.rxBytes {
+			rxSec += float64(n.rxBytes-p.rxBytes) * 8 / (float64(st.RxRate) * 1000)
+		}
 	}
-	return min(int64(sec/dt.Seconds()*1e6), 1_000_000)
+	per := func(sec float64) int64 { return min(int64(sec/dt.Seconds()*1e6), 1_000_000) }
+	return per(txSec), per(rxSec)
 }
 
-// withRxAir fills a busy reading's own receive airtime from the estimate
-// when the driver gives none, within what the busy time leaves after the
-// AP's own transmissions.
-func withRxAir(b *busySample, rxAir int64) *busySample {
-	if b == nil || b.rx != 0 || rxAir <= 0 {
+// withStaAir fills a busy reading's own transmit and receive airtime from
+// the station-counter estimate (staAirtime) where the driver gives 0, so
+// that the driver's figures stand (the MT7663's own tx; it has no
+// per-station counters, so it gets nothing new). The estimated parts are
+// scaled down together, in proportion, to fit in what the busy time
+// leaves after the driver's own figures.
+func withStaAir(b *busySample, tx, rx int64) *busySample {
+	if b == nil {
+		return nil
+	}
+	if b.tx != 0 || tx < 0 {
+		tx = 0
+	}
+	if b.rx != 0 || rx < 0 {
+		rx = 0
+	}
+	if tx == 0 && rx == 0 {
 		return b
 	}
+	if room := max(b.busy-b.tx-b.rx, 0); tx+rx > room {
+		sum := tx + rx
+		tx, rx = tx*room/sum, rx*room/sum
+	}
 	e := *b
-	e.rx = min(rxAir, max(e.busy-e.tx, 0))
+	e.tx += tx
+	e.rx += rx
 	return &e
 }
 
 // --------------------------------------------- busy time (MT7603 mibinfo)
 
-// mibInterval: `show mibinfo` (40-60 kernel-log lines a call) is asked at
+// mibInterval: `show mibinfo` (60-odd kernel-log lines a call) is asked at
 // most this often per radio, Invalidate or not (a new channel's busy time
-// shows within it); between, the last reading stands. Not yet checked on
-// the unit: whether the call clears the MIB counters the driver's own
-// one-second busy bucket is built from (compare consecutive busy readings
-// with and without mibinfo calls).
+// shows within it); between, the last reading stands. The read clears the
+// MIB counters (checked on the unit, 2026-11-20: Prim CCA Time read
+// 263203, 541770, 1243292 and 253764 µs at 1.07, 3.12, 6.06 and 1.07 s
+// apart, 17-25 % each time), so a manual `iwpriv ra0 show mibinfo` on the
+// unit steals one interval: the agent's next reading holds only the time
+// since that run, over the whole interval, and reads low once.
 const mibInterval = 10 * time.Second
 
-// mibReading is a radio's last `show mibinfo` answer.
+// mibMaxGap: a longer time since the previous ask gives no reading. The
+// counter is 24 bits of µs (16.8 s): past a minute it saturates at 28 %
+// busy, and the reading would stand for a long time it averages over.
+const mibMaxGap = time.Minute
+
+// mibSaturated: Prim CCA Time at or past this has run out of bits
+// (0xffffff was read on the unit).
+const mibSaturated = 0xffffff
+
+// mibReading is a radio's last `show mibinfo` ask.
 type mibReading struct {
-	at   time.Time   // when the driver was last asked
-	busy *busySample // nil: no busy time (none in the answer, or the radio went down since)
+	asked time.Time   // the Collect that asked (mibInterval)
+	at    time.Time   // when the request was made (the next reading's interval)
+	busy  *busySample // nil: no busy time (see mibBusy, or the radio went down since)
+	// gap: the radio was down, or behind the restart gate, since at (or
+	// there was no ask yet): the next ask has no previous one to measure
+	// from
+	gap bool
 }
 
-// mibBlock is one `show mibinfo` busy-time block; idle (the cumulative IPI
-// idle time) tells two calls' blocks apart when their busy times match.
-type mibBlock struct {
-	busySample
-	idle int64
-}
+var primCCA = regexp.MustCompile(`Prim CCA Time=0x([0-9A-Fa-f]+)`)
 
-var (
-	mibHead = regexp.MustCompile(`One sec channel busy time = \d+`)
-	mibIdle = regexp.MustCompile(`IPI Idle time = (\d+)`)
-)
-
-// parseMibInfo reads the newest busy-time block of `iwpriv ra0 show
-// mibinfo` (MT7603, 2026-11-20; stdout is only "ra0       show:mibinfo",
-// the rest goes to the kernel log):
+// parseMibInfo reads the last Prim CCA Time of `iwpriv ra0 show mibinfo`
+// (MT7603, 2026-11-20; stdout is only "ra0       show:mibinfo", the rest
+// goes to the kernel log, tab-indented):
 //
-//	Channel busy time Threshold = 600000
-//	One sec channel busy time = 74060
-//	One sec primary channel busy time = 21600
-//	One sec My Tx Airtime = 8782
-//	One sec My Rx Airtime = 0
-//	IPI Idle time = 1042235167
+//	MIB Status Control=0x7fffffff
+//	MIB Per-BSS Status Control=0x3f3f3f3f
+//	===Phy/Timing Related Counters===
+//		ChannelIdleCnt=0xffff
+//		CCA_NAV_Tx_Time=0x11fd
+//		Rx_MDRDY_CNT=0x1fda
+//		Prim CCA Time=0x45b5af
+//		Sec CCA Time=0x0
+//		Prim ED Time=0x0
+//	===Tx Related Counters(Generic)===
+//	...
 //
-// followed by the MIB counter blocks ("MIB Status Control=...",
-// "CCA_NAV_Tx_Time=0x...", ...), which are not read. Microseconds in the
-// last second, as in bgndscaninfo (parseBgndScanInfo): busy is the total
-// (cu_total = busy/10000 %), Tx and Rx the AP's own airtime. The MT7603
-// read Rx 0 on every call: own receive time is then unknown and reported
-// as 0. The busy and Tx lines must be there; Rx and the idle time may not.
-func parseMibInfo(log string) (mibBlock, bool) {
-	m := mibHead.FindAllStringIndex(log, -1)
+// followed by the AMPDU, Rx and per-BSS counters, none of which are read.
+// Prim CCA Time is the µs the primary channel was busy since the previous
+// read (which cleared it), 24 bits. ChannelIdleCnt and CCA_NAV_Tx_Time
+// are 16 bits and saturate or wrap within a second: not used. There is no
+// own-airtime counter (staAirtime).
+func parseMibInfo(log string) (int64, bool) {
+	m := primCCA.FindAllStringSubmatch(log, -1)
 	if len(m) == 0 {
-		return mibBlock{}, false
+		return 0, false
 	}
-	blk := log[m[len(m)-1][0]:]
-	if j := strings.Index(blk, "MIB Status"); j > 0 {
-		blk = blk[:j]
+	v, err := strconv.ParseUint(m[len(m)-1][1], 16, 32)
+	if err != nil {
+		return 0, false
 	}
-	var b mibBlock
-	var have int
-	for _, f := range bgndRE.FindAllStringSubmatch(blk, -1) {
-		v, _ := strconv.ParseInt(f[2], 10, 64)
-		v = min(max(v, 0), 1_000_000)
-		switch f[1] {
-		case "channel busy time":
-			if have&1 == 0 {
-				b.busy, have = v, have|1
-			}
-		case "My Tx Airtime":
-			if have&2 == 0 {
-				b.tx, have = v, have|2
-			}
-		case "My Rx Airtime":
-			if have&4 == 0 {
-				b.rx, have = v, have|4
-			}
-		}
-	}
-	if have&3 != 3 {
-		return mibBlock{}, false
-	}
-	if f := mibIdle.FindStringSubmatch(blk); f != nil {
-		b.idle, _ = strconv.ParseInt(f[1], 10, 64)
-	}
-	b.busy = max(b.busy, b.tx+b.rx)
-	return b, true
+	return int64(v), true
 }
 
-// mibBusy is the busy time `show mibinfo` added to the kernel log: added
-// and anchored are newLogAnchored(before, after). Anchored, added holds
-// only lines printed since before was read, so a block in it is this
-// call's. Not anchored (before's end is gone from the ring, or before was
-// empty), added is the whole log and may hold older calls' blocks: its
-// newest block is taken only when it differs from the newest one before
-// held (the IPI idle time grows between calls), or before held none.
-// Nothing printed gives nil, never an older call's block.
-func mibBusy(added string, anchored bool, before string) *busySample {
-	b, ok := parseMibInfo(added)
-	if !ok {
+// mibBusy is the busy time one `show mibinfo` ask gives: added and
+// anchored are newLogAnchored(before, after) around the request, since
+// the time since the previous ask (0: none). The busy time is Prim CCA
+// Time over since, µs per second (at most 1e6); no own airtime (0, filled
+// by withStaAir). No reading (nil): no previous ask, since over mibMaxGap,
+// not anchored (added is then the whole log, whose last block may be an
+// older call's or someone else's), no block, or a saturated counter.
+func mibBusy(added string, anchored bool, since time.Duration) *busySample {
+	us := since.Microseconds()
+	if !anchored || us <= 0 || since > mibMaxGap {
 		return nil
 	}
-	if !anchored {
-		if old, ok := parseMibInfo(before); ok && old == b {
-			return nil
-		}
+	v, ok := parseMibInfo(added)
+	if !ok || v >= mibSaturated {
+		return nil
 	}
-	return &b.busySample
+	return &busySample{busy: min(v*1_000_000/us, 1_000_000)}
 }
 
-// surveyAcc turns the driver's one-second readings into the cumulative
+// surveyAcc turns the driver's busy readings (rates) into the cumulative
 // survey counters the inform takes deltas of (Radio.Survey, ms): each
 // Collect adds the time since the previous one at the newest reading's
 // rates. The counters never go back (a drop would read as 0 % in the next
