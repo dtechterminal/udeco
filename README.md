@@ -49,7 +49,7 @@ Status key:
 | Feature | Status | Notes |
 |---|---|---|
 | Open, WPA2-Personal | Verified | PMF optional or required. |
-| WPA2/WPA3 transition, WPA3 (SAE) | Partial | Served with `"wpa3": true`. Not yet confirmed with a WPA3-only client. |
+| WPA2/WPA3 transition, WPA3 (SAE) | Verified | With `"wpa3": true`, 16 phones and laptops across the three units joined with SAE (AKM 00-0f-ac-8), and WPA2-only clients with PSK. A WPA3-only SSID has not been tried. |
 | Hidden SSID, enable/disable | Verified | |
 | VLAN per SSID | Verified | One bridge per VLAN on the uplink. |
 | SSID per AP group | Verified | An SSID is broadcast only by the APs of its group. |
@@ -75,8 +75,8 @@ Status key:
 | Feature | Status | Notes |
 |---|---|---|
 | Channel, width, transmit power | Verified | Includes 80 MHz on 5 GHz. |
-| Country | Partial | The driver's India table (IN/0) has no 80 MHz channel. Stock TP-Link runs these units as US/0, and the agent does the same with `"driver_country": "US"`. |
-| Power presets (low/medium/high) | Built | |
+| Country | Verified | The driver's India table (IN/0) has no 80 MHz channel. Stock TP-Link runs these units as US/0, and so does the agent with `"driver_country": "US"`: all three units run 80 MHz on 5 GHz. |
+| Power presets (low/medium/high) | Verified | Low, Medium and High set the driver's power reduction to 6 dB, 3 dB and none, without a radio restart. |
 | Neighbour and rogue-AP list | Verified | Refreshed every minute by a passive listen on the AP's own channel. A full scan from UniFi adds the other channels. |
 | Spectrum scan | Partial | 2.4 GHz is complete; 5 GHz covers 36–48. Channels 149–165 are reported as unmeasured, not as clean. |
 | DFS channels | Not yet | No radar or CAC handling, so the units stay on 36–48 and 149–165. |
