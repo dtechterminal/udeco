@@ -1,0 +1,1 @@
+TxPower is 127 qdbm, 31.75 dbm, 1496 mW  Override is Off

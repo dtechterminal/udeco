@@ -1,0 +1,41 @@
+TAG t0_baseline (reads only, before any scan in this session)
+AC 3430.53 wl01=0[ ] wl02=1[ m:971e1247/in=3291/txB=9476472/rxB=1958633/txfail=0/retry=1085/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3338/txB=9940682/rxB=782661/txfail=0/retry=570/rssi=-69 ] wl13=0[ ]
+HDR wl0 chanspec=9u (0x1907) noise=-97 up=3430.75
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=3430.76
+acsd2: 12001
+bss wl01 up
+bss wl02 up
+bss wl11 up
+bss wl12 up
+bss wl13 up
+--- chanim_stats all wl0 t=3430.80
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0x1001 crsglitch cnt: 1563 bad plcp: 36 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:13 cca_nocat: 6 cca_nopkt: 2
+ chanspec: 0x1002 crsglitch cnt: 2672 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 5 cca_nopkt: 4
+ chanspec: 0x1003 crsglitch cnt: 400 bad plcp: 36 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0x1004 crsglitch cnt: 3054 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1005 crsglitch cnt: 1200 bad plcp: 218 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 6 cca_nopkt: 7
+ chanspec: 0x1006 crsglitch cnt: 1036 bad plcp: 509 noise: -88
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:15 cca_nocat: 12 cca_nopkt: 6
+ chanspec: 0x1007 crsglitch cnt: 163 bad plcp: 72 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 2
+ chanspec: 0x1008 crsglitch cnt: 581 bad plcp: 800 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1009 crsglitch cnt: 36 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:19 cca_nocat: 4 cca_nopkt: 1
+ chanspec: 0x100a crsglitch cnt: 490 bad plcp: 301 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 6 cca_nopkt: 5
+ chanspec: 0x100b crsglitch cnt: 1327 bad plcp: 181 noise: -86
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:6 cca_nocat: 6 cca_nopkt: 3
+
+--- chanim_stats all wl1 t=3430.82
+version: 3 
+
+AC 3430.83 wl01=0[ ] wl02=1[ m:971e1247/in=3291/txB=9479072/rxB=1958675/txfail=0/retry=1085/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3339/txB=9948302/rxB=782661/txfail=0/retry=570/rssi=-69 ] wl13=0[ ]

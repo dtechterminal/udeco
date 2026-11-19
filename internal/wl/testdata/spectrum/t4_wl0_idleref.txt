@@ -1,0 +1,4 @@
+TAG t4_wl0_chunked_idleref2 13 s no scan (replaces the 1 s idleref in t4_wl0_chunked.txt)
+AC 4563.12 wl01=0[ ] wl02=1[ m:971e1247/in=4419/txB=11960847/rxB=2656394/txfail=0/retry=1418/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4466/txB=12555738/rxB=1007962/txfail=0/retry=1252/rssi=-70 ] wl13=1[ m:f0197d79/in=240/txB=12831625/rxB=377182/txfail=0/retry=199/rssi=-66 ]
+IDLE t2=4563.31 t3=4576.33 beacons=254
+AC 4576.35 wl01=0[ ] wl02=1[ m:971e1247/in=4432/txB=11988583/rxB=2661954/txfail=0/retry=1424/rssi=-65 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4480/txB=12586099/rxB=1012308/txfail=0/retry=1252/rssi=-71 ] wl13=1[ m:f0197d79/in=254/txB=12873279/rxB=385053/txfail=0/retry=199/rssi=-63 ]

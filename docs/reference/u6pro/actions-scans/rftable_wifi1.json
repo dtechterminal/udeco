@@ -1,0 +1,70 @@
+{
+  "spectrum_table": [
+    {
+      "channel": 36,
+      "width": 80,
+      "center_freq": 5210,
+      "total_samples": 0,
+      "interference": -59,
+      "utilization": 11,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 52,
+      "width": 80,
+      "center_freq": 5290,
+      "total_samples": 0,
+      "interference": -81,
+      "utilization": 3,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 100,
+      "width": 80,
+      "center_freq": 5530,
+      "total_samples": 0,
+      "interference": -80,
+      "utilization": 2,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 116,
+      "width": 80,
+      "center_freq": 5610,
+      "total_samples": 0,
+      "interference": -89,
+      "utilization": 3,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 132,
+      "width": 80,
+      "center_freq": 5690,
+      "total_samples": 0,
+      "interference": -96,
+      "utilization": 6,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 149,
+      "width": 80,
+      "center_freq": 5775,
+      "total_samples": 0,
+      "interference": -86,
+      "utilization": 48,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    }
+  ]
+}

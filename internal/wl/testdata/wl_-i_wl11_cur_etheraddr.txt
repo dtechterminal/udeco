@@ -1,0 +1,1 @@
+cur_etheraddr: BE:A7:B9:3E:17:04

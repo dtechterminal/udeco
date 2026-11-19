@@ -1,0 +1,9 @@
+.git
+dist
+state
+docs
+deploy
+packaging
+tools
+**/*_test.go
+**/testdata

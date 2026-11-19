@@ -1,0 +1,52 @@
+[VER 8] STA F4:CF:A2:1E:72:64:
+	 chanspec 2l (0x1804)
+	 aid:11 
+	 rateset [ 1 2 5.5 6 9 11 12 18 24 36 48 54 ]
+	 idle 0 seconds
+	 in network 13552 seconds
+	 state: AUTHENTICATED ASSOCIATED AUTHORIZED
+	 connection: SECURED
+	 auth: WPA2-PSK
+	 crypto: AES_CCM
+	 flags 0x101e13a: WME PS N_CAP AMPDU AMSDU DWDS_CAP
+	 HT caps 0x116e: 40MHz SGI20 SGI40 STBC-Rx
+	 tx total pkts: 241489
+	 tx total bytes: 37534426
+	 tx ucast pkts: 6174
+	 tx ucast bytes: 428776
+	 tx mcast/bcast pkts: 235315
+	 tx mcast/bcast bytes: 37105650
+	 tx failures: 0
+	 rx data pkts: 22358
+	 rx data bytes: 7913204
+	 rx data dur: 0
+	 rx ucast pkts: 21076
+	 rx ucast bytes: 7743516
+	 rx mcast/bcast pkts: 1282
+	 rx mcast/bcast bytes: 169688
+	 rate of last tx pkt: 121500 kbps - 40500 kbps
+	 rate of last rx pkt: 6000 kbps
+	 rx decrypt succeeds: 7208
+	 rx decrypt failures: 0
+	 tx data pkts retried: 4
+	 per antenna rssi of last rx data frame: -68 -68 0 0
+	 per antenna average rssi of rx data frames: -70 -70 0 0
+	 per antenna noise floor: -100 -98 0 0
+	 tx total pkts sent: 6205
+	 tx pkts retries: 4825
+	 tx pkts retry exhausted: 0
+	 tx FW total pkts sent: 0
+	 tx FW pkts retries: 0
+	 tx FW pkts retry exhausted: 0
+	 rx total pkts retried: 7318
+MCS SET : [ 0 1 2 3 4 5 6 7 ]
+smoothed rssi: -69
+tx nrate
+mcs index 6 stf mode 2 auto
+rx nrate
+legacy rate 6 Mbps stf mode 0 auto
+wnm
+0x0:
+VENDOR OUI VALUE[0] 00:50:F2 
+link bandwidth = 40 MHZ 
+RRM capability = 0x0 

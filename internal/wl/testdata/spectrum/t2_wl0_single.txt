@@ -1,0 +1,233 @@
+TAG t2_wl0_c1 radio=wl0 args=-t passive -p 110 -c 1
+HDR wl0 chanspec=9u (0x1907) noise=-97 up=3599.48
+AC 3599.49 wl01=0[ ] wl02=1[ m:971e1247/in=3459/txB=9859911/rxB=2056186/txfail=0/retry=1129/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3507/txB=10337035/rxB=813434/txfail=0/retry=704/rssi=-69 ] wl13=2[ m:f0197d79/in=42/txB=15394775/rxB=177711/txfail=0/retry=1090/rssi=-68 m:177f5794/in=81/txB=19624103/rxB=607610/txfail=0/retry=695/rssi=-73 ]
+--- chanim_stats all wl0 t=3599.74
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0x1001 crsglitch cnt: 1563 bad plcp: 36 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:13 cca_nocat: 6 cca_nopkt: 2
+ chanspec: 0x1002 crsglitch cnt: 2672 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 5 cca_nopkt: 4
+ chanspec: 0x1003 crsglitch cnt: 400 bad plcp: 36 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0x1004 crsglitch cnt: 3054 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1005 crsglitch cnt: 1200 bad plcp: 218 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 6 cca_nopkt: 7
+ chanspec: 0x1006 crsglitch cnt: 1036 bad plcp: 509 noise: -88
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:15 cca_nocat: 12 cca_nopkt: 6
+ chanspec: 0x1007 crsglitch cnt: 163 bad plcp: 72 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 2
+ chanspec: 0x1008 crsglitch cnt: 581 bad plcp: 800 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1009 crsglitch cnt: 36 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:19 cca_nocat: 4 cca_nopkt: 1
+ chanspec: 0x100a crsglitch cnt: 490 bad plcp: 301 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 6 cca_nopkt: 5
+ chanspec: 0x100b crsglitch cnt: 1327 bad plcp: 181 noise: -86
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:6 cca_nocat: 6 cca_nopkt: 3
+
+SCAN rc=0 t0=3599.76 t1=3599.90 beacons=0 polls=2 first=SSID: "h:b6dafeb8"
+--- chanim_stats all wl0 t=3599.92
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0x1001 crsglitch cnt: 1121 bad plcp: 0 noise: -104
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:8 cca_nocat: 4 cca_nopkt: 10
+ chanspec: 0x1002 crsglitch cnt: 2672 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 5 cca_nopkt: 4
+ chanspec: 0x1003 crsglitch cnt: 400 bad plcp: 36 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0x1004 crsglitch cnt: 3054 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1005 crsglitch cnt: 1200 bad plcp: 218 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 6 cca_nopkt: 7
+ chanspec: 0x1006 crsglitch cnt: 1036 bad plcp: 509 noise: -88
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:15 cca_nocat: 12 cca_nopkt: 6
+ chanspec: 0x1007 crsglitch cnt: 163 bad plcp: 72 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 2
+ chanspec: 0x1008 crsglitch cnt: 581 bad plcp: 800 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1009 crsglitch cnt: 668 bad plcp: 10 noise: -77
+	 cca_txdur: 6 cca_inbss: 1 cca_obss:26 cca_nocat: 8 cca_nopkt: 4
+ chanspec: 0x100a crsglitch cnt: 490 bad plcp: 301 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 6 cca_nopkt: 5
+ chanspec: 0x100b crsglitch cnt: 1327 bad plcp: 181 noise: -86
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:6 cca_nocat: 6 cca_nopkt: 3
+
+IDLE t2=3600.94 t3=3602.96 beacons=40
+HDR wl0 chanspec=9u (0x1907) noise=-95 up=3602.98
+AC 3602.99 wl01=0[ ] wl02=1[ m:971e1247/in=3462/txB=9864115/rxB=2058189/txfail=0/retry=1130/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3510/txB=10341171/rxB=813648/txfail=0/retry=704/rssi=-70 ] wl13=2[ m:f0197d79/in=45/txB=16248262/rxB=200119/txfail=0/retry=1135/rssi=-70 m:177f5794/in=84/txB=19721954/rxB=654833/txfail=0/retry=718/rssi=-70 ]
+BSSCOUNT 3
+--- scanresults
+SSID: "h:b6dafeb8"
+Mode: Managed	RSSI: -87 dBm	SNR: 10 dB	noise: -97 dBm	Flags: FromBcn RSSI on-channel 	Channel: 1
+BSSID: 7A:BB:C1:F5:90:6E	Capability: ESS WEP ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:0db44707"
+Mode: Managed	RSSI: -77 dBm	SNR: 20 dB	noise: -97 dBm	Flags: FromBcn RSSI on-channel 	Channel: 1
+BSSID: B6:A7:C6:17:E3:F4	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 9 18 36 54 6(b) 12(b) 24(b) 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: IW 20/40_Bss_Coexist BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-15
+WPS: V1.0 Configured
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:e6732bcc"
+Mode: Managed	RSSI: -91 dBm	SNR: 6 dB	noise: -97 dBm	Flags: FromBcn RSSI on-channel 	Channel: 1
+BSSID: 50:2B:73:57:BE:A0	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+WPA:
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA-PSK 
+	No WPA Capabilities advertised
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: 
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+TAG t2_wl0_c6 radio=wl0 args=-t passive -p 110 -c 6
+HDR wl0 chanspec=9u (0x1907) noise=-97 up=3608.26
+AC 3608.26 wl01=0[ ] wl02=1[ m:971e1247/in=3468/txB=9881463/rxB=2066259/txfail=0/retry=1131/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3515/txB=10360334/rxB=815334/txfail=0/retry=710/rssi=-71 ] wl13=2[ m:f0197d79/in=50/txB=16782932/rxB=211961/txfail=0/retry=1192/rssi=-70 m:177f5794/in=89/txB=19891490/rxB=734144/txfail=0/retry=749/rssi=-71 ]
+--- chanim_stats all wl0 t=3608.52
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0x1001 crsglitch cnt: 1121 bad plcp: 0 noise: -104
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:8 cca_nocat: 4 cca_nopkt: 10
+ chanspec: 0x1002 crsglitch cnt: 2672 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 5 cca_nopkt: 4
+ chanspec: 0x1003 crsglitch cnt: 400 bad plcp: 36 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0x1004 crsglitch cnt: 3054 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1005 crsglitch cnt: 1200 bad plcp: 218 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 6 cca_nopkt: 7
+ chanspec: 0x1006 crsglitch cnt: 1036 bad plcp: 509 noise: -88
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:15 cca_nocat: 12 cca_nopkt: 6
+ chanspec: 0x1007 crsglitch cnt: 163 bad plcp: 72 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 2
+ chanspec: 0x1008 crsglitch cnt: 581 bad plcp: 800 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1009 crsglitch cnt: 668 bad plcp: 10 noise: -77
+	 cca_txdur: 6 cca_inbss: 1 cca_obss:26 cca_nocat: 8 cca_nopkt: 4
+ chanspec: 0x100a crsglitch cnt: 490 bad plcp: 301 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 6 cca_nopkt: 5
+ chanspec: 0x100b crsglitch cnt: 1327 bad plcp: 181 noise: -86
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:6 cca_nocat: 6 cca_nopkt: 3
+
+SCAN rc=0 t0=3608.54 t1=3608.68 beacons=0 polls=2 first=SSID: "h:edb235e7"
+--- chanim_stats all wl0 t=3608.70
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0x1001 crsglitch cnt: 1121 bad plcp: 0 noise: -104
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:8 cca_nocat: 4 cca_nopkt: 10
+ chanspec: 0x1002 crsglitch cnt: 2672 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 5 cca_nopkt: 4
+ chanspec: 0x1003 crsglitch cnt: 400 bad plcp: 36 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0x1004 crsglitch cnt: 3054 bad plcp: 163 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1005 crsglitch cnt: 1200 bad plcp: 218 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 6 cca_nopkt: 7
+ chanspec: 0x1006 crsglitch cnt: 686 bad plcp: 278 noise: -91
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:7 cca_nocat: 4 cca_nopkt: 6
+ chanspec: 0x1007 crsglitch cnt: 163 bad plcp: 72 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 2
+ chanspec: 0x1008 crsglitch cnt: 581 bad plcp: 800 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 4
+ chanspec: 0x1009 crsglitch cnt: 451 bad plcp: 7 noise: -78
+	 cca_txdur: 7 cca_inbss: 1 cca_obss:19 cca_nocat: 4 cca_nopkt: 1
+ chanspec: 0x100a crsglitch cnt: 490 bad plcp: 301 noise: -103
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 6 cca_nopkt: 5
+ chanspec: 0x100b crsglitch cnt: 1327 bad plcp: 181 noise: -86
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:6 cca_nocat: 6 cca_nopkt: 3
+
+IDLE t2=3609.72 t3=3611.74 beacons=38
+HDR wl0 chanspec=9u (0x1907) noise=-98 up=3611.77
+AC 3611.77 wl01=0[ ] wl02=1[ m:971e1247/in=3471/txB=9885480/rxB=2068921/txfail=0/retry=1133/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3519/txB=10365146/rxB=816566/txfail=0/retry=711/rssi=-70 ] wl13=2[ m:f0197d79/in=54/txB=17284986/rxB=223575/txfail=0/retry=1192/rssi=-68 m:177f5794/in=93/txB=19929317/rxB=750429/txfail=0/retry=765/rssi=-70 ]
+BSSCOUNT 2
+--- scanresults
+SSID: "h:edb235e7"
+Mode: Managed	RSSI: -66 dBm	SNR: 31 dB	noise: -97 dBm	Flags: FromBcn RSSI on-channel 	Channel: 6
+BSSID: 32:E9:50:B8:87:1A	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: 
+VHT Capable:
+	Chanspec: 2.4GHz channel 6 20MHz (0x1006)
+	Primary channel: 6
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:d7095dc8"
+Mode: Managed	RSSI: -86 dBm	SNR: 11 dB	noise: -97 dBm	Flags: FromBcn RSSI on-channel 	Channel: 6
+BSSID: 96:98:69:B2:9F:BC	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 9 18 36 54 6 12 24 48 ]
+WPA:
+	multicast cipher: TKIP
+	unicast ciphers(2): TKIP AES-CCMP 
+	AKM Suites(1): WPA-PSK 
+	No WPA Capabilities advertised
+RSN (WPA2):
+	multicast cipher: TKIP
+	unicast ciphers(2): TKIP AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 6 20MHz (0x1006)
+	Primary channel: 6
+	HT Capabilities: 
+	Supported HT MCS : 0-15
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>

@@ -1,0 +1,6 @@
+txframe 1322734 txbyte 1297361847 txerror 78 rxframe 704148 rxbyte 577185511 rxerror 0 
+txnobuf 1 txfail 32 
+d11_txfrag 319950 d11_txmulti 317558 d11_txretry 226 d11_txretrie 125 
+d11_txfrmsnt 1324680 d11_rxmulti 1802 
+rxnobuf 0 rxfragerr 0 rxrunt 0 rxerror 0 
+txexptime 0 txrts 0 txnocts 0 

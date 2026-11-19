@@ -12,13 +12,6 @@ import (
 	"sort"
 )
 
-// LLDPNeighbor is one device heard on a port.
-type LLDPNeighbor struct {
-	Port                  string // local interface (lan1, wan, ...)
-	ChassisID, ChassisDes string
-	PortID, PortDescr     string
-}
-
 // parseLLDP reads "lldpctl -f json0" (every element a list, values under
 // "value"). The older "-f json" form, where interfaces and chassis are keyed
 // by their name and single elements are not lists, is read too.

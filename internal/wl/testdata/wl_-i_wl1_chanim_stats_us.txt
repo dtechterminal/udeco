@@ -1,0 +1,5 @@
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    438300558  57283710  610772807  284154299  4787851   0         11799438057  70677286  5704851   13496999000  956998667  911721778  171632    42769973
+

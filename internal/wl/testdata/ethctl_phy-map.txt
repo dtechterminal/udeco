@@ -1,0 +1,4 @@
+eth0: Down <B0:A7:B9:3E:17:00> <IntSw P0, Logical 00> 
+      Chip Port  9, CrossBar Port 0, PHY_ID <0x0007f008:0x08: On-chip 1G GPHY> Cfg: ANG.1G; Down 
+eth1:   Up <B0:A7:B9:3E:17:00> <IntSw P1, Logical 01> 
+      Chip Port 10, CrossBar Port 1, PHY_ID <0x03180005:0x05:External RGMII 1G GPHY> Cfg: ANG.1G; Up 1G

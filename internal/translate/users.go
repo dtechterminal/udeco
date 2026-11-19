@@ -15,7 +15,12 @@ type User struct {
 }
 
 var (
-	userName  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]{0,31}$`)
+	// A login safe for /etc/passwd and busybox: no ':' or whitespace, no
+	// leading '-' (option injection). A leading digit is allowed: Network
+	// 11.1.50 generates 8-character logins that can start with one. An
+	// all-digit name is refused (tools read it as a UID).
+	userName  = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_-]{0,31}$`)
+	allDigits = regexp.MustCompile(`^[0-9]+$`)
 	cryptHash = regexp.MustCompile(`^\$[0-9a-z]+\$[^:\s]+$`)
 	// never managed: the AP's own accounts
 	systemUsers = map[string]bool{"root": true, "nobody": true, "daemon": true, "ftp": true, "network": true, "dnsmasq": true, "ntp": true, "logd": true, "ubus": true}
@@ -38,7 +43,7 @@ func Users(cfg Cfg) ([]User, []string) {
 			notes = append(notes, "users."+n+": "+name+" is an AP system account: left alone")
 		case strings.HasSuffix(cfg[p+"shell"], "/false"):
 			notes = append(notes, "users."+n+": "+name+" has no shell: skipped")
-		case !userName.MatchString(name) || !cryptHash.MatchString(hash):
+		case !userName.MatchString(name) || allDigits.MatchString(name) || !cryptHash.MatchString(hash):
 			notes = append(notes, "users."+n+": bad name or password hash: skipped")
 		default:
 			out = append(out, User{Name: name, Hash: hash})

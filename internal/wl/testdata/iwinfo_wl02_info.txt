@@ -1,0 +1,13 @@
+wl02      ESSID: "Example Network"
+          Access Point: BA:A7:B9:3E:17:04
+          Mode: Master  Channel: 2 (2.417 GHz)
+          Tx-Power: 32 dBm  Link Quality: unknown/unknown
+          Signal: -70 dBm  Noise: -96 dBm
+          Bit Rate: 72.0 MBit/s
+          Encryption: none
+          Type: wl  HW Mode(s): 802.11bgn
+          Hardware: 14E4:4491 14E4:08AD [Broadcom BCM4491]
+          TX power offset: none
+          Frequency offset: unknown
+          Supports VAPs: yes
+          Beacon Interval: 100

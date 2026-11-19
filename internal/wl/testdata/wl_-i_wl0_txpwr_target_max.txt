@@ -1,0 +1,1 @@
+Maximum Tx Power Target (chanspec:0x1804):	24.00  24.00  

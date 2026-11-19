@@ -1,0 +1,17 @@
+SSID: "zEQQnH6p2LzsU8Ag"
+Mode: Managed	RSSI: 0 dBm	SNR: 0 dB	noise: -94 dBm	Channel: 44/80
+BSSID: BE:A7:B9:3E:17:04	Capability: ESS ShortPre 
+Supported Rates: [ 6(b) 9 12(b) 18 24(b) 36 48 54 ]
+HE Capable:
+	Chanspec: 5GHz channel 42 80MHz (0xe22a)
+	Primary channel: 44
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-11        Rx: 0-11      
+		NSS2 Tx: 0-11        Rx: 0-11      
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+

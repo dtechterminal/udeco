@@ -1,0 +1,12 @@
+TAG final_state (reads only, after all tests)
+AC 4642.85 wl01=0[ ] wl02=1[ m:971e1247/in=4498/txB=12282563/rxB=2704221/txfail=0/retry=1453/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4546/txB=12885791/rxB=1023840/txfail=0/retry=1308/rssi=-70 ] wl13=1[ m:f0197d79/in=320/txB=13845065/rxB=459114/txfail=0/retry=401/rssi=-63 ]
+HDR wl0 chanspec=9u (0x1907) noise=-93 up=4643.07
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4643.08
+acsd2: 12001
+bss wl01 up
+bss wl02 up
+bss wl11 up
+bss wl12 up
+bss wl13 up
+tmp-check: ls: /tmp/sr.txt: No such file or directory ls: /tmp/*.udeco-spec: No such file or directory 
+133

@@ -1,0 +1,141 @@
+### hostapd_cli -i wifi0ap0 get_config
+bssid=9c:05:d6:c2:df:09
+ssid=EXN IOT
+wps_state=disabled
+wpa=2
+key_mgmt=WPA-PSK
+group_cipher=CCMP
+rsn_pairwise_cipher=CCMP
+### hostapd_cli -i wifi0ap0 status
+phy=wifi0ap0
+freq=2472
+olbc=0
+olbc_ht=0
+ht_op_mode=0x4
+hw_mode=g
+cac_time_seconds=0
+cac_time_left_seconds=N/A
+channel=13
+edmg_enable=0
+edmg_channel=0
+secondary_channel=0
+ieee80211n=1
+ieee80211ac=1
+ieee80211ax=1
+ieee80211be=0
+beacon_int=100
+dtim_period=2
+he_oper_chwidth=0
+he_oper_centr_freq_seg0_idx=13
+he_oper_centr_freq_seg1_idx=0
+vht_oper_chwidth=0
+vht_oper_centr_freq_seg0_idx=13
+vht_oper_centr_freq_seg1_idx=0
+vht_caps_info=33817892
+ht_caps_info=18ad
+ht_mcs_bitmask=ffff0000000000000000
+supported_rates=02 04 0b 16 0c 12 18 24 30 48 60 6c
+max_txpower=30
+bss[0]=wifi0ap0
+bssid[0]=9c:05:d6:c2:df:09
+ssid[0]=EXN IOT
+---- TOTAL PACKET COUNT -----------
+Total received packets total_rx = 62956
+---- TRANSMITTED PACKETS ----------
+auth_resp   = 9452
+assoc_resp  = 8030
+deauth_tx   = 0
+disassoc_tx = 0
+---- RECEIVED PACKETS -------------
+auth_req    = 9452
+auth_ack    = 9452
+assoc_req   = 8032
+assoc_ack   = 1949
+deauth_rx   = 0
+disassoc_rx = 0
+reassoc_req = 0
+---- FAILURE ----------------------
+auth_resp_fail = 0
+auth_req_fail = 0
+assoc_resp_fail = 2
+assoc_req_fail = 2
+---- TRANSMITTED EAPOL PACKETS ----
+eapol_m1 = 1950
+eapol_m3 = 1956
+gtk_1    = 0
+---- RECEIVED EAPOL PACKETS ----
+eapol_m2 = 1949
+eapol_m4 = 1950
+gtk_2    = 0
+### hostapd_cli -i wifi1ap1 get_config
+bssid=9c:05:d6:c2:df:0a
+ssid=Example Network
+wps_state=disabled
+wpa=2
+key_mgmt=WPA-PSK SAE
+group_cipher=CCMP
+rsn_pairwise_cipher=CCMP
+### hostapd_cli -i wifi1ap1 status
+phy=wifi1ap1
+freq=5200
+olbc=0
+olbc_ht=0
+ht_op_mode=0x6
+hw_mode=a
+cac_time_seconds=0
+cac_time_left_seconds=N/A
+channel=40
+edmg_enable=0
+edmg_channel=0
+secondary_channel=-1
+ieee80211n=1
+ieee80211ac=1
+ieee80211ax=1
+ieee80211be=0
+beacon_int=100
+dtim_period=2
+he_oper_chwidth=2
+he_oper_centr_freq_seg0_idx=50
+he_oper_centr_freq_seg1_idx=0
+vht_oper_chwidth=2
+vht_oper_centr_freq_seg0_idx=50
+vht_oper_centr_freq_seg1_idx=0
+vht_caps_info=338b18f5
+ht_caps_info=08cf
+ht_mcs_bitmask=ffffffff000000000000
+supported_rates=0c 12 18 24 30 48 60 6c
+max_txpower=24
+bss[0]=wifi1ap1
+bssid[0]=9c:05:d6:c2:df:0a
+ssid[0]=Example Network
+---- TOTAL PACKET COUNT -----------
+Total received packets total_rx = 13393
+---- TRANSMITTED PACKETS ----------
+auth_resp   = 633
+assoc_resp  = 468
+deauth_tx   = 0
+disassoc_tx = 0
+---- RECEIVED PACKETS -------------
+auth_req    = 308
+auth_ack    = 308
+assoc_req   = 431
+assoc_ack   = 434
+deauth_rx   = 0
+disassoc_rx = 0
+reassoc_req = 6
+---- FAILURE ----------------------
+auth_resp_fail = 0
+auth_req_fail = 0
+assoc_resp_fail = 0
+assoc_req_fail = 0
+---- TRANSMITTED EAPOL PACKETS ----
+eapol_m1 = 434
+eapol_m3 = 438
+gtk_1    = 2530
+---- RECEIVED EAPOL PACKETS ----
+eapol_m2 = 438
+eapol_m4 = 434
+gtk_2    = 2192
+### global interfaces
+wifi0ap0
+wifi1ap1

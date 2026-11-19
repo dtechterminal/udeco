@@ -15,6 +15,8 @@ import (
 // wifi-iface it works out whether it should be up now (local time, the
 // timezone the controller set) and flips `disabled` + `wifi reload` when
 // needed. It keeps working when the daemon is away, like a UniFi AP.
+// A window's end is inclusive, as in a UAP's within_schedule (now <= end;
+// all day is 0000-2359): see translate.Schedule.
 const scheduleScript = `#!/bin/sh
 C=/etc/unifi-openwrt/schedule.conf
 [ -s "$C" ] || exit 0
@@ -23,7 +25,7 @@ changed=0
 for l in $(awk -v d="$d" -v t="$t" '
   { if (!($1 in mode)) mode[$1] = $2
     if ($3 == d) { a = $4 + 0; b = $5 + 0; tt = t + 0
-      if (a <= b ? (tt >= a && tt < b) : (tt >= a || tt < b)) win[$1] = 1 } }
+      if (a <= b ? (tt >= a && tt <= b) : (tt >= a || tt <= b)) win[$1] = 1 } }
   END { for (s in mode) { up = (mode[s] == "on") ? (s in win) : !(s in win); print s ":" up } }' "$C"); do
   sec=${l%%:*}; up=${l##*:}
   want=1; [ "$up" = 1 ] && want=0

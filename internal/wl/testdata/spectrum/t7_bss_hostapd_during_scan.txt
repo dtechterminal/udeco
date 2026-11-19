@@ -1,0 +1,164 @@
+TAG t7_wl0_c1_1 radio=wl0 vif=wl02 args=-t passive -p 110 -c 1
+HDR wl0 chanspec=9u (0x1907) noise=-96 up=4031.07
+AC 4031.08 wl01=0[ ] wl02=1[ m:971e1247/in=3889/txB=10796633/rxB=2331435/txfail=0/retry=1237/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3937/txB=11346828/rxB=902959/txfail=0/retry=1161/rssi=-70 ] wl13=2[ m:f0197d79/in=472/txB=44328349/rxB=1401712/txfail=2/retry=27665/rssi=-68 m:177f5794/in=511/txB=55827324/rxB=3325562/txfail=0/retry=4343/rssi=-68 ]
+P t=4031.35 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4031.38 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4031.41 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4031.44 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4031.48 bss=up isup=1 ping=PONG cs=9u (0x1907)
+DONE t0=4031.34 t1=4031.52 polls=4
+HDR wl0 chanspec=9u (0x1907) noise=-96 up=4031.53
+AC 4031.54 wl01=0[ ] wl02=1[ m:971e1247/in=3889/txB=10796981/rxB=2331435/txfail=0/retry=1237/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3937/txB=11347516/rxB=902959/txfail=0/retry=1161/rssi=-70 ] wl13=2[ m:f0197d79/in=472/txB=44329531/rxB=1402056/txfail=2/retry=27665/rssi=-69 m:177f5794/in=511/txB=55828660/rxB=3325962/txfail=0/retry=4343/rssi=-70 ]
+TAG t7_wl0_c1_2 radio=wl0 vif=wl02 args=-t passive -p 110 -c 1
+HDR wl0 chanspec=9u (0x1907) noise=-94 up=4034.82
+AC 4034.82 wl01=0[ ] wl02=1[ m:971e1247/in=3893/txB=10807971/rxB=2332752/txfail=0/retry=1237/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3940/txB=11358098/rxB=903299/txfail=0/retry=1161/rssi=-70 ] wl13=2[ m:f0197d79/in=475/txB=44340026/rxB=1403675/txfail=2/retry=27669/rssi=-69 m:177f5794/in=514/txB=55841441/rxB=3330465/txfail=0/retry=4343/rssi=-67 ]
+P t=4035.09 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4035.13 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4035.15 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4035.19 bss=up isup=1 ping=PONG cs=9u (0x1907)
+DONE t0=4035.08 t1=4035.23 polls=3
+HDR wl0 chanspec=9u (0x1907) noise=-93 up=4035.24
+AC 4035.25 wl01=0[ ] wl02=1[ m:971e1247/in=3893/txB=10808107/rxB=2334083/txfail=0/retry=1238/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3941/txB=11358432/rxB=903299/txfail=0/retry=1161/rssi=-70 ] wl13=2[ m:f0197d79/in=476/txB=44340360/rxB=1403675/txfail=2/retry=27669/rssi=-69 m:177f5794/in=515/txB=55845292/rxB=3342517/txfail=0/retry=4343/rssi=-67 ]
+TAG t7_wl0_c1_3 radio=wl0 vif=wl02 args=-t passive -p 110 -c 1
+HDR wl0 chanspec=9u (0x1907) noise=-94 up=4038.54
+AC 4038.55 wl01=0[ ] wl02=1[ m:971e1247/in=3896/txB=10812115/rxB=2335414/txfail=0/retry=1238/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3944/txB=11362287/rxB=903851/txfail=0/retry=1161/rssi=-70 ] wl13=2[ m:f0197d79/in=479/txB=44344034/rxB=1403675/txfail=2/retry=27669/rssi=-69 m:177f5794/in=518/txB=56380171/rxB=3447688/txfail=0/retry=4380/rssi=-67 ]
+P t=4038.83 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4038.86 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4038.90 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4038.93 bss=up isup=1 ping=PONG cs=1 (0x1001)
+DONE t0=4038.82 t1=4038.96 polls=3
+HDR wl0 chanspec=9u (0x1907) noise=-94 up=4038.98
+AC 4038.99 wl01=0[ ] wl02=1[ m:971e1247/in=3897/txB=10812319/rxB=2335414/txfail=0/retry=1238/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3944/txB=11362577/rxB=904065/txfail=0/retry=1161/rssi=-70 ] wl13=2[ m:f0197d79/in=479/txB=44344238/rxB=1403675/txfail=2/retry=27669/rssi=-69 m:177f5794/in=519/txB=56402354/rxB=3452898/txfail=0/retry=4380/rssi=-66 ]
+TAG t7_wl0_sweep radio=wl0 vif=wl02 args=-t passive -p 110
+HDR wl0 chanspec=9u (0x1907) noise=-95 up=4042.29
+AC 4042.29 wl01=0[ ] wl02=1[ m:971e1247/in=3900/txB=10851291/rxB=2339407/txfail=0/retry=1239/rssi=-65 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3948/txB=11407906/rxB=906864/txfail=0/retry=1161/rssi=-69 ] wl13=2[ m:f0197d79/in=483/txB=44387152/rxB=1403675/txfail=2/retry=27669/rssi=-69 m:177f5794/in=522/txB=57701808/rxB=3587537/txfail=0/retry=4495/rssi=-67 ]
+P t=4042.56 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4042.59 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4042.63 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4042.66 bss=up isup=1 ping=PONG cs=10 (0x100a)
+P t=4042.70 bss=up isup=1 ping=PONG cs=10 (0x100a)
+P t=4042.73 bss=up isup=1 ping=PONG cs=10 (0x100a)
+P t=4042.75 bss=up isup=1 ping=PONG cs=10 (0x100a)
+P t=4042.78 bss=up isup=1 ping=PONG cs=11 (0x100b)
+P t=4042.81 bss=up isup=1 ping=PONG cs=11 (0x100b)
+P t=4042.84 bss=up isup=1 ping=PONG cs=11 (0x100b)
+P t=4042.87 bss=up isup=1 ping=PONG cs=11 (0x100b)
+P t=4042.90 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4042.93 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4042.97 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4043.00 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4043.03 bss=up isup=1 ping=PONG cs=1 (0x1001)
+P t=4043.06 bss=up isup=1 ping=PONG cs=2 (0x1002)
+P t=4043.09 bss=up isup=1 ping=PONG cs=2 (0x1002)
+P t=4043.12 bss=up isup=1 ping=PONG cs=2 (0x1002)
+P t=4043.14 bss=up isup=1 ping=PONG cs=2 (0x1002)
+P t=4043.17 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4043.21 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4043.23 bss=up isup=1 ping=PONG cs=3 (0x1003)
+P t=4043.26 bss=up isup=1 ping=PONG cs=3 (0x1003)
+P t=4043.29 bss=up isup=1 ping=PONG cs=3 (0x1003)
+P t=4043.32 bss=up isup=1 ping=PONG cs=3 (0x1003)
+P t=4043.35 bss=up isup=1 ping=PONG cs=4 (0x1004)
+P t=4043.38 bss=up isup=1 ping=PONG cs=4 (0x1004)
+P t=4043.41 bss=up isup=1 ping=PONG cs=4 (0x1004)
+P t=4043.43 bss=up isup=1 ping=PONG cs=4 (0x1004)
+P t=4043.46 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4043.49 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4043.52 bss=up isup=1 ping=PONG cs=5 (0x1005)
+P t=4043.55 bss=up isup=1 ping=PONG cs=5 (0x1005)
+P t=4043.58 bss=up isup=1 ping=PONG cs=5 (0x1005)
+P t=4043.61 bss=up isup=1 ping=PONG cs=5 (0x1005)
+P t=4043.64 bss=up isup=1 ping=PONG cs=6 (0x1006)
+P t=4043.67 bss=up isup=1 ping=PONG cs=6 (0x1006)
+P t=4043.71 bss=up isup=1 ping=PONG cs=6 (0x1006)
+P t=4043.73 bss=up isup=1 ping=PONG cs=6 (0x1006)
+P t=4043.77 bss=up isup=1 ping=PONG cs=9u (0x1907)
+P t=4043.80 bss=up isup=1 ping=PONG cs=7 (0x1007)
+P t=4043.83 bss=up isup=1 ping=PONG cs=7 (0x1007)
+P t=4043.86 bss=up isup=1 ping=PONG cs=7 (0x1007)
+P t=4043.89 bss=up isup=1 ping=PONG cs=7 (0x1007)
+P t=4043.92 bss=up isup=1 ping=PONG cs=8 (0x1008)
+P t=4043.95 bss=up isup=1 ping=PONG cs=8 (0x1008)
+P t=4043.98 bss=up isup=1 ping=PONG cs=8 (0x1008)
+P t=4044.01 bss=up isup=1 ping=PONG cs=8 (0x1008)
+P t=4044.04 bss=up isup=1 ping=PONG cs=9u (0x1907)
+DONE t0=4042.55 t1=4044.08 polls=49
+HDR wl0 chanspec=9u (0x1907) noise=-95 up=4044.09
+AC 4044.10 wl01=0[ ] wl02=1[ m:971e1247/in=3902/txB=10859550/rxB=2339407/txfail=0/retry=1239/rssi=-65 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3949/txB=11413069/rxB=907184/txfail=0/retry=1161/rssi=-70 ] wl13=2[ m:f0197d79/in=485/txB=44391257/rxB=1403995/txfail=2/retry=27669/rssi=-71 m:177f5794/in=524/txB=57706843/rxB=3589514/txfail=0/retry=4495/rssi=-66 ]
+TAG t7_wl1_c36_1 radio=wl1 vif=wl12 args=-t passive -p 110 -c 36
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4074.36
+AC 4074.36 wl01=0[ ] wl02=1[ m:971e1247/in=3932/txB=10912510/rxB=2355521/txfail=0/retry=1247/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3980/txB=11468113/rxB=911890/txfail=0/retry=1165/rssi=-70 ] wl13=2[ m:f0197d79/in=515/txB=44471668/rxB=1426965/txfail=2/retry=27673/rssi=-69 m:177f5794/in=554/txB=58144274/rxB=3830861/txfail=0/retry=4608/rssi=-68 ]
+P t=4074.62 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4074.65 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4074.68 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4074.71 bss=up isup=1 ping=PONG cs=36 (0xd024)
+DONE t0=4074.61 t1=4074.75 polls=3
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4074.77
+AC 4074.77 wl01=0[ ] wl02=1[ m:971e1247/in=3932/txB=10912510/rxB=2355521/txfail=0/retry=1247/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3980/txB=11468611/rxB=912227/txfail=0/retry=1165/rssi=-70 ] wl13=2[ m:f0197d79/in=515/txB=44472266/rxB=1427173/txfail=2/retry=27678/rssi=-70 m:177f5794/in=554/txB=58145354/rxB=3831559/txfail=0/retry=4611/rssi=-67 ]
+TAG t7_wl1_c36_2 radio=wl1 vif=wl12 args=-t passive -p 110 -c 36
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4078.03
+AC 4078.03 wl01=0[ ] wl02=1[ m:971e1247/in=3936/txB=10923624/rxB=2358197/txfail=0/retry=1247/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3983/txB=11479245/rxB=913288/txfail=0/retry=1175/rssi=-71 ] wl13=2[ m:f0197d79/in=518/txB=44482746/rxB=1427601/txfail=2/retry=27678/rssi=-68 m:177f5794/in=557/txB=58162198/rxB=3845180/txfail=0/retry=4614/rssi=-67 ]
+P t=4078.30 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4078.33 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4078.36 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4078.40 bss=up isup=1 ping=PONG cs=36 (0xd024)
+DONE t0=4078.29 t1=4078.43 polls=3
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4078.44
+AC 4078.45 wl01=0[ ] wl02=1[ m:971e1247/in=3936/txB=10924052/rxB=2358197/txfail=0/retry=1247/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3984/txB=11479673/rxB=913288/txfail=0/retry=1175/rssi=-71 ] wl13=2[ m:f0197d79/in=519/txB=44483268/rxB=1427601/txfail=2/retry=27678/rssi=-68 m:177f5794/in=558/txB=58164291/rxB=3849127/txfail=0/retry=4615/rssi=-67 ]
+TAG t7_wl1_c36_3 radio=wl1 vif=wl12 args=-t passive -p 110 -c 36
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4081.71
+AC 4081.71 wl01=0[ ] wl02=1[ m:971e1247/in=3939/txB=10927386/rxB=2360200/txfail=0/retry=1247/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3987/txB=11482939/rxB=913288/txfail=0/retry=1175/rssi=-71 ] wl13=2[ m:f0197d79/in=522/txB=44486670/rxB=1428076/txfail=2/retry=27691/rssi=-66 m:177f5794/in=561/txB=58179684/rxB=3877941/txfail=0/retry=4621/rssi=-67 ]
+P t=4081.97 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4082.00 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4082.03 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4082.06 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4082.09 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+DONE t0=4081.96 t1=4082.12 polls=4
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4082.13
+AC 4082.14 wl01=0[ ] wl02=1[ m:971e1247/in=3940/txB=10927454/rxB=2360200/txfail=0/retry=1247/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3987/txB=11483165/rxB=913288/txfail=0/retry=1175/rssi=-71 ] wl13=2[ m:f0197d79/in=522/txB=44486896/rxB=1428076/txfail=2/retry=27691/rssi=-66 m:177f5794/in=561/txB=58180004/rxB=3878194/txfail=0/retry=4621/rssi=-67 ]
+TAG t7_wl1_sweep radio=wl1 vif=wl12 args=-t passive -p 110
+HDR wl1 chanspec=40/80 (0xe12a) noise=-95 up=4085.40
+AC 4085.41 wl01=0[ ] wl02=1[ m:971e1247/in=3943/txB=10931992/rxB=2362862/txfail=0/retry=1249/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3991/txB=11487529/rxB=914114/txfail=0/retry=1180/rssi=-70 ] wl13=2[ m:f0197d79/in=526/txB=44500375/rxB=1441044/txfail=2/retry=27735/rssi=-70 m:177f5794/in=565/txB=58186017/rxB=3881174/txfail=0/retry=4627/rssi=-68 ]
+P t=4085.66 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4085.69 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4085.72 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4085.75 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4085.78 bss=up isup=1 ping=PONG cs=44 (0xd02c)
+P t=4085.81 bss=up isup=1 ping=PONG cs=44 (0xd02c)
+P t=4085.84 bss=up isup=1 ping=PONG cs=44 (0xd02c)
+P t=4085.87 bss=up isup=1 ping=PONG cs=44 (0xd02c)
+P t=4085.90 bss=up isup=1 ping=PONG cs=48 (0xd030)
+P t=4085.93 bss=up isup=1 ping=PONG cs=48 (0xd030)
+P t=4085.96 bss=up isup=1 ping=PONG cs=48 (0xd030)
+P t=4085.99 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4086.03 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4086.06 bss=up isup=1 ping=PONG cs=149 (0xd095)
+P t=4086.09 bss=up isup=1 ping=PONG cs=149 (0xd095)
+P t=4086.12 bss=up isup=1 ping=PONG cs=149 (0xd095)
+P t=4086.15 bss=up isup=1 ping=PONG cs=149 (0xd095)
+P t=4086.18 bss=up isup=1 ping=PONG cs=153 (0xd099)
+P t=4086.21 bss=up isup=1 ping=PONG cs=153 (0xd099)
+P t=4086.24 bss=up isup=1 ping=PONG cs=153 (0xd099)
+P t=4086.27 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4086.31 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4086.34 bss=up isup=1 ping=PONG cs=157 (0xd09d)
+P t=4086.37 bss=up isup=1 ping=PONG cs=157 (0xd09d)
+P t=4086.40 bss=up isup=1 ping=PONG cs=157 (0xd09d)
+P t=4086.43 bss=up isup=1 ping=PONG cs=157 (0xd09d)
+P t=4086.45 bss=up isup=1 ping=PONG cs=161 (0xd0a1)
+P t=4086.49 bss=up isup=1 ping=PONG cs=161 (0xd0a1)
+P t=4086.51 bss=up isup=1 ping=PONG cs=161 (0xd0a1)
+P t=4086.54 bss=up isup=1 ping=PONG cs=161 (0xd0a1)
+P t=4086.57 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4086.61 bss=up isup=1 ping=PONG cs=40/80 (0xe12a)
+P t=4086.64 bss=up isup=1 ping=PONG cs=165 (0xd0a5)
+P t=4086.67 bss=up isup=1 ping=PONG cs=165 (0xd0a5)
+P t=4086.69 bss=up isup=1 ping=PONG cs=165 (0xd0a5)
+P t=4086.72 bss=up isup=1 ping=PONG cs=165 (0xd0a5)
+P t=4086.75 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4086.78 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4086.81 bss=up isup=1 ping=PONG cs=36 (0xd024)
+P t=4086.84 bss=up isup=1 ping=PONG cs=36 (0xd024)
+DONE t0=4085.65 t1=4086.87 polls=39
+HDR wl1 chanspec=40/80 (0xe12a) noise=-95 up=4086.89
+AC 4086.90 wl01=0[ ] wl02=1[ m:971e1247/in=3944/txB=10933424/rxB=2362862/txfail=0/retry=1249/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3992/txB=11489074/rxB=914264/txfail=0/retry=1184/rssi=-71 ] wl13=2[ m:f0197d79/in=527/txB=44501901/rxB=1441299/txfail=2/retry=27740/rssi=-68 m:177f5794/in=566/txB=58693952/rxB=3960076/txfail=0/retry=4919/rssi=-67 ]

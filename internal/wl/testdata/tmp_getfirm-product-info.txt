@@ -1,0 +1,16 @@
+vendor_name:TP-LINK
+vendor_url:www.tp-link.com
+product_name:X20
+product_type:HOMEWIFISYSTEM
+language:US
+product_ver:2.0.0
+product_id:58200200
+special_id:55530000
+hw_id:781AC71907C506570F6D416344CC5F4B
+oem_id:6B0CDC9E9C12DB9BFF9CA947C908AC79
+country:US
+key:***REDACTED***
+gid:1ad4b09e-beb0-11e7-b722-50c7bf2a6709
+preconf_k:***REDACTED***
+preconf_g:56f9cbfe-b73a-4671-834a-526eb140f9e0
+preconf_p:3

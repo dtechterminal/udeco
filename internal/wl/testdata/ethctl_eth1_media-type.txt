@@ -1,0 +1,3 @@
+    Auto-Negotiation: Enabled
+    PHY Capabilities: 1GFD|100MFD|100MHD|10MFD|10MHD
+    Link is Up at Speed: 1G, Duplex: FD

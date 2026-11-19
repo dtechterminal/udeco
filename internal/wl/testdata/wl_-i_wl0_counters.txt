@@ -1,0 +1,56 @@
+counters_version 30
+datalen 1296
+Slice_index: 0
+reinitreason_counts: 0(0) 1(0) 2(0) 3(0) 4(0) 5(0) 6(0) 7(0) 8(0) 9(0) 10(0) 11(0) 12(0) 13(0) 14(0) 15(0) 16(0) 17(0) 18(0) 19(0) 20(0) 21(0) 22(0) 23(0) 24(0) 25(0) 26(0) 27(0) 28(0) 29(0) 30(0) 31(0) 32(0) 33(0) 34(0) 35(0) 36(0) 37(0) 38(0) 39(0) 40(0) 41(0) 42(0) 43(0) 44(0) 45(0) 46(0) 47(0) 48(0) 49(0) 50(0) 51(0) 52(0) 53(0) 54(0) 
+reinit 0 reset 11 pciereset 0 cfgrestore 0 dma_hang 0 ampdu_wds 0 
+txframe 401368 txbyte 63737923 txretrans 58311 txlost 0 txfail 414 txchanrej 0 
+txdatamcast 0 txdatabcast 0 
+tbtt 179415 p2p_tbtt 0 p2p_tbtt_miss 0 
+rxframe 88156 rxbyte 25123854 rxerror 0 
+txdropped 0 txprshort 147 txdmawar 0 txnobuf 1 txnoassoc 460 txchit 55616 txcmiss 342982 
+txserr 2674 txphyerr 0 txphycrs 0 txerror 503 
+d11_txfrag 412793 d11_txmulti 315226 d11_txbcast 0 d11_txretry 4989 d11_txretrie 2186 
+d11_txrts 112063 d11_txnocts 50039 d11_txnoack 11042 d11_txfrmsnt 412779 
+rxdropped 0 rxcrc 711690 rxnobuf 0 rxnondata 0 rxbadds 23 rxbadcm 4 rxdup 41902 rxfragerr 0 
+rxrunt 0 rxgiant 0 rxnoscb 0 rxbadproto 78 rxbadsrcmac 0 rxrtry 120452 
+d11_rxfrag 1074191 d11_rxmulti 10712 d11_rxbcast 0 d11_rxundec 118 
+rxctl 909162 rxbadda 67 rxfilter 47 rxuflo: 0 0 0 0 0 0 
+
+tkipmicfaill 0 tkipicverr 0 tkipcntrmsr 0 
+tkipreplay 0 ccmpfmterr 0 ccmpreplay 104 
+ccmpundec 0 fourwayfail 0 wepundec 0 
+wepicverr 0 decsuccess 88794 rxundec 118 
+
+rx1mbps 68727 rx2mbps 304 rx5mbps5 404 rx11mbps 1831 
+rx6mbps 23872 rx9mbps 77 rx12mbps 0 rx18mbps 0 
+rx24mbps 7508 rx36mbps 4 rx48mbps 0 rx54mbps 0 
+txmpdu_sgi 46692 rxmpdu_sgi 33339 txmpdu_stbc 79882 rxmpdu_stbc 565 rxmpdu_mu 0 
+cso_normal 0 cso_passthrough 0 
+chained 11682 chainedsz1 0 unchained 1074265 maxchainsz 9 currchainsz 1 
+
+txbar 358 txpspoll 0 rxbar 92 rxpspoll 0 
+txnull 0 txqosnull 0 rxnull 87125 rxqosnull 1 
+txassocreq 0 txreassocreq 0 txdisassoc 3 txassocrsp 26 txreassocrsp 6 
+txauth 165 txdeauth 38 txprobereq 32 txprobersp 12677 txaction 637 
+rxassocreq 26 rxreassocreq 6 rxdisassoc 40 rxassocrsp 0 rxreassocrsp 0 
+rxauth 177 rxdeauth 0 rxprobereq 20664 rxprobersp 67395 rxaction 830 
+txallfrm 1232324 txbcnfrm 356328 txrtsfrm 162102 txctsfrm 77069 txackfrm 169755 txback 6330 txdnlfrm 0 
+txampdu 110389 txmpdu 119363 txucast 147012 rxrsptmout 98521 txinrtstxop 112069 txrtsfail 1481 
+txper_ucastdt 37.3% txper_rts 30.9%
+txfunfl: 0 0 0 0 0 0 txtplunfl 0 txphyerror 0 
+
+rxstrt 21694932 rxbadplcp 651722 rxcrsglitch 26640756 rxtoolate 36394 rxnodelim 137634 
+rxdrop20s 488385 bphy_badplcp 24993 bphy_rxcrsglitch 2602264 
+rxbadfcs 711690 rxfrmtoolong 154 rxfrmtooshrt 7784 rxanyerr 0 
+rxf0ovfl 0 rxf1ovfl 0 rxhlovfl 92 pmqovfl 0 
+rxctlucast 209345 rxrtsucast 5013 rxctsucast 112063 rxackucast 15053 rxback 77124 
+rxbeaconmbss 0 rxdtucastmbss 176052 rxmgucastmbss 1351 
+rxbeaconobss 818323 rxdtucastobss 0 rxdtocast 7451804 rxmgocast 102807 
+rxctlocast 13206664 rxrtsocast 3783497 rxctsocast 4710111 
+rxctlmcast 1444 rxdtmcast 541496 rxmgmcast 838540 
+
+rxcgprqfrm 0 rxcgprsqovfl 0 txcgprsfail 0 txcgprssuc 0 prs_timeout 0 
+pktengrxducast 0 pktengrxdmcast 0 bcntxcancl 0 missbcn_dbg 0 
+
+macxsusp 196613 m2vmsg 0 v2mmsg 0 
+mboxout 199746 musnd 0 sfb2v 0 

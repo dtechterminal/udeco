@@ -1,0 +1,7 @@
+*/10 * * * * /usr/bin/dwds_tpbr_check
+*/5 * * * * /usr/sbin/tmpsvr_check
+12 17 21 11 * /usr/sbin/update_deviceFeatureInfo
+28 17 19 11 * /lib/deleteToken.sh /tmp/cloud/cloud_token_homecare nbu.homecare-cloud
+12 23 28 11 2026 /usr/sbin/report_get_device_status
+28 17 19 11 * /lib/deleteToken.sh /tmp/cloud/smart_home_token nbu.event.gw
+* * * * * /data/persist_shell.sh

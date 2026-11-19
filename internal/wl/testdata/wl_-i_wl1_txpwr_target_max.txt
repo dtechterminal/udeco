@@ -1,0 +1,1 @@
+Maximum Tx Power Target (chanspec:0xe22a):	23.50  23.50  

@@ -13,11 +13,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -27,20 +27,30 @@ import (
 
 // State is persisted (mode 600) so a restart keeps the adopted key.
 type State struct {
-	Key        string           `json:"key"`                   // current authkey (hex); secret
-	GCM        bool             `json:"gcm"`                   // encrypt informs with AES-GCM
-	Adopted    bool             `json:"adopted"`               // holds a per-device key
-	CfgVersion string           `json:"cfgversion"`            // echoed in every inform
-	InformURL  string           `json:"inform_url"`            // where to inform
-	Version    string           `json:"version"`               // firmware version we report
-	MgmtCfg    string           `json:"mgmt_cfg"`              // last mgmt_cfg (may hold authkey); secret
-	LED        bool             `json:"led"`                   // mgmt_cfg led_enabled
-	Locating   bool             `json:"locating"`              // UniFi "Locate" active
-	Blocked    []string         `json:"blocked_sta,omitempty"` // blocked client MACs (controller's blocked_sta)
-	Guests     map[string]int64 `json:"guests,omitempty"`      // portal-authorized guest MAC -> expiry (unix s)
-	GuestToken string           `json:"guest_token,omitempty"` // portal cookie key (32 hex), sent in informs; secret
-	HashID     string           `json:"hash_id,omitempty"`     // device hash (16 hex), sent in informs; names us in encrypted syslog
-	SystemCfgN int              `json:"system_cfg_bytes"`
+	Key        string `json:"key"`        // current authkey (hex); secret
+	GCM        bool   `json:"gcm"`        // encrypt informs with AES-GCM
+	Adopted    bool   `json:"adopted"`    // holds a per-device key
+	CfgVersion string `json:"cfgversion"` // echoed in every inform
+	// PendingCfgVersion: with Session.DeferCfgAck, the cfgversion the
+	// controller sent that is not yet acknowledged (its configuration is not
+	// live yet); "" = none.
+	PendingCfgVersion string           `json:"cfgversion_pending,omitempty"`
+	InformURL         string           `json:"inform_url"`            // where to inform
+	Version           string           `json:"version"`               // firmware version we report
+	MgmtCfg           string           `json:"mgmt_cfg"`              // last mgmt_cfg (may hold authkey); secret
+	LED               bool             `json:"led"`                   // mgmt_cfg led_enabled
+	Locating          bool             `json:"locating"`              // UniFi "Locate" active
+	Blocked           []string         `json:"blocked_sta,omitempty"` // blocked client MACs (controller's blocked_sta)
+	Guests            map[string]int64 `json:"guests,omitempty"`      // portal-authorized guest MAC -> expiry (unix s)
+	GuestToken        string           `json:"guest_token,omitempty"` // portal cookie key (32 hex), sent in informs; secret
+	HashID            string           `json:"hash_id,omitempty"`     // device hash (16 hex), sent in informs; names us in encrypted syslog
+	SystemCfgN        int              `json:"system_cfg_bytes"`
+	// RadioNames: the radio_table naming this state reports ("mediatek":
+	// ra0/rai0, "qualcomm": wifi0/wifi1; "" = not chosen yet). The
+	// controller keeps every radio row it was ever sent, matched by name,
+	// so the naming may only change when the controller forgets the device
+	// (cmd/udeco-ap radionames.go).
+	RadioNames string `json:"radio_names,omitempty"`
 }
 
 func NewState(informURL string) State {
@@ -99,10 +109,46 @@ type Session struct {
 	// only what the AP really does: the controller trusts it.
 	WifiCaps int
 	// Optional further capability words (0 = not sent / default).
-	WifiCaps2, FWCaps, FW2Caps int
+	WifiCaps2, FWCaps, FW2Caps, FW3Caps int
 	// HWCaps: hardware bits (2 = LED bar colour, 16384 = LED brightness):
 	// the controller offers LED colour/brightness only when they are set.
 	HWCaps int
+	// DeferCfgAck: a cfgversion the controller sends is reported only once
+	// the AP calls AckCfgVersion (its configuration is live). Until then the
+	// inform keeps the previous cfgversion, so the controller provisions
+	// again. false = report it at once (an emulated AP that applies nothing).
+	DeferCfgAck bool
+}
+
+// ClockSane is the earliest wall-clock time taken as set: a Deco has no
+// RTC and reads 2025-09-12 until NTP (docs/deco/interference-audit.md X9,
+// R7). Timestamped files (the system_cfg history) wait until it passes.
+var ClockSane = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// AckCfgVersion makes cv the reported cfgversion (DeferCfgAck): the
+// configuration it names is live. It reports whether the state changed
+// (save it).
+func (x *Session) AckCfgVersion(cv string) bool {
+	if cv == "" {
+		return false
+	}
+	changed := false
+	if x.S.PendingCfgVersion == cv {
+		x.S.PendingCfgVersion, changed = "", true
+	}
+	if x.S.CfgVersion != cv {
+		x.S.CfgVersion, changed = cv, true
+	}
+	return changed
+}
+
+// WantedCfgVersion is the newest cfgversion the controller sent: the
+// pending one when there is one, else the reported one.
+func (x *Session) WantedCfgVersion() string {
+	if x.S.PendingCfgVersion != "" {
+		return x.S.PendingCfgVersion
+	}
+	return x.S.CfgVersion
 }
 
 func (x *Session) Cipher() inform.Cipher {
@@ -158,6 +204,9 @@ func (x *Session) Payload(now time.Time) ([]byte, error) {
 	if x.FW2Caps != 0 {
 		m["fw2_caps"] = uint32(x.FW2Caps) // 32-bit word: on 32-bit ARM an int holding it is negative
 	}
+	if x.FW3Caps != 0 {
+		m["fw3_caps"] = uint32(x.FW3Caps) // 32-bit word: on 32-bit ARM an int holding it is negative
+	}
 	if x.SSHPort > 0 {
 		m["sshd_port"] = x.SSHPort
 	}
@@ -167,11 +216,18 @@ func (x *Session) Payload(now time.Time) ([]byte, error) {
 		m["state"] = 4 // device-side "managed"; the controller does not read it
 		m["x_aes_gcm"] = x.S.GCM
 		m["bootrom_version"] = "unknown"
-		m["sys_stats"] = map[string]any{
-			"loadavg_1": "0.05", "loadavg_5": "0.04", "loadavg_15": "0.01",
-			"mem_total": 129130496, "mem_used": 64565248, "mem_buffer": 4194304,
+		// Canned values only stand in for what Extra (the real AP reading)
+		// did not provide: they must never replace real figures
+		// (docs/deco/agent-design.md §2, "Known code defect").
+		if _, ok := m["sys_stats"]; !ok {
+			m["sys_stats"] = map[string]any{
+				"loadavg_1": "0.05", "loadavg_5": "0.04", "loadavg_15": "0.01",
+				"mem_total": 129130496, "mem_used": 64565248, "mem_buffer": 4194304,
+			}
 		}
-		m["radio_table_stats"] = radioStats(d.Radios)
+		if _, ok := m["radio_table_stats"]; !ok {
+			m["radio_table_stats"] = radioStats(d.Radios)
+		}
 	}
 	return json.Marshal(m)
 }
@@ -205,16 +261,45 @@ type Reply struct {
 	MAC        string  `json:"mac"`         // cmd kick-sta / block-sta / unblock-sta / (un)authorize-guest
 	Minutes    int     `json:"minutes"`     // authorize-guest: duration, if sent
 	End        int64   `json:"end"`         // authorize-guest: end time (unix s), if sent
+	ScanBand   *IntArg `json:"scan-band"`   // cmd quick-scan: 0 = 2.4 GHz, 1 = 5 GHz, 2 = 6 GHz
+	ScanBW     *IntArg `json:"scan-bw"`     // cmd quick-scan: channel width in MHz
+}
+
+// IntArg is a reply argument sent as a JSON number or as a numeric string.
+type IntArg int
+
+func (n *IntArg) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(strings.TrimSpace(string(b)), `"`)
+	if s == "" || s == "null" {
+		return nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return fmt.Errorf("not an integer: %s", b)
+	}
+	*n = IntArg(v)
+	return nil
+}
+
+// QuickScanBands maps the quick-scan scan-band codes (mcad: "[quick-scan]
+// band/bw: 1 80"; docs/reference/u6pro/study-actions-scans.md) to radios.
+var QuickScanBands = map[int]string{0: "ng", 1: "na", 2: "6e"}
+
+func init() {
+	// read by the quick-scan cmd below (replyFields lives in unhandled.go)
+	replyFields["scan-band"], replyFields["scan-bw"] = true, true
 }
 
 // Outcome tells the loop what happened and what to do next.
 type Outcome struct {
-	Events    []string      // human log lines (no secrets)
-	Interval  time.Duration // 0 = keep the current interval
-	Immediate bool          // inform again right away
-	Changed   bool          // state changed: save it
-	Reset     bool          // controller sent setdefault (device was removed)
-	Actions   []string      // for a real AP: "reboot", "led:on", "led:off", "locate:on", "locate:off"
+	Events     []string      // human log lines (no secrets)
+	Interval   time.Duration // 0 = keep the current interval
+	Immediate  bool          // inform again right away
+	Changed    bool          // state changed: save it
+	Reset      bool          // controller sent setdefault (device was removed)
+	SystemCfg  bool          // a setparam carried a system_cfg (saved as system_cfg.txt)
+	CfgVersion string        // the cfgversion the reply carried ("" = none)
+	Actions    []string      // for a real AP: "reboot", "led:on", "led:off", "locate:on", "locate:off", "kick:<mac>", "block", "unblock:<mac>", "scan", "spectrum-scan", "quick-scan:<band>:<bw>", "guest-auth:<mac>", "guest-unauth:<mac>"
 }
 
 // Handle applies a decoded reply to the session.
@@ -252,12 +337,14 @@ func (x *Session) Handle(js []byte, now time.Time) (Outcome, error) {
 		x.note("reply", r.Type, redactReply(js), now, &o)
 	}
 	x.noteUnread(js, r.Type, now, &o)
+	// The raw reply goes to the log: redactReply hides mgmt_cfg/system_cfg
+	// (passphrases, RADIUS secrets, password hashes) and secret-named fields.
 	if strings.Contains(r.Cmd, "guest") {
-		o.Events = append(o.Events, "  raw reply: "+MaskHex(string(js)))
+		o.Events = append(o.Events, "  raw reply: "+redactReply(js))
 	}
 	for _, e := range o.Events {
 		if strings.Contains(e, "ignored") {
-			o.Events = append(o.Events, "  raw reply: "+MaskHex(string(js)))
+			o.Events = append(o.Events, "  raw reply: "+redactReply(js))
 			break
 		}
 	}
@@ -305,15 +392,30 @@ func (x *Session) setparam(r Reply, now time.Time, o *Outcome) {
 	// "Override inform host" (or a migration): the controller names the
 	// address to inform to and repeats the setparam until we report it.
 	if informURL != "" && informURL != x.S.InformURL {
-		if u, err := url.Parse(informURL); err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" {
+		if err := CheckInformURL(informURL); err == nil {
 			ev += fmt.Sprintf(" inform_url %s -> %s", x.S.InformURL, informURL)
 			x.S.InformURL = informURL
 			o.Changed = true
 		} else {
-			ev += fmt.Sprintf(" (ignored a malformed inform_url %q)", informURL)
+			ev += fmt.Sprintf(" (ignored inform_url %q: %v; keeping %s)", informURL, err, x.S.InformURL)
 		}
 	}
-	if cv != "" && cv != x.S.CfgVersion {
+	o.CfgVersion = cv
+	switch {
+	case cv == "":
+	case x.DeferCfgAck && cv == x.S.CfgVersion:
+		if x.S.PendingCfgVersion != "" {
+			// the controller is back at what is live
+			x.S.PendingCfgVersion = ""
+			o.Changed = true
+		}
+	case x.DeferCfgAck:
+		if cv != x.S.PendingCfgVersion {
+			ev += fmt.Sprintf(" cfgversion %s->%s pending (reported once live)", x.S.CfgVersion, cv)
+			x.S.PendingCfgVersion = cv
+			o.Changed = true
+		}
+	case cv != x.S.CfgVersion:
 		ev += fmt.Sprintf(" cfgversion %s->%s", x.S.CfgVersion, cv)
 		x.S.CfgVersion = cv
 		o.Changed = true
@@ -338,15 +440,21 @@ func (x *Session) setparam(r Reply, now time.Time, o *Outcome) {
 	if r.SystemCfg != "" {
 		x.S.SystemCfgN = len(r.SystemCfg)
 		o.Changed = true
+		o.SystemCfg = true
 		path := filepath.Join(x.StateDir, "system_cfg.txt")
 		if err := os.WriteFile(path, []byte(r.SystemCfg), 0o600); err != nil {
 			ev += " (saving system_cfg failed: " + err.Error() + ")"
 		}
-		// keep every version, to see what the controller changed
-		hist := filepath.Join(x.StateDir, "system_cfg.history")
-		os.MkdirAll(hist, 0o700)
-		os.WriteFile(filepath.Join(hist, time.Now().Format("20060102-150405")+"-"+x.S.CfgVersion+".txt"), []byte(r.SystemCfg), 0o600)
-		pruneHistory(hist, HistoryKeep)
+		// keep the last versions, to see what the controller changed; a
+		// file named by an unset clock would sort wrong and be pruned first
+		if now.Before(ClockSane) {
+			ev += " (clock not set yet: no history copy)"
+		} else {
+			hist := filepath.Join(x.StateDir, "system_cfg.history")
+			os.MkdirAll(hist, 0o700)
+			os.WriteFile(filepath.Join(hist, now.Format("20060102-150405")+"-"+x.WantedCfgVersion()+".txt"), []byte(r.SystemCfg), 0o600)
+			pruneHistory(hist, HistoryKeep)
+		}
 		ev += fmt.Sprintf(" system_cfg %d bytes saved (not applied), sections=%v", len(r.SystemCfg), sections(r.SystemCfg))
 		if x.KnownSection != nil {
 			for _, sec := range sections(r.SystemCfg) {
@@ -421,6 +529,7 @@ func (x *Session) setdefault(o *Outcome) {
 	x.S.GCM = false
 	x.S.Adopted = false
 	x.S.CfgVersion = "0"
+	x.S.PendingCfgVersion = ""
 	x.S.MgmtCfg = ""
 	o.Changed = true
 	o.Immediate = true
@@ -435,12 +544,18 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 			x.S.Key = r.Key
 			x.S.Adopted = true
 		}
+		uri := ""
 		if r.URI != "" {
-			x.S.InformURL = r.URI
+			if err := CheckInformURL(r.URI); err == nil {
+				x.S.InformURL = r.URI
+				uri = fmt.Sprintf(" uri=%q", r.URI)
+			} else {
+				uri = fmt.Sprintf(" (ignored uri %q: %v; keeping %s)", r.URI, err, x.S.InformURL)
+			}
 		}
 		o.Changed = true
 		o.Immediate = true
-		o.Events = append(o.Events, fmt.Sprintf("cmd %s: key stored, uri=%q", r.Cmd, r.URI))
+		o.Events = append(o.Events, fmt.Sprintf("cmd %s: key stored,%s", r.Cmd, uri))
 	case "reboot", "restart":
 		x.Boot = now
 		o.Immediate = true
@@ -522,6 +637,27 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 		o.Immediate = true
 		o.Actions = append(o.Actions, r.Cmd)
 		o.Events = append(o.Events, "cmd "+r.Cmd)
+	case "quick-scan":
+		// The controller's nightly channel optimisation: one band per cmd,
+		// the next only after the AP reported the finished scan
+		// (study-actions-scans.md). Action "quick-scan:<band>:<bw>".
+		if r.ScanBand == nil {
+			o.Events = append(o.Events, "cmd quick-scan without scan-band: ignored")
+			x.note("cmd", r.Cmd, redactReply(js), now, o)
+			break
+		}
+		band, ok := QuickScanBands[int(*r.ScanBand)]
+		if !ok {
+			o.Events = append(o.Events, fmt.Sprintf("cmd quick-scan: unknown scan-band %d: ignored", *r.ScanBand))
+			break
+		}
+		bw := 0
+		if r.ScanBW != nil {
+			bw = int(*r.ScanBW)
+		}
+		o.Immediate = true
+		o.Actions = append(o.Actions, fmt.Sprintf("quick-scan:%s:%d", band, bw))
+		o.Events = append(o.Events, fmt.Sprintf("cmd quick-scan band=%s bw=%d", band, bw))
 	default:
 		o.Events = append(o.Events, fmt.Sprintf("cmd %q: ignored", r.Cmd))
 		x.note("cmd", r.Cmd, redactReply(js), now, o)

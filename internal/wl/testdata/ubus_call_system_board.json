@@ -1,0 +1,14 @@
+{
+	"kernel": "4.1.52",
+	"hostname": "X20",
+	"system": "ARMv7 Processor rev 5 (v7l)",
+	"model": "Broadcom BCM947622",
+	"release": {
+		"distribution": "OpenWrt",
+		"version": "Attitude Adjustment",
+		"revision": "unknown",
+		"codename": "attitude_adjustment",
+		"target": "model_bcm_bcm675x\/generic",
+		"description": "OpenWrt Attitude Adjustment 12.09-rc1"
+	}
+}

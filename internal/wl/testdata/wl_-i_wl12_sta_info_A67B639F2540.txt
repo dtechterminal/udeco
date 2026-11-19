@@ -1,0 +1,63 @@
+[VER 8] STA A6:7B:63:9F:25:40:
+	 chanspec 44/80 (0xe22a)
+	 aid:9 
+	 rateset [ 6 9 12 18 24 36 48 54 ]
+	 idle 0 seconds
+	 in network 575 seconds
+	 state: AUTHENTICATED ASSOCIATED AUTHORIZED
+	 connection: SECURED
+	 auth: WPA3-SAE
+	 crypto: AES_CCM
+	 flags 0x1d1e03b: BRCM WME N_CAP VHT_CAP HE_CAP AMPDU AMSDU GBL_RCLASS DWDS_CAP
+	 HT caps 0x6f: LDPC 40MHz SGI20 SGI40
+	 VHT caps 0x43: LDPC SGI80 SU-BFE
+	 HE caps 0xf629: LDPC HE-HTC SU&MU-BFE
+	 OMI 0x0051: 80Mhz rx=2ss tx=2ss 
+	 tx total pkts: 235857
+	 tx total bytes: 37305721
+	 tx ucast pkts: 1141
+	 tx ucast bytes: 308711
+	 tx mcast/bcast pkts: 234716
+	 tx mcast/bcast bytes: 36997010
+	 tx failures: 2
+	 rx data pkts: 2468
+	 rx data bytes: 235271
+	 rx data dur: 0
+	 rx ucast pkts: 2464
+	 rx ucast bytes: 234719
+	 rx mcast/bcast pkts: 4
+	 rx mcast/bcast bytes: 552
+	 rate of last tx pkt: 408330 kbps - 204160 kbps
+	 rate of last rx pkt: 288230 kbps
+	 rx decrypt succeeds: 868
+	 rx decrypt failures: 0
+	 tx data pkts retried: 16
+	 per antenna rssi of last rx data frame: -78 -76 0 0
+	 per antenna average rssi of rx data frames: -73 -70 0 0
+	 per antenna noise floor: -96 -97 0 0
+	 tx total pkts sent: 1343
+	 tx pkts retries: 398
+	 tx pkts retry exhausted: 2
+	 tx FW total pkts sent: 0
+	 tx FW pkts retries: 0
+	 tx FW pkts retry exhausted: 0
+	 rx total pkts retried: 221
+MCS SET : [ 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 ]
+VHT SET : 0x1 1x1 2x1 3x1 4x1 5x1 6x1 7x1 8x1 9x1 10x1 11x1 
+        : 0x2 1x2 2x2 3x2 4x2 5x2 6x2 7x2 8x2 9x2 10x2 11x2 
+HE SET  :
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+smoothed rssi: -70
+tx nrate
+he mcs 8 Nss 1 Tx Exp 1 bw80 ldpc 2xLTF GI 1.6us auto
+rx nrate
+he mcs 3 Nss 2 Tx Exp 0 bw80 ldpc 2xLTF GI 0.8us auto
+wnm
+0x1:  BSS-Transition
+VENDOR OUI VALUE[0] 00:90:4C 
+VENDOR OUI VALUE[1] 00:10:18 
+VENDOR OUI VALUE[2] 00:50:F2 
+link bandwidth = 80 MHZ 
+RRM capability = 0x10873  Link_Measurement Neighbor_Report Beacon_Passive Beacon_Active Beacon_Table Statistics_Measurement AP_Channel_Report

@@ -1,0 +1,2 @@
+autho_sta_list 3A:C1:26:FB:CE:2C
+autho_sta_list F0:77:C3:A6:6F:30

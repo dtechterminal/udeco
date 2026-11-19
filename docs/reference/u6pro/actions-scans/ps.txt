@@ -1,0 +1,147 @@
+  PID USER       VSZ STAT COMMAND
+    1 3r4FNrkS  1176 S    /sbin/procd
+    2 3r4FNrkS     0 SW   [kthreadd]
+    3 3r4FNrkS     0 IW<  [rcu_gp]
+    4 3r4FNrkS     0 IW<  [rcu_par_gp]
+    8 3r4FNrkS     0 IW<  [mm_percpu_wq]
+    9 3r4FNrkS     0 SW   [ksoftirqd/0]
+   10 3r4FNrkS     0 IW   [rcu_preempt]
+   11 3r4FNrkS     0 SW   [migration/0]
+   12 3r4FNrkS     0 SW   [cpuhp/0]
+   13 3r4FNrkS     0 SW   [cpuhp/1]
+   14 3r4FNrkS     0 SW   [migration/1]
+   15 3r4FNrkS     0 SW   [ksoftirqd/1]
+   18 3r4FNrkS     0 IW<  [netns]
+   19 3r4FNrkS     0 SW   [rcu_tasks_kthre]
+   21 3r4FNrkS     0 SW   [oom_reaper]
+   22 3r4FNrkS     0 IW<  [writeback]
+   23 3r4FNrkS     0 SW   [kcompactd0]
+   34 3r4FNrkS     0 IW<  [cryptd]
+   57 3r4FNrkS     0 IW<  [kblockd]
+   58 3r4FNrkS     0 IW<  [blkcg_punt_bio]
+   59 3r4FNrkS     0 IW<  [kworker/u5:0-mh]
+   60 3r4FNrkS     0 SW   [watchdogd]
+   61 3r4FNrkS     0 IW   [kworker/1:1-eve]
+   73 3r4FNrkS     0 SW   [kswapd0]
+   75 3r4FNrkS     0 IW<  [kthrotld]
+   76 3r4FNrkS     0 SW   [irq/36-pcie-glo]
+   77 3r4FNrkS     0 SW   [irq/90-smp2p]
+   78 3r4FNrkS     0 SW   [hwrng]
+   81 3r4FNrkS     0 IW<  [nvme-wq]
+   82 3r4FNrkS     0 IW<  [nvme-reset-wq]
+   83 3r4FNrkS     0 IW<  [nvme-delete-wq]
+   84 3r4FNrkS     0 SW   [spi0]
+  105 3r4FNrkS     0 SW   [irq/28-7804000.]
+  106 3r4FNrkS     0 IW<  [sdhci]
+  107 3r4FNrkS     0 SW   [irq/27-mmc0]
+  108 3r4FNrkS     0 SW   [irq/37-q6v5 wdo]
+  110 3r4FNrkS     0 IW<  [ipv6_addrconf]
+  111 3r4FNrkS     0 IW<  [dsa_ordered]
+  112 3r4FNrkS     0 IW<  [mmc_complete]
+  116 3r4FNrkS     0 IW<  [ata_sff]
+  176 3r4FNrkS     0 SW   [jbd2/mmcblk0p5-]
+  177 3r4FNrkS     0 IW<  [ext4-rsv-conver]
+  337 3r4FNrkS     0 IW<  [kworker/1:2H]
+  467 3r4FNrkS   972 S    /sbin/ubusd
+  468 3r4FNrkS   976 S    /sbin/logd
+  469 3r4FNrkS  4180 S    /sbin/logread -f -F /var/log/messages -S 20240 -p /var/run/logread.local.pid
+  470 3r4FNrkS  7252 S    /usr/bin/reset-handler
+  594 3r4FNrkS     0 IW<  [nss_data_plane_]
+  595 3r4FNrkS     0 IW<  [nss_freq_queue]
+  596 3r4FNrkS     0 IW<  [coredump_wait]
+  605 3r4FNrkS     0 IW<  [nss_gre_redir_l]
+  627 3r4FNrkS     0 IW<  [cfg80211]
+  628 3r4FNrkS     0 IW<  [bond0]
+  650 3r4FNrkS     0 IW<  [cryptodev_queue]
+  657 3r4FNrkS     0 IW<  [diag_real_time_]
+  658 3r4FNrkS     0 IW<  [diag_wq]
+  659 3r4FNrkS     0 IW<  [diag_cntl_wq]
+  661 3r4FNrkS     0 IW<  [diag_dci_wq]
+  662 3r4FNrkS     0 IW<  [WCNSS_CNTL]
+  663 3r4FNrkS     0 IW<  [WCNSS_DATA]
+  664 3r4FNrkS     0 IW<  [WCNSS_CMD]
+  665 3r4FNrkS     0 IW<  [WCNSS_DCI]
+  667 3r4FNrkS     0 IW<  [WCNSS_DCI_CMD]
+  668 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  669 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  670 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  671 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  672 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  676 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  677 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  678 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  680 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  681 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  682 3r4FNrkS     0 IW<  [DIAG_RPMSG_APPS]
+  683 3r4FNrkS     0 IW<  [DIAG_RPMSG_APPS]
+  684 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  685 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  686 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  687 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  688 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  689 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  690 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  691 3r4FNrkS     0 IW<  [DIAG_RPMSG_DIAG]
+  692 3r4FNrkS     0 IW<  [diag_mhi_MDM]
+  694 3r4FNrkS     0 IW<  [diag_mhi_MDM_DC]
+  695 3r4FNrkS     0 IW<  [diag_dci_MDM_DC]
+  696 3r4FNrkS     0 IW<  [diag_mhi_MDM_2]
+  697 3r4FNrkS     0 IW<  [diag_mhi_MDM_DC]
+  698 3r4FNrkS     0 IW<  [diag_dci_MDM_DC]
+  705 3r4FNrkS     0 IW<  [nss_qdisc_stats]
+  778 3r4FNrkS     0 SW<  [krfcommd]
+ 1366 3r4FNrkS  1208 S    /usr/bin/cnssdaemon -s
+ 1380 3r4FNrkS     0 SW   [kworker/u4:3+WC]
+ 1473 3r4FNrkS     0 SW   [wlan_logging_th]
+ 1475 3r4FNrkS     0 SW<  [scheduler_threa]
+ 1485 3r4FNrkS     0 SW   [qrtr_rx]
+ 1487 3r4FNrkS     0 IW<  [peer_stats_wq]
+ 1582 3r4FNrkS     0 SW   [irq/110-bhi]
+ 1583 3r4FNrkS     0 IW<  [kworker/u5:1]
+ 1596 3r4FNrkS     0 SW   [qrtr_rx]
+ 1748 3r4FNrkS 11036 S    /sbin/ubntevent
+ 1760 3r4FNrkS 11484 S    /sbin/sysmon
+ 1761 3r4FNrkS  4304 S    /sbin/logread -f -u -r 192.168.1.1 5514 -p /var/run/logread.remote.pid -h U6Pro -E ***REDACTED***
+ 1763 3r4FNrkS 10992 S    /sbin/autotxpow -v
+ 3084 3r4FNrkS     0 IW   [kworker/0:0-eve]
+ 3473 3r4FNrkS 11028 S    /sbin/wevent
+ 3474 3r4FNrkS 11008 S    /sbin/stahtd
+ 3475 3r4FNrkS  1356 S    diag_lite_log -r0 -l
+ 3476 3r4FNrkS  1356 S    diag_lite_log -r1 -l
+ 3477 3r4FNrkS  1164 S    /usr/sbin/mcsd -d -C /etc/mcsd.conf
+ 3492 3r4FNrkS  1356 S    /sbin/udhcpc -i br0 -f -S -p /var/run/udhcpc.br0.pid -t 10 -T 1 -A 2 -V ubnt -s /etc/udhcpc/udhcpc -x hos
+ 3504 3r4FNrkS 10772 S    hostapd -s -g /var/run/hostapd/global -P /var/run/hostapd/global.pid
+ 3524 3r4FNrkS  1420 S    /usr/sbin/lldpd -d -M4 -O /etc/lldpd.conf
+ 3526 3r4FNrkS  6812 S    /usr/sbin/upathmond
+ 3529 3r4FNrkS  7704 S    /usr/bin/mcad
+ 3530 3r4FNrkS  7272 S    /usr/bin/mca-monitor
+ 3535 3r4FNrkS 11012 S    /sbin/utermd -C /var/run/utermd_cert.pem -K /var/run/utermd_key.pem
+ 3660 3r4FNrkS     0 IW<  [bt_ipc]
+ 3661 3r4FNrkS     0 SW   [irq/99-bt_ipc_i]
+ 3792 3r4FNrkS  1376 S    {uanywhere-launc} /bin/sh /usr/sbin/uanywhere-launcher.sh unifi-anywhere /usr/share/unifi-anywhere/unifi-
+ 3951 3r4FNrkS  2320 S    ip monitor route
+ 3952 3r4FNrkS  1356 S    cat /tmp/uanywhere-launcher.sh-tmp.XXXXgojaGO/buff
+ 3953 3r4FNrkS  1376 S    {uanywhere-launc} /bin/sh /usr/sbin/uanywhere-launcher.sh unifi-anywhere /usr/share/unifi-anywhere/unifi-
+ 4139 3r4FNrkS  1356 S<   /usr/sbin/ntpd -nN -p 0.ubnt.pool.ntp.org -p 1.ubnt.pool.ntp.org -p 2.ubnt.pool.ntp.org -p 3.ubnt.pool.nt
+ 4190 3r4FNrkS  7344 S    /usr/bin/uplink-monitor -p
+ 4346 3r4FNrkS     0 SW   [ECM_wifi_event]
+ 4361 3r4FNrkS     0 IW<  [ecm_nss_ipv4_wo]
+ 4382 3r4FNrkS     0 IW<  [ecm_nss_ipv6_wo]
+ 4474 3r4FNrkS  6576 S    /usr/sbin/bleconnd --syslog /etc/persistent/cfg/bleconn.json
+ 4779 3r4FNrkS  9284 S    /usr/sbin/blebr2d --syslog /etc/persistent/cfg/blebr2.json
+ 4932 3r4FNrkS   772 S    /sbin/askfirst /bin/login
+ 5382 3r4FNrkS 10368 S    /usr/sbin/blebrd --syslog /etc/persistent/cfg/blebr.json
+ 6083 3r4FNrkS     0 IW   [kworker/1:2]
+ 7310 3r4FNrkS     0 DW   [kworker/u4:2+ec]
+ 8015 3r4FNrkS     0 IW   [kworker/u4:0-wm]
+ 8733 3r4FNrkS     0 IW<  [kworker/0:1H]
+ 9989 3r4FNrkS     0 DW   [kworker/u4:4+ec]
+13701 3r4FNrkS     0 IW   [kworker/u4:1-wm]
+14265 3r4FNrkS     0 IW   [kworker/0:2-eve]
+14662 3r4FNrkS  1356 S    {vap_check.sh} /bin/sh /bin/vap_check.sh
+14663 3r4FNrkS  1356 S    sleep 780
+14691 3r4FNrkS  1080 S    /usr/sbin/dropbear -F -r /var/run/dropbear_rsa_host_key -r /var/run/dropbear_ed25519_host_key -p 22 -l br
+15422 3r4FNrkS  1100 S    /usr/sbin/dropbear -F -r /var/run/dropbear_rsa_host_key -r /var/run/dropbear_ed25519_host_key -p 22 -l br
+15423 3r4FNrkS  1364 R    ps w
+20080 3r4FNrkS     0 IW<  [kworker/1:1H-ev]
+24280 3r4FNrkS     0 IW<  [kworker/0:2H-ev]

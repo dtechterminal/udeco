@@ -6,3 +6,14 @@ dist/
 *.unf
 .secrets
 *.pass
+
+# Local builds of the commands
+/udeco-ap
+/cmd/udeco/udeco
+/cmd/udeco-ap/udeco-ap
+
+# Ubiquiti's own binaries from the U6 Pro capture (proprietary; the text
+# captures and the studies stay)
+/docs/reference/u6pro/actions-scans/fw/bin/
+/docs/reference/u6pro/actions-scans/fw/usr/bin/
+/docs/reference/u6pro/actions-scans/fw/usr/sbin/

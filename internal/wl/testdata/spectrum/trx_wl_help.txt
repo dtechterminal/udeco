@@ -1,0 +1,31 @@
+TAG trx_wl_help: wl -h sections for phy_rxiqest and phy_rxiqest_sweep (live on .205)
+phy_rxiqest
+	Get phy RX IQ noise in dBm:
+	-s # of samples (2^n)
+	-a antenna select, 0,1,2 or 3
+	-r resolution select, 0 (coarse) or 1 (fine)
+	-f lpf hpc override select, 0 (hpc unchanged) or 1 (overridden to ltrn mode)
+	-w dig lpf override select, 0 (lpf unchanged) or 1 (overridden to ltrn_lpf mode)	 or 2 (bypass)
+	-g gain-correction select, 0 (disable), 1(enable full correction) 
+		2 (enable temperature correction) or 3(verify rssi_gain_delta)
+	-e extra INITgain in dB on top of default. Valid values = {0, 3, 6, .., 21, 24}
+	-i gain mode select, 0 (default gain), 1 (fixed high gain) or 4 (fixed low gain).	-n number of averaging iterations.
+	-d delay in usecs between iterations - default 10usecs.
+
+
+phy_rxiqest_sweep
+	Get phy RX IQ noise in dBm for requested channels:
+	-c
+		all - All channels		comma separated list of channels (e.g. 1,2,4,136)	-s # of samples (2^n)
+	-a antenna select, 0,1 or 3
+	-r resolution select, 0 (coarse) or 1 (fine)
+	-f lpf hpc override select, 0 (hpc unchanged) or 1 (overridden to ltrn mode)
+	-w dig lpf override select, 0 (lpf unchanged) or 1 (overridden to ltrn_lpf mode)	 or 2 (bypass)
+	-g gain-correction select, 0 (disable), 1(enable full correction) 
+	     2 (enable temperature correction) or 3(verify rssi_gain_delta)
+	-e extra INITgain in dB on top of default. Valid values = {0, 3, 6, .., 21, 24}
+	-i gain mode select, 0 (default gain), 1 (fixed high gain) or 4 (fixed low gain). 
+	-n number of averaging iterations. Max 5 iterations for a sweep of 10 channels or more
+	-d delay in usecs between iterations - default 10usecs.
+
+

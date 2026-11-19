@@ -1,0 +1,148 @@
+{
+  "spectrum_table": [
+    {
+      "channel": 1,
+      "width": 20,
+      "center_freq": 2412,
+      "total_samples": 0,
+      "interference": -52,
+      "utilization": 38,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 2,
+      "width": 20,
+      "center_freq": 2417,
+      "total_samples": 0,
+      "interference": -52,
+      "utilization": 34,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 3,
+      "width": 20,
+      "center_freq": 2422,
+      "total_samples": 0,
+      "interference": -52,
+      "utilization": 30,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 4,
+      "width": 20,
+      "center_freq": 2427,
+      "total_samples": 0,
+      "interference": -64,
+      "utilization": 39,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 5,
+      "width": 20,
+      "center_freq": 2432,
+      "total_samples": 0,
+      "interference": -64,
+      "utilization": 39,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 6,
+      "width": 20,
+      "center_freq": 2437,
+      "total_samples": 0,
+      "interference": -53,
+      "utilization": 40,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 7,
+      "width": 20,
+      "center_freq": 2442,
+      "total_samples": 0,
+      "interference": -53,
+      "utilization": 26,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 8,
+      "width": 20,
+      "center_freq": 2447,
+      "total_samples": 0,
+      "interference": -53,
+      "utilization": 32,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 9,
+      "width": 20,
+      "center_freq": 2452,
+      "total_samples": 0,
+      "interference": -53,
+      "utilization": 35,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 10,
+      "width": 20,
+      "center_freq": 2457,
+      "total_samples": 0,
+      "interference": -50,
+      "utilization": 40,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 11,
+      "width": 20,
+      "center_freq": 2462,
+      "total_samples": 0,
+      "interference": -50,
+      "utilization": 45,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 12,
+      "width": 20,
+      "center_freq": 2467,
+      "total_samples": 0,
+      "interference": -50,
+      "utilization": 54,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    },
+    {
+      "channel": 13,
+      "width": 20,
+      "center_freq": 2472,
+      "total_samples": 0,
+      "interference": -57,
+      "utilization": 51,
+      "perf_index": 0,
+      "interference_type": [],
+      "other_bss_count": 0
+    }
+  ]
+}749298
+815849.55 1513283.39

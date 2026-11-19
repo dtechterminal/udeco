@@ -1,0 +1,4 @@
+authe_sta_list 8C:BF:EA:1D:BA:74
+authe_sta_list F8:17:2D:6A:16:CC
+authe_sta_list FC:3C:D7:CA:38:BB
+authe_sta_list F4:CF:A2:1E:72:64

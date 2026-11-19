@@ -1,0 +1,729 @@
+{
+	"access_client": {
+		
+	},
+	"app-classifier": {
+		
+	},
+	"app-dpi": {
+		
+	},
+	"app-qos": {
+		
+	},
+	"apsd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 11295,
+				"command": [
+					"\/usr\/bin\/apsd",
+					"-c",
+					"\/tmp\/apsd.json"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"awn": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 3025,
+				"command": [
+					"\/usr\/sbin\/awnd",
+					"-C",
+					"\/tmp\/auto-wifi-network.conf"
+				],
+				"respawn": {
+					"threshold": 120,
+					"timeout": 5,
+					"retry": 10
+				}
+			}
+		}
+	},
+	"blacklist": {
+		
+	},
+	"client_mgmt": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 8882,
+				"command": [
+					"\/usr\/bin\/client_mgmt"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			},
+			"instance2": {
+				"running": true,
+				"pid": 8883,
+				"command": [
+					"\/usr\/bin\/client_upload"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"cloud_account": {
+		
+	},
+	"cloud_brd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 11549,
+				"command": [
+					"\/usr\/bin\/cloud-brd",
+					"-c",
+					"\/etc\/cloud_config.cfg"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"cloud_proxy": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 9028,
+				"command": [
+					"\/usr\/bin\/cloud-proxy",
+					"-c",
+					"\/etc\/cloud_config.cfg"
+				]
+			}
+		}
+	},
+	"conn-indicator": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 7581,
+				"command": [
+					"\/usr\/sbin\/conn-indicator",
+					"-l",
+					"i"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"cron": {
+		"instances": {
+			"instance1": {
+				"running": false,
+				"command": [
+					"\/usr\/sbin\/crond",
+					"-f",
+					"-c",
+					"\/etc\/crontabs",
+					"-l",
+					"5"
+				]
+			}
+		}
+	},
+	"ddns": {
+		
+	},
+	"dropbear": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 2341,
+				"command": [
+					"\/usr\/sbin\/dropbear",
+					"-F",
+					"-P",
+					"\/var\/run\/dropbear.1.pid",
+					"-r",
+					"\/etc\/dropbear\/dropbear_ecdsa_host_key",
+					"-r",
+					"\/etc\/dropbear\/dropbear_rsa_2048_host_key",
+					"-p",
+					"20001",
+					"-K",
+					"300"
+				],
+				"data": {
+					"mdns": {
+						"ssh_20001": {
+							"service": "_ssh._tcp.local",
+							"port": 20001,
+							"txt": [
+								"daemon=dropbear"
+							]
+						}
+					}
+				}
+			}
+		}
+	},
+	"family_time": {
+		"instances": {
+			"instance1": {
+				"running": false,
+				"command": [
+					"echo",
+					"Family Time config trigger start!"
+				]
+			}
+		}
+	},
+	"guest-bandwidth": {
+		
+	},
+	"guest-schedule": {
+		
+	},
+	"guest_eth": {
+		
+	},
+	"improxy": {
+		"instances": {
+			"instance1": {
+				"running": false,
+				"command": [
+					"\/usr\/sbin\/improxy",
+					"-c",
+					"\/etc\/improxy.conf",
+					"-p",
+					"\/tmp\/improxy.pid"
+				]
+			}
+		}
+	},
+	"imsnoop": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 12201,
+				"command": [
+					"\/usr\/sbin\/imsnoop",
+					"-d",
+					"-C",
+					"\/tmp\/ims.conf"
+				],
+				"respawn": {
+					"threshold": 120,
+					"timeout": 5,
+					"retry": -1
+				}
+			}
+		}
+	},
+	"iot-netdev": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 8458,
+				"command": [
+					"\/usr\/bin\/iot-netdev"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"iot-tapo": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 8471,
+				"command": [
+					"\/usr\/bin\/iot-tapo"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"iot-tpra": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 8499,
+				"command": [
+					"\/usr\/bin\/iot-tpra"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"iot-wifi-center": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 8193,
+				"command": [
+					"\/usr\/bin\/iot-wifi-center"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"iot_network": {
+		
+	},
+	"iptrigger": {
+		
+	},
+	"iptv": {
+		
+	},
+	"ipv6-firewall": {
+		
+	},
+	"leds": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 2426,
+				"command": [
+					"\/usr\/bin\/leds",
+					"-l",
+					"i"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"leds_night_mode": {
+		
+	},
+	"log": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 2372,
+				"command": [
+					"\/sbin\/logd",
+					"-S",
+					"1024"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"msg_server": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 9856,
+				"command": [
+					"\/usr\/bin\/msg_server"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"msgcenter": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 12702,
+				"command": [
+					"\/usr\/bin\/msgcenterd"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"network": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 2604,
+				"command": [
+					"\/sbin\/netifd"
+				],
+				"respawn": {
+					"threshold": 600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"networkx": {
+		
+	},
+	"nrd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 13515,
+				"command": [
+					"\/usr\/sbin\/nrd",
+					"-d",
+					"-C",
+					"\/tmp\/nrd.conf",
+					"\/tmp\/nrd_link_pri.conf"
+				],
+				"respawn": {
+					"threshold": 600,
+					"timeout": 5,
+					"retry": 50
+				}
+			}
+		}
+	},
+	"parental_control": {
+		"instances": {
+			"instance1": {
+				"running": false,
+				"command": [
+					"echo",
+					"Parent Control config trigger start!"
+				]
+			}
+		}
+	},
+	"passthrough.init": {
+		
+	},
+	"philips-hue": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 11354,
+				"command": [
+					"\/usr\/bin\/philips-hue"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"plc-led": {
+		
+	},
+	"qos": {
+		
+	},
+	"reboot_schedule": {
+		"instances": {
+			"instance1": {
+				"running": false,
+				"command": [
+					"\/usr\/bin\/rsched"
+				]
+			}
+		}
+	},
+	"safesearch": {
+		
+	},
+	"server-probe": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 7710,
+				"command": [
+					"\/usr\/sbin\/server-probe",
+					"-l",
+					"n"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"smart_home": {
+		
+	},
+	"switch": {
+		
+	},
+	"sync-server": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 10420,
+				"command": [
+					"\/usr\/bin\/sync-server"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"sysmode": {
+		
+	},
+	"sysntpd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 28304,
+				"command": [
+					"\/usr\/sbin\/ntpd",
+					"-n",
+					"-C",
+					"-p",
+					"us.pool.ntp.org",
+					"-p",
+					"north-america.pool.ntp.org",
+					"-p",
+					"3.android.pool.ntp.org",
+					"-p",
+					"2.android.pool.ntp.org",
+					"-p",
+					"1.android.pool.ntp.org",
+					"-p",
+					"0.android.pool.ntp.org",
+					"-p",
+					"nz.pool.ntp.org"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"system": {
+		
+	},
+	"tfstats": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 7402,
+				"command": [
+					"\/usr\/sbin\/tfstats"
+				],
+				"respawn": {
+					"threshold": 600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"time_settings": {
+		
+	},
+	"tipc-server": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 7686,
+				"command": [
+					"\/usr\/sbin\/tipc-server",
+					"-l",
+					"i"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"tmpsvr": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 10717,
+				"command": [
+					"\/usr\/bin\/tmpsvr"
+				],
+				"respawn": {
+					"threshold": 240,
+					"timeout": 10,
+					"retry": 20
+				}
+			}
+		}
+	},
+	"tp_security": {
+		
+	},
+	"tsched": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 6723,
+				"command": [
+					"\/usr\/sbin\/tsched"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"ubus": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 822,
+				"command": [
+					"\/sbin\/ubusd"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 1,
+					"retry": 0
+				}
+			}
+		}
+	},
+	"uhttpd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 7501,
+				"command": [
+					"\/usr\/sbin\/uhttpd",
+					"-f",
+					"-h",
+					"\/www",
+					"-r",
+					"X20",
+					"-x",
+					"\/cgi-bin",
+					"-t",
+					"60",
+					"-T",
+					"30",
+					"-A",
+					"1",
+					"-n",
+					"3",
+					"-S",
+					"-D",
+					"-R",
+					"-p",
+					"0.0.0.0:80",
+					"-p",
+					"[::]:80",
+					"-C",
+					"\/etc\/uhttpd.crt",
+					"-K",
+					"\/etc\/uhttpd.key",
+					"-s",
+					"0.0.0.0:443",
+					"-s",
+					"[::]:443"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"uhttpd-fw": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 10480,
+				"command": [
+					"\/usr\/sbin\/uhttpd",
+					"-f",
+					"-p",
+					"127.0.0.1:20003",
+					"-D",
+					"-h",
+					"\/var\/firmwares"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	},
+	"wifi": {
+		
+	},
+	"wpsd": {
+		"instances": {
+			"instance1": {
+				"running": true,
+				"pid": 7995,
+				"command": [
+					"\/usr\/sbin\/wpsd",
+					"-c",
+					"\/etc\/wpsd.conf",
+					"-l",
+					"i"
+				],
+				"respawn": {
+					"threshold": 3600,
+					"timeout": 5,
+					"retry": 5
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,88 @@
+### /etc/hostapd/wifi0ap0.accept
+# Dynamic entries below here
+# SSID=EXN IOT
+### /etc/hostapd/wifi0ap0.cfg
+interface=wifi0ap0
+ctrl_interface=/var/run/hostapd
+hw_mode=g
+driver=nl80211
+nas_identifier=$bssid
+ssid=EXN IOT
+wpa_group_rekey=0
+wpa_group_update_count=4
+wpa_gmk_rekey=0
+beacon_prot=0
+wpa_passphrase=***REDACTED***
+accept_mac_file=/etc/hostapd/wifi0ap0.accept
+vlan_tagged_interface=eth0
+vlan_naming=1
+vlan_bridge=br0.
+vlan_file=/etc/hostapd/wifi0ap0.vlan
+wpa=2
+eapol_version=2
+wpa_pairwise=CCMP
+wpa_key_mgmt=WPA-PSK
+logger_syslog=-1
+logger_syslog_level=2
+wlan_id=87ff
+iapp_key=***REDACTED***
+dpi_port=10101
+dpi_ip=192.168.1.1
+own_ip_addr=192.168.1.32
+ht_capab=[LDPC][SMPS-DYNAMIC][TX-STBC][RX-STBC-1][MAX-AMSDU-7935][DSSS_CCK-40][HT20][SHORT-GI-20]
+vht_capab=[MAX-MPDU-11454][RXLDPC][TX-STBC-2BY1][RX-STBC1][SU-BEAMFORMER][SOUNDING-DIMENSION-2][SU-BEAMFORMEE][BF-ANTENNA-4][MAX-A-MPDU-LEN-EXP7][RX-ANTENNA-PATTERN][TX-ANTENNA-PATTERN]
+ieee80211n=1
+ieee80211ac=1
+ieee80211ax=1
+channel=13
+### /etc/hostapd/wifi0ap0.vlan
+*	wifi0ap0.#
+2	wifi0ap0.2	br0.2
+### /etc/hostapd/wifi1ap1.accept
+# Dynamic entries below here
+# SSID=Example Network
+### /etc/hostapd/wifi1ap1.cfg
+interface=wifi1ap1
+ctrl_interface=/var/run/hostapd
+hw_mode=a
+driver=nl80211
+nas_identifier=$bssid
+ssid=Example Network
+wpa_group_rekey=***REDACTED***
+wpa_group_update_count=4
+wpa_gmk_rekey=***REDACTED***
+beacon_prot=0
+wpa_passphrase=***REDACTED***
+sae_require_mfp=1
+sae_password=***REDACTED***
+sae_anti_clogging_threshold=5
+sae_sync=5
+accept_mac_file=/etc/hostapd/wifi1ap1.accept
+vlan_tagged_interface=eth0
+vlan_naming=1
+vlan_bridge=br0.
+vlan_file=/etc/hostapd/wifi1ap1.vlan
+wpa=2
+eapol_version=2
+ieee80211w=1
+group_mgmt_cipher=AES-128-CMAC
+wpa_pairwise=CCMP
+wpa_key_mgmt=WPA-PSK SAE
+logger_syslog=-1
+logger_syslog_level=2
+wlan_id=3c27
+iapp_key=***REDACTED***
+dpi_port=10101
+dpi_ip=192.168.1.1
+own_ip_addr=192.168.1.32
+he_oper_chwidth=2
+he_oper_centr_freq_seg0_idx=50
+ht_capab=[LDPC][SMPS-DYNAMIC][TX-STBC][RX-STBC-1][MAX-AMSDU-7935][DSSS_CCK-40][HT40-][SHORT-GI-40]
+vht_capab=[MAX-MPDU-7991][VHT160-80PLUS80][RXLDPC][SHORT-GI-80][SHORT-GI-160][TX-STBC-2BY1][RX-STBC1][SU-BEAMFORMER][SOUNDING-DIMENSION-4][SU-BEAMFORMEE][MAX-A-MPDU-LEN-EXP7][MU-BEAMFORMER][RX-ANTENNA-PATTERN][TX-ANTENNA-PATTERN]
+ieee80211n=1
+ieee80211ac=1
+ieee80211ax=1
+channel=40
+### /etc/hostapd/wifi1ap1.vlan
+*	wifi1ap1.#
+1	wifi1ap1	br0

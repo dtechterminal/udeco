@@ -1,0 +1,46 @@
+wifi0ap0	get_ap_bridge:0
+wifi0ap0	get_maccmd:0
+wifi0ap0	get_maccmd_sec:2
+wifi0ap0	get_isolationen:0
+wifi0ap0 blocked_sta sysfs: 1 entries
+wifi1ap1	get_ap_bridge:1
+wifi1ap1	get_maccmd:0
+wifi1ap1	get_maccmd_sec:2
+wifi1ap1	get_isolationen:0
+wifi1ap1 blocked_sta sysfs: 1 entries
+/proc/gpio/led_pattern=1
+/proc/gpio/led_tempo=120 (beats per minute)
+/var/run/system.led=1 120
+/var/run/system.state=ready
+/proc/ubnthal/status/IsLocated=false
+Bridge table: filter
+
+Bridge chain: INPUT, entries: 0, policy: ACCEPT
+
+Bridge chain: FORWARD, entries: 0, policy: ACCEPT
+
+Bridge chain: OUTPUT, entries: 0, policy: ACCEPT
+Bridge table: broute
+
+Bridge chain: BROUTING, entries: 2, policy: ACCEPT
+-p 802_1Q -i wifi0ap0 -j DROP 
+-p 802_1Q --vlan-id 2 -j DROP 
+'hostapd.wifi0ap0' @0d711a9d
+	"reload":{}
+	"get_clients":{}
+	"del_client":{"addr":"String","reason":"Integer","deauth":"Boolean","ban_time":"Integer"}
+	"list_bans":{}
+	"wps_start":{}
+	"wps_cancel":{}
+	"update_beacon":{}
+	"get_features":{}
+	"switch_chan":{"freq":"Integer","bcn_count":"Integer","center_freq1":"Integer","center_freq2":"Integer","bandwidth":"Integer","sec_channel_offset":"Integer","ht":"Boolean","vht":"Boolean","block_tx":"Boolean"}
+	"set_vendor_elements":{"vendor_elements":"String"}
+	"notify_response":{"notify_response":"Integer"}
+	"bss_mgmt_enable":{"neighbor_report":"Boolean","beacon_report":"Boolean","bss_transition":"Boolean"}
+	"rrm_nr_get_own":{}
+	"rrm_nr_list":{}
+	"rrm_nr_set":{"list":"Array"}
+	"rrm_beacon_req":{"addr":"String","mode":"Integer","op_class":"Integer","channel":"Integer","duration":"Integer","bssid":"String","ssid":"String"}
+	"wnm_disassoc_imminent":{"addr":"String","duration":"Integer","neighbors":"Array","abridged":"Boolean"}
+	"radius_server_update":{"index":"Integer","type":"String","ip":"String"}

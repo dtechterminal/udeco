@@ -1,0 +1,46 @@
+{
+ "client_list_speed": [
+  {
+   "mac": "8E-56-D7-04-BB-8F",
+   "up_speed": 300,
+   "down_speed": 1200,
+   "in_hnat": false
+  },
+  {
+   "mac": "02-42-C0-59-EF-05",
+   "up_speed": 40,
+   "down_speed": 10,
+   "in_hnat": true
+  },
+  {
+   "mac": "44-07-0B-11-22-33",
+   "up_speed": 120,
+   "down_speed": 8000,
+   "in_hnat": false
+  },
+  {
+   "mac": "F4-CF-A2-11-22-33",
+   "up_speed": "16",
+   "down_speed": "64",
+   "in_hnat": false
+  },
+  {
+   "mac": "3A-11-22-33-44-55",
+   "up_speed": 0,
+   "down_speed": 0,
+   "in_hnat": false
+  },
+  {
+   "mac": "B2-A7-B9-3E-17-02",
+   "up_speed": 5,
+   "down_speed": 5,
+   "in_hnat": false
+  },
+  {
+   "mac": "B0-A7-B9-3E-15-FC",
+   "up_speed": 5,
+   "down_speed": 5,
+   "in_hnat": false
+  }
+ ]
+}

@@ -298,3 +298,42 @@ func TestUnsupportedSecurityStaysOff(t *testing.T) {
 		t.Errorf("no mgmt: %q", enc)
 	}
 }
+
+// radio.N.txpower is a dBm value only for txpower_mode custom (or no mode):
+// a preset keeps a stale txpower beside it (real config: medium with 6).
+func TestPlanTxPowerMode(t *testing.T) {
+	for _, tc := range []struct {
+		name, extra string
+		op          string // "" = no wireless.radio0.txpower op
+		note        string
+	}{
+		{"no mode, number", "", "", ""}, // txpower=23 matches cur
+		{"preset medium ignores stale txpower", "radio.1.txpower_mode=medium\nradio.1.txpower=6\n", "", `preset "medium"`},
+		{"preset low", "radio.1.txpower_mode=low\nradio.1.txpower=6\n", "", `preset "low"`},
+		{"preset high = OpenWrt default", "radio.1.txpower_mode=high\nradio.1.txpower=6\n", "del", ""},
+		{"auto", "radio.1.txpower_mode=auto\nradio.1.txpower=6\n", "del", ""},
+		{"custom", "radio.1.txpower_mode=custom\nradio.1.txpower=12\n", "12", ""},
+		{"custom bad value", "radio.1.txpower_mode=custom\nradio.1.txpower=x\n", "del", "not recognised"},
+		{"unknown mode", "radio.1.txpower_mode=turbo\nradio.1.txpower=6\n", "del", "not recognised"},
+	} {
+		c := ParseCfg(cfg + tc.extra)
+		r := Plan(c, ParseUCI(cur), Features{})
+		got := ""
+		for _, op := range r.Ops {
+			if op.Key != "wireless.radio0.txpower" {
+				continue
+			}
+			if op.Del {
+				got = "del"
+			} else {
+				got = op.Value
+			}
+		}
+		if got != tc.op {
+			t.Errorf("%s: txpower op %q, want %q", tc.name, got, tc.op)
+		}
+		if tc.note != "" && !strings.Contains(strings.Join(r.Notes, "\n"), tc.note) {
+			t.Errorf("%s: no note %q in %q", tc.name, tc.note, r.Notes)
+		}
+	}
+}

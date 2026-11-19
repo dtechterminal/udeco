@@ -1,0 +1,46 @@
+TAG trx_wl0_rxiqest_default x5
+HDR wl0 chanspec=9u (0x1907) noise=-96 up=4416.42
+AC 4416.43 wl01=0[ ] wl02=1[ m:971e1247/in=4273/txB=11572631/rxB=2567360/txfail=0/retry=1369/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4320/txB=12157709/rxB=980290/txfail=0/retry=1250/rssi=-70 ] wl13=1[ m:f0197d79/in=94/txB=12359231/rxB=277168/txfail=0/retry=158/rssi=-63 ]
+--- chanim_stats (current) wl0
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1907	7	1	22	9	5	0	50	1	1	883	5	-96	56	4116264
+chan_util: 39
+
+IQ 1 t=4416.64..4416.65 out=[-102dBm -100dBm ] noise=-96 cs=9u (0x1907)
+IQ 2 t=4417.17..4417.18 out=[-105dBm -103dBm ] noise=-96 cs=9u (0x1907)
+IQ 3 t=4417.70..4417.71 out=[-72dBm -83dBm ] noise=-96 cs=9u (0x1907)
+IQ 4 t=4418.23..4418.24 out=[-106dBm -104dBm ] noise=-96 cs=9u (0x1907)
+IQ 5 t=4418.76..4418.77 out=[-78dBm -81dBm ] noise=-96 cs=9u (0x1907)
+BEACONS t0=4416.63 t1=4419.29 beacons=53
+--- chanim_stats (current) wl0
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1907	10	0	29	7	5	0	45	0	0	803	4	-96	55	4119276
+chan_util: 41
+
+HDR wl0 chanspec=9u (0x1907) noise=-96 up=4419.33
+AC 4419.33 wl01=0[ ] wl02=1[ m:971e1247/in=4276/txB=11578019/rxB=2568677/txfail=0/retry=1371/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4323/txB=12163145/rxB=980890/txfail=0/retry=1251/rssi=-70 ] wl13=1[ m:f0197d79/in=97/txB=12365411/rxB=278410/txfail=0/retry=158/rssi=-59 ]
+TAG trx_wl1_rxiqest_default x5
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4419.54
+AC 4419.55 wl01=0[ ] wl02=1[ m:971e1247/in=4276/txB=11578661/rxB=2568677/txfail=0/retry=1371/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4323/txB=12163485/rxB=981016/txfail=0/retry=1251/rssi=-70 ] wl13=1[ m:f0197d79/in=97/txB=12365479/rxB=278454/txfail=0/retry=158/rssi=-59 ]
+--- chanim_stats (current) wl1
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe12a	2	1	4	1	1	0	94	0	0	3	4	-96	96	4119704
+chan_util: 7
+
+IQ 1 t=4419.77..4419.78 out=[-96dBm -97dBm ] noise=-96 cs=40/80 (0xe12a)
+IQ 2 t=4420.30..4420.30 out=[-96dBm -97dBm ] noise=-96 cs=40/80 (0xe12a)
+IQ 3 t=4420.83..4420.84 out=[-96dBm -97dBm ] noise=-96 cs=40/80 (0xe12a)
+IQ 4 t=4421.36..4421.37 out=[-96dBm -97dBm ] noise=-96 cs=40/80 (0xe12a)
+IQ 5 t=4421.89..4421.90 out=[-96dBm -97dBm ] noise=-96 cs=40/80 (0xe12a)
+BEACONS t0=4419.76 t1=4422.42 beacons=78
+--- chanim_stats (current) wl1
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe12a	3	1	4	1	1	0	93	1	0	0	1	-96	95	4121712
+chan_util: 8
+
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4422.44
+AC 4422.45 wl01=0[ ] wl02=1[ m:971e1247/in=4279/txB=11581209/rxB=2569994/txfail=0/retry=1371/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4326/txB=12166219/rxB=982424/txfail=0/retry=1251/rssi=-71 ] wl13=1[ m:f0197d79/in=100/txB=12369167/rxB=280716/txfail=0/retry=161/rssi=-59 ]

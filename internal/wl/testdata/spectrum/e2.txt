@@ -1,0 +1,305 @@
+AC 1740.58 wl01=0[ ] wl02=1[ F4:CF:A2/1608 ] wl11=0[ ] wl12=1[ 88:57:1D/1655 ] wl13=1[ 3A:C1:26/1654 ]
+TAG e2_wl0_active_default radio=wl0 args= chanspec=9u (0x1907)
+SCAN rc=0 t0=1740.68 t1=1741.07 beacons=2 polls=6
+BSSCOUNT 12
+IDLE t2=1742.10 t3=1744.12 beacons=40
+--- chanim_stats all
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0x1001 crsglitch cnt: 1869 bad plcp: 0 noise: -70
+	 cca_txdur: 19 cca_inbss: 28 cca_obss:7 cca_nocat: 7 cca_nopkt: 17
+ chanspec: 0x1002 crsglitch cnt: 347 bad plcp: 43 noise: -94
+	 cca_txdur: 13 cca_inbss: 0 cca_obss:0 cca_nocat: 12 cca_nopkt: 3
+ chanspec: 0x1003 crsglitch cnt: 2560 bad plcp: 0 noise: -102
+	 cca_txdur: 12 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 3
+ chanspec: 0x1004 crsglitch cnt: 320 bad plcp: 0 noise: -107
+	 cca_txdur: 14 cca_inbss: 10 cca_obss:10 cca_nocat: 1 cca_nopkt: 3
+ chanspec: 0x1005 crsglitch cnt: 2360 bad plcp: 80 noise: -99
+	 cca_txdur: 12 cca_inbss: 0 cca_obss:0 cca_nocat: 13 cca_nopkt: 7
+ chanspec: 0x1006 crsglitch cnt: 1280 bad plcp: 320 noise: -106
+	 cca_txdur: 16 cca_inbss: 29 cca_obss:0 cca_nocat: 2 cca_nopkt: 8
+ chanspec: 0x1007 crsglitch cnt: 200 bad plcp: 160 noise: -93
+	 cca_txdur: 12 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 2
+ chanspec: 0x1008 crsglitch cnt: 120 bad plcp: 400 noise: -108
+	 cca_txdur: 12 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 2
+ chanspec: 0x1009 crsglitch cnt: 236 bad plcp: 0 noise: -98
+	 cca_txdur: 1 cca_inbss: 1 cca_obss:29 cca_nocat: 3 cca_nopkt: 2
+ chanspec: 0x100a crsglitch cnt: 333 bad plcp: 0 noise: -73
+	 cca_txdur: 14 cca_inbss: 15 cca_obss:0 cca_nocat: 0 cca_nopkt: 3
+ chanspec: 0x100b crsglitch cnt: 1827 bad plcp: 34 noise: -82
+	 cca_txdur: 14 cca_inbss: 39 cca_obss:0 cca_nocat: 1 cca_nopkt: 4
+
+AC 1744.14 wl01=0[ ] wl02=1[ F4:CF:A2/1611 ] wl11=0[ ] wl12=1[ 88:57:1D/1659 ] wl13=1[ 3A:C1:26/1658 ]
+SSID: "h:853695ed"
+Mode: Managed	RSSI: -52 dBm	SNR: 35 dB	noise: -99 dBm	Channel: 9u
+BSSID: AA:A7:B9:3E:15:F8	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2 + WPA3-SAE):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(2): WPA2-PSK SAE 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 7 40MHz (0x1907)
+	Primary channel: 9
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+WPS: V2.0 Configured
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:8b958625"
+Mode: Managed	RSSI: -59 dBm	SNR: 35 dB	noise: -99 dBm	Flags: RSSI on-channel 	Channel: 11
+BSSID: AA:A9:15:50:01:58	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 11 20MHz (0x100b)
+	Primary channel: 11
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-31 96
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+		NSS3 Tx: 0-9   Rx: 0-9 
+		NSS4 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+		NSS3 Tx: 0-11        Rx: 0-11
+		NSS4 Tx: 0-11        Rx: 0-11
+WPS: V2.0 Configured
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:0db44707"
+Mode: Managed	RSSI: -65 dBm	SNR: 34 dB	noise: -99 dBm	Flags: RSSI on-channel 	Channel: 1
+BSSID: 54:AF:97:74:F4:37	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 9 18 36 54 6 12 24 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: 20/40_Bss_Coexist 
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:c88c48f0"
+Mode: Managed	RSSI: -78 dBm	SNR: 21 dB	noise: -99 dBm	Flags: RSSI on-channel 	Channel: 1
+BSSID: 40:CA:63:6F:18:31	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 6 9 11(b) 12 18 24 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: Not_Available
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-7
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:efd4cace"
+Mode: Managed	RSSI: -89 dBm	SNR: 10 dB	noise: -99 dBm	Flags: RSSI on-channel 	Channel: 1
+BSSID: 2E:F4:32:6A:16:C9	Capability: ESS WEP 
+Supported Rates: [ 5.5(b) 11(b) 1(b) 2(b) 6 12 24 48 54 9 18 36 ]
+RSN (WPA2):
+	multicast cipher: TKIP
+	unicast ciphers(2): AES-CCMP TKIP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: Not_Available
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:925facf1"
+Mode: Managed	RSSI: -89 dBm	SNR: 10 dB	noise: -99 dBm	Flags: RSSI on-channel 	Channel: 4
+BSSID: 08:40:F3:B2:0F:18	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+WPA:
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA-PSK 
+	No WPA Capabilities advertised
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: 
+HT Capable:
+	Chanspec: 2.4GHz channel 4 20MHz (0x1004)
+	Primary channel: 4
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:edb235e7"
+Mode: Managed	RSSI: -74 dBm	SNR: 25 dB	noise: -99 dBm	Flags: RSSI on-channel 	Channel: 6
+BSSID: 32:E9:50:B8:87:1A	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: 
+VHT Capable:
+	Chanspec: 2.4GHz channel 6 20MHz (0x1006)
+	Primary channel: 6
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:13037859"
+Mode: Managed	RSSI: -90 dBm	SNR: 9 dB	noise: -99 dBm	Flags: RSSI on-channel 	Channel: 6
+BSSID: 34:24:3E:18:63:50	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 9 18 36 54 6 12 24 48 ]
+WPA:
+	multicast cipher: TKIP
+	unicast ciphers(2): TKIP AES-CCMP 
+	AKM Suites(1): WPA-PSK 
+	No WPA Capabilities advertised
+RSN (WPA2):
+	multicast cipher: TKIP
+	unicast ciphers(2): TKIP AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 6 20MHz (0x1006)
+	Primary channel: 6
+	HT Capabilities: 
+	Supported HT MCS : 0-15
+WPS: V2.0 Configured
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: ""
+Mode: Managed	RSSI: -51 dBm	SNR: 35 dB	noise: -99 dBm	Flags: FromBcn RSSI on-channel 	Channel: 9u
+BSSID: AA:A7:B9:3E:15:FF	Capability: ESS WEP ShortPre ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 7 40MHz (0x1907)
+	Primary channel: 9
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:853695ed"
+Mode: Managed	RSSI: -63 dBm	SNR: 35 dB	noise: -99 dBm	Flags: FromBcn RSSI on-channel 	Channel: 9u
+BSSID: AA:A7:B9:3E:16:90	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2 + WPA3-SAE):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(2): WPA2-PSK SAE 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 7 40MHz (0x1907)
+	Primary channel: 9
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+WPS: V2.0 Configured
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: ""
+Mode: Managed	RSSI: -63 dBm	SNR: 35 dB	noise: -99 dBm	Flags: FromBcn RSSI on-channel 	Channel: 9u
+BSSID: AA:A7:B9:3E:16:97	Capability: ESS WEP ShortPre ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 7 40MHz (0x1907)
+	Primary channel: 9
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:7941ed61"
+Mode: Managed	RSSI: -60 dBm	SNR: 35 dB	noise: -99 dBm	Flags: FromBcn RSSI on-channel 	Channel: 9u
+BSSID: 8C:BF:EA:1D:BA:75	Capability: ESS ShortPre ShortSlot 
+Supported Rates: [ 5.5(b) 11(b) 1(b) 2(b) 6 12 24 48 54 9 18 36 ]
+Extended Capabilities: 
+HT Capable:
+	Chanspec: 2.4GHz channel 7 40MHz (0x1907)
+	Primary channel: 9
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-7 96
+VS_IE: <dropped: vendor IE may carry device names>

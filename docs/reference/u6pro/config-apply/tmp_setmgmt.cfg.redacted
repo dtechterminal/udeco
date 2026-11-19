@@ -1,0 +1,8 @@
+capability=notif,notif-assoc-stat
+selfrun_guest_mode=pass
+cfgversion=330bbdd498df1412
+led_enabled=true
+stun_url=stun://192.168.1.1:3478/
+mgmt_url=https://192.168.1.1:8443/manage/site/default
+use_aes_gcm=true
+report_crash=true

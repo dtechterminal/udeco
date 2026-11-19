@@ -1,0 +1,624 @@
+=== sample
+18241.39 69730.15
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1239046942  47163584  3211693265  656811819  346441690  0         7057617813  37858829  51438133  13290310000  4262110358  3907873193  19723662  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	11	1	14	5	2	0	66	1	2	1566	31	-98	75	17940900
+chan_util: 25
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    431814126  56869696  606057479  279538643  4555483   0         11601507951  69810339  5597503   13275111000  947021301  904214457  166764    40407362
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	2	1	0	91	1	1	12	11	-95	94	17940860
+chan_util: 9
+
+=== sample
+18252.18 69760.74
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1239917430  47191153  3213209774  657255925  346675015  0         7065057726  37893142  51475127  13301354000  4264331867  3909840809  19752541  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	11	1	16	5	3	0	64	1	1	1664	35	-95	74	17951944
+chan_util: 27
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    432077896  56898028  606266446  279724663  4561692   0         11611559997  69834535  5603562   13286155000  947450829  904569257  166998    40478751
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	3	1	0	89	1	1	33	18	-94	92	17951904
+chan_util: 10
+
+=== sample
+18262.99 69791.61
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1240841869  47214312  3214756980  657725625  346940860  0         7072329726  37933873  51532870  13312398000  4266637777  3911863325  19779577  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	12	1	19	5	3	0	60	2	2	1723	33	-93	70	17962988
+chan_util: 32
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    432328908  56913575  606485116  279920967  4569581   0         11621562003  69848112  5604226   13297199000  947889239  904900127  167634    40580938
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	3	1	0	90	1	0	27	11	-95	92	17962948
+chan_util: 9
+
+=== sample
+18273.81 69831.26
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1241681648  47244175  3216100820  658158362  347225214  0         7078909779  37971011  51573956  13322438000  4268728571  3913658174  19801281  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	19	1	18	4	4	0	51	1	2	1528	14	-98	69	17973028
+chan_util: 30
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    432553738  56922558  606675714  280100749  4576509   0         11630714652  69860092  5606087   13307239000  948275530  905197796  167767    40665872
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	6	1	3	3	1	0	87	1	0	36	56	-95	92	17972988
+chan_util: 9
+
+=== sample
+18284.59 69872.76
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1242739100  47266701  3217731345  658609943  347472567  0         7086049704  37997809  51579444  13333482000  4271080556  3915752513  19819280  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	9	1	16	5	2	0	66	1	1	1605	28	-97	74	17984072
+chan_util: 26
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    432875488  56936899  606935087  280294043  4586965   0         11640611142  69875712  5608444   13318283000  948752994  905574778  168060    40761092
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	2	2	1	0	91	1	1	26	17	-96	94	17984032
+chan_util: 8
+
+=== sample
+18295.40 69913.67
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1243793029  47296055  3219295665  659071674  347703386  0         7093262340  38024185  51630439  13344526000  4273366780  3917800649  19834698  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	9	1	14	5	3	0	67	1	1	1772	35	-97	75	17995116
+chan_util: 25
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    433176627  56950270  607173137  280482459  4595133   0         11650611753  69887902  5611536   13329331000  949200999  905935644  168325    40844011
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	2	1	0	92	1	1	20	7	-96	95	17995080
+chan_util: 9
+
+=== sample
+18306.19 69955.20
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1244911008  47316941  3220870885  659502141  347948274  0         7100408988  38057880  51663359  13355570000  4275638241  3919813428  19856795  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	10	1	14	4	3	0	66	1	3	1909	34	-100	73	18006160
+chan_util: 26
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    433523480  56973068  607409805  280719389  4608479   0         11660422509  69910436  5615642   13340375000  949710741  906324932  168354    40957013
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	2	2	1	0	92	1	1	19	11	-96	94	18006124
+chan_util: 8
+
+=== sample
+18317.03 69993.93
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1245746072  47341754  3222189996  659925897  348164928  0         7107158385  38114997  51710291  13365610000  4277622575  3921569199  19876709  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	11	1	13	5	3	0	66	1	3	1629	25	-100	75	18016200
+chan_util: 26
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    433751202  56989487  607599937  280929726  4616537   0         11669430654  69928059  5617404   13350415000  950135687  906629158  168617    41072327
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	2	1	0	92	1	0	19	8	-95	95	18016164
+chan_util: 8
+
+=== sample
+18327.85 70035.00
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1246734440  47362967  3223683207  660424988  348403387  0         7114420899  38156678  51764341  13376655000  4279874549  3923563684  19905057  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	8	1	12	5	3	0	70	1	1	1786	34	-99	77	18027245
+chan_util: 23
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    434023336  57003078  607819188  281104496  4624158   0         11679429978  69940950  5619158   13361459000  950550920  906953471  168676    41158794
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	2	1	2	2	1	0	92	1	0	14	4	-94	94	18027208
+chan_util: 7
+
+=== sample
+18338.86 70076.44
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1247641994  47386645  3225165875  660910798  348648635  0         7121795220  38199804  51786721  13387702000  4282111953  3925539098  19930092  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	11	1	16	5	3	0	62	2	1	1885	37	-100	72	18038292
+chan_util: 28
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    434277370  57017623  608044979  281284748  4631312   0         11689495749  69951970  5620019   13372503000  950978662  907300742  168909    41235635
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	2	1	0	92	1	0	11	24	-95	94	18038252
+chan_util: 8
+
+=== sample
+18349.65 70116.80
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1248771334  47413569  3226863525  661396916  348956644  0         7128668547  38248681  51817506  13398748000  4284630654  3927732766  19956236  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	7	1	11	4	3	0	74	1	0	1815	23	-98	80	18049338
+chan_util: 20
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    434603593  57033783  608301210  281503746  4645238   0         11699368308  69964093  5620696   13383547000  951483977  907680987  169142    41354769
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	2	1	2	2	1	0	92	1	0	19	4	-96	94	18049296
+chan_util: 7
+
+=== sample
+18360.49 70158.71
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1249937282  47444224  3228626423  661871345  349222400  0         7135487685  38289351  51878287  13409790000  4287164392  3929985928  19979490  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	14	1	18	5	3	0	58	1	2	1472	20	-97	70	18060380
+chan_util: 30
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    434940146  57052182  608558931  281760242  4659054   0         11709105408  69979331  5622424   13394591000  952030409  908066034  169142    41510776
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	4	1	4	3	1	0	86	1	1	70	61	-94	89	18060340
+chan_util: 11
+
+=== sample
+18371.29 70197.28
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1251001385  47472373  3230184571  662293390  349446915  0         7141797495  38316677  51908043  13419830000  4289397249  3931980127  20000391  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	12	1	16	5	3	0	62	1	1	1699	20	-97	73	18070420
+chan_util: 27
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    435241501  57061351  608795559  281962607  4668006   0         11718071856  69986661  5622792   13404631000  952487523  908412621  169376    41617693
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	4	1	3	2	1	0	90	1	1	12	17	-96	93	18070380
+chan_util: 9
+
+=== sample
+18382.10 70238.58
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1252164359  47500634  3231928483  662746383  349685037  0         7148702646  38349591  51947626  13430874000  4291860537  3934190282  20022409  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	10	1	13	4	3	0	68	1	1	1805	27	-99	77	18081464
+chan_util: 23
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    435581320  57079946  609056260  282171564  4683495   0         11727909045  69999240  5624378   13415675000  952991265  908792132  169376    41736743
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	0	3	2	1	0	90	0	0	23	27	-94	93	18081424
+chan_util: 6
+
+=== sample
+18392.94 70275.51
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1253134318  47528658  3233488446  663236313  349953101  0         7155880407  38394021  52025920  13441918000  4294206518  3936254120  20047049  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	10	1	17	5	3	0	63	1	1	1848	35	-100	71	18092508
+chan_util: 28
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    436379310  57133016  609282196  282531030  4698516   0         11737088910  70472406  5663505   13426719000  953644758  909324184  170062    41852310
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	3	1	0	89	1	1	17	26	-94	92	18092468
+chan_util: 10
+
+=== sample
+18403.80 70315.80
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1254116330  47550339  3235097540  663756868  350219328  0         7162934238  38423937  52043097  13452962000  4296624075  3938390839  20071377  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	12	1	19	4	3	0	60	1	0	1653	22	-97	72	18103552
+chan_util: 28
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    436683513  57155670  609525259  282742230  4712262   0         11746989468  70491557  5665515   13437763000  954135421  909690067  170261    41971825
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	5	1	4	3	1	0	85	1	1	39	41	-95	90	18103512
+chan_util: 11
+
+=== sample
+18414.68 70356.18
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1255086835  47582321  3236641730  664221608  350442764  0         7170220926  38473915  52111337  13464006000  4298888423  3940412780  20098610  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	7	1	12	4	3	0	72	1	1	1729	27	-98	79	18114596
+chan_util: 22
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    436972045  57178073  609748784  282977739  4724999   0         11756829789  70511936  5686817   13448807000  954629595  910035099  170261    42115958
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	2	1	2	3	1	0	91	1	1	39	22	-95	93	18114556
+chan_util: 9
+
+=== sample
+18425.49 70396.69
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1256043349  47626370  3238002527  664663480  350669615  0         7176797532  38501414  52172910  13474046000  4300961992  3942246956  20118962  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	9	1	14	5	3	0	67	1	2	1785	21	-99	73	18124636
+chan_util: 26
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    437229571  57190625  609966968  283173451  4737050   0         11765863458  70521206  5687769   13458847000  955068094  910352818  170497    42231347
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	2	1	2	3	1	0	91	0	0	19	27	-95	93	18124596
+chan_util: 7
+
+=== sample
+18436.28 70435.19
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1256908180  47654843  3239426787  665115496  350926604  0         7184328129  38545443  52185330  13485090000  4303123730  3944145732  20133136  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	8	1	12	4	3	0	71	1	1	1726	22	-95	79	18135680
+chan_util: 22
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    437487074  57209370  610183614  283454737  4749495   0         11775694626  70541337  5692067   13469891000  955597216  910722023  170732    42386174
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	3	1	0	89	1	1	35	27	-94	91	18135640
+chan_util: 10
+
+=== sample
+18447.09 70475.27
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1257915317  47695090  3240957154  665605242  351167699  0         7191562860  38619534  52229971  13496134000  4305425185  3946192654  20154599  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	13	1	16	5	3	0	60	2	2	1362	28	-98	71	18146724
+chan_util: 29
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    437761601  57222858  610417886  283727432  4767353   0         11785402161  70552360  5697976   13480935000  956135529  911067118  170761    42571847
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	4	1	3	2	1	0	91	1	1	24	20	-94	94	18146684
+chan_util: 9
+
+=== sample
+18457.89 70515.21
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1258946811  47741899  3242483908  666103102  351431017  0         7198729740  38698377  52313535  13507178000  4307759926  3948247106  20181150  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	9	1	14	5	3	0	67	1	1	1546	56	-98	76	18157768
+chan_util: 25
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    438184222  57279323  610663456  284034585  4781691   0         11794939245  70672010  5703101   13491979000  956759055  911543566  171632    42711135
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	3	1	0	90	1	0	43	34	-94	92	18157728
+chan_util: 9
+
+=== sample
+18468.69 70555.17
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1259859977  47772213  3243928577  666549679  351658451  0         7205223591  38716481  52336357  13517218000  4309908920  3950152502  20205575  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	10	1	17	4	3	0	63	1	1	1825	25	-99	72	18167808
+chan_util: 27
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    438441920  57289164  610908748  284257264  4795924   0         11803875084  70681070  5705131   13502019000  957251100  911900380  171632    42840568
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	2	1	0	91	1	1	18	31	-94	94	18167768
+chan_util: 9
+
+=== sample
+18479.46 70595.07
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1260946263  47808883  3245539874  666990502  351972336  0         7212233277  38759880  52373341  13528262000  4312311595  3952224325  20234633  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	9	1	15	5	3	0	65	1	1	2370	51	-94	73	18178852
+chan_util: 26
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    438780868  57319495  611203019  284486719  4811783   0         11813633775  70706666  5709691   13513063000  957821016  912335313  171923    42966677
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	3	1	3	2	1	0	92	1	0	19	19	-95	94	18178812
+chan_util: 8
+
+=== sample
+18490.27 70635.49
+## wl0 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1002    1262024570  47835220  3247110736  667510303  352430848  0         7218964377  38809017  52455415  13539306000  4314887107  3954304027  20299173  0       
+
+## wl0 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	8	1	12	4	4	0	69	1	1	2156	35	-98	77	18189896
+chan_util: 23
+
+## wl1 us
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd02c    439172867  57385255  611485634  284859592  4827640   0         11823063615  70769660  5715623   13524107000  958558121  912909736  171923    43122192
+
+## wl1 pct
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0xe22a	4	1	2	2	1	0	90	1	1	16	26	-96	93	18189856
+chan_util: 8
+

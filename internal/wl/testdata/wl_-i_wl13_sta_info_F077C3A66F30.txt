@@ -1,0 +1,55 @@
+[VER 8] STA F0:77:C3:A6:6F:30:
+	 chanspec 44/80 (0xe22a)
+	 aid:24 
+	 rateset [ 6 9 12 18 24 36 48 54 ]
+	 idle 0 seconds
+	 in network 1465 seconds
+	 state: AUTHENTICATED ASSOCIATED AUTHORIZED
+	 connection: SECURED
+	 auth: WPA3-SAE
+	 crypto: AES_CCM
+	 flags 0x197e13a: WME PS N_CAP VHT_CAP AMPDU AMSDU MIMO-PS MIMO-PS-RTS GBL_RCLASS DWDS_CAP
+	 HT caps 0x9e7: LDPC 40MHz SGI20 SGI40 STBC-Tx STBC-Rx
+	 VHT caps 0x7b: LDPC SGI80 STBC-Tx STBC-Rx SU-BFR SU-BFE
+	 tx total pkts: 244368
+	 tx total bytes: 42713529
+	 tx ucast pkts: 9497
+	 tx ucast bytes: 5698455
+	 tx mcast/bcast pkts: 234871
+	 tx mcast/bcast bytes: 37015074
+	 tx failures: 0
+	 rx data pkts: 11892
+	 rx data bytes: 1861539
+	 rx data dur: 0
+	 rx ucast pkts: 11484
+	 rx ucast bytes: 1779737
+	 rx mcast/bcast pkts: 408
+	 rx mcast/bcast bytes: 81802
+	 rate of last tx pkt: 650000 kbps - 175500 kbps
+	 rate of last rx pkt: 6000 kbps
+	 rx decrypt succeeds: 8052
+	 rx decrypt failures: 0
+	 tx data pkts retried: 7
+	 per antenna rssi of last rx data frame: -65 -64 0 0
+	 per antenna average rssi of rx data frames: -66 -68 0 0
+	 per antenna noise floor: -95 -96 0 0
+	 tx total pkts sent: 9532
+	 tx pkts retries: 980
+	 tx pkts retry exhausted: 0
+	 tx FW total pkts sent: 0
+	 tx FW pkts retries: 0
+	 tx FW pkts retry exhausted: 0
+	 rx total pkts retried: 2146
+MCS SET : [ 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 ]
+VHT SET : 0x1 1x1 2x1 3x1 4x1 5x1 6x1 7x1 8x1 9x1 
+        : 0x2 1x2 2x2 3x2 4x2 5x2 6x2 7x2 8x2 9x2 
+smoothed rssi: -66
+tx nrate
+vht mcs 7 Nss 2 Tx Exp 0 bw80 ldpc sgi auto
+rx nrate
+legacy rate 6 Mbps stf mode 0 auto
+wnm
+0x101:  BSS-Transition  Notification
+VENDOR OUI VALUE[0] 00:50:F2 
+link bandwidth = 80 MHZ 
+RRM capability = 0x72  Neighbor_Report Beacon_Passive Beacon_Active Beacon_Table

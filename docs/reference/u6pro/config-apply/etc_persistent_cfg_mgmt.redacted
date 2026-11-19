@@ -1,0 +1,15 @@
+mgmt.is_default=false
+mgmt.led_enabled=true
+mgmt.cfgversion=330bbdd498df1412
+mgmt.cfgversion_effective=330bbdd498df1412
+mgmt.cfgversion_saved=330bbdd498df1412
+mgmt.cfgtimeout=0
+mgmt.authkey=***REDACTED***
+mgmt.selfrun_guest_mode=pass
+mgmt.capability=notif,notif-assoc-stat
+mgmt.use_aes_gcm=true
+mgmt.report_crash=true
+mgmt.is_setup_completed=false
+mgmt.servers.1.url=http://192.168.1.1:8080/inform
+stun_url=stun://192.168.1.1/
+mgmt_url=https://192.168.1.1:8443/manage/site/default

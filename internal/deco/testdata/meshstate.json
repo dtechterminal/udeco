@@ -1,0 +1,101 @@
+{
+  "connected": true,
+  "connected_since": "2026-11-18T11:00:00Z",
+  "logins": 1,
+  "operation_mode": "AP",
+  "units": {
+    "b0:a7:b9:3e:16:94": {"ip": "192.168.0.241", "mac": "B0-A7-B9-3E-16-94", "device_id": "c6b4d72af3732ed083d7758583c3dd10", "master_device_id": "c6b4d72af3732ed083d7758583c3dd10", "role": "master", "device_model": "X20", "channel_2g": "8", "channel_5g": 44},
+    "b0:a7:b9:3e:15:fc": {"ip": "192.168.0.232", "mac": "B0-A7-B9-3E-15-FC", "device_id": "25fbd5361f2d7ff2e1d6d745514f2b13", "master_device_id": "c6b4d72af3732ed083d7758583c3dd10", "role": "slave", "channel_2g": "1", "channel_5g": "36"}
+  },
+  "devices": {
+    "ok": true,
+    "at": "2026-11-18T12:00:00Z",
+    "value": {
+      "device_list": [
+        {"device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5", "device_model": "X20", "hardware_ver": "2.0", "software_ver": "1.1.3 Build 20240621 Rel. 52617",
+         "mac": "B0-A7-B9-3E-16-94", "ip": "192.168.0.241", "role": "master", "master_device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5",
+         "custom_nickname": "TGl2aW5nIFJvb20=", "nickname": "custom", "inet_status": "online", "group_status": "connected",
+         "connection_type": ["wired"], "runtime": "86400", "eth_port_info_support": true, "is_wired": true},
+        {"device_id": "dev205", "device_model": "X20", "hardware_ver": "2.0", "software_ver": "1.1.3 Build 20240621 Rel. 52617",
+         "mac": "B0-A7-B9-3E-17-00", "ip": "192.168.0.205", "role": "slave", "parent_device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5",
+         "nickname": "office", "connection_type": ["band5"], "signal_level": {"band5": "3"}},
+        {"device_id": "dev232", "device_model": "X20", "mac": "B0-A7-B9-3E-15-FC", "ip": "192.168.0.232", "role": "slave",
+         "parent_device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5", "inet_status": "offline", "group_status": "disconnected"}
+      ]
+    }
+  },
+  "clients": {
+    "ok": true,
+    "at": "2026-11-18T12:00:00Z",
+    "value": {
+      "client_list": [
+        {"mac": "AA-BB-CC-DD-EE-01", "ip": "192.168.0.50", "name": "cGhvbmU=", "client_type": "phone", "online": true, "interface": "main",
+         "online_time": 3600,
+         "linked_device_info": {"device_id": "dev205", "connection_type": ["band5"], "signal_strength": {"band5": -55},
+           "tx_rate_list": {"band5": 866}, "rx_rate_list": {"band5": "780"}, "wireless_ver": "wifi6", "bandwidth": "80"}},
+        {"mac": "aa:bb:cc:dd:ee:02", "ip": "192.168.0.51", "name": "bGFwdG9w", "client_type": "laptop", "online": true, "interface": "main",
+         "access_time": 1795002600,
+         "linked_device_info": {"device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5", "connection_type": ["band2_4"], "signal_level": {"band2_4": 3},
+           "tx_rate_list": {"band2_4": 144}, "rx_rate_list": {"band2_4": 72}, "wireless_ver": "wifi4"}},
+        {"mac": "AA-BB-CC-DD-EE-03", "ip": "192.168.0.52", "name": "dGFibGV0", "client_type": "tablet", "online": true, "interface": "guest",
+         "linked_device_info": {"device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5", "connection_type": ["band2+band5"],
+           "signal_strength": {"band2+band5": -67}, "tx_rate_list": {"band2+band5": 300}}},
+        {"mac": "AA-BB-CC-DD-EE-04", "ip": "192.168.0.53", "name": "dHY=", "client_type": "entertainment", "online": true, "interface": "main",
+         "linked_device_info": {"device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5", "connection_type": ["wired"]}},
+        {"mac": "AA-BB-CC-DD-EE-05", "ip": "192.168.0.54", "online": false, "interface": "main",
+         "linked_device_info": {"device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5", "connection_type": ["band5"]}},
+        {"mac": "AA-BB-CC-DD-EE-06", "ip": "192.168.0.55", "online": true, "interface": "main",
+         "linked_device_info": {"device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5", "connection_type": ["band6"]}},
+        {"mac": "AA-BB-CC-DD-EE-07", "ip": "192.168.0.56", "online": true, "interface": "main"},
+        {"mac": "AA-BB-CC-DD-EE-08", "ip": "192.168.0.57", "name": "ZnJpZGdl", "online": true, "interface": "iot",
+         "linked_device_info": {"device_id": "dev232", "connection_type": ["band2_4"]}}
+      ]
+    }
+  },
+  "speeds": {
+    "ok": true,
+    "at": "2026-11-18T12:00:00Z",
+    "value": {
+      "client_list_speed": [
+        {"mac": "AA-BB-CC-DD-EE-01", "up_speed": 100, "down_speed": 2000},
+        {"mac": "AA-BB-CC-DD-EE-02", "up_speed": 50, "down_speed": 500},
+        {"mac": "AA-BB-CC-DD-EE-03", "up_speed": 10, "down_speed": 100},
+        {"mac": "AA-BB-CC-DD-EE-04", "up_speed": 0, "down_speed": 8000}
+      ]
+    }
+  },
+  "wireless": {
+    "ok": true,
+    "at": "2026-11-18T12:00:00Z",
+    "value": {
+      "band2_4": {
+        "host": {"enable": true, "ssid": "SG9tZQ==", "password": "czNjcmV0LVdpZmktUFNL", "encryption_mode": "wpa2", "enable_hide_ssid": false, "enable_wpa3": false, "is_separate": false},
+        "guest": {"enable": true, "ssid": "SG9tZS1HdWVzdA==", "password": "Z3Vlc3QtcGFzcy05", "encryption_mode": "wpa2", "enable_wpa3": false, "access_duration": -1},
+        "radio": {"channel": "auto", "enable": true, "htmode": "HE40", "hwmode": "11axg"},
+        "backhaul": {"channel": 8}
+      },
+      "band5_1": {
+        "host": {"enable": true, "ssid": "SG9tZQ==", "password": "czNjcmV0LVdpZmktUFNL", "encryption_mode": "wpa2", "enable_hide_ssid": false, "enable_wpa3": false, "is_separate": false},
+        "guest": {"enable": true, "ssid": "SG9tZS1HdWVzdA==", "password": "Z3Vlc3QtcGFzcy05", "encryption_mode": "wpa2", "enable_wpa3": false, "access_duration": -1},
+        "radio": {"channel": "44", "enable": true, "htmode": "HE80", "hwmode": "11axa"},
+        "backhaul": {"channel": 44}
+      },
+      "config_spec": {"password_strength": "normal"}
+    }
+  },
+  "ports": {
+    "ok": true,
+    "at": "2026-11-18T12:00:00Z",
+    "value": {
+      "device_list": [
+        {"device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5", "port_info": [
+          {"port": 2, "port_speed": 100, "ports_status_info": [{"status": "well", "type": "lan"}]},
+          {"port": 1, "port_speed": 1000, "ports_status_info": [{"status": "well", "type": "wan"}]}]},
+        {"device_id": "dev205", "port_info": [
+          {"port": 1, "ports_status_info": [{"status": "unplugged", "type": "lan"}]},
+          {"port": 2, "ports_status_info": [{"status": "unplugged", "type": "lan"}]}]}
+      ]
+    }
+  },
+  "blocks": {"ok": true, "at": "2026-11-18T12:00:00Z", "value": {"client_list": []}}
+}

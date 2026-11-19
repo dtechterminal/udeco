@@ -1,0 +1,42 @@
+TAG t3_wl0_c1 radio=wl0 c=1 reps=8
+HDR wl0 chanspec=9u (0x1907) noise=-94 up=3762.58
+AC 3762.58 wl01=0[ ] wl02=1[ m:971e1247/in=3621/txB=10218668/rxB=2154903/txfail=0/retry=1170/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3669/txB=10709630/rxB=844651/txfail=0/retry=914/rssi=-70 ] wl13=2[ m:f0197d79/in=204/txB=27528223/rxB=617699/txfail=0/retry=14671/rssi=-67 m:177f5794/in=243/txB=46848697/rxB=1447463/txfail=0/retry=1799/rssi=-70 ]
+W idle r=wl0 c=1 t0=3762.90 done=- t1=3763.94 beacons=22
+W scan r=wl0 c=1 t0=3764.97 done=3765.11 t1=3766.01 beacons=18
+W idle r=wl0 c=1 t0=3767.05 done=- t1=3768.13 beacons=20
+W scan r=wl0 c=1 t0=3769.16 done=3769.31 t1=3770.19 beacons=17
+W idle r=wl0 c=1 t0=3771.21 done=- t1=3772.25 beacons=21
+W scan r=wl0 c=1 t0=3773.27 done=3773.41 t1=3774.31 beacons=18
+W idle r=wl0 c=1 t0=3775.33 done=- t1=3776.35 beacons=19
+W scan r=wl0 c=1 t0=3777.37 done=3777.51 t1=3778.41 beacons=18
+W idle r=wl0 c=1 t0=3779.43 done=- t1=3780.46 beacons=20
+W scan r=wl0 c=1 t0=3781.49 done=3781.63 t1=3782.52 beacons=18
+W idle r=wl0 c=1 t0=3783.54 done=- t1=3784.56 beacons=20
+W scan r=wl0 c=1 t0=3785.59 done=3785.73 t1=3786.62 beacons=18
+W idle r=wl0 c=1 t0=3787.64 done=- t1=3788.66 beacons=20
+W scan r=wl0 c=1 t0=3789.68 done=3789.82 t1=3790.70 beacons=18
+W idle r=wl0 c=1 t0=3791.73 done=- t1=3792.75 beacons=20
+W scan r=wl0 c=1 t0=3793.78 done=3793.92 t1=3794.80 beacons=18
+HDR wl0 chanspec=9u (0x1907) noise=-96 up=3795.82
+AC 3795.82 wl01=0[ ] wl02=1[ m:971e1247/in=3655/txB=10263517/rxB=2177235/txfail=0/retry=1180/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3702/txB=10759509/rxB=853008/txfail=0/retry=920/rssi=-71 ] wl13=2[ m:f0197d79/in=237/txB=29728887/rxB=700275/txfail=0/retry=15103/rssi=-71 m:177f5794/in=276/txB=46937272/rxB=1485551/txfail=0/retry=1835/rssi=-71 ]
+TAG t3_wl0_c6 radio=wl0 c=6 reps=8
+HDR wl0 chanspec=9u (0x1907) noise=-96 up=3796.10
+AC 3796.11 wl01=0[ ] wl02=1[ m:971e1247/in=3655/txB=10263585/rxB=2177277/txfail=0/retry=1180/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3702/txB=10759645/rxB=853008/txfail=0/retry=920/rssi=-71 ] wl13=2[ m:f0197d79/in=238/txB=29729023/rxB=700275/txfail=0/retry=15103/rssi=-71 m:177f5794/in=277/txB=46937408/rxB=1485551/txfail=0/retry=1835/rssi=-71 ]
+W idle r=wl0 c=6 t0=3796.37 done=- t1=3797.39 beacons=20
+W scan r=wl0 c=6 t0=3798.41 done=3798.55 t1=3799.43 beacons=16
+W idle r=wl0 c=6 t0=3800.45 done=- t1=3801.47 beacons=20
+W scan r=wl0 c=6 t0=3802.49 done=3802.64 t1=3803.52 beacons=18
+W idle r=wl0 c=6 t0=3804.55 done=- t1=3805.57 beacons=20
+W scan r=wl0 c=6 t0=3806.59 done=3806.73 t1=3807.63 beacons=18
+W idle r=wl0 c=6 t0=3808.65 done=- t1=3809.67 beacons=20
+W scan r=wl0 c=6 t0=3810.69 done=3810.83 t1=3811.71 beacons=18
+W idle r=wl0 c=6 t0=3812.73 done=- t1=3813.76 beacons=20
+W scan r=wl0 c=6 t0=3814.78 done=3814.92 t1=3815.81 beacons=18
+W idle r=wl0 c=6 t0=3816.83 done=- t1=3817.85 beacons=20
+W scan r=wl0 c=6 t0=3818.87 done=3819.01 t1=3819.89 beacons=18
+W idle r=wl0 c=6 t0=3820.91 done=- t1=3821.93 beacons=19
+W scan r=wl0 c=6 t0=3822.95 done=3823.09 t1=3823.99 beacons=18
+W idle r=wl0 c=6 t0=3825.01 done=- t1=3826.06 beacons=20
+W scan r=wl0 c=6 t0=3827.08 done=3827.22 t1=3828.10 beacons=16
+HDR wl0 chanspec=9u (0x1907) noise=-97 up=3829.12
+AC 3829.12 wl01=0[ ] wl02=1[ m:971e1247/in=3688/txB=10319322/rxB=2194469/txfail=0/retry=1198/rssi=-65 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3735/txB=10818100/rxB=859078/txfail=0/retry=934/rssi=-70 ] wl13=2[ m:f0197d79/in=270/txB=31910744/rxB=800143/txfail=0/retry=15627/rssi=-69 m:177f5794/in=309/txB=47117390/rxB=1584966/txfail=0/retry=1988/rssi=-71 ]

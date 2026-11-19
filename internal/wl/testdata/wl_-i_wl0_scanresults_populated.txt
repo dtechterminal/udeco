@@ -1,0 +1,576 @@
+SSID: "ESP_36CB75"
+Mode: Managed	RSSI: -62 dBm	SNR: 34 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 7u
+BSSID: 8C:BF:EA:1D:BA:75	Capability: ESS ShortPre ShortSlot 
+Supported Rates: [ 5.5(b) 11(b) 1(b) 2(b) 6 12 24 48 54 9 18 36 ]
+Extended Capabilities: 
+HT Capable:
+	Chanspec: 2.4GHz channel 5 40MHz (0x1905)
+	Primary channel: 7
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-7 96
+VS_IE:dd180050f2020101040003a4000027a4000042435e0062322f00
+
+SSID: "Example Network"
+Mode: Managed	RSSI: -53 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 8u
+BSSID: AA:A7:B9:3E:15:F8	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2 + WPA3-SAE):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(2): WPA2-PSK SAE 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 6 40MHz (0x1906)
+	Primary channel: 8
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+WPS: V2.0 Configured
+VS_IE:dd1d0050f204104a0001101044000102103c0001031049000600372a000120
+VS_IE:dd1f00904c0418bf0cb179890ffaff0000faff0000c0050006000000c303013333
+VS_IE:dd0a0010180200001c000001
+VS_IE:dd180050f2020101800003a4000027a4000042435e0062322f00
+
+SSID: ""
+Mode: Managed	RSSI: -54 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 8u
+BSSID: AA:A7:B9:3E:15:FF	Capability: ESS WEP ShortPre ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 6 40MHz (0x1906)
+	Primary channel: 8
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE:dd1f00904c0418bf0cb169890ffaff0000faff0000c0050006000000c303013333
+VS_IE:dd0a0010180200009c000001
+VS_IE:dd180050f2020101800003a4000027a4000042435e0062322f00
+
+SSID: "Example Network"
+Mode: Managed	RSSI: -57 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 8u
+BSSID: AA:A7:B9:3E:16:90	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2 + WPA3-SAE):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(2): WPA2-PSK SAE 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 6 40MHz (0x1906)
+	Primary channel: 8
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+WPS: V2.0 Configured
+VS_IE:dd1d0050f204104a0001101044000102103c0001031049000600372a000120
+VS_IE:dd1f00904c0418bf0cb179890ffaff0000faff0000c0050006000000c303013333
+VS_IE:dd0a0010180200001c000001
+VS_IE:dd180050f2020101840003a4000027a4000042435e0062322f00
+
+SSID: "olive#"
+Mode: Managed	RSSI: -58 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 8u
+BSSID: AA:A7:B9:3E:16:91	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2 + WPA3-SAE):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(2): WPA2-PSK SAE 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 6 40MHz (0x1906)
+	Primary channel: 8
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE:dd1f00904c0418bf0cb179890ffaff0000faff0000c0050006000000c303013333
+VS_IE:dd0a0010180200001c000001
+VS_IE:dd180050f2020101840003a4000027a4000042435e0062322f00
+
+SSID: ""
+Mode: Managed	RSSI: -58 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 8u
+BSSID: AA:A7:B9:3E:16:92	Capability: ESS WEP ShortPre ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 6 40MHz (0x1906)
+	Primary channel: 8
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE:dd1f00904c0418bf0cb169890ffaff0000faff0000c0050006000000c303013333
+VS_IE:dd0a0010180200009c000001
+VS_IE:dd180050f2020101840003a4000027a4000042435e0062322f00
+
+SSID: "Deco_2794"
+Mode: Managed	RSSI: -57 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 8u
+BSSID: AA:A7:B9:3E:16:93	Capability: ESS ShortPre ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 6 40MHz (0x1906)
+	Primary channel: 8
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE:dd1f00904c0418bf0cb169890ffaff0000faff0000c0050006000000c303013333
+VS_IE:dd0a0010180200001c000001
+VS_IE:dd180050f2020101840003a4000027a4000042435e0062322f00
+
+SSID: "EXN IOT"
+Mode: Managed	RSSI: -58 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 8u
+BSSID: AA:A7:B9:3E:16:94	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 6 40MHz (0x1906)
+	Primary channel: 8
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE:dd1f00904c0418bf0cb179890ffaff0000faff0000c0050006000000c303013333
+VS_IE:dd0a0010180200001c000001
+VS_IE:dd180050f2020101840003a4000027a4000042435e0062322f00
+
+SSID: "zEQQnH6p2LzsU8Ag"
+Mode: Managed	RSSI: -58 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 8u
+BSSID: B0:A7:B9:3E:16:96	Capability: ESS WEP ShortPre ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: IW BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 6 40MHz (0x1906)
+	Primary channel: 8
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE:dd1f00904c0418bf0cb179890ffaff0000faff0000c0050006000000c303013333
+VS_IE:dd0a0010180200009c000001
+VS_IE:dd180050f2020101840003a4000027a4000042435e0062322f00
+VS_IE:dd07506f9a16010100
+
+SSID: ""
+Mode: Managed	RSSI: -58 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 8u
+BSSID: AA:A7:B9:3E:16:97	Capability: ESS WEP ShortPre ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 6 40MHz (0x1906)
+	Primary channel: 8
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE:dd1f00904c0418bf0cb169890ffaff0000faff0000c0050006000000c303013333
+VS_IE:dd0a0010180200009c000001
+VS_IE:dd180050f2020101840003a4000027a4000042435e0062322f00
+
+SSID: "Timbl-2.4G"
+Mode: Managed	RSSI: -84 dBm	SNR: 12 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 10u
+BSSID: 88:C9:B3:A0:DE:0E	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+WPA:
+	multicast cipher: TKIP
+	unicast ciphers(2): TKIP AES-CCMP 
+	AKM Suites(1): WPA-PSK 
+	No WPA Capabilities advertised
+RSN (WPA2):
+	multicast cipher: TKIP
+	unicast ciphers(2): TKIP AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: 
+HT Capable:
+	Chanspec: 2.4GHz channel 8 40MHz (0x1908)
+	Primary channel: 10
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15
+WPS: V2.0 Configured
+VS_IE:dd1a0050f20101000050f20202000050f2020050f20401000050f202
+VS_IE:dd180050f2020101000003a4000027a4000042435e0062322f00
+VS_IE:dd0600e04c020160
+VS_IE:dd4d0050f204104a00011010440001021054000800060050f20400011011000652544b5f475710080002278810470010112233445566778899aa88c9b3a0de09103c0001031049000600372a000120
+
+SSID: "Kallu"
+Mode: Managed	RSSI: -61 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 11
+BSSID: AA:A9:15:50:01:58	Capability: ESS WEP ShortPre ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 2.4GHz channel 11 20MHz (0x100b)
+	Primary channel: 11
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-31 96
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+		NSS3 Tx: 0-9   Rx: 0-9 
+		NSS4 Tx: 0-9   Rx: 0-9 
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+		NSS3 Tx: 0-11        Rx: 0-11
+		NSS4 Tx: 0-11        Rx: 0-11
+WPS: V2.0 Configured
+VS_IE:dd138cfdf001010201000201010303010100040101
+VS_IE:dd180050f2020101830003a4000027a4000042435e0062322f00
+VS_IE:dd168cfdf0040000494c51030209720100000000faff0000
+VS_IE:dd078cfdf004010100
+VS_IE:dd1d0050f204104a0001101044000102103c0001011049000600372a000120
+
+SSID: "Master Bedroom display.513F.ync,"
+Mode: Managed	RSSI: -55 dBm	SNR: 35 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 11
+BSSID: FA:8F:CA:53:E1:9B	Capability: ESS WEP ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: 
+HT Capable:
+	Chanspec: 2.4GHz channel 11 20MHz (0x100b)
+	Primary channel: 11
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-7 87-88
+VS_IE:dd090010180200001c0000
+
+SSID: "OPPO A15s"
+Mode: Managed	RSSI: -90 dBm	SNR: 6 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 11
+BSSID: 2E:A5:1A:23:75:4E	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+VHT Capable:
+	Chanspec: 2.4GHz channel 11 20MHz (0x100b)
+	Primary channel: 11
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-7 96
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+VS_IE:dd180050f2020101800003a4000027a4000042435e0062322f00
+VS_IE:dd07000ce708000000
+
+SSID: "Airtel_Ansari'$"
+Mode: Managed	RSSI: -90 dBm	SNR: 6 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 11
+BSSID: B4:A7:C6:DF:C7:29	Capability: ESS WEP RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 9 18 36 54 6 12 24 48 ]
+WPA:
+	multicast cipher: TKIP
+	unicast ciphers(2): TKIP AES-CCMP 
+	AKM Suites(1): WPA-PSK 
+	No WPA Capabilities advertised
+RSN (WPA2):
+	multicast cipher: TKIP
+	unicast ciphers(2): TKIP AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: IW 20/40_Bss_Coexist BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 11 20MHz (0x100b)
+	Primary channel: 11
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+WPS: V1.0 Configured
+VS_IE:dd1a0050f20101000050f20202000050f2020050f20401000050f202
+VS_IE:dd270050f204104a000110104400010210470010bc329e001dd811b28601b4a7c6dfc729103c000101
+VS_IE:dd180050f2020101000003a4000027a4000042435e0062322f00
+VS_IE:dd07000c4300000000
+VS_IE:dd21000ce700000000bf0cb101c0332aff92042aff9204c0050000002affc303010202
+
+SSID: "JioPrivateNet"
+Mode: Managed	RSSI: -87 dBm	SNR: 9 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 11
+BSSID: 00:06:AE:D7:E0:AF	Capability: ESS WEP ShortPre ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: IW BSS_Transition
+VHT Capable:
+	Chanspec: 2.4GHz channel 11 20MHz (0x100b)
+	Primary channel: 11
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-15 96
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+Hotspot 2.0 capable
+VS_IE:dd180050f2020101800003a4000027a4000042435e0062322f00
+VS_IE:dd0900037f01010000ff7f
+VS_IE:dd088cfdf00101020100
+VS_IE:dd07506f9a10150000
+VS_IE:dd08506f9a090a010005
+
+SSID: "IOT5-M2-478590015"
+Mode: Managed	RSSI: -88 dBm	SNR: 8 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 1
+BSSID: 2E:F4:32:6A:16:C9	Capability: ESS WEP 
+Supported Rates: [ 5.5(b) 11(b) 1(b) 2(b) 6 12 24 48 54 9 18 36 ]
+RSN (WPA2):
+	multicast cipher: TKIP
+	unicast ciphers(2): AES-CCMP TKIP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: Not_Available
+VS_IE:dd0918fe34030100000000
+
+SSID: "Example Network(2.4GHz)"
+Mode: Managed	RSSI: -74 dBm	SNR: 22 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 1
+BSSID: B4:A7:C6:17:E3:F4	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 9 18 36 54 6(b) 12(b) 24(b) 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: IW 20/40_Bss_Coexist BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-15
+WPS: V1.0 Configured
+VS_IE:dd270050f204104a000110104400010210470010bc329e001dd811b28601b4a7c617e3f4103c000101
+VS_IE:dd180050f2020101000003a4000027a4000042435e0062322f00
+VS_IE:dd07000c4300000000
+VS_IE:dd21000ce700000000bf0cb101c0332aff92042aff9204c0050000002affc303010202
+
+SSID: "ORCHID"
+Mode: Managed	RSSI: -74 dBm	SNR: 22 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 1
+BSSID: B6:A7:C6:17:E3:F4	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 9 18 36 54 6(b) 12(b) 24(b) 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: IW 20/40_Bss_Coexist BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-15
+WPS: V1.0 Configured
+VS_IE:dd270050f204104a000110104400010210470010bc329e001dd811b28601b6a7c617e3f4103c000101
+VS_IE:dd180050f2020101000003a4000027a4000042435e0062322f00
+VS_IE:dd07000c4300000000
+VS_IE:dd21000ce700000000bf0cb101c0332aff92042aff9204c0050000002affc303010202
+
+SSID: "ORCHID"
+Mode: Managed	RSSI: -63 dBm	SNR: 33 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 1
+BSSID: 54:AF:97:74:F4:37	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 9 18 36 54 6 12 24 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: 20/40_Bss_Coexist 
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15 32
+VS_IE:dd180050f2020101000003a4000027a4000042435e0062322f00
+VS_IE:dd07c04a0003000000
+
+SSID: "Tony jio"
+Mode: Managed	RSSI: -93 dBm	SNR: 3 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 1
+BSSID: B2:83:94:D9:02:A1	Capability: ESS WEP ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15
+VS_IE:dd090010180202000c0000
+VS_IE:dd180050f2020101840003a4000027a4000042435e0062322f00
+
+SSID: "PathakJio"
+Mode: Managed	RSSI: -90 dBm	SNR: 6 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 1
+BSSID: 7A:BB:C1:F5:90:6E	Capability: ESS WEP ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 18 24 36 54 6 9 12 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 1 20MHz (0x1001)
+	Primary channel: 1
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15
+VS_IE:dd090010180200000c0000
+VS_IE:dd180050f2020101840003a4000027a4000042435e0062322f00
+
+SSID: "KETAN SINGH RAAJPOOT"
+Mode: Managed	RSSI: -90 dBm	SNR: 6 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 2
+BSSID: 50:2B:73:32:C2:81	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+WPA:
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA-PSK 
+	No WPA Capabilities advertised
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: 
+HT Capable:
+	Chanspec: 2.4GHz channel 2 20MHz (0x1002)
+	Primary channel: 2
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-15
+WPS: V2.0 Configured
+VS_IE:dd160050f20101000050f20401000050f20401000050f202
+VS_IE:dd180050f2020101800003a4000027a4000042435e0062322f00
+VS_IE:dd0600e04c020160
+VS_IE:dd5a0050f204104a00011010440001021054000800060050f2040001101100135265616c74656b20576972656c65737320415010080002278810470010112233445566778899aa502b7332c280103c0001031049000600372a000120
+
+SSID: ""
+Mode: Managed	RSSI: -90 dBm	SNR: 6 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 3
+BSSID: B6:A7:C6:1E:73:B4	Capability: ESS WEP ShortSlot RRM 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 9 18 36 54 6 12 24 48 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: IW 20/40_Bss_Coexist BSS_Transition
+HT Capable:
+	Chanspec: 2.4GHz channel 3 20MHz (0x1003)
+	Primary channel: 3
+	HT Capabilities: SGI20 
+	Supported HT MCS : 0-15
+WPS: V1.0 Configured
+VS_IE:dd270050f204104a000110104400010210470010bc329e001dd811b28601b6a7c61e73b4103c000101
+VS_IE:dd1f000ce700010000000000011027000000000000b6a7c61e73b5b6a7c61e73b4
+VS_IE:dd180050f2020101000003a4000027a4000042435e0062322f00
+VS_IE:dd07000c4300000000
+VS_IE:dd21000ce700000000bf0cb101c0332aff92042aff9204c0050000002affc303010202
+
+SSID: "Tenda_5B2018"
+Mode: Managed	RSSI: -84 dBm	SNR: 12 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 4
+BSSID: 08:40:F3:B2:0F:18	Capability: ESS WEP ShortSlot 
+Supported Rates: [ 1(b) 2(b) 5.5(b) 11(b) 6 9 12 18 24 36 48 54 ]
+WPA:
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA-PSK 
+	No WPA Capabilities advertised
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: 
+HT Capable:
+	Chanspec: 2.4GHz channel 4 20MHz (0x1004)
+	Primary channel: 4
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15
+VS_IE:dd160050f20101000050f20401000050f20401000050f202
+VS_IE:dd180050f2020101000003a4000027a4000042435e0062322f00
+VS_IE:dd1e00904c33ec191fffff000000000000000000000000000000000000000000
+VS_IE:dd1a00904c3404000000000000000000000000000000000000000000
+VS_IE:dd0600e04c020160
+

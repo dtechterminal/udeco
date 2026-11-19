@@ -1,0 +1,106 @@
+[VER 8] STA 02:00:00:00:0E:02:
+	 chanspec 40u (0xd926)
+	 aid:19 
+	 rateset [ 6 9 12 18 24 36 48 54 ]
+	 idle 5 seconds
+	 in network 1170 seconds
+	 state: AUTHENTICATED ASSOCIATED AUTHORIZED
+	 connection: SECURED
+	 auth: WPA2-PSK
+	 crypto: AES_CCM
+	 flags 0x111e13a: WME PS N_CAP VHT_CAP AMPDU AMSDU DWDS_CAP
+	 HT caps 0x1ef: LDPC 40MHz SGI20 SGI40 STBC-Tx STBC-Rx
+	 VHT caps 0x19: LDPC STBC-Tx STBC-Rx
+	 tx total pkts: 50796
+	 tx total bytes: 8044204
+	 tx ucast pkts: 1181
+	 tx ucast bytes: 323253
+	 tx mcast/bcast pkts: 49615
+	 tx mcast/bcast bytes: 7720951
+	 tx failures: 0
+	 rx data pkts: 2909
+	 rx data bytes: 356058
+	 rx data dur: 0
+	 rx ucast pkts: 2750
+	 rx ucast bytes: 326579
+	 rx mcast/bcast pkts: 159
+	 rx mcast/bcast bytes: 29479
+	 rate of last tx pkt: 81000 kbps - 13000 kbps
+	 rate of last rx pkt: 6000 kbps
+	 rx decrypt succeeds: 1399
+	 rx decrypt failures: 0
+	 tx data pkts retried: 3
+	 per antenna rssi of last rx data frame: -68 -68 0 0
+	 per antenna average rssi of rx data frames: -68 -68 0 0
+	 per antenna noise floor: -97 -99 0 0
+	 tx total pkts sent: 1197
+	 tx pkts retries: 144
+	 tx pkts retry exhausted: 0
+	 tx FW total pkts sent: 0
+	 tx FW pkts retries: 0
+	 tx FW pkts retry exhausted: 0
+	 rx total pkts retried: 370
+MCS SET : [ 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 ]
+VHT SET : 0x1 1x1 2x1 3x1 4x1 5x1 6x1 7x1 8x1 9x1 
+        : 0x2 1x2 2x2 3x2 4x2 5x2 6x2 7x2 8x2 9x2 
+smoothed rssi: -67
+tx nrate
+vht mcs 4 Nss 1 Tx Exp 0 bw40 stbc ldpc auto
+rx nrate
+legacy rate 6 Mbps stf mode 0 auto
+wnm
+0x21:  BSS-Transition  WNM-Sleep-Mode
+VENDOR OUI VALUE[0] 00:50:F2 
+link bandwidth = 40 MHZ 
+RRM capability = 0x0 
+[VER 8] STA 02:00:00:00:0E:01:
+	 chanspec 40 (0xd028)
+	 aid:25 
+	 rateset [ 6 12 24 ]
+	 idle 1178 seconds
+	 in network 0 seconds
+	 state:
+	 connection:OPEN
+	 auth: AUTH-DISABLED
+	 crypto: NONE
+	 flags 0x1004000: DWDS_CAP
+	 HT caps 0x0: 
+	 tx total pkts: 49615
+	 tx total bytes: 7720951
+	 tx ucast pkts: 0
+	 tx ucast bytes: 0
+	 tx mcast/bcast pkts: 49615
+	 tx mcast/bcast bytes: 7720951
+	 tx failures: 0
+	 rx data pkts: 0
+	 rx data bytes: 0
+	 rx data dur: 0
+	 rx ucast pkts: 0
+	 rx ucast bytes: 0
+	 rx mcast/bcast pkts: 0
+	 rx mcast/bcast bytes: 0
+	 rate of last tx pkt: 0 kbps - -1 kbps
+	 rate of last rx pkt: -1 kbps
+	 rx decrypt succeeds: 0
+	 rx decrypt failures: 0
+	 tx data pkts retried: 1
+	 per antenna rssi of last rx data frame: 0 0 0 0
+	 per antenna average rssi of rx data frames: 0 0 0 0
+	 per antenna noise floor: -97 -99 0 0
+	 tx total pkts sent: 1
+	 tx pkts retries: 1
+	 tx pkts retry exhausted: 0
+	 tx FW total pkts sent: 0
+	 tx FW pkts retries: 0
+	 tx FW pkts retry exhausted: 0
+	 rx total pkts retried: 0
+MCS SET : [ 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 32 ]
+smoothed rssi: 0
+tx nrate
+auto
+rx nrate
+auto
+wnm
+0x0:
+link bandwidth = 20 MHZ 
+RRM capability = 0x0 

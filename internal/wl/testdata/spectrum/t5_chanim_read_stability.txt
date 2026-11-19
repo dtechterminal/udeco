@@ -1,0 +1,104 @@
+TAG t5_chanim_read_stability: 40 x chanim_stats all per radio, 0.25 s apart, no scan
+R wl0 t=4265.50 records=11 md5=ce355f51
+R wl0 t=4265.78 records=11 md5=ce355f51
+R wl0 t=4266.05 records=11 md5=ce355f51
+R wl0 t=4266.33 records=11 md5=ce355f51
+R wl0 t=4266.61 records=11 md5=ce355f51
+R wl0 t=4266.89 records=11 md5=ce355f51
+R wl0 t=4267.17 records=11 md5=ce355f51
+R wl0 t=4267.45 records=11 md5=ce355f51
+R wl0 t=4267.72 records=11 md5=ce355f51
+R wl0 t=4268.01 records=11 md5=ce355f51
+R wl0 t=4268.29 records=11 md5=ce355f51
+R wl0 t=4268.57 records=11 md5=ce355f51
+R wl0 t=4268.85 records=11 md5=ce355f51
+R wl0 t=4269.13 records=11 md5=ce355f51
+R wl0 t=4269.41 records=11 md5=ce355f51
+R wl0 t=4269.68 records=11 md5=ce355f51
+R wl0 t=4269.96 records=11 md5=ce355f51
+R wl0 t=4270.24 records=11 md5=ce355f51
+R wl0 t=4270.52 records=11 md5=ce355f51
+R wl0 t=4270.80 records=11 md5=ce355f51
+R wl0 t=4271.08 records=11 md5=ce355f51
+R wl0 t=4271.36 records=11 md5=ce355f51
+R wl0 t=4271.65 records=11 md5=ce355f51
+R wl0 t=4271.93 records=11 md5=ce355f51
+R wl0 t=4272.21 records=11 md5=ce355f51
+R wl0 t=4272.49 records=11 md5=ce355f51
+R wl0 t=4272.77 records=11 md5=ce355f51
+R wl0 t=4273.05 records=11 md5=ce355f51
+R wl0 t=4273.33 records=11 md5=ce355f51
+R wl0 t=4273.61 records=11 md5=ce355f51
+R wl0 t=4273.89 records=11 md5=ce355f51
+R wl0 t=4274.17 records=11 md5=ce355f51
+R wl0 t=4274.45 records=11 md5=ce355f51
+R wl0 t=4274.73 records=11 md5=ce355f51
+R wl0 t=4275.01 records=11 md5=ce355f51
+R wl0 t=4275.29 records=11 md5=ce355f51
+R wl0 t=4275.56 records=11 md5=ce355f51
+R wl0 t=4275.84 records=11 md5=ce355f51
+R wl0 t=4276.12 records=11 md5=ce355f51
+R wl0 t=4276.40 records=11 md5=ce355f51
+R wl1 t=4276.68 records=9 md5=b826dbb9
+R wl1 t=4276.96 records=9 md5=b826dbb9
+R wl1 t=4277.24 records=9 md5=b826dbb9
+R wl1 t=4277.52 records=9 md5=b826dbb9
+R wl1 t=4277.79 records=9 md5=b826dbb9
+R wl1 t=4278.07 records=9 md5=b826dbb9
+R wl1 t=4278.35 records=9 md5=b826dbb9
+R wl1 t=4278.63 records=9 md5=b826dbb9
+R wl1 t=4278.91 records=9 md5=b826dbb9
+R wl1 t=4279.19 records=9 md5=b826dbb9
+R wl1 t=4279.47 records=9 md5=b826dbb9
+R wl1 t=4279.74 records=9 md5=b826dbb9
+R wl1 t=4280.02 records=9 md5=b826dbb9
+R wl1 t=4280.30 records=9 md5=b826dbb9
+R wl1 t=4280.58 records=9 md5=b826dbb9
+R wl1 t=4280.86 records=9 md5=b826dbb9
+R wl1 t=4281.14 records=9 md5=b826dbb9
+R wl1 t=4281.42 records=9 md5=b826dbb9
+R wl1 t=4281.70 records=9 md5=b826dbb9
+R wl1 t=4281.98 records=9 md5=b826dbb9
+R wl1 t=4282.26 records=9 md5=b826dbb9
+R wl1 t=4282.54 records=9 md5=b826dbb9
+R wl1 t=4282.81 records=9 md5=b826dbb9
+R wl1 t=4283.09 records=9 md5=b826dbb9
+R wl1 t=4283.37 records=9 md5=b826dbb9
+R wl1 t=4283.65 records=9 md5=b826dbb9
+R wl1 t=4283.93 records=9 md5=b826dbb9
+R wl1 t=4284.21 records=9 md5=b826dbb9
+R wl1 t=4284.49 records=9 md5=b826dbb9
+R wl1 t=4284.76 records=9 md5=b826dbb9
+R wl1 t=4285.04 records=9 md5=b826dbb9
+R wl1 t=4285.33 records=9 md5=b826dbb9
+R wl1 t=4285.61 records=9 md5=b826dbb9
+R wl1 t=4285.89 records=9 md5=b826dbb9
+R wl1 t=4286.17 records=9 md5=b826dbb9
+R wl1 t=4286.45 records=9 md5=b826dbb9
+R wl1 t=4286.73 records=9 md5=b826dbb9
+R wl1 t=4287.01 records=9 md5=b826dbb9
+R wl1 t=4287.29 records=9 md5=b826dbb9
+R wl1 t=4287.57 records=9 md5=b826dbb9
+--- chanim_stats all wl1 t=4287.84
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 52 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 18 bad plcp: 18 noise: -96
+	 cca_txdur: 6 cca_inbss: 4 cca_obss:6 cca_nocat: 3 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 1 cca_inbss: 0 cca_obss:0 cca_nocat: 4 cca_nopkt: 0
+ chanspec: 0xd030 crsglitch cnt: 130 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:2 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+

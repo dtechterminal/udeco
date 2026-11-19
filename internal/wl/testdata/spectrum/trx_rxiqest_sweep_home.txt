@@ -1,0 +1,40 @@
+TAG trx_wl0_rxiqest_sweep_c9 (home control only)
+HDR wl0 chanspec=9u (0x1907) noise=-97 up=4438.38
+AC 4438.39 wl01=0[ ] wl02=1[ m:971e1247/in=4295/txB=11673777/rxB=2578472/txfail=0/retry=1381/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4342/txB=12259138/rxB=984770/txfail=0/retry=1251/rssi=-71 ] wl13=1[ m:f0197d79/in=116/txB=12465576/rxB=287576/txfail=0/retry=184/rssi=-63 ]
+P t=4438.60 cs=9u (0x1907) bss=up
+P t=4438.72 cs=9u (0x1907) bss=up
+P t=4438.84 cs=9u (0x1907) bss=up
+P t=4438.96 cs=9u (0x1907) bss=up
+P t=4439.08 cs=9u (0x1907) bss=up
+P t=4439.20 cs=9u (0x1907) bss=up
+P t=4439.32 cs=9u (0x1907) bss=up
+P t=4439.44 cs=9u (0x1907) bss=up
+P t=4439.56 cs=9u (0x1907) bss=up
+P t=4439.68 cs=9u (0x1907) bss=up
+P t=4439.81 cs=9u (0x1907) bss=up
+P t=4439.93 cs=9u (0x1907) bss=up
+SWEEP rc=233 t=4438.60..4438.61
+error
+BEACONS t0=4438.59 t1=4440.05 beacons=28
+HDR wl0 chanspec=9u (0x1907) noise=-96 up=4442.07
+AC 4442.08 wl01=0[ ] wl02=1[ m:971e1247/in=4298/txB=11698905/rxB=2580475/txfail=0/retry=1381/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4346/txB=12286484/rxB=987376/txfail=0/retry=1251/rssi=-71 ] wl13=1[ m:f0197d79/in=120/txB=12498716/rxB=293056/txfail=0/retry=185/rssi=-63 ]
+TAG trx_wl1_rxiqest_sweep_c40 (home control only)
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4447.29
+AC 4447.30 wl01=0[ ] wl02=1[ m:971e1247/in=4303/txB=11708769/rxB=2584454/txfail=0/retry=1383/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4351/txB=12296282/rxB=988132/txfail=0/retry=1251/rssi=-71 ] wl13=1[ m:f0197d79/in=125/txB=12513636/rxB=296256/txfail=0/retry=186/rssi=-63 ]
+P t=4447.51 cs=40/80 (0xe12a) bss=up
+P t=4447.63 cs=40/80 (0xe12a) bss=up
+P t=4447.75 cs=40/80 (0xe12a) bss=up
+P t=4447.87 cs=40/80 (0xe12a) bss=up
+P t=4447.99 cs=40/80 (0xe12a) bss=up
+P t=4448.11 cs=40/80 (0xe12a) bss=up
+P t=4448.23 cs=40/80 (0xe12a) bss=up
+P t=4448.35 cs=40/80 (0xe12a) bss=up
+P t=4448.47 cs=40/80 (0xe12a) bss=up
+P t=4448.59 cs=40/80 (0xe12a) bss=up
+P t=4448.71 cs=40/80 (0xe12a) bss=up
+P t=4448.83 cs=40/80 (0xe12a) bss=up
+SWEEP rc=233 t=4447.51..4447.52
+error
+BEACONS t0=4447.51 t1=4448.95 beacons=42
+HDR wl1 chanspec=40/80 (0xe12a) noise=-95 up=4450.98
+AC 4450.99 wl01=0[ ] wl02=1[ m:971e1247/in=4307/txB=11713947/rxB=2585785/txfail=0/retry=1384/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4355/txB=12301782/rxB=988512/txfail=0/retry=1251/rssi=-70 ] wl13=1[ m:f0197d79/in=129/txB=12519229/rxB=296831/txfail=0/retry=186/rssi=-65 ]

@@ -1,0 +1,16 @@
+8C:BF:EA:1D:BA:74  -63 dBm / -96 dBm (SNR 33)  2000 ms ago
+	RX: unknown                                        0 Pkts.
+	TX: unknown                                        0 Pkts.
+
+F8:17:2D:6A:16:CC  -75 dBm / -96 dBm (SNR 21)  0 ms ago
+	RX: unknown                                        0 Pkts.
+	TX: unknown                                        0 Pkts.
+
+FC:3C:D7:CA:38:BB  -73 dBm / -96 dBm (SNR 23)  0 ms ago
+	RX: unknown                                        0 Pkts.
+	TX: unknown                                        0 Pkts.
+
+F4:CF:A2:1E:72:64  -69 dBm / -96 dBm (SNR 27)  1000 ms ago
+	RX: unknown                                        0 Pkts.
+	TX: unknown                                        0 Pkts.
+

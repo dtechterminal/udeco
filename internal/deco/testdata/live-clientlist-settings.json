@@ -1,0 +1,161 @@
+{
+ "client_list": [
+  {
+   "client_type": "phone",
+   "enable_isolation": false,
+   "enable_priority": false,
+   "has_set_client_type": false,
+   "interface": "main",
+   "mac": "8E-56-D7-04-BB-8F",
+   "name": "cGhvbmUtYQ==",
+   "online": false,
+   "remain_time": 0,
+   "space_id": "1",
+   "time_period": 0,
+   "user_set_name_type": false
+  },
+  {
+   "client_type": "pc",
+   "enable_isolation": false,
+   "enable_priority": false,
+   "has_set_client_type": false,
+   "interface": "main",
+   "mac": "02-42-C0-59-EF-05",
+   "name": "SG9tZSBTZXJ2ZXI=",
+   "online": false,
+   "remain_time": 0,
+   "space_id": "1",
+   "time_period": 0,
+   "user_set_name_type": false,
+   "brand": "unknown",
+   "custom_client_type": "Computer",
+   "system_version": ""
+  },
+  {
+   "client_type": "other",
+   "enable_isolation": false,
+   "enable_priority": false,
+   "has_set_client_type": false,
+   "interface": "main",
+   "mac": "44-07-0B-11-22-33",
+   "name": "dHYtYQ==",
+   "online": false,
+   "remain_time": 0,
+   "space_id": "1",
+   "time_period": 0,
+   "user_set_name_type": false,
+   "brand": "Google",
+   "custom_client_type": "Television",
+   "client_mesh": false,
+   "link_priority": {
+    "band_auto": true,
+    "device_auto": false,
+    "device_id": "dev205"
+   },
+   "linked_device_info": {
+    "connection_type": [
+     "band5"
+    ],
+    "device_id": "dev205",
+    "signal_level": {
+     "band2_4": 0,
+     "band5": 2
+    }
+   }
+  },
+  {
+   "client_type": "phone",
+   "enable_isolation": false,
+   "enable_priority": false,
+   "has_set_client_type": false,
+   "interface": "guest",
+   "mac": "F4-CF-A2-11-22-33",
+   "name": "Z3Vlc3QtcGhvbmU=",
+   "online": false,
+   "remain_time": 0,
+   "space_id": "1",
+   "time_period": 0,
+   "user_set_name_type": false,
+   "brand": "unknown",
+   "custom_client_type": "Mobile",
+   "client_mesh": true,
+   "link_priority": {
+    "band": [
+     "band2_4"
+    ],
+    "band_auto": false,
+    "device_auto": false,
+    "device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5"
+   },
+   "linked_device_info": {
+    "connection_type": [
+     "band2_4"
+    ],
+    "device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5",
+    "signal_level": {
+     "band2_4": 3,
+     "band5": 0
+    }
+   }
+  },
+  {
+   "client_type": "iot_device",
+   "enable_isolation": false,
+   "enable_priority": false,
+   "has_set_client_type": false,
+   "interface": "main",
+   "mac": "9C-9E-6E-11-22-33",
+   "name": "cGx1Zy1vbGQ=",
+   "online": false,
+   "remain_time": 0,
+   "space_id": "1",
+   "time_period": 0,
+   "user_set_name_type": false,
+   "link_priority": {
+    "band": [
+     "band2_4"
+    ],
+    "band_auto": false,
+    "device_auto": false,
+    "device_id": "dev232"
+   }
+  },
+  {
+   "client_type": "other",
+   "enable_isolation": false,
+   "enable_priority": false,
+   "has_set_client_type": false,
+   "interface": "iot",
+   "mac": "62-FE-8B-AA-E3-3A",
+   "name": "bmV0d29yayBkZXZpY2U=",
+   "online": false,
+   "remain_time": 0,
+   "space_id": "1",
+   "time_period": 0,
+   "user_set_name_type": false
+  },
+  {
+   "client_type": "tablet",
+   "enable_priority": false,
+   "has_set_client_type": false,
+   "interface": "main",
+   "mac": "C8-5C-CC-11-22-33",
+   "name": "a2lkLXRhYmxldA==",
+   "online": false,
+   "remain_time": 0,
+   "space_id": "6",
+   "time_period": 0,
+   "user_set_name_type": false,
+   "brand": "unknown",
+   "custom_client_type": "Tablet",
+   "owner_id": "2",
+   "link_priority": {
+    "band_auto": true,
+    "device_auto": true
+   }
+  }
+ ],
+ "is_ipv6_client_priority_support": false,
+ "priority_count_max": 256,
+ "speed_limit_count_max": 0
+}

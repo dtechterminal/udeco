@@ -1,0 +1,6 @@
+txframe 1 txbyte 118 txerror 0 rxframe 0 rxbyte 0 rxerror 0 
+txnobuf 0 txfail 0 
+d11_txfrag 1 d11_txmulti 1 d11_txretry 0 d11_txretrie 0 
+d11_txfrmsnt 1 d11_rxmulti 0 
+rxnobuf 0 rxfragerr 0 rxrunt 0 rxerror 0 
+txexptime 0 txrts 0 txnocts 0 

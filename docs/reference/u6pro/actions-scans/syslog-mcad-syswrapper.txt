@@ -1,0 +1,117 @@
+Mon Nov 16 16:56:10 2026 user.err mcad[3529]: mcagent_data.data_decrypt(): header error, magic=745f227b, version=22657079
+Mon Nov 16 16:56:10 2026 user.err mcad[3529]: ace_reporter.process_inform_response(): Failed to get the decrypted data from custom alert response
+Mon Nov 16 16:56:10 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Decrypt Error (http://192.168.1.1:8080/inform)
+Mon Nov 16 16:56:10 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): inform failed #1 (last inform: 13 seconds ago), rc=8
+Tue Nov 17 00:30:00 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Server Busy (http://192.168.1.1:8080/inform)
+Tue Nov 17 00:30:00 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): inform failed #1 (last inform: 14 seconds ago), rc=7
+Tue Nov 17 03:00:00 2026 user.info mcad[3529]: ace_reporter.reporter_handle_response_json(): [quick-scan] band/bw: 1 80
+Tue Nov 17 03:00:00 2026 user.notice syswrapper[23362][3529]: Starting quick airtime scan for band=1, bw=80
+Tue Nov 17 03:00:00 2026 user.notice syswrapper[23362][3529]: Scanning wifi1 (bw=80, vap=wifi1ap1)
+Tue Nov 17 03:00:14 2026 user.info mcad[3529]: ace_reporter.reporter_ok(): [event-reportok] complete spectral scan, resetting
+Tue Nov 17 03:00:15 2026 user.info mcad[3529]: ace_reporter.reporter_handle_response_json(): [quick-scan] band/bw: 0 20
+Tue Nov 17 03:00:15 2026 user.notice syswrapper[23961][3529]: Starting quick airtime scan for band=0, bw=20
+Tue Nov 17 03:00:15 2026 user.notice syswrapper[23961][3529]: Scanning wifi0 (bw=20, vap=wifi0ap0)
+Tue Nov 17 03:00:42 2026 user.info mcad[3529]: ace_reporter.reporter_ok(): [event-reportok] complete spectral scan, resetting
+Tue Nov 17 20:50:17 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Server Busy (http://192.168.1.1:8080/inform)
+Tue Nov 17 20:50:17 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): inform failed #1 (last inform: 14 seconds ago), rc=7
+Tue Nov 17 20:50:19 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Server Busy (http://192.168.1.1:8080/inform)
+Tue Nov 17 20:50:19 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): inform failed #2 (last inform: 16 seconds ago), rc=7
+Tue Nov 17 20:52:36 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Server Busy (http://192.168.1.1:8080/inform)
+Tue Nov 17 20:52:36 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): inform failed #3 (last inform: 153 seconds ago), rc=7
+Tue Nov 17 20:52:36 2026 user.info mcad[3529]: ace_reporter.ace_reporter_set_state(): [STATE] transition Managed -> Selfrun
+Tue Nov 17 20:52:36 2026 user.notice syswrapper[27927][3529]: [state_reload][eth -> eth] down up up
+Tue Nov 17 20:52:36 2026 user.notice syswrapper[27927][3529]: [configure_vap] up wifi0ap0
+Tue Nov 17 20:52:36 2026 user.notice syswrapper[27927][3529]: [configure_vap] up wifi1ap1
+Tue Nov 17 20:52:37 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Server Busy (http://192.168.1.1:8080/inform)
+Tue Nov 17 20:52:37 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): initial contact failed #4, url=http://192.168.1.1:8080/inform, rc=7
+Tue Nov 17 20:52:37 2026 user.info mcad[3529]: ace_reporter.set_inform_family(): next inform family: ipv6
+Tue Nov 17 20:52:37 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Server Busy (http://192.168.1.1:8080/inform)
+Tue Nov 17 20:52:37 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): initial contact failed #5, url=http://192.168.1.1:8080/inform, rc=7
+Tue Nov 17 20:52:37 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Server Busy (http://192.168.1.1:8080/inform)
+Tue Nov 17 20:52:37 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): initial contact failed #6, url=http://192.168.1.1:8080/inform, rc=7
+Tue Nov 17 20:54:37 2026 user.notice syswrapper[28465][3529]: [state_reload][eth -> eth] down up up
+Tue Nov 17 20:54:37 2026 user.notice syswrapper[28465][3529]: [configure_vap] up wifi0ap0
+Tue Nov 17 20:54:37 2026 user.notice syswrapper[28465][3529]: [configure_vap] up wifi1ap1
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.ace_reporter_set_state(): [STATE] transition Selfrun -> Managed
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: reporters.reporter_cfg_write_str(): Successfully saved config in /etc/persistent/cfg/blocked_sta (length: 17 bytes)
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): is_default: false
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): led_enabled: true
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): is_setup_completed: false
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): report_crash: true
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgversion: c8f99d93e0a0fa50
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgversion_effective: c8f99d93e0a0fa50
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgversion_saved: c8f99d93e0a0fa50
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgtimeout: 0
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): selfrun_guest_mode: true
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): capability: notif,notif-assoc-stat
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): use_aes_gcm: true
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): inform_url: http://192.168.1.1:8080/inform
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): ipv6_ll_inform_url: (null)
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): stun_url: stun://192.168.1.1/
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): mgmt_url: https://192.168.1.1:8443/manage/site/default
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): default_url: http://unifi:8080/inform
+Tue Nov 17 20:54:38 2026 user.notice syswrapper[28746][3529]: Creating /var/run/need_cfg_save
+Tue Nov 17 20:54:38 2026 user.info mcad[3529]: reporters.reporter_cfg_write_str(): Successfully saved config in /etc/persistent/cfg/mgmt.setparam.backup (length: 112 bytes)
+Tue Nov 17 21:29:44 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Server Reject (http://192.168.1.1:8080/inform)
+Tue Nov 17 21:29:44 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): inform failed #1 (last inform: 12 seconds ago), rc=5
+Wed Nov 18 00:30:01 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Server Busy (http://192.168.1.1:8080/inform)
+Wed Nov 18 00:30:01 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): inform failed #1 (last inform: 11 seconds ago), rc=7
+Wed Nov 18 03:00:00 2026 user.info mcad[3529]: ace_reporter.reporter_handle_response_json(): [quick-scan] band/bw: 1 80
+Wed Nov 18 03:00:00 2026 user.notice syswrapper[12962][3529]: Starting quick airtime scan for band=1, bw=80
+Wed Nov 18 03:00:00 2026 user.notice syswrapper[12962][3529]: Scanning wifi1 (bw=80, vap=wifi1ap1)
+Wed Nov 18 03:00:12 2026 user.info mcad[3529]: ace_reporter.reporter_ok(): [event-reportok] complete spectral scan, resetting
+Wed Nov 18 03:00:13 2026 user.info mcad[3529]: ace_reporter.reporter_handle_response_json(): [quick-scan] band/bw: 0 20
+Wed Nov 18 03:00:13 2026 user.notice syswrapper[13560][3529]: Starting quick airtime scan for band=0, bw=20
+Wed Nov 18 03:00:13 2026 user.notice syswrapper[13560][3529]: Scanning wifi0 (bw=20, vap=wifi0ap0)
+Wed Nov 18 03:00:38 2026 user.info mcad[3529]: ace_reporter.reporter_ok(): [event-reportok] complete spectral scan, resetting
+Wed Nov 18 17:06:21 2026 user.err mcad[3529]: mcagent_data.data_decrypt(): header error, magic=745f227b, version=22657079
+Wed Nov 18 17:06:21 2026 user.err mcad[3529]: ace_reporter.process_inform_response(): Failed to get the decrypted data from custom alert response
+Wed Nov 18 17:06:21 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): Decrypt Error (http://192.168.1.1:8080/inform)
+Wed Nov 18 17:06:21 2026 user.err mcad[3529]: ace_reporter.reporter_fail(): inform failed #1 (last inform: 12 seconds ago), rc=8
+Wed Nov 18 21:17:45 2026 user.info mcad[3529]: reporters.reporter_cfg_write_str(): Successfully saved config in /tmp/setmgmt.cfg (length: 226 bytes)
+Wed Nov 18 21:17:45 2026 user.info mcad[3529]: ace_reporter.reporter_handle_setparam_json(): cfgversion: c8f99d93e0a0fa50 -> 330bbdd498df1412
+Wed Nov 18 21:17:45 2026 user.info mcad[3529]: reporters.reporter_cfg_write_str(): Successfully saved config in /etc/persistent/cfg/blocked_sta (length: 17 bytes)
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: reporters.reporter_cfg_write_str(): Successfully saved config in /tmp/system.cfg (length: 9004 bytes)
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): is_default: false
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): led_enabled: true
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): is_setup_completed: false
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): report_crash: true
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgversion: 330bbdd498df1412
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgversion_effective: c8f99d93e0a0fa50
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgversion_saved: c8f99d93e0a0fa50
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgtimeout: 0
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): selfrun_guest_mode: true
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): capability: notif,notif-assoc-stat
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): use_aes_gcm: true
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): inform_url: http://192.168.1.1:8080/inform
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): ipv6_ll_inform_url: (null)
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): stun_url: stun://192.168.1.1/
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): mgmt_url: https://192.168.1.1:8443/manage/site/default
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): default_url: http://unifi:8080/inform
+Wed Nov 18 21:17:46 2026 user.notice syswrapper[14114][3529]: Creating /var/run/need_cfg_save
+Wed Nov 18 21:17:46 2026 user.info mcad[3529]: ace_reporter.reporter_handle_setparam_json(): [setparam] applying new system.cfg
+Wed Nov 18 21:17:46 2026 user.notice syswrapper[14177][3529]: [apply-config] using fast apply
+Wed Nov 18 21:17:47 2026 user.notice syswrapper[14257][3529]: [hostapd-reload-vaps] hostapd_reload_vaps started
+Wed Nov 18 21:17:48 2026 user.notice syswrapper[14177][3529]: Provision took 2 sec, full=0
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_handle_setparam_json(): cfgversion_effective: c8f99d93e0a0fa50 -> 330bbdd498df1412
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_handle_setparam_json(): cfgversion_saved: c8f99d93e0a0fa50 -> 330bbdd498df1412
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): is_default: false
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): led_enabled: true
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): is_setup_completed: false
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): report_crash: true
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgversion: 330bbdd498df1412
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgversion_effective: 330bbdd498df1412
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgversion_saved: 330bbdd498df1412
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): cfgtimeout: 0
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): selfrun_guest_mode: true
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): capability: notif,notif-assoc-stat
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): use_aes_gcm: true
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): inform_url: http://192.168.1.1:8080/inform
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): ipv6_ll_inform_url: (null)
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): stun_url: stun://192.168.1.1/
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): mgmt_url: https://192.168.1.1:8443/manage/site/default
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: ace_reporter.reporter_save_config(): default_url: http://unifi:8080/inform
+Wed Nov 18 21:17:48 2026 user.info mcad[3529]: reporters.reporter_cfg_write_str(): Successfully saved config in /etc/persistent/cfg/mgmt.setparam.backup (length: 9763 bytes)
+Wed Nov 18 21:17:49 2026 user.notice syswrapper[14724][4190]: [state_reload][eth -> eth] down up up
+Wed Nov 18 21:17:49 2026 user.notice syswrapper[14724][4190]: [configure_vap] up wifi0ap0
+Wed Nov 18 21:17:49 2026 user.notice syswrapper[14724][4190]: [configure_vap] up wifi1ap1

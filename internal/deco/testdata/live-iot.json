@@ -1,0 +1,71 @@
+{
+ "iot_client_list": [
+  {
+   "iot_client_id": "tapo-0001",
+   "name": "cGx1Zw==",
+   "type_name": "U21hcnQgUGx1Zw==",
+   "module": "tapo",
+   "category": "plug",
+   "subcategory": 1,
+   "bind_status": "binded",
+   "inet_status": "online",
+   "interface": "main",
+   "space_id": "1",
+   "online_time": "5400",
+   "detail": {
+    "mac": "50-C7-BF-11-22-33",
+    "ip": "192.168.0.80",
+    "device_on": true
+   },
+   "linked_device_info": {
+    "device_id": "dev205",
+    "connection_type": [
+     "band2_4"
+    ],
+    "signal_strength": {
+     "band2_4": -61
+    },
+    "wireless_ver": "wifi4"
+   }
+  },
+  {
+   "iot_client_id": "hub-0002",
+   "name": "aHVi",
+   "module": "network_device",
+   "category": 5,
+   "inet_status": "online",
+   "detail": {
+    "info": {
+     "mac": "50-C7-BF-44-55-66",
+     "ip": "192.168.0.81"
+    }
+   },
+   "linked_device_info": {
+    "device_id": "8022B0A7B93E16940A1B2C3D4E5F60718293A4B5",
+    "connection_type": [
+     "wired"
+    ]
+   }
+  },
+  {
+   "iot_client_id": "zb-0003",
+   "name": "ZG9vciBzZW5zb3I=",
+   "module": "zigbee",
+   "category": "sensor",
+   "inet_status": "offline",
+   "detail": {
+    "battery": 80
+   }
+  },
+  {
+   "iot_client_id": "ble-0004",
+   "name": "bG9jaw==",
+   "module": "ble",
+   "inet_status": "online",
+   "detail": {}
+  }
+ ],
+ "iot_count_per_cate_max": 64,
+ "scan_status": "idle",
+ "scan_wait_time": "0"
+}

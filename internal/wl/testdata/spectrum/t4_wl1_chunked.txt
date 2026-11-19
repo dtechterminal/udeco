@@ -1,0 +1,480 @@
+TAG t4_wl1_chunked radio=wl1 vifs=wl11 wl12 wl13 plan: passive dwell 110, passes 2 (2nd reversed), chunk 1, homegap 0.4 s, budget 45 s, poll 50 ms
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4609.94
+AC 4609.95 wl01=0[ ] wl02=1[ m:971e1247/in=4465/txB=12163795/rxB=2680223/txfail=0/retry=1445/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4513/txB=12764422/rxB=1018032/txfail=0/retry=1252/rssi=-71 ] wl13=1[ m:f0197d79/in=287/txB=13062738/rxB=395700/txfail=0/retry=200/rssi=-63 ]
+START_SET wl12:m:76c0915f wl13:m:f0197d79
+--- chanim_stats all wl1 t=4610.20
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 52 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 18 bad plcp: 18 noise: -96
+	 cca_txdur: 6 cca_inbss: 4 cca_obss:6 cca_nocat: 3 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 1 cca_inbss: 0 cca_obss:0 cca_nocat: 4 cca_nopkt: 0
+ chanspec: 0xd030 crsglitch cnt: 130 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:2 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 1 pass=1 ch=36 rc=0 t=4610.24 done=4610.38 polls=2 bss=0
+--- chanim_stats all wl1 t=4610.41
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 11 bad plcp: 8 noise: -96
+	 cca_txdur: 3 cca_inbss: 1 cca_obss:5 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 1 cca_inbss: 0 cca_obss:0 cca_nocat: 4 cca_nopkt: 0
+ chanspec: 0xd030 crsglitch cnt: 130 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:2 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 2 pass=1 ch=40 rc=0 t=4610.83 done=4610.96 polls=2 bss=6
+BSS AE:A7:B9:3E:16:90 -84 (0xe12a)
+BSS AE:A7:B9:3E:16:91 -85 (0xe12a)
+BSS AE:A7:B9:3E:16:92 -84 (0xe12a)
+BSS AE:A7:B9:3E:15:F8 -72 (0xe12a)
+BSS AE:A7:B9:3E:15:F9 -72 (0xe12a)
+BSS AE:A7:B9:3E:15:FA -72 (0xe12a)
+--- chanim_stats all wl1 t=4610.98
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 11 bad plcp: 8 noise: -96
+	 cca_txdur: 3 cca_inbss: 1 cca_obss:5 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 1 cca_inbss: 0 cca_obss:0 cca_nocat: 4 cca_nopkt: 0
+ chanspec: 0xd030 crsglitch cnt: 130 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:2 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 3 pass=1 ch=44 rc=0 t=4611.42 done=4611.62 polls=3 bss=0
+--- chanim_stats all wl1 t=4611.64
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 49 bad plcp: 7 noise: -96
+	 cca_txdur: 3 cca_inbss: 1 cca_obss:4 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 130 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:2 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 4 pass=1 ch=48 rc=0 t=4612.07 done=4612.21 polls=2 bss=1
+BSS 54:AF:97:74:F4:39 -85 (0xd030)
+--- chanim_stats all wl1 t=4612.23
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 41 bad plcp: 7 noise: -96
+	 cca_txdur: 3 cca_inbss: 0 cca_obss:5 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 5 pass=1 ch=149 rc=0 t=4612.68 done=4612.82 polls=2 bss=0
+--- chanim_stats all wl1 t=4612.84
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 22 bad plcp: 175 noise: -96
+	 cca_txdur: 3 cca_inbss: 0 cca_obss:5 cca_nocat: 3 cca_nopkt: 3
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 6 pass=1 ch=153 rc=0 t=4613.27 done=4613.41 polls=2 bss=0
+--- chanim_stats all wl1 t=4613.43
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 35 bad plcp: 151 noise: -95
+	 cca_txdur: 6 cca_inbss: 1 cca_obss:6 cca_nocat: 2 cca_nopkt: 2
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 7 pass=1 ch=157 rc=0 t=4613.86 done=4614.06 polls=3 bss=0
+--- chanim_stats all wl1 t=4614.08
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 37 bad plcp: 95 noise: -96
+	 cca_txdur: 4 cca_inbss: 1 cca_obss:8 cca_nocat: 2 cca_nopkt: 2
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 8 pass=1 ch=161 rc=0 t=4614.52 done=4614.66 polls=2 bss=0
+--- chanim_stats all wl1 t=4614.68
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 71 bad plcp: 0 noise: -96
+	 cca_txdur: 3 cca_inbss: 0 cca_obss:4 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 9 pass=1 ch=165 rc=0 t=4615.12 done=4615.32 polls=3 bss=0
+--- chanim_stats all wl1 t=4615.33
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 45 bad plcp: 2 noise: -96
+	 cca_txdur: 7 cca_inbss: 1 cca_obss:6 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 10 pass=2 ch=165 rc=0 t=4615.77 done=4615.97 polls=3 bss=0
+--- chanim_stats all wl1 t=4615.98
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 33 bad plcp: 16 noise: -96
+	 cca_txdur: 5 cca_inbss: 1 cca_obss:4 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 11 pass=2 ch=161 rc=0 t=4616.42 done=4616.55 polls=2 bss=0
+--- chanim_stats all wl1 t=4616.57
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 54 bad plcp: 37 noise: -96
+	 cca_txdur: 4 cca_inbss: 1 cca_obss:6 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 12 pass=2 ch=157 rc=0 t=4617.00 done=4617.15 polls=2 bss=0
+--- chanim_stats all wl1 t=4617.16
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 59 bad plcp: 12 noise: -96
+	 cca_txdur: 3 cca_inbss: 1 cca_obss:4 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 13 pass=2 ch=153 rc=0 t=4617.60 done=4617.73 polls=2 bss=0
+--- chanim_stats all wl1 t=4617.75
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 8 bad plcp: 17 noise: -96
+	 cca_txdur: 2 cca_inbss: 0 cca_obss:3 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 14 pass=2 ch=149 rc=0 t=4618.18 done=4618.32 polls=2 bss=0
+--- chanim_stats all wl1 t=4618.34
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 48 bad plcp: 8 noise: -96
+	 cca_txdur: 4 cca_inbss: 1 cca_obss:6 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 245 bad plcp: 26 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 15 pass=2 ch=48 rc=0 t=4618.78 done=4618.98 polls=3 bss=1
+BSS 54:AF:97:74:F4:39 -85 (0xd030)
+--- chanim_stats all wl1 t=4619.00
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 56 bad plcp: 0 noise: -96
+	 cca_txdur: 2 cca_inbss: 1 cca_obss:3 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 208 bad plcp: 8 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 16 pass=2 ch=44 rc=0 t=4619.43 done=4619.63 polls=3 bss=0
+--- chanim_stats all wl1 t=4619.65
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 52 bad plcp: 67 noise: -96
+	 cca_txdur: 4 cca_inbss: 1 cca_obss:5 cca_nocat: 3 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 139 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 208 bad plcp: 8 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 17 pass=2 ch=40 rc=0 t=4620.08 done=4620.22 polls=2 bss=6
+BSS AE:A7:B9:3E:16:90 -84 (0xe12a)
+BSS AE:A7:B9:3E:16:91 -85 (0xe12a)
+BSS AE:A7:B9:3E:16:92 -84 (0xe12a)
+BSS AE:A7:B9:3E:15:F8 -72 (0xe12a)
+BSS AE:A7:B9:3E:15:F9 -72 (0xe12a)
+BSS AE:A7:B9:3E:15:FA -72 (0xe12a)
+--- chanim_stats all wl1 t=4620.24
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 95 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 52 bad plcp: 67 noise: -96
+	 cca_txdur: 4 cca_inbss: 1 cca_obss:5 cca_nocat: 3 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 139 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 208 bad plcp: 8 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+CALL 18 pass=2 ch=36 rc=0 t=4620.67 done=4620.81 polls=2 bss=0
+--- chanim_stats all wl1 t=4620.83
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 86 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 61 bad plcp: 11 noise: -96
+	 cca_txdur: 2 cca_inbss: 1 cca_obss:4 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 139 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 208 bad plcp: 8 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+BAND t0=4610.22 t1=4621.24 dur=11.02 calls=18 beacons=271 abort=none
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=4621.26
+AC 4621.27 wl01=0[ ] wl02=1[ m:971e1247/in=4477/txB=12201044/rxB=2688420/txfail=0/retry=1449/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4524/txB=12801535/rxB=1019526/txfail=0/retry=1262/rssi=-70 ] wl13=1[ m:f0197d79/in=298/txB=13763413/rxB=457141/txfail=0/retry=388/rssi=-61 ]
+TAG t4_wl1_chunked_idleref 11 s no scan
+AC 4621.47 wl01=0[ ] wl02=1[ m:971e1247/in=4477/txB=12201342/rxB=2688742/txfail=0/retry=1449/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4525/txB=12801765/rxB=1019526/txfail=0/retry=1262/rssi=-70 ] wl13=1[ m:f0197d79/in=299/txB=13763643/rxB=457185/txfail=0/retry=388/rssi=-61 ]
+IDLE t2=4621.67 t3=4632.69 beacons=321
+AC 4632.71 wl01=0[ ] wl02=1[ m:971e1247/in=4488/txB=12268156/rxB=2696111/txfail=0/retry=1451/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=4536/txB=12871021/rxB=1022966/txfail=0/retry=1300/rssi=-69 ] wl13=1[ m:f0197d79/in=310/txB=13830219/rxB=457922/txfail=0/retry=393/rssi=-61 ]

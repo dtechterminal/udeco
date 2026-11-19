@@ -9,8 +9,16 @@ package device
 // ubnt from <console>" in the daemon host's own sshd log). The device reports the port
 // in its inform payload (`sshd_port`).
 //
-// This is not a shell: it only parses set-adopt (and set-inform), answers
-// every other command with empty output and exit 0, and runs nothing.
+// For the console this is not a shell: it only parses set-adopt (and
+// set-inform), answers every other command with empty output and exit 0,
+// and runs nothing. With Site set, the site's device users also get a
+// real shell (sitessh.go); the console's adoption path stays as it is.
+//
+// Who may log in: only AllowFrom (the console's address); and, when Auth is
+// set, only with a password Auth accepts. A pending AP takes any password
+// (the console uses the factory login); the on-device agent sets Auth once
+// adopted, so a set-adopt or set-inform then needs the site's device
+// credential (docs/deco/interference-audit.md R12).
 
 import (
 	"crypto/ed25519"
@@ -42,8 +50,16 @@ type SSHAdopt struct {
 	AllowFrom []string // source IPs allowed to connect (the console)
 	HostKey   string   // path to the PEM host key (created mode 600)
 	Requests  chan AdoptRequest
-	mu        sync.Mutex
-	ln        net.Listener
+	// Auth, when set, decides each password login (true = accept). nil
+	// accepts any password. It is called from the SSH goroutines: it must
+	// be safe for concurrent use. The password is never logged.
+	Auth func(user string, password []byte) bool
+	// Site, when set, also serves the site's device users (sitessh.go):
+	// from the console as before, and from the sources SetSite allows.
+	Site *SiteOptions
+	mu   sync.Mutex
+	ln   net.Listener
+	site siteRuntime
 }
 
 var (
@@ -63,16 +79,33 @@ func (s *SSHAdopt) Start() error {
 		return err
 	}
 	cfg := &ssh.ServerConfig{
-		PasswordCallback: func(c ssh.ConnMetadata, _ []byte) (*ssh.Permissions, error) {
-			// Any password: the console uses the factory login (ubnt) or the
-			// site's device password. The source IP is already restricted.
+		PasswordCallback: func(c ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
+			// Without Auth any password: the console uses the factory login
+			// (ubnt) or the site's device password. The source IP is
+			// already restricted.
+			if s.Auth != nil && !s.Auth(c.User(), pw) {
+				log.Printf("ssh-adopt: login REFUSED user=%q from %s (not the site's device credential)", c.User(), c.RemoteAddr())
+				return nil, errors.New("ssh-adopt: access denied")
+			}
 			log.Printf("ssh-adopt: login user=%q from %s", c.User(), c.RemoteAddr())
-			return nil, nil
+			// a site user's login may also run a shell (sitessh.go)
+			return s.consoleSite(c, pw), nil
 		},
 		ServerVersion: "SSH-2.0-dropbear_2019.78",
 	}
 	cfg.AddHostKey(rsaSigner)
 	cfg.AddHostKey(signer)
+	// site sources: the site users only, at most 3 tries per connection
+	var siteCfg *ssh.ServerConfig
+	if s.Site != nil {
+		s.siteInit()
+		// 6 tries (OpenSSH's default): a client offers each of its keys
+		// before a password; password guessing is bounded by the limiter
+		siteCfg = &ssh.ServerConfig{PasswordCallback: s.sitePassword, PublicKeyCallback: s.sitePublicKey,
+			MaxAuthTries: 6, ServerVersion: cfg.ServerVersion}
+		siteCfg.AddHostKey(rsaSigner)
+		siteCfg.AddHostKey(signer)
+	}
 	ln, err := net.Listen("tcp", s.Listen)
 	if err != nil {
 		return err
@@ -91,6 +124,16 @@ func (s *SSHAdopt) Start() error {
 			}
 			host, _, _ := net.SplitHostPort(c.RemoteAddr().String())
 			if !contains(s.AllowFrom, host) {
+				if siteCfg != nil {
+					if ok, reason, detail := s.siteAdmit(host); ok {
+						go s.serveSite(c, siteCfg, host)
+						continue
+					} else if reason != "" {
+						s.note(host, reason, detail)
+						c.Close()
+						continue
+					}
+				}
 				log.Printf("ssh-adopt: refused connection from %s (not the console)", host)
 				c.Close()
 				continue
@@ -112,10 +155,21 @@ func (s *SSHAdopt) Close() {
 func (s *SSHAdopt) serve(c net.Conn, cfg *ssh.ServerConfig) {
 	defer c.Close()
 	c.SetDeadline(time.Now().Add(2 * time.Minute))
-	_, chans, reqs, err := ssh.NewServerConn(c, cfg)
+	sc, chans, reqs, err := ssh.NewServerConn(c, cfg)
 	if err != nil {
 		log.Printf("ssh-adopt: handshake: %v", err)
 		return
+	}
+	// a site user's login from the console (sitessh.go); nil otherwise
+	var site *siteConn
+	if p := sc.Permissions; p != nil && p.Extensions[permSiteUser] != "" && s.Site != nil {
+		site = &siteConn{user: p.Extensions[permSiteUser], hash: p.Extensions[permSiteHash], src: hostOf(c.RemoteAddr()),
+			console: true, nc: c, procs: map[*siteProc]struct{}{}}
+		if s.register(site) {
+			defer s.unregister(site)
+		} else {
+			site = nil
+		}
 	}
 	go ssh.DiscardRequests(reqs)
 	for nc := range chans {
@@ -127,7 +181,14 @@ func (s *SSHAdopt) serve(c net.Conn, cfg *ssh.ServerConfig) {
 		if err != nil {
 			continue
 		}
+		if site != nil {
+			go s.siteSession(site, ch, in)
+			continue
+		}
 		go s.session(ch, in)
+	}
+	if site != nil {
+		site.closing.Store(true)
 	}
 }
 
@@ -138,25 +199,36 @@ func (s *SSHAdopt) session(ch ssh.Channel, in <-chan *ssh.Request) {
 		case "exec":
 			var p struct{ Cmd string }
 			ssh.Unmarshal(req.Payload, &p)
-			req.Reply(true, nil)
-			s.command(p.Cmd)
-			ch.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{0}))
+			s.adoptExec(ch, req, p.Cmd)
 			return
 		case "shell":
-			req.Reply(true, nil)
-			// Read commands line by line until EOF.
-			buf, _ := io.ReadAll(io.LimitReader(ch, 64<<10))
-			for _, line := range strings.Split(string(buf), "\n") {
-				if strings.TrimSpace(line) != "" {
-					s.command(line)
-				}
-			}
-			ch.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{0}))
+			s.adoptShell(ch, req)
 			return
 		default:
 			req.Reply(req.Type == "pty-req" || req.Type == "env", nil)
 		}
 	}
+}
+
+// adoptExec answers an exec request with the adoption parser: nothing
+// runs, the exit status is 0.
+func (s *SSHAdopt) adoptExec(ch ssh.Channel, req *ssh.Request, cmd string) {
+	req.Reply(true, nil)
+	s.command(cmd)
+	ch.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{0}))
+}
+
+// adoptShell answers a shell request with the adoption parser: commands
+// are read line by line until EOF.
+func (s *SSHAdopt) adoptShell(ch ssh.Channel, req *ssh.Request) {
+	req.Reply(true, nil)
+	buf, _ := io.ReadAll(io.LimitReader(ch, 64<<10))
+	for _, line := range strings.Split(string(buf), "\n") {
+		if strings.TrimSpace(line) != "" {
+			s.command(line)
+		}
+	}
+	ch.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{0}))
 }
 
 func (s *SSHAdopt) command(cmd string) {
@@ -209,7 +281,11 @@ func loadOrCreateHostKey(path string) (ssh.Signer, error) {
 func (x *Session) ApplyAdopt(r AdoptRequest) Outcome {
 	o := Outcome{Changed: true, Immediate: true}
 	if r.URL != "" {
-		x.S.InformURL = r.URL
+		if err := CheckInformURL(r.URL); err == nil {
+			x.S.InformURL = r.URL
+		} else {
+			o.Events = append(o.Events, fmt.Sprintf("ssh-adopt: ignored inform url %q: %v; keeping %s", r.URL, err, x.S.InformURL))
+		}
 	}
 	if r.Key != "" {
 		x.S.Key = r.Key

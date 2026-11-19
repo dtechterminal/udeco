@@ -1,0 +1,9 @@
+bridge name	bridge id		STP enabled	interfaces
+br-guest		8000.000000000000	no		
+br-iptv		8000.000000000000	no		
+br-lan		7fff.b0a7b93e1700	no		eth0
+							eth1
+							wl02
+							wl12
+							wl13
+br-wan		8000.b0a7b93e1701	no		

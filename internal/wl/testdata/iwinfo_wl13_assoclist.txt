@@ -1,0 +1,8 @@
+3A:C1:26:FB:CE:2C  -66 dBm / -96 dBm (SNR 30)  0 ms ago
+	RX: unknown                                        0 Pkts.
+	TX: unknown                                        0 Pkts.
+
+F0:77:C3:A6:6F:30  -65 dBm / -96 dBm (SNR 31)  0 ms ago
+	RX: unknown                                        0 Pkts.
+	TX: unknown                                        0 Pkts.
+

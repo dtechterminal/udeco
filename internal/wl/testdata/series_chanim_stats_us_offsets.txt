@@ -1,0 +1,45 @@
+1795018074
+# wl0
+7u (0x1905)
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1007    4483394128  4323695333  4584596093  4349674224  4356065088  0         1610966000  4307960194  4302896640  1610966000  4729128850  4404180946  4562281520  0       
+
+# wl1
+40/80 (0xe12a)
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd028    4374030349  4304458611  4369489479  4331325009  4297818699  0         8427552872433558289  4316992788  4300034752  18446739785199950616  4418189910  4407900221  4296468060  4301623107
+
+1795018076
+# wl0
+7u (0x1905)
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1007    4483718445  4323828071  4584632522  4349729066  4356133533  0         1612974000  4307990015  4302918198  1612974000  4729421304  4404321283  4562371691  0       
+
+# wl1
+40/80 (0xe12a)
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd028    4374072660  4304459739  4369575574  4331339433  4297819066  0         8427552872435365894  4316993044  4300034752  18446739785201958616  4418291924  4408000090  4296468060  4301624905
+
+1795018078
+# wl0
+7u (0x1905)
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0x1007    4484025113  4324165477  4584662810  4349808516  4356199752  0         1614982000  4308041810  4302939729  1614982000  4729934667  4404641089  4562503778  0       
+
+# wl1
+40/80 (0xe12a)
+version: 3 
+us version: 2 
+chanspec  tx        inbss     obss      nocat     nopkt     doze      txop      goodtx    badtx     total_tm  busy_tm   pri20     sec20     sec40   
+0xd028    4374163577  4304460681  4369724715  4331352118  4297820010  0         8427552872437040992  4316993413  4300034752  18446739785203966616  4418455636  4408162357  4296468060  4301626044
+

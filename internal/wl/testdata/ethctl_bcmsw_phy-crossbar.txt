@@ -1,0 +1,2 @@
+eth0: on crossbar with phy endpoint: 9 
+eth1: on crossbar with phy endpoint: 10 

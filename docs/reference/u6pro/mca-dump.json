@@ -1,0 +1,7300 @@
+{
+ "anon_id": "2aaf8451-1153-aa17-24e0-06d50ca9d803",
+ "antenna_table": [
+  {
+   "default": true,
+   "id": 4,
+   "name": "Combined",
+   "wifi0_gain": 4,
+   "wifi1_gain": 6
+  }
+ ],
+ "architecture": "armv7l",
+ "ble_caps": 1,
+ "board_rev": 48,
+ "bomrev": "113-00963-48",
+ "bomrev_id": "0003c330",
+ "boot": {
+  "id": "95673b06-7ce8-4f9c-a044-91eb252511d3",
+  "reason": "KERNEL_CRASH"
+ },
+ "bootid": 1,
+ "bootrom_version": "2016.01-gd48a5a03-[local,local]",
+ "cfgversion": "330bbdd498df1412",
+ "cfgversion_effective": "330bbdd498df1412",
+ "cfgversion_saved": "330bbdd498df1412",
+ "connect_request_ip": "192.168.1.32",
+ "connect_request_port": "49656",
+ "country_code": 0,
+ "countrycode_table": [],
+ "default": false,
+ "discovery_response": false,
+ "dualboot": true,
+ "emmc_wear_level": 1,
+ "ever_crash": false,
+ "fingerprint": "m8y871:ddiQ5HYNe1BeZa/a5l6otVc1sZDk/Bn4NsO25Vr86Dx",
+ "fingerprint_req": true,
+ "fp_ml_version": 1,
+ "fw2_caps": 1481179136,
+ "fw3_caps": 206,
+ "fw_caps": 3892117055,
+ "gateway_ip": "192.168.1.1",
+ "gateway_mac": "28:70:4e:ab:c2:12",
+ "guest_kicks": 0,
+ "guest_token": "***REDACTED***",
+ "guid": "03cb814b-0000-40df-9d6f-7c8271da8a89",
+ "has_eth1": false,
+ "has_speaker": false,
+ "hash_id": "d8ba66dd8afb175b",
+ "hostname": "U6Pro",
+ "hw_caps": 2048,
+ "if_table": [
+  {
+   "full_duplex": true,
+   "mac": "9c:05:d6:c2:df:08",
+   "name": "eth0",
+   "num_port": 1,
+   "rx_bytes": 721444093135,
+   "rx_dropped": 27175,
+   "rx_errors": 0,
+   "rx_multicast": 4399364,
+   "rx_packets": 552531773,
+   "speed": 1000,
+   "tx_bytes": 54117953997,
+   "tx_dropped": 0,
+   "tx_errors": 0,
+   "tx_packets": 152830084,
+   "up": true
+  }
+ ],
+ "inform_min_interval": 1,
+ "inform_url": "http://192.168.1.1:8080/inform",
+ "internet": true,
+ "ip": "192.168.1.32",
+ "ipv6": [
+  "fe80::9e05:d6ff:fee7:f008/64"
+ ],
+ "isolated": false,
+ "kernel_version": "5.4.213",
+ "last_error_conns": [
+  {
+   "error_reason": 5,
+   "last_error_str": "Server Reject (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 0,
+   "last_managed_s_time": 56,
+   "timestamp": "2026-11-13T18:31:00"
+  },
+  {
+   "error_reason": 7,
+   "last_error_str": "Server Busy (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 0,
+   "last_managed_s_time": 56,
+   "timestamp": "2026-11-15T00:30:00"
+  },
+  {
+   "error_reason": 8,
+   "last_error_str": "Decrypt Error (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 0,
+   "last_managed_s_time": 56,
+   "timestamp": "2026-11-15T12:24:56"
+  },
+  {
+   "error_reason": 7,
+   "last_error_str": "Server Busy (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 0,
+   "last_managed_s_time": 56,
+   "timestamp": "2026-11-16T00:30:02"
+  },
+  {
+   "error_reason": 8,
+   "last_error_str": "Decrypt Error (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 0,
+   "last_managed_s_time": 56,
+   "timestamp": "2026-11-16T16:56:10"
+  },
+  {
+   "error_reason": 7,
+   "last_error_str": "Server Busy (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 0,
+   "last_managed_s_time": 56,
+   "timestamp": "2026-11-17T00:30:00"
+  },
+  {
+   "error_reason": 7,
+   "last_error_str": "Server Busy (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 727240,
+   "last_managed_s_time": 56,
+   "timestamp": "2026-11-17T20:52:37"
+  },
+  {
+   "error_reason": 5,
+   "last_error_str": "Server Reject (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 727240,
+   "last_managed_s_time": 727362,
+   "timestamp": "2026-11-17T21:29:44"
+  },
+  {
+   "error_reason": 7,
+   "last_error_str": "Server Busy (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 727240,
+   "last_managed_s_time": 727362,
+   "timestamp": "2026-11-18T00:30:01"
+  },
+  {
+   "error_reason": 8,
+   "last_error_str": "Decrypt Error (http://192.168.1.1:8080/inform)",
+   "last_managed_e_time": 727240,
+   "last_managed_s_time": 727362,
+   "timestamp": "2026-11-18T17:06:21"
+  }
+ ],
+ "lldp_table": [
+  {
+   "chassis_id": "28:70:4e:ab:c2:09",
+   "chassis_id_subtype": "local",
+   "is_wired": true,
+   "local_port_idx": 1,
+   "local_port_name": "eth0",
+   "mgmt_ips": [
+    "192.168.1.1",
+    "2001:db8:1000::fa"
+   ],
+   "port_id": "28:70:4e:ab:c2:09"
+  }
+ ],
+ "locating": false,
+ "mac": "9c:05:d6:c2:df:08",
+ "manufacturer_id": 52,
+ "model": "UAP6MP",
+ "model_display": "U6-Pro",
+ "netmask": "255.255.255.0",
+ "pathmon": {
+  "ema_samples": 60,
+  "interval": 5,
+  "targets": [
+   {
+    "family": "ipv4",
+    "jitter_us": 138,
+    "jitter_us_ema": 222,
+    "last_update_ts": 1795017033,
+    "latency_us": 436,
+    "latency_us_ema": 489,
+    "loss_pcm_ema": 0,
+    "resolved": "192.168.1.1",
+    "samples": 163023,
+    "state": "reachable",
+    "type": "gateway"
+   },
+   {
+    "family": "ipv6",
+    "jitter_us": 0,
+    "jitter_us_ema": 0,
+    "last_update_ts": 0,
+    "latency_us": 0,
+    "latency_us_ema": 0,
+    "loss_pcm_ema": 0,
+    "resolved": "",
+    "samples": 0,
+    "state": "pending",
+    "type": "gateway"
+   },
+   {
+    "family": "ipv4",
+    "jitter_us": 138,
+    "jitter_us_ema": 216,
+    "last_update_ts": 1795017033,
+    "latency_us": 462,
+    "latency_us_ema": 534,
+    "loss_pcm_ema": 0,
+    "resolved": "192.168.1.1",
+    "samples": 163018,
+    "state": "reachable",
+    "type": "uplink"
+   }
+  ]
+ },
+ "qrid": "uB33f",
+ "radio_table": [
+  {
+   "athstats": {
+    "ast_ath_reset": 0,
+    "ast_be_xmit": 0,
+    "ast_cst": 0,
+    "ast_deadqueue_reset": 0,
+    "ast_fullqueue_stop": 0,
+    "ast_txto": 0,
+    "ce_send_fail_cnt": 0,
+    "cu_interf": 40,
+    "cu_self_rx": 0,
+    "cu_self_tx": 5,
+    "cu_total": 45,
+    "invalid_mac_addr_cnt": 0,
+    "n_rx_aggr": 0,
+    "n_rx_pkts": 57800,
+    "n_tx_bawadv": 0,
+    "n_tx_bawretries": 0,
+    "n_tx_pkts": 72200,
+    "n_tx_queue": 0,
+    "n_tx_retries": 0,
+    "n_tx_xretries": 0,
+    "n_txaggr_compgood": 0,
+    "n_txaggr_compretries": 0,
+    "n_txaggr_compxretry": 0,
+    "n_txaggr_prepends": 0,
+    "name": "wifi0",
+    "noise_floor": -95,
+    "timeout_waiting_for_vap_cnt": 0
+   },
+   "builtin_ant_gain": 4,
+   "builtin_antenna": true,
+   "has_dfs": true,
+   "has_fccdfs": true,
+   "ieee_modes": 90,
+   "is_11ac": true,
+   "is_11ax": true,
+   "max_txpower": 22,
+   "min_txpower": 6,
+   "name": "wifi0",
+   "nss": 2,
+   "radio": "ng",
+   "radio_caps": 16404,
+   "radio_caps2": 31,
+   "scan_table": [
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "44:95:3b:xx:xx:xx",
+     "bw": 40,
+     "center_freq": 2462,
+     "channel": 13,
+     "essid": "neighbor-ssid-1",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 25,
+     "rssi_age": 0,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -71
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "a8:42:a1:xx:xx:xx",
+     "bw": 20,
+     "center_freq": 2472,
+     "channel": 13,
+     "essid": "neighbor-ssid-2",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 15,
+     "rssi_age": 1,
+     "security": "WPA2-Personal (TKIP/AES/CCMP)",
+     "signal": -81
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "44:95:3b:xx:xx:xx",
+     "bw": 40,
+     "center_freq": 2462,
+     "channel": 13,
+     "essid": "neighbor-ssid-3",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 17,
+     "rssi_age": 0,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -79
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "b4:3d:08:xx:xx:xx",
+     "bw": 40,
+     "center_freq": 2462,
+     "channel": 13,
+     "essid": "neighbor-ssid-4",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 15,
+     "rssi_age": 6,
+     "security": "WPA2-Personal (TKIP/AES/CCMP)",
+     "signal": -81
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "b4:3d:08:xx:xx:xx",
+     "bw": 40,
+     "center_freq": 2462,
+     "channel": 13,
+     "essid": "neighbor-ssid-5",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 19,
+     "rssi_age": 0,
+     "security": "WPA2-Personal (TKIP/AES/CCMP)",
+     "signal": -77
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "44:95:3b:xx:xx:xx",
+     "bw": 40,
+     "center_freq": 2462,
+     "channel": 13,
+     "essid": "neighbor-ssid-6",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 14,
+     "rssi_age": 0,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -82
+    },
+    {
+     "age": 3,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "24:0b:88:xx:xx:xx",
+     "bw": 20,
+     "center_freq": 2472,
+     "channel": 13,
+     "essid": "neighbor-ssid-7",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 15,
+     "rssi_age": 39,
+     "security": "WPA2-Personal (TKIP/AES/CCMP)",
+     "signal": -81
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "26:0b:88:xx:xx:xx",
+     "bw": 20,
+     "center_freq": 2472,
+     "channel": 13,
+     "essid": "",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 14,
+     "rssi_age": 1,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -82
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "44:95:3b:xx:xx:xx",
+     "bw": 40,
+     "center_freq": 2462,
+     "channel": 13,
+     "essid": "neighbor-ssid-8",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 18,
+     "rssi_age": 2,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -78
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "ng",
+     "bssid": "44:95:3b:xx:xx:xx",
+     "bw": 40,
+     "center_freq": 2462,
+     "channel": 13,
+     "essid": "neighbor-ssid-9",
+     "freq": 2472,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 17,
+     "rssi_age": 0,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -79
+    }
+   ],
+   "spectrum_scanning_abnormal": false,
+   "spectrum_table": [
+    {
+     "center_freq": 2412,
+     "channel": 1,
+     "interference": -52,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 38,
+     "width": 20
+    },
+    {
+     "center_freq": 2417,
+     "channel": 2,
+     "interference": -52,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 34,
+     "width": 20
+    },
+    {
+     "center_freq": 2422,
+     "channel": 3,
+     "interference": -52,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 30,
+     "width": 20
+    },
+    {
+     "center_freq": 2427,
+     "channel": 4,
+     "interference": -64,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 39,
+     "width": 20
+    },
+    {
+     "center_freq": 2432,
+     "channel": 5,
+     "interference": -64,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 39,
+     "width": 20
+    },
+    {
+     "center_freq": 2437,
+     "channel": 6,
+     "interference": -53,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 40,
+     "width": 20
+    },
+    {
+     "center_freq": 2442,
+     "channel": 7,
+     "interference": -53,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 26,
+     "width": 20
+    },
+    {
+     "center_freq": 2447,
+     "channel": 8,
+     "interference": -53,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 32,
+     "width": 20
+    },
+    {
+     "center_freq": 2452,
+     "channel": 9,
+     "interference": -53,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 35,
+     "width": 20
+    },
+    {
+     "center_freq": 2457,
+     "channel": 10,
+     "interference": -50,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 40,
+     "width": 20
+    },
+    {
+     "center_freq": 2462,
+     "channel": 11,
+     "interference": -50,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 45,
+     "width": 20
+    },
+    {
+     "center_freq": 2467,
+     "channel": 12,
+     "interference": -50,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 54,
+     "width": 20
+    },
+    {
+     "center_freq": 2472,
+     "channel": 13,
+     "interference": -57,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 51,
+     "width": 20
+    }
+   ],
+   "spectrum_table_time": 66022
+  },
+  {
+   "athstats": {
+    "ast_ath_reset": 0,
+    "ast_be_xmit": 0,
+    "ast_cst": 0,
+    "ast_deadqueue_reset": 0,
+    "ast_fullqueue_stop": 0,
+    "ast_txto": 0,
+    "ce_send_fail_cnt": 0,
+    "cu_interf": 7,
+    "cu_self_rx": 1,
+    "cu_self_tx": 1,
+    "cu_total": 9,
+    "invalid_mac_addr_cnt": 0,
+    "n_rx_aggr": 0,
+    "n_rx_pkts": 1441200,
+    "n_tx_bawadv": 0,
+    "n_tx_bawretries": 0,
+    "n_tx_pkts": 2401900,
+    "n_tx_queue": 0,
+    "n_tx_retries": 0,
+    "n_tx_xretries": 0,
+    "n_txaggr_compgood": 0,
+    "n_txaggr_compretries": 0,
+    "n_txaggr_compxretry": 0,
+    "n_txaggr_prepends": 0,
+    "name": "wifi1",
+    "noise_floor": -94,
+    "timeout_waiting_for_vap_cnt": 0
+   },
+   "builtin_ant_gain": 6,
+   "builtin_antenna": true,
+   "has_dfs": true,
+   "has_fccdfs": true,
+   "has_ht160": true,
+   "ieee_modes": 85,
+   "is_11ac": true,
+   "is_11ax": true,
+   "max_txpower": 26,
+   "min_txpower": 6,
+   "name": "wifi1",
+   "nss": 4,
+   "radio": "na",
+   "radio_caps": 201474052,
+   "radio_caps2": 31,
+   "scan_table": [
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "na",
+     "bssid": "94:e3:ee:xx:xx:xx",
+     "bw": 80,
+     "center_freq": 5210,
+     "channel": 40,
+     "essid": "neighbor-ssid-10",
+     "freq": 5200,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 11,
+     "rssi_age": 0,
+     "security": "WPA2-Personal (TKIP/AES/CCMP)",
+     "signal": -85
+    },
+    {
+     "age": 1,
+     "ap_name": "",
+     "band": "na",
+     "bssid": "00:06:ae:xx:xx:xx",
+     "bw": 20,
+     "center_freq": 5200,
+     "channel": 40,
+     "essid": "neighbor-ssid-11",
+     "freq": 5200,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 6,
+     "rssi_age": 12,
+     "security": "WPA2-Enterprise (AES/CCMP)",
+     "signal": -90
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "na",
+     "bssid": "20:b5:c6:xx:xx:xx",
+     "bw": 160,
+     "center_freq": 5250,
+     "channel": 40,
+     "essid": "neighbor-ssid-12",
+     "freq": 5200,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 8,
+     "rssi_age": 0,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -88
+    },
+    {
+     "age": 0,
+     "ap_name": "",
+     "band": "na",
+     "bssid": "44:95:3b:xx:xx:xx",
+     "bw": 80,
+     "center_freq": 5210,
+     "channel": 40,
+     "essid": "neighbor-ssid-13",
+     "freq": 5200,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 6,
+     "rssi_age": 0,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -90
+    },
+    {
+     "age": 1,
+     "ap_name": "",
+     "band": "na",
+     "bssid": "26:0b:88:xx:xx:xx",
+     "bw": 80,
+     "center_freq": 5210,
+     "channel": 40,
+     "essid": "",
+     "freq": 5200,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 7,
+     "rssi_age": 17,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -89
+    },
+    {
+     "age": 1,
+     "ap_name": "",
+     "band": "na",
+     "bssid": "24:0b:88:xx:xx:xx",
+     "bw": 80,
+     "center_freq": 5210,
+     "channel": 40,
+     "essid": "neighbor-ssid-14",
+     "freq": 5200,
+     "is_adhoc": false,
+     "is_ubnt": false,
+     "noise": -96,
+     "rssi": 7,
+     "rssi_age": 19,
+     "security": "WPA2-Personal (AES/CCMP)",
+     "signal": -89
+    }
+   ],
+   "spectrum_scanning_abnormal": false,
+   "spectrum_table": [
+    {
+     "center_freq": 5210,
+     "channel": 36,
+     "interference": -59,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 11,
+     "width": 80
+    },
+    {
+     "center_freq": 5290,
+     "channel": 52,
+     "interference": -81,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 3,
+     "width": 80
+    },
+    {
+     "center_freq": 5530,
+     "channel": 100,
+     "interference": -80,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 2,
+     "width": 80
+    },
+    {
+     "center_freq": 5610,
+     "channel": 116,
+     "interference": -89,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 3,
+     "width": 80
+    },
+    {
+     "center_freq": 5690,
+     "channel": 132,
+     "interference": -96,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 6,
+     "width": 80
+    },
+    {
+     "center_freq": 5775,
+     "channel": 149,
+     "interference": -86,
+     "interference_type": [],
+     "other_bss_count": 0,
+     "perf_index": 0,
+     "total_samples": 0,
+     "utilization": 48,
+     "width": 80
+    }
+   ],
+   "spectrum_table_time": 66035
+  }
+ ],
+ "reboot_duration": 90,
+ "required_version": "6.2.49",
+ "required_versions": [
+  "6.2.49"
+ ],
+ "satisfaction": 90,
+ "satisfaction_real": 90,
+ "scan_radio_table": [],
+ "selfrun_beacon": true,
+ "serial": "9C05D6C2DF08",
+ "spectrum_scanning": false,
+ "ssh_session_table": [],
+ "state": 2,
+ "stats_inform_interval": 1,
+ "support_wifi6e": false,
+ "sys_error_caps": 0,
+ "sys_stats": {
+  "loadavg_1": "2.14",
+  "loadavg_15": "2.03",
+  "loadavg_5": "2.11",
+  "mem_buffer": 86949888,
+  "mem_total": 939495424,
+  "mem_used": 226086912
+ },
+ "sysid": 42576,
+ "system-stats": {
+  "cpu": "12.6",
+  "mem": "24.1",
+  "uptime": "815320"
+ },
+ "time": 1795017035,
+ "time_monotonic": 815319,
+ "time_ms": 171,
+ "timestamp": "2026-11-18T21:20:35",
+ "tm_ready": true,
+ "upgrade_duration": 120,
+ "uplink": "eth0",
+ "uptime": 815320,
+ "uptime_str": "9d10h28m40s",
+ "vap_table": [
+  {
+   "avg_client_signal": -60,
+   "bssid": "9c:05:d6:c2:df:0a",
+   "bw": 160,
+   "ccq": 0,
+   "channel": 40,
+   "essid": "Example Network",
+   "extchannel": -1,
+   "id": "1",
+   "mac_filter_rejections": 5,
+   "name": "wifi1ap1",
+   "num_sta": 9,
+   "radio": "na",
+   "radio_name": "wifi1",
+   "rx_bcast": 53996,
+   "rx_bytes": 52202068119,
+   "rx_crypts": 7,
+   "rx_dropped": 1073,
+   "rx_errors": 7,
+   "rx_frags": 0,
+   "rx_mcast": 2967671,
+   "rx_nwids": 139409,
+   "rx_packets": 147813359,
+   "rx_tcp_stats": {
+    "goodbytes": 0,
+    "lat_avg": -1,
+    "lat_max": -1,
+    "lat_min": -1,
+    "lat_samples": 0,
+    "lat_sum": 0,
+    "retries": 0,
+    "stalls": 0
+   },
+   "satisfaction": 99,
+   "satisfaction_real": 99,
+   "sta_table": [
+    {
+     "anomalies": 0,
+     "anon_client_id": "df582bb3f1f6c8e8a8866fe61a697377",
+     "auth_time": 4294967256,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 333,
+     "chwidth": 3,
+     "dhcpend_time": 410,
+     "dhcpstart_time": 400,
+     "hostname": "Pix***",
+     "idletime": 3,
+     "ip": "192.168.1.116",
+     "ipv6_addresses": [
+      "fe80::a066:eeff:feed:1897"
+     ],
+     "is_11a": true,
+     "is_11ac": true,
+     "is_11ax": true,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "a2:66:ee:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "rx_bytes": 172,
+        "rx_pkts": 2,
+        "tx_bytes": 31179644,
+        "tx_pkts": 362558,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "rx_bytes": 3150,
+        "rx_pkts": 35,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374,
+        "type": "mld"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 350,
+        "rx_pkts": 1,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 210,
+        "rx_pkts": 5,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313,
+        "type": "arp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "rx_bytes": 700,
+        "rx_pkts": 10,
+        "tx_bytes": 394352,
+        "tx_pkts": 5668,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 1900,
+        "group_ip": "239.255.255.250",
+        "rx_bytes": 1680,
+        "rx_pkts": 9,
+        "type": "ssdp"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "192.168.1.255",
+        "rx_bytes": 35971,
+        "rx_pkts": 115,
+        "tx_bytes": 12122693,
+        "tx_pkts": 38430,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "ff12::8384",
+        "rx_bytes": 38063,
+        "rx_pkts": 114,
+        "tx_bytes": 12693718,
+        "tx_pkts": 38008,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "224.0.0.22",
+        "rx_bytes": 2334,
+        "rx_pkts": 41,
+        "tx_bytes": 12283760,
+        "tx_pkts": 227312,
+        "type": "igmp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "rx_bytes": 35189,
+        "rx_pkts": 298,
+        "tx_bytes": 735749785,
+        "tx_pkts": 1373954,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "rx_bytes": 16169,
+        "rx_pkts": 55,
+        "tx_bytes": 716936692,
+        "tx_pkts": 1201646,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 5266211,
+        "tx_pkts": 29543,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 8680,
+        "tx_pkts": 434,
+        "type": "other"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1412944,
+        "tx_pkts": 27172,
+        "type": "stream"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 453551,
+        "tx_pkts": 1324,
+        "type": "other"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10789898,
+        "tx_pkts": 234563,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10831201,
+        "tx_pkts": 235346,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "239.255.255.251",
+        "tx_bytes": 1319500,
+        "tx_pkts": 14188,
+        "type": "stream"
+       }
+      ],
+      "mdns_rr": {
+       "ANY": 48,
+       "PTR": 821,
+       "SRV": 66
+      },
+      "memberships": [
+       {
+        "age_ms": 3980600,
+        "group_ip": "ff02::1:ffed:1897"
+       },
+       {
+        "age_ms": 3979900,
+        "group_ip": "ff12::8384"
+       },
+       {
+        "age_ms": 356800,
+        "group_ip": "224.0.0.251"
+       },
+       {
+        "age_ms": 356400,
+        "group_ip": "ff02::fb"
+       }
+      ],
+      "services": [
+       {
+        "bytes": 31894,
+        "name": "_googlecast._tcp.local",
+        "pkts": 118
+       },
+       {
+        "bytes": 6842,
+        "name": "_96084372._sub._googlecast._tcp.local",
+        "pkts": 26
+       },
+       {
+        "bytes": 528,
+        "name": "_services._dns-sd._udp.local",
+        "pkts": 6
+       },
+       {
+        "bytes": 574,
+        "name": "_esphomelib._tcp.local",
+        "pkts": 7
+       },
+       {
+        "bytes": 602,
+        "name": "_home-assistant._tcp.local",
+        "pkts": 7
+       },
+       {
+        "bytes": 525,
+        "name": "_hap._tcp.local",
+        "pkts": 7
+       },
+       {
+        "bytes": 609,
+        "name": "_spotify-connect._tcp.local",
+        "pkts": 7
+       },
+       {
+        "bytes": 948,
+        "name": "_airplay._tcp.local",
+        "pkts": 12
+       },
+       {
+        "bytes": 760,
+        "name": "_raop._tcp.local",
+        "pkts": 10
+       },
+       {
+        "bytes": 765,
+        "name": "_sonysmarthome._tcp.local",
+        "pkts": 9
+       },
+       {
+        "bytes": 492,
+        "name": "_googlezone._tcp.local",
+        "pkts": 6
+       },
+       {
+        "bytes": 430,
+        "name": "_companion-link._tcp.local",
+        "pkts": 5
+       },
+       {
+        "bytes": 352,
+        "name": "_androidtvremote2._tcp.local",
+        "pkts": 4
+       },
+       {
+        "bytes": 522,
+        "name": "_googcrossdevice._tcp.local",
+        "pkts": 6
+       },
+       {
+        "bytes": 375,
+        "name": "_ssh._tcp.local",
+        "pkts": 5
+       },
+       {
+        "bytes": 400,
+        "name": "_sftp-ssh._tcp.local",
+        "pkts": 5
+       },
+       {
+        "bytes": 468,
+        "name": "_asquic._udp.local",
+        "pkts": 6
+       },
+       {
+        "bytes": 425,
+        "name": "_remotepairing._tcp.local",
+        "pkts": 5
+       },
+       {
+        "bytes": 340,
+        "name": "_apple-mobdev2._tcp.local",
+        "pkts": 4
+       },
+       {
+        "bytes": 396,
+        "name": "_sub._apple-mobdev2._tcp.local",
+        "pkts": 4
+       },
+       {
+        "bytes": 24914,
+        "name": "_CFE7FEDA._sub._googlecast._tcp.local",
+        "pkts": 80
+       },
+       {
+        "bytes": 4052,
+        "name": "_CC1AD845._sub._googlecast._tcp.local",
+        "pkts": 12
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 210,
+        "rx_pkts": 5,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313
+       },
+       "dhcp": {
+        "rx_bytes": 350,
+        "rx_pkts": 1,
+        "tx_bytes": 684,
+        "tx_pkts": 2
+       },
+       "dhcpv6": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 9890,
+        "tx_pkts": 115
+       },
+       "igmp": {
+        "rx_bytes": 2334,
+        "rx_pkts": 41,
+        "tx_bytes": 12283944,
+        "tx_pkts": 227316
+       },
+       "ipv6_nd": {
+        "rx_bytes": 872,
+        "rx_pkts": 12,
+        "tx_bytes": 31575458,
+        "tx_pkts": 368243
+       },
+       "mdns": {
+        "rx_bytes": 51358,
+        "rx_pkts": 353,
+        "tx_bytes": 1452686477,
+        "tx_pkts": 2575600
+       },
+       "mld": {
+        "rx_bytes": 3150,
+        "rx_pkts": 35,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374
+       },
+       "other": {
+        "rx_bytes": 35971,
+        "rx_pkts": 115,
+        "tx_bytes": 19035790,
+        "tx_pkts": 80361
+       },
+       "ssdp": {
+        "rx_bytes": 1680,
+        "rx_pkts": 9,
+        "tx_bytes": 8463350,
+        "tx_pkts": 35168
+       },
+       "stream": {
+        "rx_bytes": 38063,
+        "rx_pkts": 114,
+        "tx_bytes": 22289304,
+        "tx_pkts": 124152
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21627638,
+        "tx_pkts": 469928
+       }
+      }
+     },
+     "noise": -94,
+     "nss": 2,
+     "rssi": 54,
+     "rx_bytes": 56669133,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 685,
+     "rx_packets": 132540,
+     "rx_rate": 2401900,
+     "rx_rate_mov": 2199566,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 100,
+     "satisfaction_real": 100,
+     "satisfaction_reason": 0,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -40,
+     "state": 11,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 609097199,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 3240,
+     "tx_data_mpdu_bytes": 619114430,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 500850,
+     "tx_power": 48,
+     "tx_rate": 2401900,
+     "tx_rate_mov": 1566250,
+     "tx_retries": 3201,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 39,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 133296,
+     "tx_total_mov": 0,
+     "uptime": 3982,
+     "vlan_id": 1,
+     "wifi_tx_attempts": 136497,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 0,
+      "max": 3000,
+      "min": 0,
+      "total": 7,
+      "total_count": 557
+     },
+     "wifi_tx_success": 133296
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "a1351395a85a7b7b6ac82578d9a810da",
+     "auth_time": 4294967236,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 333,
+     "chwidth": 3,
+     "dhcpend_time": 170,
+     "dhcpstart_time": 170,
+     "hostname": "Ank***",
+     "idletime": 2,
+     "ip": "192.168.1.16",
+     "ipv6_addresses": [
+      "fe80::7866:6781:4f5e:61e4"
+     ],
+     "is_11a": true,
+     "is_11ac": true,
+     "is_11ax": true,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "8c:6a:3b:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "rx_bytes": 86,
+        "rx_pkts": 1,
+        "tx_bytes": 31179644,
+        "tx_pkts": 362558,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "rx_bytes": 1070,
+        "rx_pkts": 11,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374,
+        "type": "mld"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 356,
+        "rx_pkts": 1,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 126,
+        "rx_pkts": 3,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313,
+        "type": "arp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "224.0.0.22",
+        "rx_bytes": 648,
+        "rx_pkts": 12,
+        "tx_bytes": 12283760,
+        "tx_pkts": 227312,
+        "type": "igmp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "rx_bytes": 770,
+        "rx_pkts": 11,
+        "tx_bytes": 394352,
+        "tx_pkts": 5668,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 1900,
+        "group_ip": "239.255.255.250",
+        "rx_bytes": 716,
+        "rx_pkts": 4,
+        "type": "ssdp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "rx_bytes": 7848,
+        "rx_pkts": 31,
+        "tx_bytes": 735749785,
+        "tx_pkts": 1373954,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "rx_bytes": 8364,
+        "rx_pkts": 30,
+        "tx_bytes": 716936692,
+        "tx_pkts": 1201646,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 20002,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 2378,
+        "rx_pkts": 41,
+        "type": "other"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 5266211,
+        "tx_pkts": 29543,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 8680,
+        "tx_pkts": 434,
+        "type": "other"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1412944,
+        "tx_pkts": 27172,
+        "type": "stream"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 453551,
+        "tx_pkts": 1324,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "ff12::8384",
+        "tx_bytes": 12693718,
+        "tx_pkts": 38008,
+        "type": "stream"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "192.168.1.255",
+        "tx_bytes": 12122693,
+        "tx_pkts": 38430,
+        "type": "other"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10789898,
+        "tx_pkts": 234563,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10831201,
+        "tx_pkts": 235346,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "239.255.255.251",
+        "tx_bytes": 1319500,
+        "tx_pkts": 14188,
+        "type": "stream"
+       }
+      ],
+      "mdns_rr": {
+       "A": 24,
+       "AAAA": 24,
+       "ANY": 12,
+       "PTR": 121,
+       "SRV": 24,
+       "TXT": 24
+      },
+      "memberships": [
+       {
+        "age_ms": 5375160,
+        "group_ip": "ff02::1:ff5e:61e4"
+       }
+      ],
+      "services": [
+       {
+        "bytes": 1068,
+        "name": "_meshcop._udp.local",
+        "pkts": 12
+       },
+       {
+        "bytes": 15060,
+        "name": "_FC9F5ED42C8A._tcp.local",
+        "pkts": 48
+       },
+       {
+        "bytes": 3968,
+        "name": "_RH6VL8BS.local",
+        "pkts": 8
+       },
+       {
+        "bytes": 11904,
+        "name": "_services._dns-sd._udp.local",
+        "pkts": 24
+       },
+       {
+        "bytes": 7936,
+        "name": "_CHSLXRS1.local",
+        "pkts": 16
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 126,
+        "rx_pkts": 3,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313
+       },
+       "dhcp": {
+        "rx_bytes": 356,
+        "rx_pkts": 1,
+        "tx_bytes": 684,
+        "tx_pkts": 2
+       },
+       "dhcpv6": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 9890,
+        "tx_pkts": 115
+       },
+       "igmp": {
+        "rx_bytes": 648,
+        "rx_pkts": 12,
+        "tx_bytes": 12283944,
+        "tx_pkts": 227316
+       },
+       "ipv6_nd": {
+        "rx_bytes": 856,
+        "rx_pkts": 12,
+        "tx_bytes": 31575458,
+        "tx_pkts": 368243
+       },
+       "mdns": {
+        "rx_bytes": 16212,
+        "rx_pkts": 61,
+        "tx_bytes": 1452686477,
+        "tx_pkts": 2575600
+       },
+       "mld": {
+        "rx_bytes": 1070,
+        "rx_pkts": 11,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374
+       },
+       "other": {
+        "rx_bytes": 2378,
+        "rx_pkts": 41,
+        "tx_bytes": 19035790,
+        "tx_pkts": 80361
+       },
+       "ssdp": {
+        "rx_bytes": 716,
+        "rx_pkts": 4,
+        "tx_bytes": 8463350,
+        "tx_pkts": 35168
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 22289304,
+        "tx_pkts": 124152
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21627638,
+        "tx_pkts": 469928
+       }
+      }
+     },
+     "noise": -94,
+     "nss": 2,
+     "rssi": 32,
+     "rx_bytes": 12557725,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 145,
+     "rx_packets": 34241,
+     "rx_rate": 6000,
+     "rx_rate_mov": 555450,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 99,
+     "satisfaction_real": 99,
+     "satisfaction_reason": 2048,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      99,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -62,
+     "state": 27,
+     "state_ht": true,
+     "state_pwrmgt": true,
+     "tx_bcast": 0,
+     "tx_bytes": 157360631,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 3405,
+     "tx_data_mpdu_bytes": 159801627,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 119298,
+     "tx_power": 48,
+     "tx_rate": 1297100,
+     "tx_rate_mov": 675550,
+     "tx_retries": 3381,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 24,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 32769,
+     "tx_total_mov": 0,
+     "uptime": 5376,
+     "vlan_id": 1,
+     "wifi_tx_attempts": 36150,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 0,
+      "max": 0,
+      "min": 0,
+      "total": 0,
+      "total_count": 100
+     },
+     "wifi_tx_success": 32769
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "440112debddacba289f73e9e31a645c3",
+     "auth_time": 4294967266,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 333,
+     "chwidth": 2,
+     "dhcpend_time": 1160,
+     "dhcpstart_time": 1160,
+     "hostname": "Goo***",
+     "idletime": 8,
+     "ip": "192.168.1.195",
+     "ipv6_addresses": [
+      "fe80::16c1:4eff:fe48:fc59"
+     ],
+     "is_11a": true,
+     "is_11ac": true,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "14:c1:4e:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "rx_bytes": 620,
+        "rx_pkts": 6,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "224.0.0.22",
+        "rx_bytes": 556,
+        "rx_pkts": 10,
+        "tx_bytes": 12283760,
+        "tx_pkts": 227312,
+        "type": "igmp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "rx_bytes": 86,
+        "rx_pkts": 1,
+        "tx_bytes": 31179644,
+        "tx_pkts": 362558,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 342,
+        "rx_pkts": 1,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 252,
+        "rx_pkts": 6,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313,
+        "type": "arp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "rx_bytes": 235872,
+        "rx_pkts": 1232,
+        "tx_bytes": 735749785,
+        "tx_pkts": 1373954,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "rx_bytes": 257885,
+        "rx_pkts": 1198,
+        "tx_bytes": 716936692,
+        "tx_pkts": 1201646,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "rx_bytes": 280,
+        "rx_pkts": 4,
+        "tx_bytes": 394352,
+        "tx_pkts": 5668,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "239.255.255.251",
+        "rx_bytes": 18228,
+        "rx_pkts": 196,
+        "tx_bytes": 1319500,
+        "tx_pkts": 14188,
+        "type": "stream"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "224.0.0.250",
+        "rx_bytes": 18228,
+        "rx_pkts": 196,
+        "type": "stream"
+       },
+       {
+        "dst_port": 9478,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 15744,
+        "rx_pkts": 192,
+        "type": "other"
+       },
+       {
+        "dst_port": 9999,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 13632,
+        "rx_pkts": 192,
+        "type": "other"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 5266211,
+        "tx_pkts": 29543,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 8680,
+        "tx_pkts": 434,
+        "type": "other"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1412944,
+        "tx_pkts": 27172,
+        "type": "stream"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 453551,
+        "tx_pkts": 1324,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "ff12::8384",
+        "tx_bytes": 12693718,
+        "tx_pkts": 38008,
+        "type": "stream"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "192.168.1.255",
+        "tx_bytes": 12122693,
+        "tx_pkts": 38430,
+        "type": "other"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10789898,
+        "tx_pkts": 234563,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10831201,
+        "tx_pkts": 235346,
+        "type": "ubnt"
+       }
+      ],
+      "mdns_rr": {
+       "A": 198,
+       "AAAA": 195,
+       "ANY": 36,
+       "PTR": 1681,
+       "SRV": 638,
+       "TXT": 16
+      },
+      "memberships": [
+       {
+        "age_ms": 11630230,
+        "group_ip": "ff02::fb"
+       },
+       {
+        "age_ms": 11630230,
+        "group_ip": "ff02::1:ff48:fc59"
+       },
+       {
+        "age_ms": 11629740,
+        "group_ip": "224.0.0.251"
+       },
+       {
+        "age_ms": 11628000,
+        "group_ip": "ff05::c"
+       },
+       {
+        "age_ms": 11627340,
+        "group_ip": "239.255.255.250"
+       },
+       {
+        "age_ms": 11623230,
+        "group_ip": "239.255.255.251"
+       },
+       {
+        "age_ms": 11619700,
+        "group_ip": "224.0.0.250"
+       }
+      ],
+      "services": [
+       {
+        "bytes": 10818,
+        "name": "_home-assistant._tcp.local",
+        "pkts": 31
+       },
+       {
+        "bytes": 10818,
+        "name": "_ewelink._tcp.local",
+        "pkts": 31
+       },
+       {
+        "bytes": 10214,
+        "name": "_hap._tcp.local",
+        "pkts": 27
+       },
+       {
+        "bytes": 10818,
+        "name": "_gmultichannel._tcp.local",
+        "pkts": 31
+       },
+       {
+        "bytes": 295229,
+        "name": "_googlecast._tcp.local",
+        "pkts": 1194
+       },
+       {
+        "bytes": 136430,
+        "name": "_googlezone._tcp.local",
+        "pkts": 778
+       },
+       {
+        "bytes": 8358,
+        "name": "_googcrossdevice._tcp.local",
+        "pkts": 36
+       },
+       {
+        "bytes": 7076,
+        "name": "_services._dns-sd._udp.local",
+        "pkts": 42
+       },
+       {
+        "bytes": 904,
+        "name": "_CC1AD845._sub._googlecast._tcp.local",
+        "pkts": 2
+       },
+       {
+        "bytes": 436,
+        "name": "_2DB7CC49._sub._googlecast._tcp.local",
+        "pkts": 1
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 252,
+        "rx_pkts": 6,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313
+       },
+       "dhcp": {
+        "rx_bytes": 342,
+        "rx_pkts": 1,
+        "tx_bytes": 684,
+        "tx_pkts": 2
+       },
+       "dhcpv6": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 9890,
+        "tx_pkts": 115
+       },
+       "igmp": {
+        "rx_bytes": 556,
+        "rx_pkts": 10,
+        "tx_bytes": 12283944,
+        "tx_pkts": 227316
+       },
+       "ipv6_nd": {
+        "rx_bytes": 366,
+        "rx_pkts": 5,
+        "tx_bytes": 31575458,
+        "tx_pkts": 368243
+       },
+       "mdns": {
+        "rx_bytes": 493757,
+        "rx_pkts": 2430,
+        "tx_bytes": 1452686477,
+        "tx_pkts": 2575600
+       },
+       "mld": {
+        "rx_bytes": 620,
+        "rx_pkts": 6,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374
+       },
+       "other": {
+        "rx_bytes": 29376,
+        "rx_pkts": 384,
+        "tx_bytes": 19035790,
+        "tx_pkts": 80361
+       },
+       "ssdp": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 8463350,
+        "tx_pkts": 35168
+       },
+       "stream": {
+        "rx_bytes": 36456,
+        "rx_pkts": 392,
+        "tx_bytes": 22289304,
+        "tx_pkts": 124152
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21627638,
+        "tx_pkts": 469928
+       }
+      }
+     },
+     "noise": -94,
+     "nss": 1,
+     "rssi": 21,
+     "rx_bytes": 8167882,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 3234,
+     "rx_packets": 27560,
+     "rx_rate": 292500,
+     "rx_rate_mov": 341250,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 100,
+     "satisfaction_real": 100,
+     "satisfaction_reason": 0,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -73,
+     "state": 11,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 6523070,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 1148,
+     "tx_data_mpdu_bytes": 7546204,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 25723,
+     "tx_power": 48,
+     "tx_rate": 433300,
+     "tx_rate_mov": 394316,
+     "tx_retries": 735,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 413,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 25997,
+     "tx_total_mov": 0,
+     "uptime": 11631,
+     "vlan_id": 1,
+     "wifi_tx_attempts": 26732,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 0,
+      "max": 1000,
+      "min": 0,
+      "total": 2,
+      "total_count": 171
+     },
+     "wifi_tx_success": 25997
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "e05258cb35b1607c19f628aca3068d23",
+     "auth_time": 4294967256,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 333,
+     "chwidth": 3,
+     "dhcpend_time": 230,
+     "dhcpstart_time": 230,
+     "hostname": "iPh***",
+     "idletime": 2,
+     "ip": "192.168.1.86",
+     "ipv6_addresses": [
+      "fe80::c6:8ba0:cba0:d68f"
+     ],
+     "is_11a": true,
+     "is_11ac": true,
+     "is_11ax": true,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "b2:9e:08:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "rx_bytes": 250,
+        "rx_pkts": 3,
+        "tx_bytes": 31179644,
+        "tx_pkts": 362558,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "rx_bytes": 17160,
+        "rx_pkts": 190,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374,
+        "type": "mld"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 342,
+        "rx_pkts": 1,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "rx_bytes": 202,
+        "rx_pkts": 3,
+        "tx_bytes": 394352,
+        "tx_pkts": 5668,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 1512,
+        "rx_pkts": 36,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313,
+        "type": "arp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "224.0.0.22",
+        "rx_bytes": 10152,
+        "rx_pkts": 188,
+        "tx_bytes": 12283760,
+        "tx_pkts": 227312,
+        "type": "igmp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "rx_bytes": 1347182,
+        "rx_pkts": 2866,
+        "tx_bytes": 735749785,
+        "tx_pkts": 1373954,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "rx_bytes": 1404379,
+        "rx_pkts": 2865,
+        "tx_bytes": 716936692,
+        "tx_pkts": 1201646,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 20002,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 253477,
+        "rx_pkts": 462,
+        "type": "other"
+       },
+       {
+        "dst_port": 20002,
+        "group_ip": "192.168.1.255",
+        "rx_bytes": 19208,
+        "rx_pkts": 35,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "192.168.1.255",
+        "rx_bytes": 20030,
+        "rx_pkts": 41,
+        "tx_bytes": 12122693,
+        "tx_pkts": 38430,
+        "type": "other"
+       },
+       {
+        "dst_port": 1900,
+        "group_ip": "239.255.255.250",
+        "rx_bytes": 501,
+        "rx_pkts": 3,
+        "type": "ssdp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 5266211,
+        "tx_pkts": 29543,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 8680,
+        "tx_pkts": 434,
+        "type": "other"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1412944,
+        "tx_pkts": 27172,
+        "type": "stream"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 453551,
+        "tx_pkts": 1324,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "ff12::8384",
+        "tx_bytes": 12693718,
+        "tx_pkts": 38008,
+        "type": "stream"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10789898,
+        "tx_pkts": 234563,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10831201,
+        "tx_pkts": 235346,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "239.255.255.251",
+        "tx_bytes": 1319500,
+        "tx_pkts": 14188,
+        "type": "stream"
+       }
+      ],
+      "mdns_rr": {
+       "A": 1406,
+       "AAAA": 1378,
+       "ANY": 3318,
+       "PTR": 25142,
+       "SRV": 3924,
+       "TXT": 12156
+      },
+      "memberships": [
+       {
+        "age_ms": 21117260,
+        "group_ip": "ff02::2:ff50:ff90"
+       },
+       {
+        "age_ms": 21117260,
+        "group_ip": "ff02::1:ffa0:d68f"
+       },
+       {
+        "age_ms": 130450,
+        "group_ip": "224.0.0.251"
+       },
+       {
+        "age_ms": 6824690,
+        "group_ip": "239.255.255.250"
+       },
+       {
+        "age_ms": 170560,
+        "group_ip": "ff02::fb"
+       }
+      ],
+      "services": [
+       {
+        "bytes": 720318,
+        "name": "_companion-link._tcp.local",
+        "pkts": 1288
+       },
+       {
+        "bytes": 713094,
+        "name": "_rdlink._tcp.local",
+        "pkts": 1278
+       },
+       {
+        "bytes": 736464,
+        "name": "_hap._udp.local",
+        "pkts": 1330
+       },
+       {
+        "bytes": 956974,
+        "name": "_hap._tcp.local",
+        "pkts": 1658
+       },
+       {
+        "bytes": 100880,
+        "name": "_airplay._tcp.local",
+        "pkts": 240
+       },
+       {
+        "bytes": 100470,
+        "name": "_airplay-bds._tcp.local",
+        "pkts": 236
+       },
+       {
+        "bytes": 98658,
+        "name": "_raop._tcp.local",
+        "pkts": 236
+       },
+       {
+        "bytes": 1497452,
+        "name": "_remotepairing._tcp.local",
+        "pkts": 2742
+       },
+       {
+        "bytes": 1482092,
+        "name": "_apple-mobdev2._tcp.local",
+        "pkts": 2688
+       },
+       {
+        "bytes": 1047164,
+        "name": "_services._dns-sd._udp.local",
+        "pkts": 1460
+       },
+       {
+        "bytes": 1134098,
+        "name": "_sub._apple-mobdev2._tcp.local",
+        "pkts": 1670
+       },
+       {
+        "bytes": 429170,
+        "name": "_asquic._udp.local",
+        "pkts": 774
+       },
+       {
+        "bytes": 7900,
+        "name": "_sleep-proxy._udp.local",
+        "pkts": 20
+       },
+       {
+        "bytes": 7900,
+        "name": "_meshcop._udp.local",
+        "pkts": 20
+       },
+       {
+        "bytes": 7612,
+        "name": "_dns-sd._udp.local",
+        "pkts": 20
+       },
+       {
+        "bytes": 4562,
+        "name": "_atc._tcp.local",
+        "pkts": 12
+       },
+       {
+        "bytes": 7188,
+        "name": "_rpft._tcp.local",
+        "pkts": 34
+       },
+       {
+        "bytes": 103,
+        "name": "_googlecast._tcp.local",
+        "pkts": 1
+       },
+       {
+        "bytes": 103,
+        "name": "_2DB7CC49._sub._googlecast._tcp.local",
+        "pkts": 1
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 1512,
+        "rx_pkts": 36,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313
+       },
+       "dhcp": {
+        "rx_bytes": 342,
+        "rx_pkts": 1,
+        "tx_bytes": 684,
+        "tx_pkts": 2
+       },
+       "dhcpv6": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 9890,
+        "tx_pkts": 115
+       },
+       "igmp": {
+        "rx_bytes": 10152,
+        "rx_pkts": 188,
+        "tx_bytes": 12283944,
+        "tx_pkts": 227316
+       },
+       "ipv6_nd": {
+        "rx_bytes": 452,
+        "rx_pkts": 6,
+        "tx_bytes": 31575458,
+        "tx_pkts": 368243
+       },
+       "mdns": {
+        "rx_bytes": 2751561,
+        "rx_pkts": 5731,
+        "tx_bytes": 1452686477,
+        "tx_pkts": 2575600
+       },
+       "mld": {
+        "rx_bytes": 17160,
+        "rx_pkts": 190,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374
+       },
+       "other": {
+        "rx_bytes": 292715,
+        "rx_pkts": 538,
+        "tx_bytes": 19035790,
+        "tx_pkts": 80361
+       },
+       "ssdp": {
+        "rx_bytes": 501,
+        "rx_pkts": 3,
+        "tx_bytes": 8463350,
+        "tx_pkts": 35168
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 22289304,
+        "tx_pkts": 124152
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21627638,
+        "tx_pkts": 469928
+       }
+      }
+     },
+     "noise": -94,
+     "nss": 2,
+     "rssi": 24,
+     "rx_bytes": 57974196,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 6693,
+     "rx_packets": 228642,
+     "rx_rate": 1152900,
+     "rx_rate_mov": 879400,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 94,
+     "satisfaction_real": 94,
+     "satisfaction_reason": 2048,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      94,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -70,
+     "state": 27,
+     "state_ht": true,
+     "state_pwrmgt": true,
+     "tx_bcast": 0,
+     "tx_bytes": 953613696,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 15172,
+     "tx_data_mpdu_bytes": 969872702,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 728165,
+     "tx_power": 48,
+     "tx_rate": 1441200,
+     "tx_rate_mov": 1657383,
+     "tx_retries": 14886,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 286,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 224082,
+     "tx_total_mov": 0,
+     "uptime": 21120,
+     "vlan_id": 1,
+     "wifi_tx_attempts": 238968,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 0,
+      "max": 4000,
+      "min": 0,
+      "total": 133,
+      "total_count": 570
+     },
+     "wifi_tx_success": 224082
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "ad6a6276c5671173bf59dd981bfc03bc",
+     "auth_time": 4294967266,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 333,
+     "chwidth": 2,
+     "dhcpend_time": 150,
+     "dhcpstart_time": 140,
+     "hostname": "Mac***",
+     "idletime": 29,
+     "ip": "192.168.1.220",
+     "ipv6_addresses": [
+      "fe80::8c2:b26e:8e7f:6d73"
+     ],
+     "is_11a": true,
+     "is_11ac": true,
+     "is_11ax": true,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "6e:92:04:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "rx_bytes": 220,
+        "rx_pkts": 2,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "rx_bytes": 172,
+        "rx_pkts": 2,
+        "tx_bytes": 31179644,
+        "tx_pkts": 362558,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 15048,
+        "rx_pkts": 44,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "rx_bytes": 7412,
+        "rx_pkts": 106,
+        "tx_bytes": 394352,
+        "tx_pkts": 5668,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 6510,
+        "rx_pkts": 155,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313,
+        "type": "arp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "rx_bytes": 283585,
+        "rx_pkts": 654,
+        "tx_bytes": 735749785,
+        "tx_pkts": 1373954,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "rx_bytes": 296665,
+        "rx_pkts": 654,
+        "tx_bytes": 716936692,
+        "tx_pkts": 1201646,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 137,
+        "group_ip": "192.168.1.255",
+        "rx_bytes": 10294,
+        "rx_pkts": 98,
+        "type": "other"
+       },
+       {
+        "dst_port": 138,
+        "group_ip": "192.168.1.255",
+        "rx_bytes": 9936,
+        "rx_pkts": 46,
+        "type": "other"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 5266211,
+        "tx_pkts": 29543,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 8680,
+        "tx_pkts": 434,
+        "type": "other"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1412944,
+        "tx_pkts": 27172,
+        "type": "stream"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 453551,
+        "tx_pkts": 1324,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "ff12::8384",
+        "tx_bytes": 12693718,
+        "tx_pkts": 38008,
+        "type": "stream"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "192.168.1.255",
+        "tx_bytes": 12122693,
+        "tx_pkts": 38430,
+        "type": "other"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10789898,
+        "tx_pkts": 234563,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10831201,
+        "tx_pkts": 235346,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "224.0.0.22",
+        "tx_bytes": 12283760,
+        "tx_pkts": 227312,
+        "type": "igmp"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "239.255.255.251",
+        "tx_bytes": 1319500,
+        "tx_pkts": 14188,
+        "type": "stream"
+       }
+      ],
+      "mdns_rr": {
+       "A": 280,
+       "AAAA": 280,
+       "ANY": 774,
+       "PTR": 7746,
+       "SRV": 630,
+       "TXT": 764
+      },
+      "memberships": [
+       {
+        "age_ms": 34280740,
+        "group_ip": "ff02::2:ff6f:3a4b"
+       },
+       {
+        "age_ms": 34280740,
+        "group_ip": "ff02::1:ff7f:6d73"
+       }
+      ],
+      "services": [
+       {
+        "bytes": 112868,
+        "name": "_dns-sd._udp.local",
+        "pkts": 350
+       },
+       {
+        "bytes": 112868,
+        "name": "_uscan._tcp.local",
+        "pkts": 350
+       },
+       {
+        "bytes": 112868,
+        "name": "_printer._tcp.local",
+        "pkts": 350
+       },
+       {
+        "bytes": 112868,
+        "name": "_uscans._tcp.local",
+        "pkts": 350
+       },
+       {
+        "bytes": 112868,
+        "name": "_ipp._tcp.local",
+        "pkts": 350
+       },
+       {
+        "bytes": 112868,
+        "name": "_ptp._tcp.local",
+        "pkts": 350
+       },
+       {
+        "bytes": 112868,
+        "name": "_ippusb._tcp.local",
+        "pkts": 350
+       },
+       {
+        "bytes": 112868,
+        "name": "_scanner._tcp.local",
+        "pkts": 350
+       },
+       {
+        "bytes": 387836,
+        "name": "_airplay._tcp.local",
+        "pkts": 602
+       },
+       {
+        "bytes": 387836,
+        "name": "_raop._tcp.local",
+        "pkts": 602
+       },
+       {
+        "bytes": 303710,
+        "name": "_services._dns-sd._udp.local",
+        "pkts": 290
+       },
+       {
+        "bytes": 124276,
+        "name": "_companion-link._tcp.local",
+        "pkts": 186
+       },
+       {
+        "bytes": 100920,
+        "name": "_device-info._tcp.local",
+        "pkts": 98
+       },
+       {
+        "bytes": 7620,
+        "name": "_afpovertcp._tcp.local",
+        "pkts": 60
+       },
+       {
+        "bytes": 7620,
+        "name": "_smb._tcp.local",
+        "pkts": 60
+       },
+       {
+        "bytes": 7620,
+        "name": "_rfb._tcp.local",
+        "pkts": 60
+       },
+       {
+        "bytes": 7620,
+        "name": "_adisk._tcp.local",
+        "pkts": 60
+       },
+       {
+        "bytes": 648,
+        "name": "_apple-mobdev._tcp.local",
+        "pkts": 4
+       },
+       {
+        "bytes": 648,
+        "name": "_sub._apple-mobdev2._tcp.local",
+        "pkts": 4
+       },
+       {
+        "bytes": 648,
+        "name": "_apple-pairable._tcp.local",
+        "pkts": 4
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 6510,
+        "rx_pkts": 155,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313
+       },
+       "dhcp": {
+        "rx_bytes": 15048,
+        "rx_pkts": 44,
+        "tx_bytes": 684,
+        "tx_pkts": 2
+       },
+       "dhcpv6": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 9890,
+        "tx_pkts": 115
+       },
+       "igmp": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 12283944,
+        "tx_pkts": 227316
+       },
+       "ipv6_nd": {
+        "rx_bytes": 7584,
+        "rx_pkts": 108,
+        "tx_bytes": 31575458,
+        "tx_pkts": 368243
+       },
+       "mdns": {
+        "rx_bytes": 580250,
+        "rx_pkts": 1308,
+        "tx_bytes": 1452686477,
+        "tx_pkts": 2575600
+       },
+       "mld": {
+        "rx_bytes": 220,
+        "rx_pkts": 2,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374
+       },
+       "other": {
+        "rx_bytes": 20230,
+        "rx_pkts": 144,
+        "tx_bytes": 19035790,
+        "tx_pkts": 80361
+       },
+       "ssdp": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 8463350,
+        "tx_pkts": 35168
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 22289304,
+        "tx_pkts": 124152
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21627638,
+        "tx_pkts": 469928
+       }
+      }
+     },
+     "noise": -94,
+     "nss": 2,
+     "rssi": 26,
+     "rx_bytes": 26761701,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 1761,
+     "rx_packets": 136663,
+     "rx_rate": 680600,
+     "rx_rate_mov": 680600,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 100,
+     "satisfaction_real": 100,
+     "satisfaction_reason": 0,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -68,
+     "state": 27,
+     "state_ht": true,
+     "state_pwrmgt": true,
+     "tx_bcast": 0,
+     "tx_bytes": 217279749,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 6995,
+     "tx_data_mpdu_bytes": 224963701,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 278759,
+     "tx_power": 48,
+     "tx_rate": 960800,
+     "tx_rate_mov": 165133,
+     "tx_retries": 6871,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 124,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 141436,
+     "tx_total_mov": 0,
+     "uptime": 34284,
+     "vlan_id": 1,
+     "wifi_tx_attempts": 148307,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 0,
+      "max": 0,
+      "min": 0,
+      "total": 0,
+      "total_count": 2
+     },
+     "wifi_tx_success": 141436
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "9d4adb39b6d716d6e3fd263696880382",
+     "auth_time": 4294967266,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 333,
+     "chwidth": 2,
+     "dhcpend_time": 720,
+     "dhcpstart_time": 720,
+     "idletime": 7,
+     "ip": "192.168.1.210",
+     "ipv6_addresses": [
+      "fe80::8bfc:da13:3b9:e565"
+     ],
+     "is_11a": true,
+     "is_11ac": true,
+     "is_11ax": true,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "ec:91:61:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "rx_bytes": 688,
+        "rx_pkts": 8,
+        "tx_bytes": 31179644,
+        "tx_pkts": 362558,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "rx_bytes": 1190,
+        "rx_pkts": 13,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374,
+        "type": "mld"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 336,
+        "rx_pkts": 1,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 420,
+        "rx_pkts": 10,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313,
+        "type": "arp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "rx_bytes": 1610,
+        "rx_pkts": 23,
+        "tx_bytes": 394352,
+        "tx_pkts": 5668,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "224.0.0.22",
+        "rx_bytes": 216,
+        "rx_pkts": 4,
+        "tx_bytes": 12283760,
+        "tx_pkts": 227312,
+        "type": "igmp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "rx_bytes": 1519698,
+        "rx_pkts": 4541,
+        "tx_bytes": 735749785,
+        "tx_pkts": 1373954,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "rx_bytes": 687572,
+        "rx_pkts": 2146,
+        "tx_bytes": 716936692,
+        "tx_pkts": 1201646,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 1900,
+        "group_ip": "239.255.255.250",
+        "rx_bytes": 396209,
+        "rx_pkts": 1133,
+        "type": "ssdp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 5266211,
+        "tx_pkts": 29543,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 8680,
+        "tx_pkts": 434,
+        "type": "other"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1412944,
+        "tx_pkts": 27172,
+        "type": "stream"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 453551,
+        "tx_pkts": 1324,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "ff12::8384",
+        "tx_bytes": 12693718,
+        "tx_pkts": 38008,
+        "type": "stream"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "192.168.1.255",
+        "tx_bytes": 12122693,
+        "tx_pkts": 38430,
+        "type": "other"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10789898,
+        "tx_pkts": 234563,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10831201,
+        "tx_pkts": 235346,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "239.255.255.251",
+        "tx_bytes": 1319500,
+        "tx_pkts": 14188,
+        "type": "stream"
+       }
+      ],
+      "mdns_rr": {
+       "A": 665,
+       "AAAA": 490,
+       "ANY": 106,
+       "PTR": 7048,
+       "SRV": 1237,
+       "TXT": 331
+      },
+      "memberships": [
+       {
+        "age_ms": 67071730,
+        "group_ip": "ff02::1:ffb9:e565"
+       },
+       {
+        "age_ms": 67071990,
+        "group_ip": "224.0.0.251"
+       },
+       {
+        "age_ms": 67071730,
+        "group_ip": "ff02::fb"
+       },
+       {
+        "age_ms": 67056340,
+        "group_ip": "239.255.255.250"
+       },
+       {
+        "age_ms": 67056430,
+        "group_ip": "ff02::c"
+       },
+       {
+        "age_ms": 67055150,
+        "group_ip": "ff05::c"
+       }
+      ],
+      "services": [
+       {
+        "bytes": 674345,
+        "name": "_androidtvremote2._tcp.local",
+        "pkts": 1065
+       },
+       {
+        "bytes": 40968,
+        "name": "_947de4b9cc734147bfdb528ecc43d99f.local",
+        "pkts": 112
+       },
+       {
+        "bytes": 233143,
+        "name": "_services._dns-sd._udp.local",
+        "pkts": 1256
+       },
+       {
+        "bytes": 132554,
+        "name": "_airplay._tcp.local",
+        "pkts": 358
+       },
+       {
+        "bytes": 53666,
+        "name": "_hap._tcp.local",
+        "pkts": 146
+       },
+       {
+        "bytes": 1034311,
+        "name": "_googlecast._tcp.local",
+        "pkts": 3049
+       },
+       {
+        "bytes": 703055,
+        "name": "_sonysmarthome._tcp.local",
+        "pkts": 1097
+       },
+       {
+        "bytes": 7902,
+        "name": "_CFE7FEDA._sub._googlecast._tcp.local",
+        "pkts": 18
+       },
+       {
+        "bytes": 878,
+        "name": "_233637DE._sub._googlecast._tcp.local",
+        "pkts": 2
+       },
+       {
+        "bytes": 1756,
+        "name": "_CC1AD845._sub._googlecast._tcp.local",
+        "pkts": 4
+       },
+       {
+        "bytes": 878,
+        "name": "_96084372._sub._googlecast._tcp.local",
+        "pkts": 2
+       },
+       {
+        "bytes": 423,
+        "name": "_2DB7CC49._sub._googlecast._tcp.local",
+        "pkts": 1
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 420,
+        "rx_pkts": 10,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313
+       },
+       "dhcp": {
+        "rx_bytes": 336,
+        "rx_pkts": 1,
+        "tx_bytes": 684,
+        "tx_pkts": 2
+       },
+       "dhcpv6": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 9890,
+        "tx_pkts": 115
+       },
+       "igmp": {
+        "rx_bytes": 216,
+        "rx_pkts": 4,
+        "tx_bytes": 12283944,
+        "tx_pkts": 227316
+       },
+       "ipv6_nd": {
+        "rx_bytes": 2298,
+        "rx_pkts": 31,
+        "tx_bytes": 31575458,
+        "tx_pkts": 368243
+       },
+       "mdns": {
+        "rx_bytes": 2207270,
+        "rx_pkts": 6687,
+        "tx_bytes": 1452686477,
+        "tx_pkts": 2575600
+       },
+       "mld": {
+        "rx_bytes": 1190,
+        "rx_pkts": 13,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374
+       },
+       "other": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 19035790,
+        "tx_pkts": 80361
+       },
+       "ssdp": {
+        "rx_bytes": 396209,
+        "rx_pkts": 1133,
+        "tx_bytes": 8463350,
+        "tx_pkts": 35168
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 22289304,
+        "tx_pkts": 124152
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21627638,
+        "tx_pkts": 469928
+       }
+      }
+     },
+     "noise": -94,
+     "nss": 2,
+     "rssi": 39,
+     "rx_bytes": 105375067,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 7879,
+     "rx_packets": 1282228,
+     "rx_rate": 6000,
+     "rx_rate_mov": 1060883,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 100,
+     "satisfaction_real": 100,
+     "satisfaction_reason": 0,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -55,
+     "state": 27,
+     "state_ht": true,
+     "state_pwrmgt": true,
+     "tx_bcast": 0,
+     "tx_bytes": 3468882189,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 72185,
+     "tx_data_mpdu_bytes": 3534467744,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 2449489,
+     "tx_power": 48,
+     "tx_rate": 6000,
+     "tx_rate_mov": 1201000,
+     "tx_retries": 71925,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 260,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 923924,
+     "tx_total_mov": 0,
+     "uptime": 67074,
+     "vlan_id": 1,
+     "wifi_tx_attempts": 995849,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 0,
+      "max": 1000,
+      "min": 0,
+      "total": 1,
+      "total_count": 104
+     },
+     "wifi_tx_success": 923924
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "e6556d9e74a54bcdfe1d265198b57a3e",
+     "auth_time": 4294967266,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 333,
+     "chwidth": 2,
+     "dhcpend_time": 170,
+     "dhcpstart_time": 170,
+     "hostname": "iPa***",
+     "idletime": 24,
+     "ip": "192.168.1.57",
+     "ipv6_addresses": [
+      "fe80::14ed:717d:9325:5dbf",
+      "fe80::14ed:717d:9325:5dbf"
+     ],
+     "is_11a": true,
+     "is_11ac": true,
+     "is_11ax": true,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "4a:56:12:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "rx_bytes": 128600,
+        "rx_pkts": 1428,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "rx_bytes": 258,
+        "rx_pkts": 3,
+        "tx_bytes": 31179644,
+        "tx_pkts": 362558,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 342,
+        "rx_pkts": 1,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "rx_bytes": 202,
+        "rx_pkts": 3,
+        "tx_bytes": 394352,
+        "tx_pkts": 5668,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 1890,
+        "rx_pkts": 45,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313,
+        "type": "arp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "rx_bytes": 4279280,
+        "rx_pkts": 16945,
+        "tx_bytes": 716936692,
+        "tx_pkts": 1201646,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "224.0.0.22",
+        "rx_bytes": 75708,
+        "rx_pkts": 1402,
+        "tx_bytes": 12283760,
+        "tx_pkts": 227312,
+        "type": "igmp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "rx_bytes": 3938797,
+        "rx_pkts": 16941,
+        "tx_bytes": 735749785,
+        "tx_pkts": 1373954,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 1900,
+        "group_ip": "239.255.255.250",
+        "rx_bytes": 12525,
+        "rx_pkts": 75,
+        "type": "ssdp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 5266211,
+        "tx_pkts": 29543,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 8680,
+        "tx_pkts": 434,
+        "type": "other"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1412944,
+        "tx_pkts": 27172,
+        "type": "stream"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 453551,
+        "tx_pkts": 1324,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "ff12::8384",
+        "tx_bytes": 12693718,
+        "tx_pkts": 38008,
+        "type": "stream"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "192.168.1.255",
+        "tx_bytes": 12122693,
+        "tx_pkts": 38430,
+        "type": "other"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10789898,
+        "tx_pkts": 234563,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10831201,
+        "tx_pkts": 235346,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "239.255.255.251",
+        "tx_bytes": 1319500,
+        "tx_pkts": 14188,
+        "type": "stream"
+       }
+      ],
+      "mdns_rr": {
+       "A": 7490,
+       "AAAA": 7491,
+       "ANY": 17603,
+       "PTR": 54122,
+       "SRV": 7590,
+       "TXT": 7857
+      },
+      "memberships": [
+       {
+        "age_ms": 439798510,
+        "group_ip": "ff02::2:ff7b:2839"
+       },
+       {
+        "age_ms": 439798510,
+        "group_ip": "ff02::1:ff25:5dbf"
+       },
+       {
+        "age_ms": 417890,
+        "group_ip": "224.0.0.251"
+       },
+       {
+        "age_ms": 585320,
+        "group_ip": "ff02::fb"
+       }
+      ],
+      "services": [
+       {
+        "bytes": 1066679,
+        "name": "_companion-link._tcp.local",
+        "pkts": 7418
+       },
+       {
+        "bytes": 956323,
+        "name": "_rdlink._tcp.local",
+        "pkts": 7018
+       },
+       {
+        "bytes": 5452488,
+        "name": "_remotepairing._tcp.local",
+        "pkts": 19228
+       },
+       {
+        "bytes": 3124975,
+        "name": "_services._dns-sd._udp.local",
+        "pkts": 7583
+       },
+       {
+        "bytes": 64497,
+        "name": "_device-info._tcp.local",
+        "pkts": 157
+       },
+       {
+        "bytes": 4482,
+        "name": "_dns-sd._udp.local",
+        "pkts": 24
+       },
+       {
+        "bytes": 4042,
+        "name": "_atc._tcp.local",
+        "pkts": 32
+       },
+       {
+        "bytes": 412,
+        "name": "_googlecast._tcp.local",
+        "pkts": 4
+       },
+       {
+        "bytes": 412,
+        "name": "_233637DE._sub._googlecast._tcp.local",
+        "pkts": 4
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 1890,
+        "rx_pkts": 45,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313
+       },
+       "dhcp": {
+        "rx_bytes": 342,
+        "rx_pkts": 1,
+        "tx_bytes": 684,
+        "tx_pkts": 2
+       },
+       "dhcpv6": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 9890,
+        "tx_pkts": 115
+       },
+       "igmp": {
+        "rx_bytes": 75708,
+        "rx_pkts": 1402,
+        "tx_bytes": 12283944,
+        "tx_pkts": 227316
+       },
+       "ipv6_nd": {
+        "rx_bytes": 460,
+        "rx_pkts": 6,
+        "tx_bytes": 31575458,
+        "tx_pkts": 368243
+       },
+       "mdns": {
+        "rx_bytes": 8218077,
+        "rx_pkts": 33886,
+        "tx_bytes": 1452686477,
+        "tx_pkts": 2575600
+       },
+       "mld": {
+        "rx_bytes": 128600,
+        "rx_pkts": 1428,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374
+       },
+       "other": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 19035790,
+        "tx_pkts": 80361
+       },
+       "ssdp": {
+        "rx_bytes": 12525,
+        "rx_pkts": 75,
+        "tx_bytes": 8463350,
+        "tx_pkts": 35168
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 22289304,
+        "tx_pkts": 124152
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21627638,
+        "tx_pkts": 469928
+       }
+      }
+     },
+     "noise": -94,
+     "nss": 2,
+     "rssi": 22,
+     "rx_bytes": 59808602,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 36843,
+     "rx_packets": 336301,
+     "rx_rate": 272200,
+     "rx_rate_mov": 475066,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 98,
+     "satisfaction_real": 98,
+     "satisfaction_reason": 2,
+     "satisfaction_subscores": [
+      -1,
+      98,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -72,
+     "state": 27,
+     "state_ht": true,
+     "state_pwrmgt": true,
+     "tx_bcast": 0,
+     "tx_bytes": 1115953241,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 24238,
+     "tx_data_mpdu_bytes": 1140240613,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 859328,
+     "tx_power": 48,
+     "tx_rate": 6000,
+     "tx_rate_mov": 125100,
+     "tx_retries": 23878,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 360,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 358568,
+     "tx_total_mov": 0,
+     "uptime": 439799,
+     "vlan_id": 1,
+     "wifi_tx_attempts": 382444,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 2,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 0,
+      "max": 1000,
+      "min": 0,
+      "total": 2,
+      "total_count": 9
+     },
+     "wifi_tx_success": 358566
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "a970cd4eb6ed9cb45113989ae3e4b2f5",
+     "auth_time": 4294967246,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 333,
+     "chwidth": 0,
+     "dhcpend_time": 990,
+     "dhcpstart_time": 990,
+     "hostname": "son***",
+     "idletime": 23,
+     "ip": "192.168.1.106",
+     "ipv6_addresses": [
+      "fe80::c2bf:beff:feb0:35e6"
+     ],
+     "is_11a": true,
+     "is_11ac": true,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "c0:bf:be:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "rx_bytes": 12138230,
+        "rx_pkts": 134869,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "rx_bytes": 86,
+        "rx_pkts": 1,
+        "tx_bytes": 31179644,
+        "tx_pkts": 362558,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 347,
+        "rx_pkts": 1,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 1470,
+        "rx_pkts": 35,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313,
+        "type": "arp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "rx_bytes": 280,
+        "rx_pkts": 4,
+        "tx_bytes": 394352,
+        "tx_pkts": 5668,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "rx_bytes": 376517225,
+        "rx_pkts": 555596,
+        "tx_bytes": 716936692,
+        "tx_pkts": 1201646,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "224.0.0.22",
+        "rx_bytes": 7279578,
+        "rx_pkts": 134807,
+        "tx_bytes": 12283760,
+        "tx_pkts": 227312,
+        "type": "igmp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "rx_bytes": 365398069,
+        "rx_pkts": 555581,
+        "tx_bytes": 735749785,
+        "tx_pkts": 1373954,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 1902,
+        "group_ip": "239.255.255.250",
+        "rx_bytes": 149876,
+        "rx_pkts": 421,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 5266211,
+        "tx_pkts": 29543,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 8680,
+        "tx_pkts": 434,
+        "type": "other"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1412944,
+        "tx_pkts": 27172,
+        "type": "stream"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 453551,
+        "tx_pkts": 1324,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "ff12::8384",
+        "tx_bytes": 12693718,
+        "tx_pkts": 38008,
+        "type": "stream"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "192.168.1.255",
+        "tx_bytes": 12122693,
+        "tx_pkts": 38430,
+        "type": "other"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10789898,
+        "tx_pkts": 234563,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10831201,
+        "tx_pkts": 235346,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "239.255.255.251",
+        "tx_bytes": 1319500,
+        "tx_pkts": 14188,
+        "type": "stream"
+       }
+      ],
+      "mdns_rr": {
+       "A": 350653,
+       "AAAA": 350656,
+       "ANY": 2018222,
+       "PTR": 3543864,
+       "SRV": 1402477,
+       "TXT": 1402477
+      },
+      "memberships": [
+       {
+        "age_ms": 504461330,
+        "group_ip": "ff02::1:ffb0:35e6"
+       },
+       {
+        "age_ms": 504456170,
+        "group_ip": "239.255.255.250"
+       },
+       {
+        "age_ms": 1556090,
+        "group_ip": "224.0.0.251"
+       },
+       {
+        "age_ms": 1556180,
+        "group_ip": "ff02::fb"
+       }
+      ],
+      "services": [
+       {
+        "bytes": 659820823,
+        "name": "_spotify-connect._tcp.local",
+        "pkts": 754284
+       },
+       {
+        "bytes": 659824359,
+        "name": "_airplay._tcp.local",
+        "pkts": 754288
+       },
+       {
+        "bytes": 659824359,
+        "name": "_raop._tcp.local",
+        "pkts": 754288
+       },
+       {
+        "bytes": 485394883,
+        "name": "_services._dns-sd._udp.local",
+        "pkts": 350666
+       },
+       {
+        "bytes": 659789871,
+        "name": "_sonysmarthome._tcp.local",
+        "pkts": 754237
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 1470,
+        "rx_pkts": 35,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313
+       },
+       "dhcp": {
+        "rx_bytes": 347,
+        "rx_pkts": 1,
+        "tx_bytes": 684,
+        "tx_pkts": 2
+       },
+       "dhcpv6": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 9890,
+        "tx_pkts": 115
+       },
+       "igmp": {
+        "rx_bytes": 7279578,
+        "rx_pkts": 134807,
+        "tx_bytes": 12283944,
+        "tx_pkts": 227316
+       },
+       "ipv6_nd": {
+        "rx_bytes": 366,
+        "rx_pkts": 5,
+        "tx_bytes": 31575458,
+        "tx_pkts": 368243
+       },
+       "mdns": {
+        "rx_bytes": 741915294,
+        "rx_pkts": 1111177,
+        "tx_bytes": 1452686477,
+        "tx_pkts": 2575600
+       },
+       "mld": {
+        "rx_bytes": 12138230,
+        "rx_pkts": 134869,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374
+       },
+       "other": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 19035790,
+        "tx_pkts": 80361
+       },
+       "ssdp": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 8463350,
+        "tx_pkts": 35168
+       },
+       "stream": {
+        "rx_bytes": 149876,
+        "rx_pkts": 421,
+        "tx_bytes": 22289304,
+        "tx_pkts": 124152
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21627638,
+        "tx_pkts": 469928
+       }
+      }
+     },
+     "noise": -94,
+     "nss": 2,
+     "rssi": 53,
+     "rx_bytes": 780591334,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 1381315,
+     "rx_packets": 1438990,
+     "rx_rate": 156000,
+     "rx_rate_mov": 144400,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 99,
+     "satisfaction_real": 99,
+     "satisfaction_reason": 2,
+     "satisfaction_subscores": [
+      -1,
+      99,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -41,
+     "state": 27,
+     "state_ht": true,
+     "state_pwrmgt": true,
+     "tx_bcast": 0,
+     "tx_bytes": 2920082,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 570,
+     "tx_data_mpdu_bytes": 4107580,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 16480,
+     "tx_power": 48,
+     "tx_rate": 173300,
+     "tx_rate_mov": 145416,
+     "tx_retries": 515,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 55,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 19348,
+     "tx_total_mov": 0,
+     "uptime": 504463,
+     "vlan_id": 1,
+     "wifi_tx_attempts": 19863,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 0,
+      "max": 0,
+      "min": 0,
+      "total": 0,
+      "total_count": 5
+     },
+     "wifi_tx_success": 19348
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "8197fdb1d19c3a9f4cf6458b89e2c48a",
+     "auth_time": 4294967256,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 333,
+     "chwidth": 2,
+     "dhcpend_time": 170,
+     "dhcpstart_time": 170,
+     "hostname": "Mac***",
+     "idletime": 0,
+     "ip": "192.168.1.44",
+     "ipv6_addresses": [
+      "fe80::1c11:af24:c506:91c0"
+     ],
+     "is_11a": true,
+     "is_11ac": true,
+     "is_11ax": true,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "66:57:34:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "rx_bytes": 220,
+        "rx_pkts": 2,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "rx_bytes": 585058,
+        "rx_pkts": 6803,
+        "tx_bytes": 31179644,
+        "tx_pkts": 362558,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 342,
+        "rx_pkts": 1,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "rx_bytes": 202,
+        "rx_pkts": 3,
+        "tx_bytes": 394352,
+        "tx_pkts": 5668,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "rx_bytes": 7473768,
+        "rx_pkts": 14248,
+        "tx_bytes": 716936692,
+        "tx_pkts": 1201646,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 65310,
+        "rx_pkts": 1555,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313,
+        "type": "arp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "224.0.0.22",
+        "rx_bytes": 108,
+        "rx_pkts": 2,
+        "tx_bytes": 12283760,
+        "tx_pkts": 227312,
+        "type": "igmp"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "rx_bytes": 9938084,
+        "rx_pkts": 32791,
+        "tx_bytes": 735749785,
+        "tx_pkts": 1373954,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 137,
+        "group_ip": "192.168.1.255",
+        "rx_bytes": 36286,
+        "rx_pkts": 350,
+        "type": "other"
+       },
+       {
+        "dst_port": 138,
+        "group_ip": "192.168.1.255",
+        "rx_bytes": 29808,
+        "rx_pkts": 138,
+        "type": "other"
+       },
+       {
+        "dst_port": 1900,
+        "group_ip": "239.255.255.250",
+        "rx_bytes": 630,
+        "rx_pkts": 4,
+        "type": "ssdp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 5266211,
+        "tx_pkts": 29543,
+        "type": "stream"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 8680,
+        "tx_pkts": 434,
+        "type": "other"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1412944,
+        "tx_pkts": 27172,
+        "type": "stream"
+       },
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 453551,
+        "tx_pkts": 1324,
+        "type": "other"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "ff12::8384",
+        "tx_bytes": 12693718,
+        "tx_pkts": 38008,
+        "type": "stream"
+       },
+       {
+        "dst_port": 21027,
+        "group_ip": "192.168.1.255",
+        "tx_bytes": 12122693,
+        "tx_pkts": 38430,
+        "type": "other"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10789898,
+        "tx_pkts": 234563,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10831201,
+        "tx_pkts": 235346,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10101,
+        "group_ip": "239.255.255.251",
+        "tx_bytes": 1319500,
+        "tx_pkts": 14188,
+        "type": "stream"
+       }
+      ],
+      "mdns_rr": {
+       "A": 5133,
+       "AAAA": 4362,
+       "ANY": 65465,
+       "PTR": 179406,
+       "SRV": 28220,
+       "TXT": 41979
+      },
+      "memberships": [
+       {
+        "age_ms": 507409830,
+        "group_ip": "ff02::2:ffa2:c7f7"
+       },
+       {
+        "age_ms": 507409830,
+        "group_ip": "ff02::1:ff06:91c0"
+       },
+       {
+        "age_ms": 507407040,
+        "group_ip": "224.0.0.251"
+       }
+      ],
+      "services": [
+       {
+        "bytes": 6851881,
+        "name": "_ssh._tcp.local",
+        "pkts": 7502
+       },
+       {
+        "bytes": 6851881,
+        "name": "_sftp-ssh._tcp.local",
+        "pkts": 7502
+       },
+       {
+        "bytes": 6337046,
+        "name": "_services._dns-sd._udp.local",
+        "pkts": 7788
+       },
+       {
+        "bytes": 7175094,
+        "name": "_device-info._tcp.local",
+        "pkts": 7913
+       },
+       {
+        "bytes": 3213256,
+        "name": "_dns-sd._udp.local",
+        "pkts": 4787
+       },
+       {
+        "bytes": 2850266,
+        "name": "_rdlink._tcp.local",
+        "pkts": 3987
+       },
+       {
+        "bytes": 9953501,
+        "name": "_companion-link._tcp.local",
+        "pkts": 15502
+       },
+       {
+        "bytes": 7742233,
+        "name": "_asquic._udp.local",
+        "pkts": 11891
+       },
+       {
+        "bytes": 3086086,
+        "name": "_hap._tcp.local",
+        "pkts": 4427
+       },
+       {
+        "bytes": 3000770,
+        "name": "_hap._udp.local",
+        "pkts": 4235
+       },
+       {
+        "bytes": 7258877,
+        "name": "_airplay._tcp.local",
+        "pkts": 7945
+       },
+       {
+        "bytes": 7260261,
+        "name": "_raop._tcp.local",
+        "pkts": 7951
+       },
+       {
+        "bytes": 1954244,
+        "name": "_apple-mobdev._tcp.local",
+        "pkts": 3187
+       },
+       {
+        "bytes": 1974300,
+        "name": "_sub._apple-mobdev2._tcp.local",
+        "pkts": 3261
+       },
+       {
+        "bytes": 1949848,
+        "name": "_apple-pairable._tcp.local",
+        "pkts": 3181
+       },
+       {
+        "bytes": 1675098,
+        "name": "_uscan._tcp.local",
+        "pkts": 2598
+       },
+       {
+        "bytes": 1657132,
+        "name": "_ippusb._tcp.local",
+        "pkts": 2570
+       },
+       {
+        "bytes": 1620842,
+        "name": "_uscans._tcp.local",
+        "pkts": 2512
+       },
+       {
+        "bytes": 1598188,
+        "name": "_ptp._tcp.local",
+        "pkts": 2480
+       },
+       {
+        "bytes": 178444,
+        "name": "_ipps._tcp.local",
+        "pkts": 354
+       },
+       {
+        "bytes": 132600,
+        "name": "_printer._tcp.local",
+        "pkts": 292
+       },
+       {
+        "bytes": 129898,
+        "name": "_scanner._tcp.local",
+        "pkts": 286
+       },
+       {
+        "bytes": 5450,
+        "name": "_ipp._tcp.local",
+        "pkts": 14
+       },
+       {
+        "bytes": 2167287,
+        "name": "_adb._tcp.local",
+        "pkts": 14809
+       },
+       {
+        "bytes": 2047815,
+        "name": "_adb-tls-pairing._tcp.local",
+        "pkts": 14523
+       },
+       {
+        "bytes": 2338677,
+        "name": "_adb-tls-connect._tcp.local",
+        "pkts": 16281
+       },
+       {
+        "bytes": 89366,
+        "name": "_expo._tcp.local",
+        "pkts": 258
+       },
+       {
+        "bytes": 37048,
+        "name": "_meshcop._udp.local",
+        "pkts": 346
+       },
+       {
+        "bytes": 283384,
+        "name": "_E9XWOIP5.local",
+        "pkts": 1706
+       },
+       {
+        "bytes": 35634,
+        "name": "_sleep-proxy._udp.local",
+        "pkts": 328
+       },
+       {
+        "bytes": 8374,
+        "name": "_46490a26bd064d2fbdbf4ddf121da4fb.local",
+        "pkts": 53
+       },
+       {
+        "bytes": 15036,
+        "name": "_afpovertcp._tcp.local",
+        "pkts": 110
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 65310,
+        "rx_pkts": 1555,
+        "tx_bytes": 45574290,
+        "tx_pkts": 764313
+       },
+       "dhcp": {
+        "rx_bytes": 342,
+        "rx_pkts": 1,
+        "tx_bytes": 684,
+        "tx_pkts": 2
+       },
+       "dhcpv6": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 9890,
+        "tx_pkts": 115
+       },
+       "igmp": {
+        "rx_bytes": 108,
+        "rx_pkts": 2,
+        "tx_bytes": 12283944,
+        "tx_pkts": 227316
+       },
+       "ipv6_nd": {
+        "rx_bytes": 585260,
+        "rx_pkts": 6806,
+        "tx_bytes": 31575458,
+        "tx_pkts": 368243
+       },
+       "mdns": {
+        "rx_bytes": 17411852,
+        "rx_pkts": 47039,
+        "tx_bytes": 1452686477,
+        "tx_pkts": 2575600
+       },
+       "mld": {
+        "rx_bytes": 220,
+        "rx_pkts": 2,
+        "tx_bytes": 20489860,
+        "tx_pkts": 227374
+       },
+       "other": {
+        "rx_bytes": 66094,
+        "rx_pkts": 488,
+        "tx_bytes": 19035790,
+        "tx_pkts": 80361
+       },
+       "ssdp": {
+        "rx_bytes": 630,
+        "rx_pkts": 4,
+        "tx_bytes": 8463350,
+        "tx_pkts": 35168
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 22289304,
+        "tx_pkts": 124152
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21627638,
+        "tx_pkts": 469928
+       }
+      }
+     },
+     "noise": -94,
+     "nss": 2,
+     "rssi": 37,
+     "rx_bytes": 7496404679,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 55897,
+     "rx_packets": 21525923,
+     "rx_rate": 1201000,
+     "rx_rate_mov": 866716,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 99,
+     "satisfaction_real": 99,
+     "satisfaction_reason": 2048,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      99,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -57,
+     "state": 11,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 81436880049,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 419971,
+     "tx_data_mpdu_bytes": 83155655182,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 70602775,
+     "tx_power": 48,
+     "tx_rate": 1201000,
+     "tx_rate_mov": 1201000,
+     "tx_retries": 407682,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 12289,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 41,
+      "stalls": 0
+     },
+     "tx_total": 27656583,
+     "tx_total_mov": 0,
+     "uptime": 507412,
+     "vlan_id": 1,
+     "wifi_tx_attempts": 28054064,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 10201,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 0,
+      "max": 30000,
+      "min": 0,
+      "total": 796,
+      "total_count": 9280
+     },
+     "wifi_tx_success": 27646382
+    }
+   ],
+   "state": "RUN",
+   "tx_bcast": 317066,
+   "tx_bytes": 720458992501,
+   "tx_combined_retries": 546924,
+   "tx_data_mpdu_bytes": 89815769783,
+   "tx_dropped": 5712744,
+   "tx_errors": 144487,
+   "tx_mcast": 3128813,
+   "tx_packets": 549508673,
+   "tx_power": 24,
+   "tx_retries": 533074,
+   "tx_rts_retries": 13850,
+   "tx_success": 29505800,
+   "tx_tcp_stats": {
+    "goodbytes": 0,
+    "lat_avg": -1,
+    "lat_max": -1,
+    "lat_min": -1,
+    "lat_samples": 0,
+    "lat_sum": 0,
+    "retries": 0,
+    "stalls": 0
+   },
+   "tx_total": 29516003,
+   "up": true,
+   "usage": "user",
+   "wifi_tx_attempts": 30038874,
+   "wifi_tx_dropped": 10203,
+   "wifi_tx_latency_mov": {
+    "avg": 0,
+    "max": 30000,
+    "min": 0,
+    "total": 941,
+    "total_count": 10798
+   }
+  },
+  {
+   "avg_client_signal": -57,
+   "bssid": "9c:05:d6:c2:df:09",
+   "bw": 20,
+   "ccq": 0,
+   "channel": 13,
+   "essid": "EXN IOT",
+   "id": "3",
+   "mac_filter_rejections": 0,
+   "name": "wifi0ap0",
+   "num_sta": 10,
+   "radio": "ng",
+   "radio_name": "wifi0",
+   "rx_bcast": 1645683,
+   "rx_bytes": 2116370427,
+   "rx_crypts": 8,
+   "rx_dropped": 52,
+   "rx_errors": 8,
+   "rx_frags": 0,
+   "rx_mcast": 3296,
+   "rx_nwids": 47350,
+   "rx_packets": 5956321,
+   "rx_tcp_stats": {
+    "goodbytes": 0,
+    "lat_avg": -1,
+    "lat_max": -1,
+    "lat_min": -1,
+    "lat_samples": 0,
+    "lat_sum": 0,
+    "retries": 0,
+    "stalls": 0
+   },
+   "satisfaction": 82,
+   "satisfaction_real": 82,
+   "sta_table": [
+    {
+     "anomalies": 0,
+     "anon_client_id": "afb6a7ce181fce38f7ea5e2375f65038",
+     "auth_time": 4294967266,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 30,
+     "chwidth": 0,
+     "dhcpend_time": 90,
+     "dhcpstart_time": 90,
+     "hostname": "P11***",
+     "idletime": 20,
+     "ip": "10.0.1.36",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "f0:09:0d:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 644,
+        "rx_pkts": 14,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 644,
+        "rx_pkts": 14,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "dhcp": {
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 50,
+     "rx_bytes": 172068,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 16,
+     "rx_packets": 343,
+     "rx_rate": 26000,
+     "rx_rate_mov": 34666,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 100,
+     "satisfaction_real": 100,
+     "satisfaction_reason": 0,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -46,
+     "state": 15,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 116823,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 17,
+     "tx_data_mpdu_bytes": 132213,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 319,
+     "tx_power": 28,
+     "tx_rate": 72200,
+     "tx_rate_mov": 72200,
+     "tx_retries": 17,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 0,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 339,
+     "tx_total_mov": 0,
+     "uptime": 380,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 356,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 1,
+      "max": 12000,
+      "min": 0,
+      "total": 94,
+      "total_count": 146
+     },
+     "wifi_tx_success": 339
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "d4ee47fe637cdc9f1d20544534d50493",
+     "auth_time": 4294967206,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 104,
+     "chwidth": 0,
+     "dhcpend_time": 230,
+     "dhcpstart_time": 230,
+     "hostname": "lwi***",
+     "idletime": 0,
+     "ip": "10.0.1.20",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "b8:06:0d:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 6667,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 43168,
+        "rx_pkts": 142,
+        "type": "other"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "dhcp": {
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "other": {
+        "rx_bytes": 43168,
+        "rx_pkts": 142,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 14,
+     "rx_bytes": 58805,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 152,
+     "rx_packets": 321,
+     "rx_rate": 1000,
+     "rx_rate_mov": 1000,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 100,
+     "satisfaction_real": 100,
+     "satisfaction_reason": 0,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -82,
+     "state": 15,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 23308,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 1605,
+     "tx_data_mpdu_bytes": 31586,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 201,
+     "tx_power": 28,
+     "tx_rate": 1000,
+     "tx_rate_mov": 1000,
+     "tx_retries": 1454,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 151,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 230,
+     "tx_total_mov": 0,
+     "uptime": 710,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 1666,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 18,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 4,
+      "max": 50000,
+      "min": 0,
+      "total": 4104,
+      "total_count": 1133
+     },
+     "wifi_tx_success": 212
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "bd34f1a7ee43d92909e8727caa070eaf",
+     "auth_time": 4294967206,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 111,
+     "chwidth": 0,
+     "dhcpend_time": 440,
+     "dhcpstart_time": 440,
+     "hostname": "lwi***",
+     "idletime": 3,
+     "ip": "10.0.1.62",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "b8:06:0d:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 6667,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 133456,
+        "rx_pkts": 439,
+        "type": "other"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "dhcp": {
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "other": {
+        "rx_bytes": 133456,
+        "rx_pkts": 439,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 15,
+     "rx_bytes": 172571,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 449,
+     "rx_packets": 856,
+     "rx_rate": 1000,
+     "rx_rate_mov": 1333,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 100,
+     "satisfaction_real": 100,
+     "satisfaction_reason": 0,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -81,
+     "state": 15,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 61764,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 2248,
+     "tx_data_mpdu_bytes": 87065,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 548,
+     "tx_power": 28,
+     "tx_rate": 1000,
+     "tx_rate_mov": 1000,
+     "tx_retries": 1946,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 302,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 610,
+     "tx_total_mov": 0,
+     "uptime": 2199,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 2538,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 18,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 4,
+      "max": 50000,
+      "min": 0,
+      "total": 1217,
+      "total_count": 304
+     },
+     "wifi_tx_success": 592
+    },
+    {
+     "anomalies": 1024,
+     "anon_client_id": "4a1ca24e1fa6d25dcbc3d5fd13d74dfa",
+     "auth_time": 4294967196,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 30,
+     "chwidth": 0,
+     "dhcpend_time": 460,
+     "dhcpstart_time": 450,
+     "hostname": "lwi***",
+     "idletime": 1,
+     "ip": "10.0.1.27",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "e4:ae:e4:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 1062,
+        "rx_pkts": 3,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "dhcp": {
+        "rx_bytes": 1062,
+        "rx_pkts": 3,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 38,
+     "rx_bytes": 843150,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 11,
+     "rx_packets": 8990,
+     "rx_rate": 26000,
+     "rx_rate_mov": 28900,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 60,
+     "satisfaction_real": 60,
+     "satisfaction_reason": 1024,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      60,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -58,
+     "state": 15,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 1123464,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 4706,
+     "tx_data_mpdu_bytes": 1630732,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 10034,
+     "tx_power": 28,
+     "tx_rate": 57800,
+     "tx_rate_mov": 55733,
+     "tx_retries": 3968,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 738,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 11128,
+     "tx_total_mov": 0,
+     "uptime": 41619,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 15096,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 1,
+      "max": 8000,
+      "min": 0,
+      "total": 61,
+      "total_count": 42
+     },
+     "wifi_tx_success": 11128
+    },
+    {
+     "anomalies": 1024,
+     "anon_client_id": "bb52e6059c4099b0212b54df7633c49f",
+     "auth_time": 4294967246,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 30,
+     "chwidth": 0,
+     "dhcpend_time": 610,
+     "dhcpstart_time": 610,
+     "hostname": "ato***",
+     "idletime": 0,
+     "ip": "10.0.1.28",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "20:6e:f1:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 33304,
+        "rx_pkts": 724,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 5625,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 5864042,
+        "rx_pkts": 47317,
+        "type": "other"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 33304,
+        "rx_pkts": 724,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "dhcp": {
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "other": {
+        "rx_bytes": 5864042,
+        "rx_pkts": 47317,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 60,
+     "rx_bytes": 6627077,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 48042,
+     "rx_packets": 56934,
+     "rx_rate": 72200,
+     "rx_rate_mov": 72200,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 60,
+     "satisfaction_real": 60,
+     "satisfaction_reason": 1024,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      60,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -36,
+     "state": 31,
+     "state_ht": true,
+     "state_pwrmgt": true,
+     "tx_bcast": 0,
+     "tx_bytes": 223496,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 888,
+     "tx_data_mpdu_bytes": 499230,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 4298,
+     "tx_power": 28,
+     "tx_rate": 1000,
+     "tx_rate_mov": 60200,
+     "tx_retries": 855,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 33,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 5372,
+     "tx_total_mov": 0,
+     "uptime": 43010,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 6227,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 2,
+      "max": 25000,
+      "min": 0,
+      "total": 78,
+      "total_count": 46
+     },
+     "wifi_tx_success": 5372
+    },
+    {
+     "anomalies": 1024,
+     "anon_client_id": "5167bc70bc9f541014fc39a8fe2cb1d5",
+     "auth_time": 4294967166,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 30,
+     "chwidth": 0,
+     "dhcpend_time": 510,
+     "dhcpstart_time": 510,
+     "hostname": "lwi***",
+     "idletime": 22,
+     "ip": "10.0.1.31",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "20:f1:b2:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 1062,
+        "rx_pkts": 3,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "dhcp": {
+        "rx_bytes": 1062,
+        "rx_pkts": 3,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 45,
+     "rx_bytes": 4644024,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 11,
+     "rx_packets": 49342,
+     "rx_rate": 43300,
+     "rx_rate_mov": 43300,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 70,
+     "satisfaction_real": 70,
+     "satisfaction_reason": 1024,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      70,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -51,
+     "state": 15,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 6353841,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 7564,
+     "tx_data_mpdu_bytes": 9225291,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 56738,
+     "tx_power": 28,
+     "tx_rate": 65000,
+     "tx_rate_mov": 67400,
+     "tx_retries": 6391,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 1173,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 62984,
+     "tx_total_mov": 0,
+     "uptime": 235546,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 69375,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 2,
+      "max": 29000,
+      "min": 0,
+      "total": 59,
+      "total_count": 33
+     },
+     "wifi_tx_success": 62984
+    },
+    {
+     "anomalies": 1024,
+     "anon_client_id": "7c57b2299f6a40601f8d0b51ff12439c",
+     "auth_time": 4294967236,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 65,
+     "chwidth": 0,
+     "dhcpend_time": 100,
+     "dhcpstart_time": 100,
+     "hostname": "lwi***",
+     "idletime": 3,
+     "ip": "10.0.1.57",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "c0:f8:53:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 6667,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 17460240,
+        "rx_pkts": 57435,
+        "type": "other"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "dhcp": {
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "other": {
+        "rx_bytes": 17460240,
+        "rx_pkts": 57435,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 21,
+     "rx_bytes": 22347568,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 57445,
+     "rx_packets": 109628,
+     "rx_rate": 5500,
+     "rx_rate_mov": 5500,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 60,
+     "satisfaction_real": 60,
+     "satisfaction_reason": 1024,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      60,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -75,
+     "state": 31,
+     "state_ht": true,
+     "state_pwrmgt": true,
+     "tx_bcast": 0,
+     "tx_bytes": 7722018,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 59172,
+     "tx_data_mpdu_bytes": 11218660,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 68928,
+     "tx_power": 28,
+     "tx_rate": 2000,
+     "tx_rate_mov": 6383,
+     "tx_retries": 41040,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 18132,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 76616,
+     "tx_total_mov": 0,
+     "uptime": 287188,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 117649,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 7,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 3,
+      "max": 43000,
+      "min": 0,
+      "total": 165,
+      "total_count": 52
+     },
+     "wifi_tx_success": 76609
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "65b91a485afeff600956c572db53c269",
+     "auth_time": 4294967246,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 30,
+     "chwidth": 0,
+     "dhcpend_time": 950,
+     "dhcpstart_time": 950,
+     "hostname": "lwi***",
+     "idletime": 2,
+     "ip": "10.0.1.52",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "f8:17:2d:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 6667,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 47904928,
+        "rx_pkts": 157582,
+        "type": "other"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "dhcp": {
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "other": {
+        "rx_bytes": 47904928,
+        "rx_pkts": 157582,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 40,
+     "rx_bytes": 61098754,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 157592,
+     "rx_packets": 297293,
+     "rx_rate": 43300,
+     "rx_rate_mov": 43300,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 100,
+     "satisfaction_real": 100,
+     "satisfaction_reason": 0,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -56,
+     "state": 31,
+     "state_ht": true,
+     "state_pwrmgt": true,
+     "tx_bcast": 0,
+     "tx_bytes": 21188871,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 78519,
+     "tx_data_mpdu_bytes": 30763934,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 189203,
+     "tx_power": 28,
+     "tx_rate": 65000,
+     "tx_rate_mov": 65000,
+     "tx_retries": 67271,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 11248,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 210048,
+     "tx_total_mov": 0,
+     "uptime": 787928,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 277317,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 2,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 1,
+      "max": 7000,
+      "min": 0,
+      "total": 44,
+      "total_count": 39
+     },
+     "wifi_tx_success": 210046
+    },
+    {
+     "anomalies": 1024,
+     "anon_client_id": "4b46edb7226ba86091663ed44725c397",
+     "auth_time": 4294967236,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 30,
+     "chwidth": 0,
+     "dhcpend_time": 1330,
+     "dhcpstart_time": 1330,
+     "hostname": "C21***",
+     "idletime": 9,
+     "ip": "10.0.1.2",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "20:23:51:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 1900,
+        "group_ip": "239.255.255.250",
+        "rx_bytes": 248880,
+        "rx_pkts": 1360,
+        "type": "ssdp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "ssdp": {
+        "rx_bytes": 248880,
+        "rx_pkts": 1360,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 85,
+     "rx_bytes": 1285426986,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 1360,
+     "rx_packets": 1808944,
+     "rx_rate": 72200,
+     "rx_rate_mov": 60333,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 70,
+     "satisfaction_real": 70,
+     "satisfaction_reason": 1024,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      70,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -11,
+     "state": 15,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 321215885,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 105091,
+     "tx_data_mpdu_bytes": 360330873,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 924813,
+     "tx_power": 28,
+     "tx_rate": 1000,
+     "tx_rate_mov": 1000,
+     "tx_retries": 75042,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 30049,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 946838,
+     "tx_total_mov": 0,
+     "uptime": 815251,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 1021880,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 1,
+      "max": 6000,
+      "min": 0,
+      "total": 15,
+      "total_count": 18
+     },
+     "wifi_tx_success": 946838
+    },
+    {
+     "anomalies": 0,
+     "anon_client_id": "a121b2129e865b83ac85573e49f7cd24",
+     "auth_time": 4294967236,
+     "authorized": true,
+     "bw_max_supp": 0,
+     "ccq": 30,
+     "chwidth": 0,
+     "dhcpend_time": 720,
+     "dhcpstart_time": 720,
+     "hostname": "lwi***",
+     "idletime": 4,
+     "ip": "10.0.1.40",
+     "ipv6_addresses": [],
+     "is_11a": false,
+     "is_11ac": false,
+     "is_11ax": false,
+     "is_11b": false,
+     "is_11be": false,
+     "is_11n": true,
+     "is_11r": false,
+     "keyid": "\u000b",
+     "mac": "b8:06:0d:xx:xx:xx",
+     "multicast": {
+      "groups": [
+       {
+        "dst_port": 67,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "type": "dhcp"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "0.0.0.0",
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749,
+        "type": "arp"
+       },
+       {
+        "dst_port": 6667,
+        "group_ip": "255.255.255.255",
+        "rx_bytes": 49565680,
+        "rx_pkts": 163045,
+        "type": "other"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::16",
+        "tx_bytes": 360,
+        "tx_pkts": 4,
+        "type": "mld"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::1:ff00:0",
+        "tx_bytes": 115240,
+        "tx_pkts": 1340,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "233.89.188.1",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 10001,
+        "group_ip": "255.255.255.255",
+        "tx_bytes": 10713998,
+        "tx_pkts": 232913,
+        "type": "ubnt"
+       },
+       {
+        "dst_port": 0,
+        "group_ip": "ff02::2",
+        "tx_bytes": 15890,
+        "tx_pkts": 227,
+        "type": "ipv6_nd"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "224.0.0.251",
+        "tx_bytes": 806583432,
+        "tx_pkts": 1744460,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 5353,
+        "group_ip": "ff02::fb",
+        "tx_bytes": 795967225,
+        "tx_pkts": 1568596,
+        "type": "mdns"
+       },
+       {
+        "dst_port": 2647,
+        "group_ip": "224.0.37.42",
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174,
+        "type": "stream"
+       }
+      ],
+      "types": {
+       "arp": {
+        "rx_bytes": 368,
+        "rx_pkts": 8,
+        "tx_bytes": 18135012,
+        "tx_pkts": 323749
+       },
+       "dhcp": {
+        "rx_bytes": 708,
+        "rx_pkts": 2,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "ipv6_nd": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 131130,
+        "tx_pkts": 1567
+       },
+       "mdns": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1602550657,
+        "tx_pkts": 3313056
+       },
+       "mld": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 360,
+        "tx_pkts": 4
+       },
+       "other": {
+        "rx_bytes": 49565680,
+        "rx_pkts": 163045,
+        "tx_bytes": 0,
+        "tx_pkts": 0
+       },
+       "stream": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 1413048,
+        "tx_pkts": 27174
+       },
+       "ubnt": {
+        "rx_bytes": 0,
+        "rx_pkts": 0,
+        "tx_bytes": 21427996,
+        "tx_pkts": 465826
+       }
+      }
+     },
+     "noise": -96,
+     "nss": 1,
+     "rssi": 25,
+     "rx_bytes": 63131355,
+     "rx_bytes_mov": 0,
+     "rx_mcast": 163055,
+     "rx_packets": 306176,
+     "rx_rate": 21700,
+     "rx_rate_mov": 18400,
+     "rx_retries": 0,
+     "rx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "satisfaction": 100,
+     "satisfaction_real": 100,
+     "satisfaction_reason": 0,
+     "satisfaction_subscores": [
+      -1,
+      100,
+      -1,
+      100,
+      100,
+      -1,
+      -1,
+      -1,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ],
+     "serialno": "00:00:00:00:00:00",
+     "signal": -71,
+     "state": 15,
+     "state_ht": true,
+     "state_pwrmgt": false,
+     "tx_bcast": 0,
+     "tx_bytes": 21997900,
+     "tx_bytes_mov": 0,
+     "tx_combined_retries": 92581,
+     "tx_data_mpdu_bytes": 31934794,
+     "tx_mcast": 0,
+     "tx_mcs": -1,
+     "tx_packets": 196482,
+     "tx_power": 60,
+     "tx_rate": 58500,
+     "tx_rate_mov": 48450,
+     "tx_retries": 66393,
+     "tx_retries_mov": 0,
+     "tx_retry_burst_count": 0,
+     "tx_rts_retries": 26188,
+     "tx_tcp_stats": {
+      "goodbytes": 0,
+      "lat_avg": -1,
+      "lat_max": -1,
+      "lat_min": -1,
+      "lat_samples": 0,
+      "lat_sum": 0,
+      "retries": 0,
+      "stalls": 0
+     },
+     "tx_total": 218058,
+     "tx_total_mov": 0,
+     "uptime": 815256,
+     "vlan_id": 2,
+     "wifi_tx_attempts": 284451,
+     "wifi_tx_attempts_mov": 0,
+     "wifi_tx_dropped": 0,
+     "wifi_tx_dropped_mov": 0,
+     "wifi_tx_latency_mov": {
+      "avg": 1,
+      "max": 5000,
+      "min": 0,
+      "total": 24,
+      "total_count": 27
+     },
+     "wifi_tx_success": 218058
+    }
+   ],
+   "state": "RUN",
+   "tx_bcast": 556589,
+   "tx_bytes": 2615453941,
+   "tx_combined_retries": 352391,
+   "tx_data_mpdu_bytes": 445854378,
+   "tx_dropped": 0,
+   "tx_errors": 13523,
+   "tx_mcast": 3574258,
+   "tx_packets": 8129127,
+   "tx_power": 14,
+   "tx_retries": 264377,
+   "tx_rts_retries": 88014,
+   "tx_success": 1532178,
+   "tx_tcp_stats": {
+    "goodbytes": 0,
+    "lat_avg": -1,
+    "lat_max": -1,
+    "lat_min": -1,
+    "lat_samples": 0,
+    "lat_sum": 0,
+    "retries": 0,
+    "stalls": 0
+   },
+   "tx_total": 1532223,
+   "up": true,
+   "usage": "user",
+   "wifi_tx_attempts": 1796555,
+   "wifi_tx_dropped": 45,
+   "wifi_tx_latency_mov": {
+    "avg": 3,
+    "max": 50000,
+    "min": 0,
+    "total": 5861,
+    "total_count": 1840
+   }
+  }
+ ],
+ "version": "8.8.14.20179",
+ "wifi_caps": 2709438173,
+ "wifi_caps2": 4206576
+}

@@ -1,0 +1,85 @@
+TAG t9_wl1_dfs_in radio=wl1 reads only (getters), .205, 2026-11-19 ~03:50 IST, country IN, agent udeco-ap.r7 in takeover
+NOTE the 03:30 spectrum-scan before this read logged (agent-r7.log):
+NOTE   spectrum-scan na: wl: spectrum scan missed channels: 20 MHz rows [56] need a channel with no fresh record after 10.9s (the previous table stays; spectrum_scanning_abnormal), unmeasured [52 60 64 149 153 157 161 165]; channel 56 still stale after its retry in pass 2: band stopped early
+NOTE   spectrum-scan ng: 22 rows at [20 40] MHz on wl0 in 14.8s (chunked, 26 calls, 11 neighbours)
+NOTE 52-64 records: crsglitch 0 and bad plcp 0 like the UNII-3 placeholders; 56 keeps cca_obss 1 (a non-zero record a later call did not rewrite = STALE)
+## wl -i wl1 country
+IN (IN/0) INDIA
+## wl -i wl1 chanspec
+40u (0xd926)
+## wl -i wl1 noise
+-98
+## wl -i wl1 scan_passive_time
+200
+## wl -i wl1 chan_info
+Channel 36	5G Band
+Channel 40	5G Band
+Channel 44	5G Band
+Channel 48	5G Band
+Channel 52	5G Band, RADAR Sensitive, Passive
+Channel 56	5G Band, RADAR Sensitive, Passive
+Channel 60	5G Band, RADAR Sensitive, Passive
+Channel 64	5G Band, RADAR Sensitive, Passive
+Channel 149	5G Band
+Channel 153	5G Band
+Channel 157	5G Band
+Channel 161	5G Band
+Channel 165	5G Band
+## wl -i wl1 chanspecs
+36 (0xd024)
+40 (0xd028)
+44 (0xd02c)
+48 (0xd030)
+52 (0xd034)
+56 (0xd038)
+60 (0xd03c)
+64 (0xd040)
+149 (0xd095)
+153 (0xd099)
+157 (0xd09d)
+161 (0xd0a1)
+165 (0xd0a5)
+40u (0xd926)
+48u (0xd92e)
+56u (0xd936)
+64u (0xd93e)
+153u (0xd997)
+161u (0xd99f)
+36l (0xd826)
+44l (0xd82e)
+52l (0xd836)
+60l (0xd83e)
+149l (0xd897)
+157l (0xd89f)
+
+## wl -i wl1 chanim_stats all
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 8 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 0 bad plcp: 0 noise: -97
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd02c crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 0
+ chanspec: 0xd030 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd034 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd038 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd03c crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd040 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+

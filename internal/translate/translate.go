@@ -152,14 +152,22 @@ func Plan(cfg Cfg, cur UCI, f Features) Result {
 		} else if raw != "" {
 			r.Notes = append(r.Notes, fmt.Sprintf("radio %s: unknown country code %q from the controller: country left as it is", sec, raw))
 		}
-		switch tp := cfg[p+"txpower"]; {
-		case tp == "auto" || tp == "":
+		// radio.N.txpower is a dBm value only for txpower_mode custom (or
+		// with no mode): a preset keeps a stale txpower beside it (a real
+		// Network 11 config: txpower_mode=medium, txpower=6). Same rule as
+		// IntentFromCfg (txPower in intent.go).
+		tpMode, tpDBm := txPower(cfg[p+"txpower_mode"], cfg[p+"txpower"], func(s string) {
+			r.Notes = append(r.Notes, fmt.Sprintf("radio %s: %s", sec, s))
+		})
+		switch tpMode {
+		case "custom":
+			want["txpower"] = strconv.Itoa(tpDBm)
+		case "low", "medium":
+			// No known preset -> dBm mapping for OpenWrt: leave it as it is.
+			r.Notes = append(r.Notes, fmt.Sprintf("radio %s: tx power preset %q has no OpenWrt value: txpower left as it is", sec, tpMode))
+		default: // auto, high: OpenWrt's default (the regulatory maximum)
 			if cur[k+"txpower"] != "" {
 				r.Ops = append(r.Ops, Op{Del: true, Key: k + "txpower", Old: cur[k+"txpower"]})
-			}
-		default:
-			if _, err := strconv.Atoi(tp); err == nil {
-				want["txpower"] = tp
 			}
 		}
 		r.Ops = append(r.Ops, diff(k, want, cur, nil)...)

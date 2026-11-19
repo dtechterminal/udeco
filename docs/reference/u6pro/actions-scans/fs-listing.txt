@@ -1,0 +1,389 @@
+::sysinit:/etc/init.d/rcS S boot
+::shutdown:/etc/init.d/rcS K shutdown
+
+::askconsolelate:/bin/login
+null::respawn:/sbin/logd
+null::respawn:/sbin/logread -f -F /var/log/messages -S 20240 -p /var/run/logread.local.pid
+null::respawn:/usr/bin/reset-handler
+# Dynamic entries go below
+null::watch:/sbin/sysmon
+null::respawn:/sbin/logread -f -u -r 192.168.1.1 5514 -p /var/run/logread.remote.pid -h U6Pro -E ***REDACTED*** -P 9c05d6c2df08,U6-Pro-8.8.14+20179
+null::watch:/sbin/autotxpow -v
+null::respawn:/sbin/wevent
+null::watch:/sbin/stahtd
+null::respawn:diag_lite_log -r0 -l
+null::respawn:diag_lite_log -r1 -l
+null::respawn:/usr/sbin/mcsd -d -C /etc/mcsd.conf
+null::watch:/usr/bin/uplink-monitor -p
+null::respawn:/sbin/udhcpc -i br0 -f -S -p /var/run/udhcpc.br0.pid -t 10 -T 1 -A 2 -V ubnt -s /etc/udhcpc/udhcpc -x hostname:U6Pro
+null::respawn:/usr/bin/hostapd_wrapper.sh
+null::respawn:/usr/sbin/ntpd -nN -p 0.ubnt.pool.ntp.org -p 1.ubnt.pool.ntp.org -p 2.ubnt.pool.ntp.org -p 3.ubnt.pool.ntp.org
+null::respawn:/usr/sbin/lldpd -d -M4  -O /etc/lldpd.conf
+null::watch:/usr/sbin/upathmond
+null::respawn:/usr/bin/oom-protect -500 /usr/bin/mcad
+null::watch:/usr/bin/mca-monitor
+null::watch:/sbin/utermd -C /var/run/utermd_cert.pem -K /var/run/utermd_key.pem
+null::respawn:/usr/sbin/dropbear -F -r /var/run/dropbear_rsa_host_key -r /var/run/dropbear_ed25519_host_key -p 22 -l br0
+===
+/etc/init.d:
+drwxr-xr-x    2 3r4FNrkS root           683 Mar 26  2026 .
+drwxr-xr-x    1 3r4FNrkS root           620 Nov 18 21:17 ..
+-rwxr-xr-x    1 3r4FNrkS root          1642 Mar 26  2026 01_skb_recycler
+-rwxr-xr-x    1 3r4FNrkS root           580 Mar 26  2026 02_mp512_vm_tuning
+-rwxr-xr-x    1 3r4FNrkS root           798 Mar 26  2026 blebr
+-rwxr-xr-x    1 3r4FNrkS root           784 Mar 26  2026 blebr2
+-rwxr-xr-x    1 3r4FNrkS root          1658 Mar 26  2026 bleconn
+-rwxr-xr-x    1 3r4FNrkS root           791 Mar 26  2026 bluetopia
+-rwxr-xr-x    1 3r4FNrkS root           877 Mar 26  2026 boot
+-rwxr-xr-x    1 3r4FNrkS root          2643 Mar 26  2026 boot-ftm
+-rwxr-xr-x    1 3r4FNrkS root           836 Mar 26  2026 cron
+-rwxr-xr-x    1 3r4FNrkS root           767 Mar 26  2026 diag_socket_app
+-rwxr-xr-x    1 3r4FNrkS root         35326 Mar 26  2026 dnsmasq
+-rwxr-xr-x    1 3r4FNrkS root           379 Mar 26  2026 hostapd_cli
+-rwxr-xr-x    1 3r4FNrkS root          2829 Mar 26  2026 minidump2nvmem
+-rwxr-xr-x    1 3r4FNrkS root          1685 Mar 26  2026 openssl
+-rwxr-xr-x    1 3r4FNrkS root          1929 Mar 26  2026 qca-hostapd
+-rwxr-xr-x    1 3r4FNrkS root          1551 Mar 26  2026 qca-nss-dp
+-rwxr-xr-x    1 3r4FNrkS root          1492 Mar 26  2026 qca-nss-drv
+-rwxr-xr-x    1 3r4FNrkS root          4824 Mar 26  2026 qca-nss-ecm
+-rwxr-xr-x    1 3r4FNrkS root          9612 Mar 26  2026 qca-ssdk
+-rwxr-xr-x    1 3r4FNrkS root          2001 Mar 26  2026 qca-wpa-supplicant
+-rwxr-xr-x    1 3r4FNrkS root           303 Mar 26  2026 qcawifi-legacy
+-rwxr-xr-x    1 3r4FNrkS root           764 Mar 26  2026 qrtr
+-rwxr-xr-x    1 3r4FNrkS root          6732 Mar 26  2026 rstp
+-rwxr-xr-x    1 3r4FNrkS root           172 Mar 26  2026 snmpd
+-rwxr-xr-x    1 3r4FNrkS root           877 Mar 26  2026 ssid_steering
+-rwxr-xr-x    1 3r4FNrkS root           377 Mar 26  2026 startup-loglevel
+-rwxr-xr-x    1 3r4FNrkS root           947 Mar 26  2026 sysctl
+-rwxr-xr-x    1 3r4FNrkS root          3216 Mar 26  2026 sysntpd
+-rwxr-xr-x    1 3r4FNrkS root           594 Mar 26  2026 thermal
+-rwxr-xr-x    1 3r4FNrkS root           631 Mar 26  2026 uanywhere-launcher
+-rwxr-xr-x    1 3r4FNrkS root           138 Mar 26  2026 ubnt_bootconf
+-rwxr-xr-x    1 3r4FNrkS root            94 Mar 26  2026 ubnt_cfgsave
+-rwxr-xr-x    1 3r4FNrkS root           177 Mar 26  2026 ubnt_plugins
+-rwxr-xr-x    1 3r4FNrkS root           187 Mar 26  2026 ubnt_sysinit
+-rwxr-xr-x    1 3r4FNrkS root           760 Mar 26  2026 udapi-bridge
+-rwxr-xr-x    1 3r4FNrkS root           350 Mar 26  2026 udapi-server
+-rwxr-xr-x    1 3r4FNrkS root           125 Mar 26  2026 umount
+
+/etc/rc.d:
+drwxr-x---    1 3r4FNrkS root           180 Jan  1  1970 .
+drwxr-xr-x    1 3r4FNrkS root           620 Nov 18 21:17 ..
+lrwxrwxrwx    1 3r4FNrkS root            26 Mar 26  2026 K00startup-loglevel -> ../init.d/startup-loglevel
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 K10ubnt_plugins -> ../init.d/ubnt_plugins
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 K1udapi-bridge -> ../init.d/udapi-bridge
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 K2udapi-server -> ../init.d/udapi-server
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 K85ubnt_cfgsave -> ../init.d/ubnt_cfgsave
+lrwxrwxrwx    1 3r4FNrkS root            14 Mar 26  2026 K90boot -> ../init.d/boot
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 K90umount -> ../init.d/umount
+lrwxrwxrwx    1 3r4FNrkS root            18 Mar 26  2026 K98boot-ftm -> ../init.d/boot-ftm
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 S00ubnt_sysinit -> ../init.d/ubnt_sysinit
+lrwxrwxrwx    1 3r4FNrkS root            18 Mar 26  2026 S08boot-ftm -> ../init.d/boot-ftm
+lrwxrwxrwx    1 3r4FNrkS root            14 Mar 26  2026 S10boot -> ../init.d/boot
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 S11sysctl -> ../init.d/sysctl
+lrwxrwxrwx    1 3r4FNrkS root            23 Mar 26  2026 S11ubnt_bootconf -> ../init.d/ubnt_bootconf
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 S12ubnt_plugins -> ../init.d/ubnt_plugins
+lrwxrwxrwx    1 3r4FNrkS root            19 Mar 26  2026 S15bluetopia -> ../init.d/bluetopia
+lrwxrwxrwx    1 3r4FNrkS root            18 Mar 26  2026 S16qca-ssdk -> ../init.d/qca-ssdk
+lrwxrwxrwx    1 3r4FNrkS root            20 Mar 26  2026 S18qca-nss-dp -> ../init.d/qca-nss-dp
+lrwxrwxrwx    1 3r4FNrkS root            21 Mar 26  2026 S26qca-nss-ecm -> ../init.d/qca-nss-ecm
+lrwxrwxrwx    1 3r4FNrkS root            25 Mar 26  2026 S4001_skb_recycler -> ../init.d/01_skb_recycler
+lrwxrwxrwx    1 3r4FNrkS root            28 Mar 26  2026 S4102_mp512_vm_tuning -> ../init.d/02_mp512_vm_tuning
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 S85ubnt_cfgsave -> ../init.d/ubnt_cfgsave
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 S88udapi-server -> ../init.d/udapi-server
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 S89udapi-bridge -> ../init.d/udapi-bridge
+lrwxrwxrwx    1 3r4FNrkS root            26 Mar 26  2026 S99startup-loglevel -> ../init.d/startup-loglevel
+-rwxr-xr-x    1 3r4FNrkS root          6232 Jan  1  1970 rc
+-rwxr-xr-x    1 3r4FNrkS root           422 Jan  1  1970 rc.disable_wb_cache
+-rwxr-xr-x    1 3r4FNrkS root           207 Jan  1  1970 rc.e515
+-rwxr-xr-x    1 3r4FNrkS root          2828 Jan  1  1970 rc.identity
+-rwxr-xr-x    1 3r4FNrkS root         18480 Jan  1  1970 rc.modules
+-rwxr-xr-x    1 3r4FNrkS root           472 Jan  1  1970 rc.platform
+-rwxr-xr-x    1 3r4FNrkS root          1724 Jan  1  1970 rc.sysinit
+===
+/bin:
+drwxr-xr-x    2 3r4FNrkS root          1164 Mar 26  2026 .
+drwxr-xr-x    1 3r4FNrkS root           180 Oct 30 05:30 ..
+-rwxr-xr-x    1 3r4FNrkS root        602137 Mar 26  2026 busybox
+-rwxr-xr-x    1 3r4FNrkS root           673 Mar 26  2026 fanctrl_wrapper.sh
+-rwxr-xr-x    1 3r4FNrkS root          5991 Mar 26  2026 htb
+-rwxr-xr-x    1 3r4FNrkS root          3034 Mar 26  2026 ipcalc.sh
+-rwxr-xr-x    1 3r4FNrkS root          2683 Mar 26  2026 mmc_info
+-rwxr-xr-x    1 3r4FNrkS root          1583 Mar 26  2026 pktgen.sh
+-rwxr-xr-x    1 3r4FNrkS root          3994 Mar 26  2026 qosLinkAddGroup.sh
+-rwxr-xr-x    1 3r4FNrkS root          1463 Mar 26  2026 qosLinkInit.sh
+-rwxr-xr-x    1 3r4FNrkS root         12318 Mar 26  2026 qos_control.sh
+-rwxr-xr-x    1 3r4FNrkS root            69 Mar 26  2026 radartoolw
+-rwxr-xr-x    1 3r4FNrkS root           269 Mar 26  2026 show_node
+-rwxr-xr-x    1 3r4FNrkS root           205 Mar 26  2026 show_nt
+-rwxr-xr-x    1 3r4FNrkS root         24986 Mar 26  2026 stainfo
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 stamgr -> stainfo
+-rwxr-xr-x    1 3r4FNrkS root           145 Mar 26  2026 syslogd_wrapper.sh
+-rwxr-xr-x    1 3r4FNrkS root            74 Mar 26  2026 thermald_wrapper.sh
+-rwxr-xr-x    1 3r4FNrkS root          2408 Mar 26  2026 ubnt-rssimon
+-rwxr-xr-x    1 3r4FNrkS root         12300 Mar 26  2026 ubus
+-rwxr-xr-x    1 3r4FNrkS root          1726 Mar 26  2026 ulcmd_wrapper.sh
+-rwxr-xr-x    1 3r4FNrkS root           431 Mar 26  2026 vap_check.sh
+-rwxr-xr-x    1 3r4FNrkS root          2586 Mar 26  2026 walled_action.sh
+-rwxr-xr-x    1 3r4FNrkS root          3413 Mar 26  2026 wifi_list
+
+/sbin:
+drwxr-xr-x    2 3r4FNrkS root          1065 Mar 26  2026 .
+drwxr-xr-x    1 3r4FNrkS root           180 Oct 30 05:30 ..
+-rwxr-xr-x    1 3r4FNrkS root          4098 Mar 26  2026 askfirst
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 autotxpow -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 bootsel -> ubntbox
+-rwxr-xr-x    1 3r4FNrkS root          1378 Mar 26  2026 bridge-stp
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 cfgmtd -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 coredump -> ubntbox
+-rwxr-xr-x    1 3r4FNrkS root         20734 Mar 26  2026 diag_lite_log
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 egtool -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 factorytest -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 fwupdate -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 hostkeydump -> ubntbox
+-rwxr-xr-x    1 3r4FNrkS root           359 Mar 26  2026 hotplug-call
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 hwcheck -> ubntbox
+-rwxr-xr-x    1 3r4FNrkS root         16585 Mar 26  2026 init
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 insmod -> /sbin/kmodloader
+lrwxrwxrwx    1 3r4FNrkS root            20 Mar 26  2026 ip -> /usr/libexec/ip-full
+-rwxr-xr-x    1 3r4FNrkS root         20494 Mar 26  2026 kmodloader
+-rwxr-xr-x    1 3r4FNrkS root         12537 Mar 26  2026 logd
+-rwxr-xr-x    1 3r4FNrkS root         16697 Mar 26  2026 logread
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 lsmod -> /sbin/kmodloader
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 modinfo -> /sbin/kmodloader
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 modprobe -> /sbin/kmodloader
+-rwxr-xr-x    1 3r4FNrkS root         28686 Mar 26  2026 mtd
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 nettool -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 oopsdump -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 packetdump -> ubntbox
+-rwxr-xr-x    1 3r4FNrkS root         92207 Mar 26  2026 procd
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 radius-fqdn -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 ramdump -> ubntbox
+-rwxr-xr-x    1 3r4FNrkS root           490 Mar 26  2026 reload_config
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 rmmod -> /sbin/kmodloader
+-rwxr-xr-x    1 3r4FNrkS root         28696 Mar 26  2026 rstpctl
+-rwxr-xr-x    1 3r4FNrkS root         82273 Mar 26  2026 rstpd
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 selfupgrade -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 stahtd -> ubntbox
+-rwxr-xr-x    1 3r4FNrkS root         16629 Mar 26  2026 swconfig
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 sysmon -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 sysmon_ctrl -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root            20 Mar 26  2026 tc -> /usr/libexec/tc-full
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 trace -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 ubnt-netmon -> ubntbox
+-rwxr-xr-x    1 3r4FNrkS root       2108021 Mar 26  2026 ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 ubntconf -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 ubntevent -> ubntbox
+-rwxr-xr-x    1 3r4FNrkS root         24674 Mar 26  2026 ubusd
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 udevtrigger
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 utermd -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 vwirectl -> ubntbox
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 wevent -> ubntbox
+
+/usr/bin:
+drwxr-xr-x    2 3r4FNrkS root          2095 Mar 26  2026 .
+drwxr-xr-x    1 3r4FNrkS root            60 Mar 26  2026 ..
+-rwxr-xr-x    1 3r4FNrkS root        323796 Mar 26  2026 LinuxDEVM
+-rwxr-xr-x    1 3r4FNrkS root        336084 Mar 26  2026 LinuxGATM_CLT
+-rwxr-xr-x    1 3r4FNrkS root        733139 Mar 26  2026 LinuxHCI
+-rwxr-xr-x    1 3r4FNrkS root        753619 Mar 26  2026 LinuxL2CAP
+-rwxr-xr-x    1 3r4FNrkS root        737235 Mar 26  2026 LinuxSCO
+-rwxr-xr-x    1 3r4FNrkS root        749523 Mar 26  2026 LinuxSDP
+-rwxr-xr-x    1 3r4FNrkS root        749523 Mar 26  2026 LinuxSPP
+-rwxr-xr-x    1 3r4FNrkS root        847995 Mar 26  2026 LinuxSPPLE
+-rwxr-xr-x    1 3r4FNrkS root        336188 Mar 26  2026 LinuxSPPLE_PM
+-rwxr-xr-x    1 3r4FNrkS root        315604 Mar 26  2026 LinuxSPPM
+-rwxr-xr-x    1 3r4FNrkS root          5936 Mar 26  2026 PS_KEY_CSR8811.txt
+-rwxr-xr-x    1 3r4FNrkS root       1388563 Mar 26  2026 SS1BTPM
+-rwxr-xr-x    1 3r4FNrkS root         12301 Mar 26  2026 ble-beacon
+-rwxr-xr-x    1 3r4FNrkS root          8200 Mar 26  2026 ble-cc-rssi
+-rwxr-xr-x    1 3r4FNrkS root          8200 Mar 26  2026 ble-rx
+-rwxr-xr-x    1 3r4FNrkS root         12492 Mar 26  2026 ble-scanner
+-rwxr-xr-x    1 3r4FNrkS root          8200 Mar 26  2026 ble-tx
+-rwxr-xr-x    1 3r4FNrkS root          8385 Mar 26  2026 cnsscli
+-rwxr-xr-x    1 3r4FNrkS root         33201 Mar 26  2026 cnssdaemon
+-rwxr-xr-x    1 3r4FNrkS root        151643 Mar 26  2026 curl
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 dbclient -> ../sbin/dropbear
+-rwxr-xr-x    1 3r4FNrkS root         12290 Mar 26  2026 dotlockfile
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 downlink-monitor -> mcad
+-rwxr-xr-x    1 3r4FNrkS root         49162 Mar 26  2026 dropbearconvert
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 dropbearkey -> ../sbin/dropbear
+-rwxr-xr-x    1 3r4FNrkS root          2517 Mar 26  2026 ecm_dump.sh
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 element-adopt-monitor -> mcad
+lrwxrwxrwx    1 3r4FNrkS root            25 Mar 26  2026 flock -> /usr/bin/util-linux-flock
+-rwxr-xr-x    1 3r4FNrkS root         15496 Mar 26  2026 guest_portal_funcs.sh
+-rwxr-xr-x    1 3r4FNrkS root           241 Mar 26  2026 hostapd_wrapper.sh
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 iperf3
+-rwxr-xr-x    1 3r4FNrkS root        376881 Mar 26  2026 jq
+-rwxr-xr-x    1 3r4FNrkS root         12294 Mar 26  2026 jshn
+-rwxr-xr-x    1 3r4FNrkS root         20610 Mar 26  2026 jsonfilter
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 ldd -> ../../lib/libc.so
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 lua -> luajit
+-rwxr-xr-x    1 3r4FNrkS root         16390 Mar 26  2026 luajit
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 mca-ap-neighbor-max-signal -> mca.sh
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 mca-cli -> mcad
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 mca-cli-op -> mcad
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 mca-ctrl -> mcad
+-rwxr-xr-x    1 3r4FNrkS root          2724 Mar 26  2026 mca-custom-alert.sh
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 mca-dump -> mca.sh
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 mca-monitor -> mcad
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 mca-scan -> mca.sh
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 mca-sta -> mca.sh
+-rwxr-xr-x    1 3r4FNrkS root          1422 Mar 26  2026 mca.sh
+-rwxr-xr-x    1 3r4FNrkS root        439159 Mar 26  2026 mcad
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 mesh-monitor -> mcad
+-rwxr-xr-x    1 3r4FNrkS root           515 Mar 26  2026 oom-protect
+-rwxr-xr-x    1 3r4FNrkS root        856856 Mar 26  2026 openssl
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 radius-da-dispatcher -> mcad
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 redirector -> mcad
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 reset-handler -> mcad
+lrwxrwxrwx    1 3r4FNrkS root            18 Mar 26  2026 scp -> /usr/sbin/dropbear
+-rwxr-xr-x    1 3r4FNrkS root          1159 Mar 26  2026 sfe_dump
+-rwxr-xr-x    1 3r4FNrkS root         12290 Mar 26  2026 speedtd
+lrwxrwxrwx    1 3r4FNrkS root            18 Mar 26  2026 ssh -> /usr/sbin/dropbear
+lrwxrwxrwx    1 3r4FNrkS root            18 Mar 26  2026 ssh-keygen -> /usr/sbin/dropbear
+-rwxr-xr-x    1 3r4FNrkS root         56720 Mar 26  2026 supp
+-rwxr-xr-x    1 3r4FNrkS root         88201 Mar 26  2026 syswrapper.sh
+-rwxr-xr-x    1 3r4FNrkS root       1035131 Mar 26  2026 tcpdump
+-rwxr-xr-x    1 3r4FNrkS root        856747 Mar 26  2026 ubnt-btmw-rpc
+lrwxrwxrwx    1 3r4FNrkS root             5 Mar 26  2026 uboard -> uibox
+-rwxr-xr-x    1 3r4FNrkS root        710479 Mar 26  2026 udapi-bridge
+lrwxrwxrwx    1 3r4FNrkS root             5 Mar 26  2026 udapi-server -> uibox
+-rwxr-xr-x    1 3r4FNrkS root         98914 Mar 26  2026 uibox
+-rwxr-xr-x    1 3r4FNrkS root         12483 Mar 26  2026 unifi_util_funcs.sh
+lrwxrwxrwx    1 3r4FNrkS root             4 Mar 26  2026 uplink-monitor -> mcad
+-rwxr-xr-x    1 3r4FNrkS root         28741 Mar 26  2026 util-linux-flock
+-rwxr-xr-x    1 3r4FNrkS root          8246 Mar 26  2026 uwds
+-rwxr-xr-x    1 3r4FNrkS root           367 Mar 26  2026 wpa_supplicant_wrapper.sh
+
+/usr/sbin:
+drwxr-xr-x    2 3r4FNrkS root          2570 Mar 26  2026 .
+drwxr-xr-x    1 3r4FNrkS root            60 Mar 26  2026 ..
+-rwxr-xr-x    1 3r4FNrkS root         20482 Mar 26  2026 80211stats
+-rwxr-xr-x    1 3r4FNrkS root          4098 Mar 26  2026 PktRspTest
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 acsdbgtool
+-rwxr-xr-x    1 3r4FNrkS root         53259 Mar 26  2026 apstats
+lrwxrwxrwx    1 3r4FNrkS root            26 Mar 26  2026 arptables -> /usr/sbin/arptables-legacy
+-rwxr-xr-x    1 3r4FNrkS root         58885 Mar 26  2026 arptables-legacy
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 assocdenialnotify
+-rwxr-xr-x    1 3r4FNrkS root         12433 Mar 26  2026 athdiag
+-rwxr-xr-x    1 3r4FNrkS root         12296 Mar 26  2026 athkey
+-rwxr-xr-x    1 3r4FNrkS root         53250 Mar 26  2026 athstats
+-rwxr-xr-x    1 3r4FNrkS root          4098 Mar 26  2026 athstatsclr
+-rwxr-xr-x    1 3r4FNrkS root       1258591 Mar 26  2026 blebr2d
+-rwxr-xr-x    1 3r4FNrkS root       2376787 Mar 26  2026 blebrd
+-rwxr-xr-x    1 3r4FNrkS root       2630731 Mar 26  2026 bleconnd
+lrwxrwxrwx    1 3r4FNrkS root            31 Mar 26  2026 brctl -> /usr/libexec/brctl-bridge-utils
+-rwxr-xr-x    1 3r4FNrkS root        119627 Mar 26  2026 bridge
+-rwxr-xr-x    1 3r4FNrkS root         27842 Mar 26  2026 burnin.sh
+-rwxr-xr-x    1 3r4FNrkS root          5441 Mar 26  2026 cfg80211tool
+-rwxr-xr-x    1 3r4FNrkS root         93173 Mar 26  2026 cfg80211tool.1
+-rwxr-xr-x    1 3r4FNrkS root         97269 Mar 26  2026 cfg80211tool_batch
+lrwxrwxrwx    1 3r4FNrkS root            22 Mar 26  2026 cfg80211tool_mesh -> /usr/sbin/cfg80211tool
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 cfr_test_app
+-rwxr-xr-x    1 3r4FNrkS root          4098 Mar 26  2026 debug-diag
+-rwxr-xr-x    1 3r4FNrkS root          8225 Mar 26  2026 diag_callback_sample
+-rwxr-xr-x    1 3r4FNrkS root         16646 Mar 26  2026 diag_dci_sample
+lrwxrwxrwx    1 3r4FNrkS root            12 Mar 26  2026 diag_flash_logger -> ./diag_mdlog
+-rwxr-xr-x    1 3r4FNrkS root          4101 Mar 26  2026 diag_klog
+-rwxr-xr-x    1 3r4FNrkS root         29919 Mar 26  2026 diag_mdlog
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 diag_socket_app -> ./diag_socket_log
+-rwxr-xr-x    1 3r4FNrkS root         18042 Mar 26  2026 diag_socket_log
+-rwxr-xr-x    1 3r4FNrkS root         12476 Mar 26  2026 diag_uart_log
+-rwxr-xr-x    1 3r4FNrkS root        307377 Mar 26  2026 dnsmasq
+-rwxr-xr-x    1 3r4FNrkS root        324123 Mar 26  2026 dropbear
+-rwxr-xr-x    1 3r4FNrkS root        336235 Mar 26  2026 e2fsck
+lrwxrwxrwx    1 3r4FNrkS root            25 Mar 26  2026 ebtables -> /usr/sbin/ebtables-legacy
+-rwxr-xr-x    1 3r4FNrkS root          4098 Mar 26  2026 ebtables-legacy
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 ebtables-legacy-restore
+lrwxrwxrwx    1 3r4FNrkS root            33 Mar 26  2026 ebtables-restore -> /usr/sbin/ebtables-legacy-restore
+-rwxr-xr-x    1 3r4FNrkS root        110867 Mar 26  2026 ethtool
+-rwxr-xr-x    1 3r4FNrkS root         16825 Mar 26  2026 exttool
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 fsck.ext2 -> e2fsck
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 fsck.ext3 -> e2fsck
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 fsck.ext4 -> e2fsck
+-rwxr-xr-x    1 3r4FNrkS root         24901 Mar 26  2026 fw_printenv
+lrwxrwxrwx    1 3r4FNrkS root            11 Mar 26  2026 fw_setenv -> fw_printenv
+-rwxr-xr-x    1 3r4FNrkS root          1199 Mar 26  2026 hapd
+lrwxrwxrwx    1 3r4FNrkS root            13 Mar 26  2026 hostapd -> qca-hapd-supp
+-rwxr-xr-x    1 3r4FNrkS root         73769 Mar 26  2026 hostapd_cli
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 ip6tables -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 ip6tables-nft -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 ip6tables-nft-restore -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 ip6tables-nft-save -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 ip6tables-restore -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 ip6tables-restore-translate -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 ip6tables-save -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 ip6tables-translate -> xtables-nft-multi
+-rwxr-xr-x    1 3r4FNrkS root          4098 Mar 26  2026 ipset
+lrwxrwxrwx    1 3r4FNrkS root            15 Mar 26  2026 ipset-translate -> /usr/sbin/ipset
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 iptables -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 iptables-nft -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 iptables-nft-restore -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 iptables-nft-save -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 iptables-restore -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 iptables-restore-translate -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 iptables-save -> xtables-nft-multi
+lrwxrwxrwx    1 3r4FNrkS root            17 Mar 26  2026 iptables-translate -> xtables-nft-multi
+-rwxr-xr-x    1 3r4FNrkS root        166295 Mar 26  2026 iw
+-rwxr-xr-x    1 3r4FNrkS root         61578 Mar 26  2026 iwconfig
+lrwxrwxrwx    1 3r4FNrkS root             8 Mar 26  2026 iwlist -> iwconfig
+lrwxrwxrwx    1 3r4FNrkS root             8 Mar 26  2026 iwpriv -> iwconfig
+-rwxr-xr-x    1 3r4FNrkS root         16689 Mar 26  2026 lite_mon
+-rwxr-xr-x    1 3r4FNrkS root        152159 Mar 26  2026 lldpcli
+lrwxrwxrwx    1 3r4FNrkS root             7 Mar 26  2026 lldpctl -> lldpcli
+-rwxr-xr-x    1 3r4FNrkS root        182871 Mar 26  2026 lldpd
+-rwxr-xr-x    1 3r4FNrkS root         16434 Mar 26  2026 mcsctl
+-rwxr-xr-x    1 3r4FNrkS root         65978 Mar 26  2026 mcsd
+-rwxr-xr-x    1 3r4FNrkS root         57597 Mar 26  2026 mdns-repeater
+-rwxr-xr-x    1 3r4FNrkS root         16728 Mar 26  2026 memtester
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 minidump
+-rwxr-xr-x    1 3r4FNrkS root        123026 Mar 26  2026 mke2fs
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 mkfs.ext2 -> mke2fs
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 mkfs.ext3 -> mke2fs
+lrwxrwxrwx    1 3r4FNrkS root             6 Mar 26  2026 mkfs.ext4 -> mke2fs
+-rwxr-xr-x    1 3r4FNrkS root        135709 Mar 26  2026 mksquashfs4
+-rwxr-xr-x    1 3r4FNrkS root           265 Mar 26  2026 ntpd-hotplug
+lrwxrwxrwx    1 3r4FNrkS root            14 Mar 26  2026 ol_regdomain -> ubnt-regdomain
+-rwxr-xr-x    1 3r4FNrkS root         16386 Mar 26  2026 peerratestats
+-rwxr-xr-x    1 3r4FNrkS root         12290 Mar 26  2026 pktlogconf
+-rwxr-xr-x    1 3r4FNrkS root         12345 Mar 26  2026 pktlogdump
+-rwxr-xr-x    1 3r4FNrkS root       3224889 Mar 26  2026 qca-hapd-supp
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 qca_gensock
+-rwxr-xr-x    1 3r4FNrkS root         12290 Mar 26  2026 qldtool
+-rwxr-xr-x    1 3r4FNrkS root          4098 Mar 26  2026 qrtr-cfg
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 qrtr-lookup
+-rwxr-xr-x    1 3r4FNrkS root         16386 Mar 26  2026 qrtr-ns
+-rwxr-xr-x    1 3r4FNrkS root         16386 Mar 26  2026 radartool
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 scp -> ../sbin/dropbear
+-rwxr-xr-x    1 3r4FNrkS root           651 Mar 26  2026 setup-regvaps
+-rwxr-xr-x    1 3r4FNrkS root        699219 Mar 26  2026 snmpd
+-rwxr-xr-x    1 3r4FNrkS root         57346 Mar 26  2026 spectraltool
+-rwxr-xr-x    1 3r4FNrkS root        966774 Mar 26  2026 ssdk_sh
+lrwxrwxrwx    1 3r4FNrkS root            16 Mar 26  2026 ssh -> ../sbin/dropbear
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 ssidsteering
+-rwxr-xr-x    1 3r4FNrkS root         16481 Mar 26  2026 test_diag
+-rwxr-xr-x    1 3r4FNrkS root         50610 Mar 26  2026 thermald
+-rwxr-xr-x    1 3r4FNrkS root          8222 Mar 26  2026 thermaltool
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 tx99tool
+-rwxr-xr-x    1 3r4FNrkS root          6335 Mar 26  2026 uanywhere-launcher.sh
+-rwxr-xr-x    1 3r4FNrkS root         12454 Mar 26  2026 ubnt-ecm-dump
+-rwxr-xr-x    1 3r4FNrkS root        538111 Mar 26  2026 ubnt-regdomain
+-rwxr-xr-x    1 3r4FNrkS root         37106 Mar 26  2026 ubntquickscan
+-rwxr-xr-x    1 3r4FNrkS root         94417 Mar 26  2026 ubntrfclient
+-rwxr-xr-x    1 3r4FNrkS root        959575 Mar 26  2026 unifi-anywhere
+-rwxr-xr-x    1 3r4FNrkS root         78717 Mar 26  2026 unsquashfs4
+-rwxr-xr-x    1 3r4FNrkS root         36945 Mar 26  2026 upathmond
+-rwxr-xr-x    1 3r4FNrkS root          9196 Mar 26  2026 wifi_hw_mode
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 wifi_radar_test_app
+-rwxr-xr-x    1 3r4FNrkS root          5925 Mar 26  2026 wifi_try
+-rwxr-xr-x    1 3r4FNrkS root          8194 Mar 26  2026 wifistats
+-rwxr-xr-x    1 3r4FNrkS root        110959 Mar 26  2026 wifitelemetry
+-rwxr-xr-x    1 3r4FNrkS root        172311 Mar 26  2026 wifitool
+-rwxr-xr-x    1 3r4FNrkS root        147483 Mar 26  2026 wlanconfig
+-rwxr-xr-x    1 3r4FNrkS root        119905 Mar 26  2026 wpa_cli
+lrwxrwxrwx    1 3r4FNrkS root            13 Mar 26  2026 wpa_supplicant -> qca-hapd-supp
+-rwxr-xr-x    1 3r4FNrkS root         32806 Mar 26  2026 wps_enhc
+-rwxr-xr-x    1 3r4FNrkS root           710 Mar 26  2026 wpsd
+-rwxr-xr-x    1 3r4FNrkS root         66845 Mar 26  2026 xtables-legacy-multi
+-rwxr-xr-x    1 3r4FNrkS root        194979 Mar 26  2026 xtables-nft-multi

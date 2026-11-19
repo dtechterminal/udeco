@@ -1,0 +1,21 @@
+
+AC_BE: tx frames: 1541973 bytes: 1145065536 failed frames: 1388 failed bytes: 649620
+       rx frames: 838980 bytes: 717711607 failed frames: 88 failed bytes: 264504
+       foward frames: 0 bytes: 0 
+       tx frames time expired: 0 
+
+AC_BK: tx frames: 1693 bytes: 1023012 failed frames: 4 failed bytes: 240
+       rx frames: 872 bytes: 209759 failed frames: 0 failed bytes: 0
+       foward frames: 0 bytes: 0 
+       tx frames time expired: 0 
+
+AC_VI: tx frames: 4052 bytes: 5749019 failed frames: 6 failed bytes: 856
+       rx frames: 0 bytes: 0 failed frames: 0 failed bytes: 0
+       foward frames: 0 bytes: 0 
+       tx frames time expired: 0 
+
+AC_VO: tx frames: 181139 bytes: 302574642 failed frames: 4 failed bytes: 240
+       rx frames: 6698 bytes: 1529290 failed frames: 0 failed bytes: 0
+       foward frames: 0 bytes: 0 
+       tx frames time expired: 0 
+

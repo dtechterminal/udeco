@@ -1,0 +1,3 @@
+TAG t3_idle_reference 60 s, no scan
+AC 3916.75 wl01=0[ ] wl02=1[ m:971e1247/in=3775/txB=10565205/rxB=2249571/txfail=0/retry=1224/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3823/txB=11069069/rxB=874101/txfail=0/retry=1083/rssi=-70 ] wl13=2[ m:f0197d79/in=358/txB=42021519/rxB=1148433/txfail=2/retry=27415/rssi=-70 m:177f5794/in=397/txB=54420352/rxB=2962178/txfail=0/retry=4103/rssi=-71 ]
+AC 3977.01 wl01=0[ ] wl02=1[ m:971e1247/in=3835/txB=10708416/rxB=2294040/txfail=0/retry=1231/rssi=-67 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3883/txB=11253403/rxB=892438/txfail=0/retry=1156/rssi=-70 ] wl13=2[ m:f0197d79/in=418/txB=43601258/rxB=1270404/txfail=2/retry=27598/rssi=-69 m:177f5794/in=457/txB=55573439/rxB=3051607/txfail=0/retry=4199/rssi=-71 ]

@@ -1,0 +1,26 @@
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0x1001 crsglitch cnt: 2014 bad plcp: 9 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:6 cca_nocat: 2 cca_nopkt: 8
+ chanspec: 0x1002 crsglitch cnt: 1726 bad plcp: 34 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 2
+ chanspec: 0x1003 crsglitch cnt: 2956 bad plcp: 58 noise: -107
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 5
+ chanspec: 0x1004 crsglitch cnt: 2331 bad plcp: 73 noise: -108
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 4
+ chanspec: 0x1005 crsglitch cnt: 3160 bad plcp: 136 noise: -93
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 3 cca_nopkt: 4
+ chanspec: 0x1006 crsglitch cnt: 795 bad plcp: 14 noise: -94
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 7
+ chanspec: 0x1007 crsglitch cnt: 3146 bad plcp: 29 noise: -106
+	 cca_txdur: 1 cca_inbss: 2 cca_obss:1 cca_nocat: 2 cca_nopkt: 36
+ chanspec: 0x1008 crsglitch cnt: 472 bad plcp: 18 noise: -91
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:68 cca_nocat: 4 cca_nopkt: 1
+ chanspec: 0x1009 crsglitch cnt: 936 bad plcp: 43 noise: -107
+	 cca_txdur: 1 cca_inbss: 2 cca_obss:2 cca_nocat: 3 cca_nopkt: 11
+ chanspec: 0x100a crsglitch cnt: 648 bad plcp: 29 noise: -94
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 4
+ chanspec: 0x100b crsglitch cnt: 1336 bad plcp: 43 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:6 cca_nocat: 2 cca_nopkt: 8
+

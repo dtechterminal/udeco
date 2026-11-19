@@ -13,21 +13,6 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
-// IfnamesByDevname maps the controller's VAP devnames (wifi0ap5) to the AP's
-// interfaces (phy0-ap2), through system_cfg's ssid|radio -> devname.
-func (s *Snapshot) IfnamesByDevname(info CfgInfo) map[string]string {
-	m := map[string]string{}
-	for i, r := range s.Radios {
-		radio := fmt.Sprintf("wifi%d", i)
-		for _, v := range r.VAPs {
-			if d := info.DevName[v.SSID+"|"+radio]; d != "" {
-				m[d] = v.Iface
-			}
-		}
-	}
-	return m
-}
-
 var ifnameOK = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,15}$`)
 
 // guestRuleset renders the nftables bridge table for guest interfaces:

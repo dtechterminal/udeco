@@ -1,0 +1,13 @@
+wl12      ESSID: "Example Network"
+          Access Point: BE:A7:B9:3E:17:05
+          Mode: Master  Channel: 44 (5.220 GHz)
+          Tx-Power: 32 dBm  Link Quality: unknown/unknown
+          Signal: -73 dBm  Noise: -96 dBm
+          Bit Rate: 272.0 MBit/s
+          Encryption: none
+          Type: wl  HW Mode(s): 802.11an/ac
+          Hardware: 14E4:4492 14E4:08AD [Broadcom BCM4492]
+          TX power offset: none
+          Frequency offset: unknown
+          Supports VAPs: yes
+          Beacon Interval: 100

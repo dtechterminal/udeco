@@ -1,0 +1,238 @@
+TAG t1_wl1_passive_p110_r3 radio=wl1 args=-t passive -p 110
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=3519.29
+AC 3519.29 wl01=0[ ] wl02=1[ m:971e1247/in=3379/txB=9637594/rxB=2011662/txfail=0/retry=1102/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3427/txB=10110155/rxB=798155/txfail=0/retry=644/rssi=-70 ] wl13=1[ m:177f5794/in=1/txB=9538356/rxB=9177/txfail=0/retry=11/rssi=-73 ]
+--- chanim_stats all wl1 t=3519.51
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 25 bad plcp: 17 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 8 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 145 bad plcp: 18 noise: -96
+	 cca_txdur: 19 cca_inbss: 1 cca_obss:6 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 130 bad plcp: 0 noise: -102
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 173 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+SCAN rc=0 t0=3519.54 t1=3520.78 beacons=6 polls=20 first=SSID: ""
+--- chanim_stats all wl1 t=3520.82
+version: 3 
+CHAN Interference Measurement:
+Stats during last scan:
+ chanspec: 0xd024 crsglitch cnt: 43 bad plcp: 0 noise: -101
+	 cca_txdur: 1 cca_inbss: 0 cca_obss:0 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd028 crsglitch cnt: 254 bad plcp: 0 noise: -96
+	 cca_txdur: 4 cca_inbss: 2 cca_obss:0 cca_nocat: 2 cca_nopkt: 1
+ chanspec: 0xd02c crsglitch cnt: 43 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd030 crsglitch cnt: 78 bad plcp: 8 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:1 cca_nocat: 1 cca_nopkt: 1
+ chanspec: 0xd095 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd099 crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd09d crsglitch cnt: 0 bad plcp: 0 noise: -100
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a1 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+ chanspec: 0xd0a5 crsglitch cnt: 0 bad plcp: 0 noise: -101
+	 cca_txdur: 0 cca_inbss: 0 cca_obss:0 cca_nocat: 0 cca_nopkt: 0
+
+IDLE t2=3521.84 t3=3523.86 beacons=60
+HDR wl1 chanspec=40/80 (0xe12a) noise=-96 up=3523.89
+AC 3523.89 wl01=0[ ] wl02=1[ m:971e1247/in=3384/txB=9653576/rxB=2015038/txfail=0/retry=1106/rssi=-66 ] wl11=0[ ] wl12=1[ m:76c0915f/in=3431/txB=10125519/rxB=799703/txfail=0/retry=654/rssi=-69 ] wl13=1[ m:177f5794/in=5/txB=9575014/rxB=34846/txfail=0/retry=53/rssi=-69 ]
+BSSCOUNT 7
+--- scanresults
+SSID: ""
+Mode: Managed	RSSI: -83 dBm	SNR: 13 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 40/80
+BSSID: AE:A7:B9:3E:16:90	Capability: ESS WEP 
+Supported Rates: [ 6(b) 9 12(b) 18 24(b) 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 5GHz channel 42 80MHz (0xe12a)
+	Primary channel: 40
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-11        Rx: 0-11      
+		NSS2 Tx: 0-11        Rx: 0-11      
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:853695ed"
+Mode: Managed	RSSI: -83 dBm	SNR: 13 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 40/80
+BSSID: AE:A7:B9:3E:16:91	Capability: ESS WEP RRM 
+Supported Rates: [ 6(b) 9 12(b) 18 24(b) 36 48 54 ]
+RSN (WPA2 + WPA3-SAE):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(2): WPA2-PSK SAE 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 5GHz channel 42 80MHz (0xe12a)
+	Primary channel: 40
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-11        Rx: 0-11      
+		NSS2 Tx: 0-11        Rx: 0-11      
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+WPS: V2.0 Configured
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:94cdf24f"
+Mode: Managed	RSSI: -84 dBm	SNR: 12 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 40/80
+BSSID: AE:A7:B9:3E:16:92	Capability: ESS WEP RRM 
+Supported Rates: [ 6(b) 9 12(b) 18 24(b) 36 48 54 ]
+RSN (WPA2 + WPA3-SAE):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(2): WPA2-PSK SAE 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 5GHz channel 42 80MHz (0xe12a)
+	Primary channel: 40
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-11        Rx: 0-11      
+		NSS2 Tx: 0-11        Rx: 0-11      
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: ""
+Mode: Managed	RSSI: -72 dBm	SNR: 24 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 40/80
+BSSID: AE:A7:B9:3E:15:F8	Capability: ESS WEP 
+Supported Rates: [ 6(b) 9 12(b) 18 24(b) 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x000c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 5GHz channel 42 80MHz (0xe12a)
+	Primary channel: 40
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-11        Rx: 0-11      
+		NSS2 Tx: 0-11        Rx: 0-11      
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:853695ed"
+Mode: Managed	RSSI: -72 dBm	SNR: 24 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 40/80
+BSSID: AE:A7:B9:3E:15:F9	Capability: ESS WEP RRM 
+Supported Rates: [ 6(b) 9 12(b) 18 24(b) 36 48 54 ]
+RSN (WPA2 + WPA3-SAE):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(2): WPA2-PSK SAE 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 5GHz channel 42 80MHz (0xe12a)
+	Primary channel: 40
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-11        Rx: 0-11      
+		NSS2 Tx: 0-11        Rx: 0-11      
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+WPS: V2.0 Configured
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:94cdf24f"
+Mode: Managed	RSSI: -72 dBm	SNR: 24 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 40/80
+BSSID: AE:A7:B9:3E:15:FA	Capability: ESS WEP RRM 
+Supported Rates: [ 6(b) 9 12(b) 18 24(b) 36 48 54 ]
+RSN (WPA2 + WPA3-SAE):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(2): WPA2-PSK SAE 
+	Capabilities(0x008c): No Pre-Auth, Pairwise, 16 PTK Replay Ctrs1 GTK Replay Ctr, MFP: Capable
+Extended Capabilities: BSS_Transition
+HE Capable:
+	Chanspec: 5GHz channel 42 80MHz (0xe12a)
+	Primary channel: 40
+	HT Capabilities: 40MHz SGI20 SGI40 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-11        Rx: 0-11      
+		NSS2 Tx: 0-11        Rx: 0-11      
+	Supported HE MCS:
+	    20/40/80 MHz:
+		NSS1 Tx: 0-11        Rx: 0-11
+		NSS2 Tx: 0-11        Rx: 0-11
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+
+SSID: "h:50616fb6"
+Mode: Managed	RSSI: -90 dBm	SNR: 6 dB	noise: -96 dBm	Flags: FromBcn RSSI on-channel 	Channel: 48
+BSSID: 54:AF:97:74:F4:39	Capability: ESS WEP 
+Supported Rates: [ 6(b) 9 12(b) 18 24(b) 36 48 54 ]
+RSN (WPA2):
+	multicast cipher: AES-CCMP
+	unicast ciphers(1): AES-CCMP 
+	AKM Suites(1): WPA2-PSK 
+	Capabilities(0x0000): No Pre-Auth, Pairwise, 1 PTK Replay Ctr1 GTK Replay Ctr, MFP: Disabled
+Extended Capabilities: 
+VHT Capable:
+	Chanspec: 5GHz channel 48 20MHz (0xd030)
+	Primary channel: 48
+	HT Capabilities: SGI20 SGI40 
+	Supported HT MCS : 0-15
+	Supported VHT MCS:
+		NSS1 Tx: 0-9   Rx: 0-9 
+		NSS2 Tx: 0-9   Rx: 0-9 
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>
+VS_IE: <dropped: vendor IE may carry device names>

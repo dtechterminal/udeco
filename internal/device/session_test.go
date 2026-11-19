@@ -186,3 +186,112 @@ func TestRepeatedSetparamStopsHurrying(t *testing.T) {
 		t.Error("a new setparam must be answered right away")
 	}
 }
+
+// Once adopted, the payload must keep the real sys_stats and
+// radio_table_stats that Extra read from the AP (agent-design.md §2: they
+// used to be replaced by canned U7PG2 constants). The canned values only
+// fill in when Extra has none.
+func TestAdoptedPayloadKeepsExtraStats(t *testing.T) {
+	x := newSession(t)
+	handle(t, x, `{"_type":"setparam","mgmt_cfg":"authkey=`+newKey+`\n"}`)
+	if !x.S.Adopted {
+		t.Fatal("not adopted")
+	}
+	x.Extra = func() map[string]any {
+		return map[string]any{
+			"sys_stats": map[string]any{"loadavg_1": "1.23", "mem_total": 264241152},
+			"radio_table_stats": []map[string]any{
+				{"name": "wifi0", "radio": "ng", "channel": 6, "num_sta": 7, "cu_total": 42},
+			},
+		}
+	}
+	var m map[string]any
+	js, err := x.Payload(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(js, &m); err != nil {
+		t.Fatal(err)
+	}
+	ss := m["sys_stats"].(map[string]any)
+	if ss["loadavg_1"] != "1.23" || ss["mem_total"] != 264241152.0 {
+		t.Errorf("sys_stats replaced: %v", ss)
+	}
+	rs := m["radio_table_stats"].([]any)
+	if len(rs) != 1 || rs[0].(map[string]any)["num_sta"] != 7.0 || rs[0].(map[string]any)["cu_total"] != 42.0 {
+		t.Errorf("radio_table_stats replaced: %v", rs)
+	}
+
+	// without Extra the canned stand-ins are still sent
+	x.Extra = nil
+	js, _ = x.Payload(time.Now())
+	m = nil
+	json.Unmarshal(js, &m)
+	if ss, ok := m["sys_stats"].(map[string]any); !ok || ss["mem_total"] != 129130496.0 {
+		t.Errorf("canned sys_stats missing: %v", m["sys_stats"])
+	}
+	if rs, ok := m["radio_table_stats"].([]any); !ok || len(rs) != 2 {
+		t.Errorf("canned radio_table_stats missing: %v", m["radio_table_stats"])
+	}
+}
+
+// The nightly channel optimisation sends cmd quick-scan with scan-band and
+// scan-bw (numbers, or numeric strings).
+func TestQuickScanCmd(t *testing.T) {
+	x := newSession(t)
+	x.Unhandled = OpenLedger(x.StateDir + "/unhandled.json")
+	for _, c := range []struct{ reply, want string }{
+		{`{"_type":"cmd","cmd":"quick-scan","scan-band":1,"scan-bw":80}`, "quick-scan:na:80"},
+		{`{"_type":"cmd","cmd":"quick-scan","scan-band":"0","scan-bw":"20"}`, "quick-scan:ng:20"},
+		{`{"_type":"cmd","cmd":"quick-scan","scan-band":1}`, "quick-scan:na:0"},
+	} {
+		o := handle(t, x, c.reply)
+		if !slices.Equal(o.Actions, []string{c.want}) || !o.Immediate {
+			t.Errorf("%s: actions %v immediate %v, want %s", c.reply, o.Actions, o.Immediate, c.want)
+		}
+	}
+	for _, bad := range []string{
+		`{"_type":"cmd","cmd":"quick-scan"}`,
+		`{"_type":"cmd","cmd":"quick-scan","scan-band":7,"scan-bw":20}`,
+	} {
+		if o := handle(t, x, bad); len(o.Actions) != 0 {
+			t.Errorf("%s: actions %v", bad, o.Actions)
+		}
+	}
+	for _, u := range x.Unhandled.Entries() {
+		if u.Kind == "field" && strings.Contains(u.Name, "scan-") {
+			t.Errorf("scan-band/scan-bw recorded as unread: %+v", u)
+		}
+	}
+}
+
+// The capability words are 32-bit unsigned (a bit 31 word held in a 32-bit
+// ARM int is negative); a zero word is left out, which the controller reads
+// as 0 (payload getInt default), so clearing the last bit of fw3_caps or
+// wifi_caps2 also clears it on the controller.
+func TestCapabilityWordsSerialised(t *testing.T) {
+	x := newSession(t)
+	x.WifiCaps, x.WifiCaps2, x.FWCaps, x.FW3Caps = 0x1120000, 0x20, 0x21401403, 0xc0
+	x.FW2Caps = -0x80000000 // bit 31 in a 32-bit int
+	m := map[string]any{}
+	js, err := x.Payload(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	json.Unmarshal(js, &m)
+	for k, want := range map[string]float64{"wifi_caps": 0x1120000, "wifi_caps2": 0x20, "fw_caps": 0x21401403,
+		"fw2_caps": 0x80000000, "fw3_caps": 0xc0} {
+		if m[k] != want {
+			t.Errorf("%s = %v, want %v", k, m[k], want)
+		}
+	}
+	x.WifiCaps2, x.FW3Caps, x.FW2Caps = 0, 0, 0
+	m = map[string]any{}
+	js, _ = x.Payload(time.Now())
+	json.Unmarshal(js, &m)
+	for _, k := range []string{"wifi_caps2", "fw2_caps", "fw3_caps"} {
+		if _, ok := m[k]; ok {
+			t.Errorf("zero %s sent: %v", k, m[k])
+		}
+	}
+}

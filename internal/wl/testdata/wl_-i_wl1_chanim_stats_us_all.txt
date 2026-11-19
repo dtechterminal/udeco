@@ -1,0 +1,25 @@
+version: 3 
+us version: 2 
+CHAN Interference Measurement:
+Stats during last scan:
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0x1001      0           0           0           0           0           0           0           0           0           0           0         
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0xd024      983         1938        29767       174303      3627        0           3126000     0           0           3126000     206134    
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0xd028      4294215846  4294947792  4294303487  4294608701  4294905246  0           38642922945  4294923321  4294961913  18446739783610360616  4294000283
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0xd02c      438368094   57286456    610838269   284203675   4791857     0           11801173275  70678710    5704956     13499007000  911806256 
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0xd030      404640      6036        381802      180939      47308       0           11138000    7714        3782        11138000    960873    
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0xd095      629         0           382         0           0           0           3125000     0           0           3125000     382       
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0xd099      630         0           0           0           0           0           3126000     0           0           3126000     0         
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0xd09d      629         0           0           0           0           0           3125000     0           0           3125000     0         
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0xd0a1      629         0           189         0           0           0           3127000     0           0           3127000     189       
+chanspec    tx          inbss       obss        nocat       nopkt       doze        txop        goodtx      badtx       total_tm    busy_tm   
+0xd0a5      630         0           0           0           0           0           253260      0           0           255000      0         
+

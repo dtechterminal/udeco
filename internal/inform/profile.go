@@ -9,6 +9,7 @@ package inform
 type Profile struct {
 	Model, Display, Version string
 	FWCaps, FW2Caps         int64
+	FW3Caps                 int64 // fw3_caps (0 = not sent)
 	WifiCaps, WifiCaps2     int64
 	Radios                  map[string]RadioProfile // by band: "ng", "na"
 }

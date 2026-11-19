@@ -1,0 +1,5 @@
+version: 3 
+chanspec tx   inbss   obss   nocat   nopkt   doze     txop     goodtx  badtx   glitch   badplcp  knoise  idle  timestamp
+0x1804	7	1	13	5	3	0	70	1	1	1760	25	-99	77	18129656
+chan_util: 24
+

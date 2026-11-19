@@ -1,0 +1,3 @@
+authe_sta_list D2:F7:E5:58:6F:89
+authe_sta_list A6:7B:63:9F:25:40
+authe_sta_list 88:57:1D:BB:BB:86

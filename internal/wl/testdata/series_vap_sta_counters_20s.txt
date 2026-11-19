@@ -1,0 +1,306 @@
+=== sample 18748.78
+## wl02
+sys_rx_bytes 25542095
+sys_tx_bytes 64467885
+sys_rx_packets 89605
+sys_tx_packets 407559
+txframe 407559 txbyte 64467953 txerror 430 rxframe 89605 rxbyte 25542095 rxerror 0 
+[VER 8] STA C8:5C:CC:D1:2E:C7:
+	 tx total bytes: 37435354
+	 tx ucast pkts: 0
+	 tx ucast bytes: 0
+	 tx mcast/bcast bytes: 37435354
+	 rx data pkts: 0
+	 rx data bytes: 0
+	 rx ucast bytes: 0
+[VER 8] STA 8C:BF:EA:1D:BA:74:
+	 tx total bytes: 37474600
+	 tx ucast pkts: 350
+	 tx ucast bytes: 39246
+	 tx mcast/bcast bytes: 37435354
+	 rx data pkts: 494
+	 rx data bytes: 100579
+	 rx ucast bytes: 81271
+[VER 8] STA F8:17:2D:6A:16:CC:
+	 tx total bytes: 37885862
+	 tx ucast pkts: 3611
+	 tx ucast bytes: 450508
+	 tx mcast/bcast bytes: 37435354
+	 rx data pkts: 26616
+	 rx data bytes: 2212767
+	 rx ucast bytes: 1236363
+[VER 8] STA FC:3C:D7:CA:38:BB:
+	 tx total bytes: 40882538
+	 tx ucast pkts: 43770
+	 tx ucast bytes: 3447184
+	 tx mcast/bcast bytes: 37435354
+	 rx data pkts: 55474
+	 rx data bytes: 11725884
+	 rx ucast bytes: 10900828
+[VER 8] STA F4:CF:A2:1E:72:64:
+	 tx total bytes: 37869876
+	 tx ucast pkts: 6257
+	 tx ucast bytes: 434522
+	 tx mcast/bcast bytes: 37435354
+	 rx data pkts: 22619
+	 rx data bytes: 8013496
+	 rx ucast bytes: 7843100
+## wl12
+sys_rx_bytes 145030729
+sys_tx_bytes 161086873
+sys_rx_packets 146150
+sys_tx_packets 412763
+txframe 412763 txbyte 161086873 txerror 311 rxframe 146150 rxbyte 145030729 rxerror 0 
+[VER 8] STA D2:F7:E5:58:6F:89:
+	 tx total bytes: 37701423
+	 tx ucast pkts: 901
+	 tx ucast bytes: 409725
+	 tx mcast/bcast bytes: 37291698
+	 rx data pkts: 1608
+	 rx data bytes: 297865
+	 rx ucast bytes: 291845
+[VER 8] STA A6:7B:63:9F:25:40:
+	 tx total bytes: 39189513
+	 tx ucast pkts: 2995
+	 tx ucast bytes: 1897815
+	 tx mcast/bcast bytes: 37291698
+	 rx data pkts: 3966
+	 rx data bytes: 804328
+	 rx ucast bytes: 803776
+[VER 8] STA 88:57:1D:BB:BB:86:
+	 tx total bytes: 39634554
+	 tx ucast pkts: 10931
+	 tx ucast bytes: 2342856
+	 tx mcast/bcast bytes: 37291698
+	 rx data pkts: 44714
+	 rx data bytes: 10246785
+	 rx ucast bytes: 9977702
+## wl13
+sys_rx_bytes 606932435
+sys_tx_bytes 1328482345
+sys_rx_packets 733105
+sys_tx_packets 1353948
+txframe 1353958 txbyte 1328493607 txerror 78 rxframe 733105 rxbyte 606932435 rxerror 0 
+[VER 8] STA 3A:C1:26:FB:CE:2C:
+	 tx total bytes: 87820665
+	 tx ucast pkts: 50943
+	 tx ucast bytes: 50531469
+	 tx mcast/bcast bytes: 37289196
+	 rx data pkts: 55230
+	 rx data bytes: 54670296
+	 rx ucast bytes: 54670032
+[VER 8] STA F0:77:C3:A6:6F:30:
+	 tx total bytes: 46947663
+	 tx ucast pkts: 12151
+	 tx ucast bytes: 9658467
+	 tx mcast/bcast bytes: 37289196
+	 rx data pkts: 13155
+	 rx data bytes: 2018193
+	 rx ucast bytes: 1934998
+## eth1
+sys_rx_bytes 1460719196
+sys_tx_bytes 761638628
+=== sample 18769.68
+## wl02
+sys_rx_bytes 25578947
+sys_tx_bytes 64564517
+sys_rx_packets 89752
+sys_tx_packets 408112
+txframe 408112 txbyte 64564517 txerror 455 rxframe 89752 rxbyte 25578947 rxerror 0 
+[VER 8] STA C8:5C:CC:D1:2E:C7:
+	 tx total bytes: 37524722
+	 tx ucast pkts: 32
+	 tx ucast bytes: 6896
+	 tx mcast/bcast bytes: 37517826
+	 rx data pkts: 267
+	 rx data bytes: 20368
+	 rx ucast bytes: 17748
+[VER 8] STA 8C:BF:EA:1D:BA:74:
+	 tx total bytes: 37557140
+	 tx ucast pkts: 351
+	 tx ucast bytes: 39314
+	 tx mcast/bcast bytes: 37517826
+	 rx data pkts: 498
+	 rx data bytes: 101057
+	 rx ucast bytes: 81353
+[VER 8] STA F8:17:2D:6A:16:CC:
+	 tx total bytes: 37968826
+	 tx ucast pkts: 3615
+	 tx ucast bytes: 451000
+	 tx mcast/bcast bytes: 37517826
+	 rx data pkts: 26659
+	 rx data bytes: 2216065
+	 rx ucast bytes: 1238237
+[VER 8] STA FC:3C:D7:CA:38:BB:
+	 tx total bytes: 40971034
+	 tx ucast pkts: 43844
+	 tx ucast bytes: 3453208
+	 tx mcast/bcast bytes: 37517826
+	 rx data pkts: 55570
+	 rx data bytes: 11744579
+	 rx ucast bytes: 10918331
+[VER 8] STA F4:CF:A2:1E:72:64:
+	 tx total bytes: 37952960
+	 tx ucast pkts: 6266
+	 tx ucast bytes: 435134
+	 tx mcast/bcast bytes: 37517826
+	 rx data pkts: 22655
+	 rx data bytes: 8026077
+	 rx ucast bytes: 7855261
+## wl12
+sys_rx_bytes 145076630
+sys_tx_bytes 162556877
+sys_rx_packets 146466
+sys_tx_packets 414327
+txframe 414327 txbyte 162556877 txerror 312 rxframe 146466 rxbyte 145076630 rxerror 0 
+[VER 8] STA D2:F7:E5:58:6F:89:
+	 tx total bytes: 37839657
+	 tx ucast pkts: 967
+	 tx ucast bytes: 465769
+	 tx mcast/bcast bytes: 37373888
+	 rx data pkts: 1744
+	 rx data bytes: 313853
+	 rx ucast bytes: 306305
+[VER 8] STA A6:7B:63:9F:25:40:
+	 tx total bytes: 40603285
+	 tx ucast pkts: 4061
+	 tx ucast bytes: 3229397
+	 tx mcast/bcast bytes: 37373888
+	 rx data pkts: 4263
+	 rx data bytes: 842303
+	 rx ucast bytes: 841751
+[VER 8] STA 88:57:1D:BB:BB:86:
+	 tx total bytes: 39716932
+	 tx ucast pkts: 10933
+	 tx ucast bytes: 2343044
+	 tx mcast/bcast bytes: 37373888
+	 rx data pkts: 44769
+	 rx data bytes: 10249449
+	 rx ucast bytes: 9980252
+## wl13
+sys_rx_bytes 611091191
+sys_tx_bytes 1332415856
+sys_rx_packets 737152
+sys_tx_packets 1358379
+txframe 1358380 txbyte 1332427734 txerror 79 rxframe 737154 rxbyte 611091462 rxerror 0 
+[VER 8] STA 3A:C1:26:FB:CE:2C:
+	 tx total bytes: 91741734
+	 tx ucast pkts: 54860
+	 tx ucast bytes: 54370280
+	 tx mcast/bcast bytes: 37371454
+	 rx data pkts: 59144
+	 rx data bytes: 58848492
+	 rx ucast bytes: 58848228
+[VER 8] STA F0:77:C3:A6:6F:30:
+	 tx total bytes: 47042979
+	 tx ucast pkts: 12225
+	 tx ucast bytes: 9671525
+	 tx mcast/bcast bytes: 37371454
+	 rx data pkts: 13289
+	 rx data bytes: 2032193
+	 rx ucast bytes: 1948998
+## eth1
+sys_rx_bytes 1466065197
+sys_tx_bytes 765753736
+=== sample 18790.60
+## wl02
+sys_rx_bytes 25617785
+sys_tx_bytes 64662621
+sys_rx_packets 89886
+sys_tx_packets 408654
+txframe 408654 txbyte 64662621 txerror 455 rxframe 89886 rxbyte 25617785 rxerror 0 
+[VER 8] STA C8:5C:CC:D1:2E:C7:
+	 tx total bytes: 37614077
+	 tx ucast pkts: 51
+	 tx ucast bytes: 12862
+	 tx mcast/bcast bytes: 37601215
+	 rx data pkts: 436
+	 rx data bytes: 36512
+	 rx ucast bytes: 33796
+[VER 8] STA 8C:BF:EA:1D:BA:74:
+	 tx total bytes: 37641464
+	 tx ucast pkts: 358
+	 tx ucast bytes: 40249
+	 tx mcast/bcast bytes: 37601215
+	 rx data pkts: 510
+	 rx data bytes: 102751
+	 rx ucast bytes: 82555
+[VER 8] STA F8:17:2D:6A:16:CC:
+	 tx total bytes: 38052953
+	 tx ucast pkts: 3621
+	 tx ucast bytes: 451738
+	 tx mcast/bcast bytes: 37601215
+	 rx data pkts: 26695
+	 rx data bytes: 2219187
+	 rx ucast bytes: 1239935
+[VER 8] STA FC:3C:D7:CA:38:BB:
+	 tx total bytes: 41060819
+	 tx ucast pkts: 43922
+	 tx ucast bytes: 3459604
+	 tx mcast/bcast bytes: 37601215
+	 rx data pkts: 55666
+	 rx data bytes: 11764974
+	 rx ucast bytes: 10937236
+[VER 8] STA F4:CF:A2:1E:72:64:
+	 tx total bytes: 38037029
+	 tx ucast pkts: 6276
+	 tx ucast bytes: 435814
+	 tx mcast/bcast bytes: 37601215
+	 rx data pkts: 22694
+	 rx data bytes: 8038842
+	 rx ucast bytes: 7867606
+## wl12
+sys_rx_bytes 145210285
+sys_tx_bytes 162776619
+sys_rx_packets 146793
+sys_tx_packets 415028
+txframe 415028 txbyte 162776619 txerror 312 rxframe 146793 rxbyte 145210285 rxerror 0 
+[VER 8] STA D2:F7:E5:58:6F:89:
+	 tx total bytes: 38051285
+	 tx ucast pkts: 1182
+	 tx ucast bytes: 594008
+	 tx mcast/bcast bytes: 37457277
+	 rx data pkts: 2022
+	 rx data bytes: 440664
+	 rx ucast bytes: 432108
+[VER 8] STA A6:7B:63:9F:25:40:
+	 tx total bytes: 40691187
+	 tx ucast pkts: 4108
+	 tx ucast bytes: 3233910
+	 tx mcast/bcast bytes: 37457277
+	 rx data pkts: 4359
+	 rx data bytes: 851269
+	 rx ucast bytes: 850717
+[VER 8] STA 88:57:1D:BB:BB:86:
+	 tx total bytes: 39803922
+	 tx ucast pkts: 10950
+	 tx ucast bytes: 2346645
+	 tx mcast/bcast bytes: 37457277
+	 rx data pkts: 44958
+	 rx data bytes: 10260398
+	 rx ucast bytes: 9990273
+## wl13
+sys_rx_bytes 611469483
+sys_tx_bytes 1332848594
+sys_rx_packets 737666
+sys_tx_packets 1359227
+txframe 1359227 txbyte 1332848594 txerror 79 rxframe 737666 rxbyte 611469483 rxerror 0 
+[VER 8] STA 3A:C1:26:FB:CE:2C:
+	 tx total bytes: 92127356
+	 tx ucast pkts: 55204
+	 tx ucast bytes: 54672581
+	 tx mcast/bcast bytes: 37454775
+	 rx data pkts: 59602
+	 rx data bytes: 59219996
+	 rx ucast bytes: 59219732
+[VER 8] STA F0:77:C3:A6:6F:30:
+	 tx total bytes: 47161538
+	 tx ucast pkts: 12307
+	 tx ucast bytes: 9706763
+	 tx mcast/bcast bytes: 37454775
+	 rx data pkts: 13423
+	 rx data bytes: 2048823
+	 rx ucast bytes: 1965296
+## eth1
+sys_rx_bytes 1466646721
+sys_tx_bytes 766285488

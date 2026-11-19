@@ -1,0 +1,113 @@
+1|0|1660|procd|/sbin/procd 
+10|2|0|migration/0|
+10405|1|4268|hostapd|hostapd -B -P /tmp/wl0_hapd.pid /tmp/wl0_hapd.conf 
+10420|1|1584|sync-server|/usr/bin/sync-server 
+10480|1|364|uhttpd|/usr/sbin/uhttpd -f -p 127.0.0.1:20003 -D -h /var/firmwares 
+1051|2|0|bcmsw_rx|
+1054|2|0|bcmsw_recycle|
+10555|1|1904|eapd|eapd 
+10701|1|4384|hostapd|hostapd -B -P /tmp/wl1_hapd.pid /tmp/wl1_hapd.conf 
+10717|1|2460|tmpsvr|/usr/bin/tmpsvr 
+1078|2|0|enet-kthrd|
+11|2|0|watchdog/0|
+1110|2|0|cfg80211|
+11295|1|2284|apsd|/usr/bin/apsd -c /tmp/apsd.json 
+11354|1|2824|philips-hue|/usr/bin/philips-hue 
+11549|1|3884|cloud-brd|/usr/bin/cloud-brd -c /etc/cloud_config.cfg 
+11635|1|444|cloud-client|/usr/bin/cloud-client 
+12|2|0|watchdog/1|
+12201|1|1784|imsnoop|/usr/sbin/imsnoop -d -C /tmp/ims.conf 
+12493|1|2108|acsd2|acsd2 
+12702|1|1804|msgcenterd|/usr/bin/msgcenterd 
+13|2|0|migration/1|
+13515|1|2624|nrd|/usr/sbin/nrd -d -C /tmp/nrd.conf /tmp/nrd_link_pri.conf 
+14|2|0|ksoftirqd/1|
+150|2|0|writeback|
+152|2|0|crypto|
+154|2|0|bioset|
+15574|2|0|kworker/0:24|
+156|2|0|kblockd|
+16|2|0|kworker/1:0H|
+166|2|0|skb_free_task|
+17|2|0|watchdog/2|
+178|2|0|rpciod|
+18|2|0|migration/2|
+18028|2|0|kworker/2:0|
+189|2|0|kswapd0|
+19|2|0|ksoftirqd/2|
+190|2|0|fsnotify_mark|
+191|2|0|nfsiod|
+2|0|0|kthreadd|
+2000|2|0|kworker/0:0|
+21|2|0|kworker/2:0H|
+22|2|0|watchdog/3|
+22119|2|0|kworker/0:2|
+22386|1|252|dropbear|/data/dropbear -p 22 -r /data/ssh_host_ed25519 -s -j -k 
+23|2|0|migration/3|
+2338|2|0|kworker/u8:2|
+2341|1|1604|dropbear|/usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -r /etc/dropbear/dropbear_ecdsa_host_key -r /etc/dropbear/dropbear_rsa_2048_host_key -p 20001 -K 300 
+2372|1|3116|logd|/sbin/logd -S 1024 
+24|2|0|ksoftirqd/3|
+2426|1|280|leds|/usr/bin/leds -l i 
+24401|2|0|kworker/1:1|
+25|2|0|kworker/3:0|
+25351|2|0|kworker/1:0|
+26|2|0|kworker/3:0H|
+2604|1|1800|netifd|/sbin/netifd 
+27|2|0|khelper|
+28|2|0|kdevtmpfs|
+28070|2|0|kworker/2:2|
+28304|1|1868|ntpd|/usr/sbin/ntpd -n -C -p us.pool.ntp.org -p north-america.pool.ntp.org -p 3.android.pool.ntp.org -p 2.android.pool.ntp.org -p 1.android.pool.ntp.org -p 0.android.pool.ntp.org -p nz.pool.ntp.org 
+29319|2|0|kworker/0:1|
+3|2|0|ksoftirqd/0|
+3025|1|1948|awnd|/usr/sbin/awnd -C /tmp/auto-wifi-network.conf 
+313|2|0|btnhandler0|
+318|2|0|linkwatch|
+319|2|0|ipv6_addrconf|
+331|2|0|deferwq|
+336|2|0|ubi_bgt0d|
+343|2|0|kworker/3:1|
+428|2|0|ubi_bgt1d|
+447|2|0|ubifs_bgt1_0|
+474|2|0|ubi_bgt2d|
+494|2|0|ubifs_bgt2_0|
+5|2|0|kworker/0:0H|
+5419|2|0|wl0-kthrd|
+5440|2|0|wl1-kthrd|
+5870|1|1220|powermanager|/usr/sbin/powermanager 
+6|2|0|kworker/u8:0|
+6007|1|1820|smartipd|/usr/bin/smartipd -t lan -S 
+6537|1|492|login|/bin/login 
+6723|1|1352|tsched|/usr/sbin/tsched 
+6968|1|356|cloud-pfclient|/usr/bin/cloud-pfclient 
+7|2|0|rcu_preempt|
+7209|22386|268|dropbear|/data/dropbear -p 22 -r /data/ssh_host_ed25519 -s -j -k -2 9 
+7210|7209|1816|ash|ash -c for p in /proc/[0-9]*; do pid=${p#/proc/}; c=$(tr "\0" " " < $p/cmdline 2>/dev/null); r=$(grep VmRSS $p/status 2>/dev/null | awk "{print \$2}"); pp=$(grep PPid $p/status 2>/dev/null | awk "{print \$2}"); n=$(grep ^Name $p/status | awk "{print \$2}"); echo "$pid|$pp|${r:-0}|$n|$c"; done 
+7402|1|2232|tfstats|/usr/sbin/tfstats 
+7501|1|2368|uhttpd|/usr/sbin/uhttpd -f -h /www -r X20 -x /cgi-bin -t 60 -T 30 -A 1 -n 3 -S -D -R -p 0.0.0.0:80 -p [::]:80 -C /etc/uhttpd.crt -K /etc/uhttpd.key -s 0.0.0.0:443 -s [::]:443 
+7532|1|1132|dhcp_hook_d|/usr/bin/dhcp_hook_d 
+7552|1|1560|wanDetection|/usr/bin/wanDetection 
+7581|1|1748|conn-indicator|/usr/sbin/conn-indicator -l i 
+7686|1|2036|tipc-server|/usr/sbin/tipc-server -l i 
+7710|1|372|server-probe|/usr/sbin/server-probe -l n 
+7742|2|0|url_send|
+7995|1|484|wpsd|/usr/sbin/wpsd -c /etc/wpsd.conf -l i 
+8|2|0|rcu_sched|
+8193|1|2152|iot-wifi-center|/usr/bin/iot-wifi-center 
+822|1|1036|ubusd|/sbin/ubusd 
+8458|1|2632|iot-netdev|/usr/bin/iot-netdev 
+8471|1|3480|iot-tapo|/usr/bin/iot-tapo 
+8499|1|2208|iot-tpra|/usr/bin/iot-tpra 
+8882|1|2592|client_mgmt|/usr/bin/client_mgmt 
+8883|1|548|client_upload|/usr/bin/client_upload 
+8999|1|800|cloud-https|/usr/bin/cloud-https 
+9|2|0|rcu_bh|
+9028|1|2132|cloud-proxy|/usr/bin/cloud-proxy -c /etc/cloud_config.cfg 
+9205|2341|1700|dropbear|/usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -r /etc/dropbear/dropbear_ecdsa_host_key -r /etc/dropbear/dropbear_rsa_2048_host_key -p 20001 -K 300 
+9245|2|0|kworker/2:1|
+955|2|0|fc_evt|
+956|2|0|fc_timer|
+957|2|0|bcmFlwStatsTask|
+971|2|0|bcm_archer_us|
+976|2|0|bcm_archer_wlan|
+9856|1|584|msg_server|/usr/bin/msg_server 
