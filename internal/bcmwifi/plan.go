@@ -457,12 +457,12 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 
 	_, takeover := ls.TPLink[p]
 	reconcile := takeover || len(phy) > 0
-	var acl *aclLive // only the station ACLs changed: updated in place (acllive.go)
+	var acl *aclLive // only station ACLs or live settings changed: updated in place (acllive.go)
 	if len(hr.BSS) > 0 {
 		acl = a.planACLLive(p, conf, drv, files)
 		// sameConf: the FT-SAE peer lines are added live (SyncFTPeers), not
 		// by a restart.
-		reconcile = reconcile || !ls.Ours[p] || !a.sameConf(confPath(a.o.RunDir, p), conf) ||
+		reconcile = reconcile || !ls.Ours[p] || !acl.covers(confPath(a.o.RunDir, p)) && !a.sameConf(confPath(a.o.RunDir, p), conf) ||
 			!acl.covers(drvPath(a.o.RunDir, p)) && !a.sameFile(drvPath(a.o.RunDir, p), drvJSON)
 		for _, f := range files {
 			if f.Kind == StepWrite && !acl.covers(f.Path) && f.Path != confPath(a.o.RunDir, p) && !a.sameFile(f.Path, f.Data) {

@@ -5,6 +5,7 @@ package bcmwifi
 import (
 	"context"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -237,14 +238,15 @@ func TestLockToAPAllowListWithMACAuthSkipsHostapdAccept(t *testing.T) {
 	}
 }
 
-// Anything besides the station ACLs still reconciles the radio in full.
+// Anything besides the station ACLs and the live settings still reconciles
+// the radio in full.
 func TestLockToAPWithOtherChangeStillReconciles(t *testing.T) {
 	f, a := appliedUnit(t, twoSSIDs())
 	d := withDeny(twoSSIDs(), lockedMAC)
-	d.SSIDs[1].Hidden = true
+	d.SSIDs[1].UAPSD = !d.SSIDs[1].UAPSD
 	p := planApply(t, a, d)
 	if !p.disruptive || !restarted(f) {
-		t.Fatalf("a hidden-SSID change with a lock change was not a full reconcile:\n%s", p)
+		t.Fatalf("a U-APSD change with a lock change was not a full reconcile:\n%s", p)
 	}
 	if got := fileLines(t, f, "/tmp/udeco/wl12.deny"); strings.Join(got, " ") != lockedMAC {
 		t.Errorf("wl12.deny = %v", got)
@@ -278,9 +280,9 @@ func TestLockToAPWithDriverStateDriftReconciles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	drifted := strings.Replace(string(b), `"bss_maxassoc": `, `"bss_maxassoc": 1`, 1)
+	drifted := strings.Replace(string(b), `"rrm": "`, `"rrm": "0x1`, 1)
 	if drifted == string(b) {
-		t.Fatalf("no bss_maxassoc in %s", b)
+		t.Fatalf("no rrm in %s", b)
 	}
 	if err := os.WriteFile(p, []byte(drifted), 0o644); err != nil {
 		t.Fatal(err)
@@ -307,5 +309,125 @@ func TestLockToAPUnreadableDriverStateReconciles(t *testing.T) {
 	}
 	if !p.disruptive {
 		t.Errorf("planned live without a readable driver state:\n%s", p)
+	}
+}
+
+// Hide SSID, client isolation, max clients and multicast enhancement are
+// taken by the running BSS (driver iovar plus hostapd SET): no hostapd
+// restart, no radio down/up, and the conf file holds the new value for the
+// next start. The other SSIDs of the radio are not touched.
+func TestSettingsAppliedLive(t *testing.T) {
+	ctx := context.Background()
+	f, a := appliedUnit(t, twoSSIDs())
+
+	d := twoSSIDs()
+	d.SSIDs[1].Hidden = true
+	d.SSIDs[1].Isolation = true
+	d.SSIDs[1].MulticastToUnicast = true
+	na := d.Radios["na"]
+	na.MaxClients = 64
+	d.Radios["na"] = na
+	p := planApply(t, a, d)
+	if p.disruptive || restarted(f) {
+		t.Fatalf("settings change restarted hostapd:\n%s", p)
+	}
+	if f.called("wl -i wl1 down") || f.called("wl -i wl0 down") {
+		t.Fatalf("settings change took a radio down:\n%s", p)
+	}
+	for _, want := range []string{
+		"wl -i wl12 closednet 1", "wl -i wl12 ap_isolate 1", "wl -i wl12 bss_maxassoc 64", "wl -i wl12 wmf_bss_enable 1",
+		"hostapd_cli -p /var/run/udeco-hostapd -i wl12 set ignore_broadcast_ssid 1",
+		"hostapd_cli -p /var/run/udeco-hostapd -i wl12 set ap_isolate 1",
+		"hostapd_cli -p /var/run/udeco-hostapd -i wl12 set max_num_sta 64",
+		"hostapd_cli -p /var/run/udeco-hostapd -i wl12 set multicast_to_unicast 1",
+		"wl -i wl02 closednet 1",
+	} {
+		if !f.called(want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if f.called("wl -i wl02 bss_maxassoc") || f.called("-i wl03 closednet") || f.called("-i wl03 ap_isolate") || f.called("-i wl03 set ") {
+		t.Errorf("a radio or SSID the change does not concern was touched:\n%s", p)
+	}
+	conf := string(mustRead(t, f, "/tmp/udeco/hapd-wl1.conf"))
+	for _, want := range []string{"ignore_broadcast_ssid=1", "ap_isolate=1", "max_num_sta=64", "multicast_to_unicast=1"} {
+		if !strings.Contains(conf, "\n"+want+"\n") {
+			t.Errorf("hapd-wl1.conf lacks %s", want)
+		}
+	}
+	if p, _ := a.Plan(ctx, d); !p.Empty() {
+		t.Errorf("plan after the live update not empty:\n%s", p)
+	}
+
+	// And back, together with a lock change: still live.
+	f.reset()
+	p = planApply(t, a, withDeny(twoSSIDs(), lockedMAC))
+	if p.disruptive || restarted(f) {
+		t.Fatalf("settings revert with a lock change restarted hostapd:\n%s", p)
+	}
+	for _, want := range []string{
+		"wl -i wl12 closednet 0", "hostapd_cli -p /var/run/udeco-hostapd -i wl12 set multicast_to_unicast 0",
+		"hostapd_cli -p /var/run/udeco-hostapd -i wl12 DENY_ACL ADD_MAC " + lockedMAC,
+	} {
+		if !f.called(want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if p, _ := a.Plan(ctx, withDeny(twoSSIDs(), lockedMAC)); !p.Empty() {
+		t.Errorf("plan after the revert not empty:\n%s", p)
+	}
+}
+
+// 802.11k (wl rrm is refused unless the whole radio is down), an SSID
+// rename, a passphrase or an added SSID still reconcile the radio in full.
+func TestNonLiveSettingsReconcile(t *testing.T) {
+	for name, mod := range map[string]func(*Desired){
+		"802.11k":    func(d *Desired) { d.SSIDs[1].RRM = !d.SSIDs[1].RRM },
+		"rename":     func(d *Desired) { d.SSIDs[1].SSID = "Renamed" },
+		"passphrase": func(d *Desired) { d.SSIDs[1].Passphrase = "another-passphrase-2" },
+		"hidden+dtim": func(d *Desired) {
+			d.SSIDs[1].Hidden = true
+			d.SSIDs[1].DTIM = map[string]int{"na": 3, "ng": 3}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, a := appliedUnit(t, twoSSIDs())
+			d := twoSSIDs()
+			mod(&d)
+			if p := planApply(t, a, d); !p.disruptive || !restarted(f) {
+				t.Errorf("applied live:\n%s", p)
+			}
+		})
+	}
+}
+
+func mustRead(t *testing.T, f *fakeDev, p string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(f.path(p))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+func TestConfLiveDiff(t *testing.T) {
+	base := "interface=wl11\nssid=ph\nignore_broadcast_ssid=1\nbss=wl12\nssid=A\nignore_broadcast_ssid=0\nmax_num_sta=128\nbss=wl13\nssid=B\nignore_broadcast_ssid=0\n"
+	for _, c := range []struct {
+		name, new string
+		want      []confSet
+		ok        bool
+	}{
+		{"same", base, nil, true},
+		{"hide wl13", strings.Replace(base, "ssid=B\nignore_broadcast_ssid=0", "ssid=B\nignore_broadcast_ssid=1", 1), []confSet{{"wl13", "ignore_broadcast_ssid", "1"}}, true},
+		{"m2u added", base + "multicast_to_unicast=1\n", []confSet{{"wl13", "multicast_to_unicast", "1"}}, true},
+		{"placeholder changed", strings.Replace(base, "ignore_broadcast_ssid=1", "ignore_broadcast_ssid=0", 1), nil, false},
+		{"static changed", strings.Replace(base, "ssid=A", "ssid=C", 1), nil, false},
+		{"bss removed", strings.Split(base, "bss=wl13")[0], nil, false},
+		{"ft peers ignored", base + "r0kh=x\n", nil, true},
+	} {
+		got, ok := confLiveDiff([]byte(base), []byte(c.new))
+		if ok != c.ok || !slices.Equal(got, c.want) {
+			t.Errorf("%s: got %v %v, want %v %v", c.name, got, ok, c.want, c.ok)
+		}
 	}
 }

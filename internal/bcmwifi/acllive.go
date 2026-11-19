@@ -5,6 +5,9 @@ package bcmwifi
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
+	"sort"
+	"strings"
 )
 
 // Live station-ACL updates (Lock to AP, docs/deco/features/lock-to-ap.md).
@@ -30,6 +33,19 @@ import (
 // themselves still come from computeACL, so the block list and the per-SSID
 // filter (with its lock2ap entries) are one union and neither clobbers the
 // other.
+//
+// The same in-place update carries the per-SSID settings the X20 takes
+// while the BSS runs (verified on .205, 2026-11-19: hostapd 2.9 answers OK
+// to SET and stays ENABLED, the driver accepts the iovar with the radio up
+// and its other BSSes keep their stations): hide SSID (closednet,
+// ignore_broadcast_ssid), client isolation (ap_isolate), max clients
+// (bss_maxassoc, max_num_sta) and multicast enhancement (wmf_bss_enable,
+// multicast_to_unicast). The driver iovar does the work; hostapd's SET keeps
+// its in-memory conf in line for any beacon it pushes later, and the conf
+// file holds the value for its next start. Everything else (SSID, security,
+// keys, FT, DTIM, U-APSD, 802.11k: wl rrm is refused unless the whole radio
+// is down, and a radio down/up drops every station) still reconciles the
+// radio in full.
 
 // aclLive is the in-place update of one radio's station ACLs. A nil
 // *aclLive means the radio's change is not ACL-only (or there is none); its
@@ -40,16 +56,28 @@ type aclLive struct {
 	steps []Step
 }
 
-// planACLLive returns the in-place ACL update for the radio whose primary
-// is primary, when the hostapd conf is unchanged and drv differs from the
+// planACLLive returns the in-place update for the radio whose primary is
+// primary, when the hostapd conf differs from the running one only in
+// liveConfKeys of its SSID sections (or not at all) and drv differs from the
 // stored driver state only in the station ACLs (deny/accept lists and the
-// driver MAC filter derived from them). files are planRadio's file steps for
-// the radio (ACL files, driver state, hostapd conf). It returns nil when
-// anything else changed, or nothing did.
+// driver MAC filter derived from them) and the live settings (liveDriver).
+// files are planRadio's file steps for the radio (ACL files, driver state,
+// hostapd conf). It returns nil when anything else changed, or nothing did.
 func (a *Applier) planACLLive(primary string, conf []byte, drv []vifDriver, files []Step) *aclLive {
 	run := a.o.RunDir
-	if len(drv) == 0 || !a.sameConf(confPath(run, primary), conf) {
+	if len(drv) == 0 {
 		return nil
+	}
+	var sets []confSet
+	if !a.sameConf(confPath(run, primary), conf) {
+		old, err := a.readFile(confPath(run, primary))
+		if err != nil {
+			return nil
+		}
+		var ok bool
+		if sets, ok = confLiveDiff(old, conf); !ok {
+			return nil
+		}
 	}
 	b, err := a.readFile(drvPath(run, primary))
 	if err != nil {
@@ -60,11 +88,19 @@ func (a *Applier) planACLLive(primary string, conf []byte, drv []vifDriver, file
 		return nil
 	}
 	l := &aclLive{prev: map[string]vifDriver{}, paths: map[string]bool{drvPath(run, primary): true}}
-	changed := false
+	if len(sets) > 0 {
+		l.paths[confPath(run, primary)] = true
+	}
+	changed := len(sets) > 0
+	var settings []Step
 	for i, d := range drv {
 		p := prev[i]
-		if p.Vif != d.Vif || p.Allow != d.Allow || !sameNonACL(p, d) {
+		if p.Vif != d.Vif || p.Allow != d.Allow || !sameStatic(p, d) {
 			return nil
+		}
+		if st := liveDriverSteps(p, d); len(st) > 0 {
+			settings = append(settings, st...)
+			changed = true
 		}
 		l.prev[d.Vif] = p
 		l.paths[denyPath(run, d.Vif)] = true
@@ -79,7 +115,7 @@ func (a *Applier) planACLLive(primary string, conf []byte, drv []vifDriver, file
 	}
 	for _, f := range files {
 		switch {
-		case f.Kind == StepWrite && f.Path == confPath(run, primary):
+		case f.Kind == StepWrite && f.Path == confPath(run, primary) && len(sets) == 0:
 			// unchanged (checked above)
 		case !l.paths[f.Path]:
 			return nil // a file this update does not own: full reconcile
@@ -90,6 +126,14 @@ func (a *Applier) planACLLive(primary string, conf []byte, drv []vifDriver, file
 		default:
 			l.steps = append(l.steps, f)
 		}
+	}
+	// The settings: driver iovars (they do the work), then hostapd's
+	// in-memory conf (optional: the conf file above holds it for the next
+	// start; hostapd_cli matches "set" exactly).
+	l.steps = append(l.steps, settings...)
+	for _, c := range sets {
+		l.steps = append(l.steps, onVif(c.Vif, optStep("hostapd "+c.Key+" "+c.Value+" on "+c.Vif,
+			"hostapd_cli", "-p", CtrlDir, "-i", c.Vif, "set", c.Key, c.Value)))
 	}
 	// hostapd's in-memory lists, by difference (never CLEAR: with
 	// macaddr_acl=1 an emptied accept list disassociates every station of
@@ -178,15 +222,116 @@ func (l *aclLive) Steps() []Step {
 	return l.steps
 }
 
-// sameNonACL compares two vif driver states with their station ACLs (and
-// the driver MAC filter derived from them) left out.
-func sameNonACL(x, y vifDriver) bool {
+// sameStatic compares two vif driver states with their station ACLs (and
+// the driver MAC filter derived from them) and the live settings
+// (liveDriverSteps) left out.
+func sameStatic(x, y vifDriver) bool {
 	strip := func(d vifDriver) []byte {
 		d.Macmode, d.Maclist, d.DenyACL, d.AcceptACL = 0, nil, nil, nil
+		d.Closed, d.Isolate, d.MaxAssoc, d.WMF = 0, 0, 0, 0
 		b, _ := json.Marshal(d)
 		return b
 	}
 	return bytes.Equal(strip(x), strip(y))
+}
+
+// liveDriverSteps sets the iovars the driver takes on a running BSS
+// (closednet, ap_isolate, bss_maxassoc, wmf_bss_enable: verified live on
+// .205) where want differs from the stored state cur.
+func liveDriverSteps(cur, want vifDriver) []Step {
+	var st []Step
+	set := func(c, w int, iovar string) {
+		if c != w {
+			st = append(st, onVif(want.Vif, cmdStep("set "+want.Vif+" "+iovar, "wl", "-i", want.Vif, iovar, itoa(w))))
+		}
+	}
+	set(cur.Closed, want.Closed, "closednet")
+	set(cur.Isolate, want.Isolate, "ap_isolate")
+	set(cur.MaxAssoc, want.MaxAssoc, "bss_maxassoc")
+	set(cur.WMF, want.WMF, "wmf_bss_enable")
+	return st
+}
+
+// liveConfKeys are the hostapd BSS keys taken live (SET), each with the
+// value hostapd assumes when its line is absent.
+var liveConfKeys = map[string]string{
+	"ignore_broadcast_ssid": "0",
+	"ap_isolate":            "0",
+	"max_num_sta":           "2007",
+	"multicast_to_unicast":  "0",
+}
+
+// confSet is one hostapd SET for a BSS.
+type confSet struct{ Vif, Key, Value string }
+
+// liveSection is one BSS section of a hostapd conf: the interface= section
+// (vif "") or a bss= one, its lines other than liveConfKeys in order, and
+// its liveConfKeys values.
+type liveSection struct {
+	vif    string
+	static []string
+	live   map[string]string
+}
+
+func liveSections(conf []byte) ([]liveSection, bool) {
+	secs := []liveSection{{live: map[string]string{}}}
+	for _, line := range strings.Split(string(conf), "\n") {
+		if line == "" {
+			continue
+		}
+		k, v, _ := strings.Cut(line, "=")
+		if k == "bss" {
+			secs = append(secs, liveSection{vif: v, live: map[string]string{}})
+		}
+		cur := &secs[len(secs)-1]
+		if _, isLive := liveConfKeys[k]; isLive && cur.vif != "" {
+			if _, dup := cur.live[k]; dup {
+				return nil, false
+			}
+			cur.live[k] = v
+			continue
+		}
+		cur.static = append(cur.static, line)
+	}
+	return secs, true
+}
+
+// confLiveDiff returns the SETs that turn the running conf old into new, and
+// false when they differ in anything else (FT-SAE peer lines aside: those
+// are synced live by SyncFTPeers). The interface= section (the hidden
+// placeholder) must match as a whole.
+func confLiveDiff(old, new []byte) ([]confSet, bool) {
+	ol, ok1 := liveSections(stripFTPeers(old))
+	nl, ok2 := liveSections(stripFTPeers(new))
+	if !ok1 || !ok2 || len(ol) != len(nl) {
+		return nil, false
+	}
+	var sets []confSet
+	for i := range ol {
+		o, n := ol[i], nl[i]
+		if o.vif != n.vif || !slices.Equal(o.static, n.static) {
+			return nil, false
+		}
+		var keys []string
+		for k := range liveConfKeys {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			ov, ook := o.live[k]
+			nv, nok := n.live[k]
+			if !ook {
+				ov = liveConfKeys[k]
+			}
+			if !nok {
+				nv = liveConfKeys[k]
+			}
+			if ov != nv {
+				sets = append(sets, confSet{Vif: n.vif, Key: k, Value: nv})
+			}
+		}
+	}
+	return sets, true
 }
 
 // sameSet reports whether xs and ys hold the same MACs.
