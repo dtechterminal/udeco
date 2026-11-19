@@ -148,6 +148,7 @@ type timing struct {
 	lldpEvery     time.Duration // LLDP transmit interval (30 s)
 	selfCheck     time.Duration // R10 self-check summary (5 min)
 	informTO      time.Duration // one inform POST, connect to last byte (10 s)
+	logPoll       time.Duration // remote syslog on jio-mtk: log file poll (1 s; logfollow.go)
 }
 
 func (t *timing) fill() {
@@ -174,6 +175,7 @@ func (t *timing) fill() {
 	def(&t.lldpEvery, 30*time.Second)
 	def(&t.selfCheck, 5*time.Minute)
 	def(&t.informTO, 10*time.Second)
+	def(&t.logPoll, logPoll)
 }
 
 // options are the agent's environment; tests replace the edges.
@@ -274,6 +276,9 @@ type agent struct {
 	bg     sync.WaitGroup
 	worker workerState // Wi-Fi worker goroutine only
 	rs     radsecState // RadSec proxy (radsec.go); Wi-Fi worker goroutine only
+	// selfLog hands the agent's own log lines to remote syslog (platform
+	// jio-mtk, logfollow.go)
+	selfLog logTap
 }
 
 func newAgent(cfg *Config, o options) (*agent, error) {
@@ -325,7 +330,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 	}
 	a := &agent{cfg: cfg, o: o, t: o.t, scans: newScanner(), wake: make(chan struct{}, 1),
 		jobs: make(chan job, 32), adopt: make(chan device.AdoptRequest, 4), acks: make(chan string, 8)}
-	a.events = &eventLog{path: a.dev(filepath.Join(o.base, eventsFile)), root: o.root, clock: o.now, logf: o.logf}
+	a.events = &eventLog{path: a.dev(filepath.Join(o.base, eventsFile)), root: o.root, clock: o.now, logf: a.logf}
 	a.topo = newTopology()
 	// ports an earlier run took out of br-lan (loop guard; ramfs record)
 	a.topo.removed = loadLoopGuard(a.loopFilePath())
@@ -351,7 +356,10 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 // dev maps a device path onto the filesystem root.
 func (a *agent) dev(p string) string { return filepath.Join(a.o.root, p) }
 
-func (a *agent) logf(f string, args ...any) { a.o.logf(f, args...) }
+func (a *agent) logf(f string, args ...any) {
+	a.o.logf(f, args...)
+	a.selfLog.send(time.Now(), f, args...) // remote syslog on platform jio-mtk (logfollow.go)
+}
 
 func (a *agent) mode() string {
 	if a.takeover.Load() {
