@@ -7,9 +7,13 @@ package main
 // runner on that unit, run it for their band(s) and report scan_table only.
 
 import (
+	"context"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 )
 
@@ -24,9 +28,15 @@ func TestSiteSurveyConfig(t *testing.T) {
 	}
 	// the Deco scans with wl whatever the key says: accepted, ignored (and
 	// logged at start, TestSiteSurveyWiring)
-	deco := `{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","site_survey":true}`
+	deco := `{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","takeover":true,"site_survey":true}`
 	if _, err = parseConfig([]byte(deco)); err != nil {
 		t.Fatalf("Deco with site_survey: %v", err)
+	}
+	// observe mode runs no scans and claims no RF_SCAN: refused, as the
+	// other takeover-only keys, rather than accepted and logged as on
+	observe := strings.Replace(jio, `"takeover":true`, `"takeover":false`, 1)
+	if _, err = parseConfig([]byte(observe + `,"site_survey":true}`)); err == nil || !strings.Contains(err.Error(), "site_survey needs takeover") {
+		t.Errorf("site_survey without takeover: %v", err)
 	}
 	if _, err = parseConfig([]byte(jio + `,"site_survey":"yes"}`)); err == nil {
 		t.Error("site_survey \"yes\" accepted")
@@ -53,7 +63,7 @@ func TestSiteSurveyWiring(t *testing.T) {
 			t.Errorf("site_survey %v: start log %q", on, h.logs.all())
 		}
 	}
-	h := newHarness(t, func(c *Config, o *options) { c.SiteSurvey = true })
+	h := newHarness(t, func(c *Config, o *options) { c.Takeover, c.SiteSurvey = true, true })
 	if !strings.Contains(h.logs.all(), "site_survey: ignored") {
 		t.Errorf("Deco with site_survey: no log line: %q", h.logs.all())
 	}
@@ -76,13 +86,14 @@ func (c *ctl) all() []map[string]any {
 	return append([]map[string]any(nil), c.informs...)
 }
 
-// noSpectrumState: no inform claimed a spectrum run (spectrum_scanning or
-// quickscan_scanning true: their true -> false makes the controller store
-// the empty table), carried a spectrum_table or an EVT_AP_QuickScanEvent.
-func noSpectrumState(t *testing.T, h *harness) {
+// noSpectrumState: no inform claimed a spectrum run (spectrum_scanning
+// true; quickscan_scanning true too unless quick, the quick-scan survey,
+// which holds it while it runs: TestQuickScanSurveyHoldsFlag), carried a
+// spectrum_table or an EVT_AP_QuickScanEvent.
+func noSpectrumState(t *testing.T, h *harness, quick bool) {
 	t.Helper()
 	for i, m := range h.ctl.all() {
-		if m["spectrum_scanning"] == true || m["quickscan_scanning"] != nil {
+		if m["spectrum_scanning"] == true || (m["quickscan_scanning"] != nil && !(quick && m["quickscan_scanning"] == true)) {
 			t.Errorf("inform %d: spectrum_scanning %v quickscan_scanning %v", i, m["spectrum_scanning"], m["quickscan_scanning"])
 		}
 		if m["notif_payload"] != nil || m["inform_as_notif"] != nil {
@@ -118,9 +129,10 @@ func TestSpectrumCommandsRunSurvey(t *testing.T) {
 	for _, tc := range []struct {
 		cmd, log string
 		want     []string
+		quick    bool
 	}{
-		{`{"_type":"cmd","cmd":"quick-scan","scan-band":1,"scan-bw":40}`, "quick-scan", []string{"scan:na"}},
-		{`{"_type":"cmd","cmd":"spectrum-scan","spectrum-cfg":"","infinite":false}`, "spectrum-scan", []string{"scan:na", "scan:ng"}},
+		{`{"_type":"cmd","cmd":"quick-scan","scan-band":1,"scan-bw":40}`, "quick-scan", []string{"scan:na"}, true},
+		{`{"_type":"cmd","cmd":"spectrum-scan","spectrum-cfg":"","infinite":false}`, "spectrum-scan", []string{"scan:na", "scan:ng"}, false},
 	} {
 		h := newHarness(t, func(c *Config, o *options) {
 			c.Takeover = true
@@ -145,7 +157,7 @@ func TestSpectrumCommandsRunSurvey(t *testing.T) {
 		if !strings.Contains(h.logs.all(), tc.log+": no spectrum runner on this unit: neighbour site survey") {
 			t.Errorf("%s: no log of the survey instead: %q", tc.log, h.logs.all())
 		}
-		noSpectrumState(t, h)
+		noSpectrumState(t, h, tc.quick)
 	}
 }
 
@@ -169,7 +181,7 @@ func TestSpectrumCommandsWithoutSurvey(t *testing.T) {
 			t.Errorf("ran %s: %v", c, h.rec.list())
 		}
 	}
-	noSpectrumState(t, h)
+	noSpectrumState(t, h, false)
 }
 
 // An apply or rollback running (scanBlock) refuses the survey a spectrum
@@ -193,5 +205,91 @@ func TestSpectrumSurveyBlocked(t *testing.T) {
 			t.Errorf("ran %s during an apply: %v", c, h.rec.list())
 		}
 	}
-	noSpectrumState(t, h)
+	noSpectrumState(t, h, false)
+}
+
+// blockSurvey is a surveying collector whose Scan holds until released, as
+// the driver's survey takes seconds.
+type blockSurvey struct {
+	surveyCol
+	started chan string
+	release chan struct{}
+}
+
+func (c blockSurvey) Scan(ctx context.Context, band string) (*apstate.ScanResult, error) {
+	c.started <- band
+	select {
+	case <-c.release:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	return c.fakeCol.Scan(ctx, band)
+}
+
+// The nightly quick-scan is one command per band, and the controller sends
+// the next band once the AP has reported the finished one (CE §2.1; it
+// sets quickscan_scanning true itself when it sends the command, and an
+// inform without it ends the quick-scan, CE §5). So the survey a quick-scan
+// runs instead holds quickscan_scanning true until it has ended, as the
+// spectrum runner's quick-scan does: an inform without it while the survey
+// runs would end the controller's quick-scan at once, and the next band
+// would arrive mid-survey and be dropped. A band that does arrive
+// mid-survey is refused by name, without claiming a survey of it.
+func TestQuickScanSurveyHoldsFlag(t *testing.T) {
+	col := blockSurvey{started: make(chan string, 4), release: make(chan struct{})}
+	h := newHarness(t, func(c *Config, o *options) {
+		c.Takeover = true
+		col.surveyCol = surveyCol{fakeCol: o.col.(*fakeCol), on: true}
+		o.col = col
+	})
+	var once sync.Once
+	release := func() { once.Do(func() { close(col.release) }) }
+	t.Cleanup(release)
+	h.ctl.queue(adoptReply, `{"_type":"cmd","cmd":"quick-scan","scan-band":1,"scan-bw":80}`)
+	h.start()
+	select {
+	case b := <-col.started:
+		if b != "na" {
+			t.Fatalf("surveyed %s, want na", b)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no survey started")
+	}
+	n := h.ctl.count()
+	eventually(t, "informs while the survey runs", func() bool { return h.ctl.count() > n+1 })
+	// a controller that does not wait: band 0 arrives mid-survey
+	h.ctl.queue(`{"_type":"cmd","cmd":"quick-scan","scan-band":0,"scan-bw":20}`)
+	eventually(t, "the mid-survey band refused", func() bool {
+		return strings.Contains(h.logs.all(), "quick-scan ng: skipped: already in progress (quick-scan na)")
+	})
+	if strings.Contains(h.logs.all(), "site survey of [ng]") {
+		t.Errorf("claims a survey of ng that never ran: %q", h.logs.all())
+	}
+	during := h.ctl.all()
+	release()
+	eventually(t, "the finished survey reported, the quick-scan ended", func() bool {
+		m := h.ctl.last()
+		_, flag := m["quickscan_scanning"]
+		return !h.a.scans.busy() && !flag && surveyed(t, h)
+	})
+	// the informs from the command on (the first carried the adoption
+	// reply's answer, the second the command's) until the release
+	for i, m := range during[2:] {
+		if m["quickscan_scanning"] != true {
+			t.Errorf("inform %d during the na survey: quickscan_scanning %v: ends the controller's quick-scan early", i+2, m["quickscan_scanning"])
+		}
+	}
+	// the controller now sends the next band: it is surveyed
+	h.ctl.queue(`{"_type":"cmd","cmd":"quick-scan","scan-band":0,"scan-bw":20}`)
+	select {
+	case b := <-col.started:
+		if b != "ng" {
+			t.Errorf("surveyed %s, want ng", b)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the next band was not surveyed")
+	}
+	eventually(t, "the ng survey ended", func() bool { return !h.a.scans.busy() })
+	h.stop()
+	noSpectrumState(t, h, true)
 }

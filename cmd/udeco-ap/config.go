@@ -107,9 +107,8 @@ type Config struct {
 	// scan_table only (sitesurvey.go). RF_SCAN is claimed with it. Never
 	// periodic, never during a radio restart or its settle time. Off by
 	// default: the agent then claims no RF_SCAN and only the driver's
-	// cached survey feeds the neighbour list. Takeover only in effect
-	// (observe mode runs no scans); ignored, with a log line, on the Deco
-	// (wl scans).
+	// cached survey feeds the neighbour list. Needs takeover (observe mode
+	// runs no scans); ignored, with a log line, on the Deco (wl scans).
 	SiteSurvey bool `json:"site_survey,omitempty"`
 }
 
@@ -230,6 +229,9 @@ func (c *Config) validate() error {
 	}
 	if c.Hotspot2 && !c.Takeover {
 		return errors.New("config: hotspot2 needs takeover (observe mode serves no Wi-Fi of its own)")
+	}
+	if c.SiteSurvey && !c.Takeover {
+		return errors.New("config: site_survey needs takeover (observe mode runs no scans and claims no RF scan)")
 	}
 	for _, m := range c.MgmtSources {
 		if net.ParseIP(m) != nil {

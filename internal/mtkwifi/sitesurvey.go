@@ -43,7 +43,12 @@ type surveySeen struct {
 }
 
 // scanPoll: how often a fresh survey's table is read; scanSettle: how long
-// it must stay the same to count as finished.
+// it must stay the same to count as finished. Not measured on the unit: a
+// driver that clears its table when the survey starts and refills it
+// channel by channel could hold a partial table for scanSettle on quiet
+// passive (DFS) channels, so Scan would end, and release the restart gate,
+// before the radio is back on its channel. Log get_site_survey every
+// 250 ms through one 5 GHz survey before site_survey goes on (README).
 const (
 	scanPoll   = 500 * time.Millisecond
 	scanSettle = 2 * time.Second

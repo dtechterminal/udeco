@@ -80,29 +80,31 @@ func (a *agent) action(ctx context.Context, act string) {
 
 // startScan runs the neighbour scan (`cmd scan`) off the inform loop and
 // informs right after it.
-func (a *agent) startScan(ctx context.Context, bands []string) { a.neighbourScan(ctx, "scan", bands) }
+func (a *agent) startScan(ctx context.Context, bands []string) {
+	a.neighbourScan(ctx, neighbourJob{what: "scan", bands: bands})
+}
 
-// neighbourScan runs the collector's neighbour scan of bands off the inform
-// loop and informs right after it; what names the command in the logs
-// (`cmd scan`, or a spectrum command on a collector without a spectrum
-// runner: sitesurvey.go).
-func (a *agent) neighbourScan(ctx context.Context, what string, bands []string) {
+// neighbourScan runs the collector's neighbour scan of j.bands off the
+// inform loop, informs at its start (j.quick: quickscan_scanning) and right
+// after it (`cmd scan`, or a spectrum command on a collector without a
+// spectrum runner: sitesurvey.go).
+func (a *agent) neighbourScan(ctx context.Context, j neighbourJob) {
 	if a.shed.Load() {
-		a.logf("%s: skipped, memory is low (R4)", what)
+		a.logf("%s: skipped, memory is low (R4)", j.label())
 		return
 	}
 	if why := a.scanBlock(); why != "" {
-		a.logf("%s: skipped, %s", what, why)
+		a.logf("%s: skipped, %s", j.label(), why)
 		return
 	}
 	a.bg.Add(1)
-	busy, started := a.scans.neighbourScan(ctx, a.o.col, what, bands, a.t.scanTO, a.logf, a.scanBlock, func() {
+	busy, started := a.scans.neighbourScan(ctx, a.o.col, j, a.t.scanTO, a.logf, a.scanBlock, func() {
 		defer a.bg.Done()
 		a.wakeLoop()
 	})
 	if !started {
 		a.bg.Done()
-		a.logf("%s: skipped: already in progress (%s)", what, busy)
+		a.logf("%s: skipped: already in progress (%s)", j.label(), busy)
 		return
 	}
 	a.wakeLoop()

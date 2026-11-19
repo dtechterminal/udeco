@@ -11,10 +11,18 @@ package main
 // band(s) instead, the same path as `cmd scan` (scanner.neighbourScan),
 // and report scan_table only. Nothing of the spectrum path is sent:
 //
-//   - no spectrum_scanning or quickscan_scanning true: on its true -> false
-//     the controller would store the (empty) spectrum table of the run;
+//   - no spectrum_scanning true (the controller sets it itself when it
+//     sends spectrum-scan; the next inform's false ends it);
 //   - no spectrum_table, and no EVT_AP_QuickScanEvent, which would stamp
 //     spectrum_scan_timestamp for a table that does not exist.
+//
+// A quick-scan's survey does hold quickscan_scanning true while it runs, as
+// the spectrum runner's quick-scan: the controller sets that flag itself
+// when it sends the command, and the first inform without it ends the
+// controller's quick-scan (it then saves only non-empty spectrum tables:
+// none here) and sends the next band (CE §2.1, §5). Without the flag that
+// was the inform right after the command, so the second band arrived
+// mid-survey and was dropped as already in progress.
 //
 // With site_survey off, the commands scan nothing (RF_SCAN is not claimed
 // then, so the controller should not send them) and the agent logs why.
@@ -30,7 +38,10 @@ package main
 // for it); and never on a radio that is down (mtkwifi: ErrRadioDown, the
 // driver not asked).
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 // spectrumBySurvey: ok says the collector has no spectrum runner; on says
 // its spectrum commands run the neighbour survey instead (site_survey).
@@ -43,13 +54,19 @@ func (a *agent) spectrumBySurvey() (ok, on bool) {
 }
 
 // surveyForSpectrum answers spectrum command what (loop goroutine) with
-// the neighbour survey of bands when on, else with nothing.
+// the neighbour survey of bands when on, else with nothing. A quick-scan's
+// survey holds quickscan_scanning true while it runs (sitesurvey.go top).
 func (a *agent) surveyForSpectrum(ctx context.Context, what string, bands []string, on bool) {
 	if !on {
 		a.logf("%s: no spectrum runner on this unit and site_survey is off: nothing scanned", what)
 		return
 	}
-	a.logf("%s: no spectrum runner on this unit: neighbour site survey of %v instead "+
-		"(scan_table only; no spectrum_table, no scanning flags, no EVT_AP_QuickScanEvent)", what, bands)
-	a.neighbourScan(ctx, what, bands)
+	quick := what == "quick-scan"
+	flags := "no scanning flags"
+	if quick {
+		flags = "quickscan_scanning until it ends"
+	}
+	a.neighbourScan(ctx, neighbourJob{what: what, bands: bands, quick: quick,
+		note: fmt.Sprintf("%s: no spectrum runner on this unit: neighbour site survey of %v instead "+
+			"(scan_table only; no spectrum_table, %s, no EVT_AP_QuickScanEvent)", what, bands, flags)})
 }
