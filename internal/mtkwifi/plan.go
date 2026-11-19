@@ -44,6 +44,7 @@ type RadioDef struct {
 	MaxTxDBm  int      // TxPower=100 (%)
 	HWName    string
 	SAE       bool // the driver serves WPA3-Personal (SAE)
+	UAPSD     bool // the driver has U-APSD (APSDCapable, per BSS)
 }
 
 // JCOW414 is the JioFiber JCOW414 layout.
@@ -51,7 +52,7 @@ var JCOW414 = []RadioDef{
 	{Band: "ng", Ifaces: []string{"ra0", "ra1", "ra2", "ra3"}, Dat: "/etc/Wireless/RT2860AP/RT2860AP.dat",
 		MaxStaKey: "MaxStaNum", MaxTxDBm: 20, HWName: "MT7603E"},
 	{Band: "na", Ifaces: []string{"rai0", "rai1", "rai2", "rai3"}, Dat: "/etc/Wireless/RT2860AP_AC/RT2860AP.dat",
-		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, HWName: "MT7663", SAE: true},
+		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, HWName: "MT7663", SAE: true, UAPSD: true},
 }
 
 // Channels the units' country (IN, CountryRegion 0 / CountryRegionABand 10)
@@ -74,10 +75,16 @@ type BSS struct {
 	Hidden  bool
 	Isolate bool
 	MaxSta  int
-	VLAN    int // 0 = the LAN bridge
+	VLAN    int  // 0 = the LAN bridge
+	RRM     bool // 802.11k (RRMEnable)
+	BTM     bool // 802.11v BSS transition management (WNMEnable)
+	UAPSD   bool // U-APSD (APSDCapable); only where RadioDef.UAPSD
 }
 
-// RadioPlan is what one radio serves.
+// RadioPlan is what one radio serves. The zero value of each per-radio
+// setting after BSS keeps the vendor's profile value, so a last-good plan
+// saved by an older agent still writes a working profile (its BSSes then
+// have 802.11k/v and U-APSD off).
 type RadioPlan struct {
 	Band    string
 	On      bool
@@ -85,10 +92,21 @@ type RadioPlan struct {
 	Width   int // 20, 40, 80
 	TxPct   int // TxPower (% of the maximum)
 	BSS     []BSS
+	// DTIM is DtimPeriod (one per radio in both drivers); 0 = the vendor's.
+	DTIM int `json:",omitempty"`
+	// BasicRate is the driver's BasicRate bitmap (bit 0 = 1 Mb/s ... bit
+	// 11 = 54 Mb/s, basicRateKbps); 0 = the vendor's (351 on 2.4 GHz).
+	// 2.4 GHz only: on 5 GHz the driver forces 6, 12 and 24 Mb/s basic.
+	BasicRate int `json:",omitempty"`
+	// IgmpSn writes IgmpSnEnable=1 (multicast enhancement). false keeps
+	// the vendor's value (1 on both radios): never written as 0.
+	IgmpSn bool `json:",omitempty"`
 }
 
 // structural is everything that needs the radio restarted: the BSS list
-// with names, security and keys, the channel, width and power. Hidden,
+// with names, security, keys and 802.11k/v/U-APSD, the channel, width,
+// power, DTIM, basic rates and IGMP snooping (profile() patches the vendor
+// baseline, read only when a radio's BSSes come up). Hidden,
 // Isolate and MaxSta are live.
 func (r RadioPlan) structural() string {
 	c := r
@@ -122,6 +140,7 @@ func normBand(b string) string {
 func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan, []string) {
 	var notes []string
 	note := func(f string, a ...any) { notes = append(notes, fmt.Sprintf(f, a...)) }
+	refused := ssidNotes(d.SSIDs, note)
 	out := map[string]RadioPlan{}
 	for _, rd := range layout {
 		ri, ok := d.Radios[rd.Band]
@@ -153,12 +172,14 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 		if maxSta <= 0 || maxSta > maxStaDefault {
 			maxSta = maxStaDefault
 		}
+		var served []bcmwifi.SSID // parallel to rp.BSS
 		for _, s := range d.SSIDs {
-			if !s.Enabled || !onBand(s, rd.Band) {
+			if !s.Enabled || !onBand(s, rd.Band) || refused[s.ID] {
 				continue
 			}
 			s = s.ForBand(rd.Band) // the controller's own values for this radio
-			b := BSS{ID: s.ID, SSID: s.SSID, Hidden: s.Hidden, Isolate: s.Isolation, MaxSta: maxSta, VLAN: s.VLAN}
+			b := BSS{ID: s.ID, SSID: s.SSID, Hidden: s.Hidden, Isolate: s.Isolation, MaxSta: maxSta, VLAN: s.VLAN,
+				RRM: s.RRM, BTM: s.BSSTransition, UAPSD: s.UAPSD && rd.UAPSD}
 			switch s.Security {
 			case "open", "":
 				b.Auth, b.Encr = "OPEN", "NONE"
@@ -177,15 +198,14 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			case "wpa2":
 				b.Auth, b.Encr, b.PSK = "WPA2PSK", "AES", s.Passphrase
 				// PMF as the controller sets it, where the driver has it
-				// (the MT7663; the MT7603 module has no PMF profile keys)
+				// (the MT7663; the MT7603 module has no PMF profile keys).
+				// PMF asked and not served is noted by bssNotes.
 				switch {
-				case s.PMF != "optional" && s.PMF != "required":
-				case rd.SAE && s.PMF == "required":
+				case !rd.SAE:
+				case s.PMF == "required":
 					b.PMF = 2
-				case rd.SAE:
+				case s.PMF == "optional":
 					b.PMF = 1
-				default:
-					note("%s: SSID %q: PMF %s is not supported by this driver: served without PMF", rd.Band, s.SSID, s.PMF)
 				}
 			default:
 				note("%s: SSID %q: security %s is not supported by this driver: not served", rd.Band, s.SSID, s.Security)
@@ -214,12 +234,16 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			if s.Security == "wpa2wpa3" && b.Auth == "WPA2PSK" {
 				note("%s: SSID %q: served as WPA2 only (no SAE in this driver)", rd.Band, s.SSID)
 			}
+			bssNotes(s, b, rd, note)
 			rp.BSS = append(rp.BSS, b)
+			served = append(served, s)
 		}
 		if len(rp.BSS) == 0 {
 			rp.On = false
 		}
-		if !rp.On {
+		if rp.On {
+			radioFeatures(&rp, rd, ri, served, note)
+		} else {
 			rp.BSS, rp.Channel = nil, 0
 		}
 		out[rd.Band] = rp
@@ -373,6 +397,7 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 		kv["PMFSHA256"] = listKey(nil, "PMFSHA256", n, nil, "0")
 	}
 	kv["IEEE8021X"] = listKey(base, "IEEE8021X", n, []string{"0", "0", "0", "0"}[:len(rp.BSS)], "0")
+	profileFeatures(kv, base, rd, rp)
 	return setKeys(base, kv)
 }
 

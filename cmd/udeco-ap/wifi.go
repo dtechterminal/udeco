@@ -528,6 +528,11 @@ func (a *agent) led(ctx context.Context, mode string) {
 func (a *agent) logIntent(pv provision) (bcmwifi.Desired, translate.Intent) {
 	in, notes := translate.IntentFromCfg(pv.systemCfg)
 	d, dn := desiredFrom(in)
+	if a.cfg.jio() {
+		var mn []string
+		d, mn = jioMinRates(d, a.cfg.MinRates)
+		dn = append(dn, mn...)
+	}
 	if dc := strings.ToUpper(strings.TrimSpace(a.cfg.DriverCountry)); dc != "" && !strings.EqualFold(dc, d.Country) {
 		dn = append(dn, fmt.Sprintf("country %s: the radios run as %s (driver_country)", d.Country, dc))
 		d.Country = dc

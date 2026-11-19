@@ -104,3 +104,27 @@ func TestConfigMinRatesNeedsTakeover(t *testing.T) {
 		t.Errorf("takeover with min_rates: %+v %v", c, err)
 	}
 }
+
+// jio-mtk: the controller's minimums reach mtkwifi (the radio's BasicRate)
+// only with min_rates; off, they are dropped with a note per SSID and band.
+func TestJioMinRates(t *testing.T) {
+	d := bcmwifi.Desired{SSIDs: []bcmwifi.SSID{
+		{ID: "a", MinRateKbps: map[string]int{"ng": 6000, "na": 12000}, MinRateOpts: map[string]bcmwifi.RateOpts{"ng": {NoCCK: true}}},
+		{ID: "b"},
+	}}
+	got, notes := jioMinRates(d, true)
+	if len(notes) != 0 || got.SSIDs[0].MinRateKbps["ng"] != 6000 || !got.SSIDs[0].MinRateOpts["ng"].NoCCK {
+		t.Errorf("min_rates on: %+v %q", got.SSIDs[0], notes)
+	}
+	got, notes = jioMinRates(d, false)
+	if got.SSIDs[0].MinRateKbps != nil || got.SSIDs[0].MinRateOpts != nil {
+		t.Errorf("min_rates off: minimums kept: %+v", got.SSIDs[0])
+	}
+	if strings.Join(notes, "\n") != "ssid a: minimum rate na=12000 kbps not applied (min_rates is off)\nssid a: minimum rate ng=6000 kbps not applied (min_rates is off)" {
+		t.Errorf("notes %q", notes)
+	}
+	// the caller's Desired is not changed
+	if d.SSIDs[0].MinRateKbps["ng"] != 6000 {
+		t.Errorf("input changed: %+v", d.SSIDs[0])
+	}
+}

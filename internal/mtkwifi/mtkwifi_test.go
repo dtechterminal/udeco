@@ -540,7 +540,7 @@ func TestPlansPerBand(t *testing.T) {
 	if b := ps["ng"].BSS[0]; b.Auth != "WPA2PSK" || b.PMF != 0 {
 		t.Errorf("ng Example Network %+v", b)
 	}
-	if !strings.Contains(strings.Join(notes, "\n"), `ng: SSID "Example Network": PMF optional is not supported`) {
+	if !strings.Contains(strings.Join(notes, "\n"), `ng: SSID "Example Network": PMF optional not applied: served with PMF disabled`) {
 		t.Errorf("notes %q", notes)
 	}
 	// WPA2 with PMF required on 5 GHz

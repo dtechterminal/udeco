@@ -136,14 +136,20 @@ func TestDesiredFrom(t *testing.T) {
 	}
 }
 
-// TestJioPlatformConfig: platform jio-mtk reports as U7LT and refuses the
-// features its driver or system manager do not have.
+// TestJioPlatformConfig: platform jio-mtk reports as U7LT, takes min_rates
+// and refuses the features its driver or system manager do not have.
 func TestJioPlatformConfig(t *testing.T) {
 	base := `{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","takeover":true,"apply":true,"platform":"jio-mtk"`
 	if c, err := parseConfig([]byte(base + `,"model":"U7LT"}`)); err != nil || !c.jio() {
 		t.Fatalf("jio config refused: %v", err)
 	}
-	for _, bad := range []string{`}`, `,"model":"U7LT","min_rates":true}`, `,"model":"U7LT","egress":true}`, `,"model":"UAL6"}`} {
+	// min_rates: each radio's BasicRate (mtkwifi)
+	for _, model := range []string{"U7LT", "UHDIW"} {
+		if c, err := parseConfig([]byte(base + `,"model":"` + model + `","min_rates":true}`)); err != nil || !c.MinRates {
+			t.Errorf("jio %s min_rates refused: %v", model, err)
+		}
+	}
+	for _, bad := range []string{`}`, `,"model":"U7LT","egress":true}`, `,"model":"U7LT","mdns_bridge":true}`, `,"model":"U7LT","hotspot2":true}`, `,"model":"UAL6"}`} {
 		if _, err := parseConfig([]byte(base + bad)); err == nil {
 			t.Errorf("accepted %s", bad)
 		}
