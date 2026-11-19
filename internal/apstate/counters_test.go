@@ -332,3 +332,36 @@ func TestCountersObservePositionalNames(t *testing.T) {
 		t.Errorf("controller counted %d tx bytes, at most 1200 are real", sum)
 	}
 }
+
+// TestStationRetryFields: a sta_table row carries wifi_tx_attempts (packets
+// plus retries) like a real UniFi AP's, so the controller's per-client TX
+// retry percentage is retries over attempts, not 0% or 100% (2026-11-19:
+// every client read 100% once it had any retry).
+func TestStationRetryFields(t *testing.T) {
+	st := Station{MAC: "aa:bb:cc:00:00:09", Connected: 30, TxPackets: 900, TxRetries: 100, TxFailed: 5}
+	check := func(name string, f map[string]any) {
+		t.Helper()
+		var row map[string]any
+		for _, v := range f["vap_table"].([]map[string]any) {
+			for _, s := range v["sta_table"].([]map[string]any) {
+				row = s
+			}
+		}
+		if row == nil {
+			t.Fatalf("%s: no sta_table row", name)
+		}
+		want := map[string]int64{"tx_retries": 100, "tx_combined_retries": 100, "wifi_tx_attempts": 1000,
+			"wifi_tx_dropped": 5, "tx_total": 900, "wifi_tx_success": 895}
+		for k, v := range want {
+			if got, ok := row[k]; !ok || toI(got) != v {
+				t.Errorf("%s: %s = %v, want %d", name, k, got, v)
+			}
+		}
+	}
+	// without counter tracking (raw readings)
+	check("raw", reading(100, vapSpec{band: "na", iface: "wl13", ssid: "IoT", stas: []Station{st}}).FieldsWith(nil, CfgInfo{}, nil, nil))
+	// with counter tracking: the first reading's values are the totals
+	mc := NewCounters()
+	mc.Begin(100)
+	check("counted", reading(100, vapSpec{band: "na", iface: "wl13", ssid: "IoT", stas: []Station{st}}).FieldsWith(nil, CfgInfo{}, nil, mc))
+}

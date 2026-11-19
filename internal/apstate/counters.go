@@ -337,11 +337,20 @@ func (c *Counters) vap(name, iface string, stats map[string]int64, stas []Statio
 		if d["tx_packets"] > d["tx_failed"] {
 			dSuccess += d["tx_packets"] - d["tx_failed"]
 		}
-		t := c.total("sta:"+mac, d)
+		// the station's own success count (tx_packets less failures) is
+		// accumulated as its own monotonic key
+		ds := map[string]uint64{"tx_success": 0}
+		for k, v := range d {
+			ds[k] = v
+		}
+		if d["tx_packets"] > d["tx_failed"] {
+			ds["tx_success"] = d["tx_packets"] - d["tx_failed"]
+		}
+		t := c.total("sta:"+mac, ds)
 		out.Stations = append(out.Stations, map[string]int64{
 			"tx_bytes": t.get("tx_bytes"), "rx_bytes": t.get("rx_bytes"),
 			"tx_packets": t.get("tx_packets"), "rx_packets": t.get("rx_packets"),
-			"tx_retries": t.get("tx_retries"),
+			"tx_retries": t.get("tx_retries"), "tx_failed": t.get("tx_failed"), "tx_success": t.get("tx_success"),
 		})
 	}
 	t := c.total(key, map[string]uint64{"sta_retries": dRetries, "sta_failed": dFailed, "sta_tx": dTx, "sta_success": dSuccess})
@@ -362,7 +371,7 @@ func rawVAPCounters(v Radio) vapCounters {
 		out.TxPkts += st.TxPackets
 		out.Stations = append(out.Stations, map[string]int64{
 			"tx_bytes": st.TxBytes, "rx_bytes": st.RxBytes, "tx_packets": st.TxPackets, "rx_packets": st.RxPackets,
-			"tx_retries": st.TxRetries,
+			"tx_retries": st.TxRetries, "tx_failed": st.TxFailed, "tx_success": max(st.TxPackets-st.TxFailed, 0),
 		})
 	}
 	out.Success = max(out.TxPkts-out.Failed, 0)
@@ -395,7 +404,19 @@ func (c *Counters) finish(vaps []map[string]any) {
 				for _, k := range []string{"tx_bytes", "rx_bytes", "tx_packets", "rx_packets", "tx_retries"} {
 					st[k] = t.get(k)
 				}
+				staRetryFields(st, t.get("tx_packets"), t.get("tx_retries"), t.get("tx_failed"), t.get("tx_success"))
 			}
 		}
 	}
+}
+
+// staRetryFields sets a sta_table row's transmit attempt counters the way a
+// real UniFi AP reports them (docs/reference mca-dump): the controller's
+// per-client "TX retries" percentage is retries over wifi_tx_attempts, and
+// without wifi_tx_attempts it read 100% for any client with a retry and 0%
+// otherwise (2026-11-19).
+func staRetryFields(row map[string]any, pkts, retries, failed, success int64) {
+	row["tx_retries"], row["tx_combined_retries"] = retries, retries
+	row["wifi_tx_attempts"], row["wifi_tx_dropped"] = pkts+retries, failed
+	row["tx_total"], row["wifi_tx_success"] = pkts, success
 }

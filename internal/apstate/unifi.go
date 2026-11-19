@@ -283,6 +283,7 @@ func (s *Snapshot) FieldsWith(prev *Snapshot, info CfgInfo, caps map[string]Radi
 					"state": 15, "state_ht": st.HT, "state_pwrmgt": false,
 					"is_guest": guest,
 				}
+				staRetryFields(row, sc["tx_packets"], sc["tx_retries"], sc["tx_failed"], sc["tx_success"])
 				if guest {
 					// portal state; WPA authorization stays in the AP
 					row["authorized"] = info.Authorized[strings.ToLower(st.MAC)]
