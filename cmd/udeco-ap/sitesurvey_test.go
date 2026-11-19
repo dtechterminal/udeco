@@ -56,8 +56,10 @@ func TestSiteSurveyWiring(t *testing.T) {
 		if !ok {
 			t.Fatalf("jio-mtk collector %T", h.a.o.col)
 		}
-		if col.ScanSupported() != on || col.SpectrumBySurvey() != on {
-			t.Errorf("site_survey %v: ScanSupported %v, SpectrumBySurvey %v", on, col.ScanSupported(), col.SpectrumBySurvey())
+		// the MT7603 (ng) sweeps with site_survey; the MT7663 (na) surveys
+		if col.ScanSupported() != on || !noRunner(col, "na") || bySurvey(col, "na") != on || noRunner(col, "ng") == on {
+			t.Errorf("site_survey %v: ScanSupported %v, na no runner %v by survey %v, ng no runner %v",
+				on, col.ScanSupported(), noRunner(col, "na"), bySurvey(col, "na"), noRunner(col, "ng"))
 		}
 		if got := strings.Contains(h.logs.all(), "site_survey: on"); got != on {
 			t.Errorf("site_survey %v: start log %q", on, h.logs.all())
@@ -76,8 +78,8 @@ type surveyCol struct {
 	on bool
 }
 
-func (c surveyCol) ScanSupported() bool    { return c.on }
-func (c surveyCol) SpectrumBySurvey() bool { return c.on }
+func (c surveyCol) ScanSupported() bool                               { return c.on }
+func (c surveyCol) SpectrumBySurvey(string) (noRunner, bySurvey bool) { return true, c.on }
 
 // informs is every inform the controller got so far.
 func (c *ctl) all() []map[string]any {
@@ -292,4 +294,18 @@ func TestQuickScanSurveyHoldsFlag(t *testing.T) {
 	eventually(t, "the ng survey ended", func() bool { return !h.a.scans.busy() })
 	h.stop()
 	noSpectrumState(t, h, true)
+}
+
+func noRunner(c interface {
+	SpectrumBySurvey(string) (bool, bool)
+}, band string) bool {
+	n, _ := c.SpectrumBySurvey(band)
+	return n
+}
+
+func bySurvey(c interface {
+	SpectrumBySurvey(string) (bool, bool)
+}, band string) bool {
+	_, b := c.SpectrumBySurvey(band)
+	return b
 }

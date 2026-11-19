@@ -228,21 +228,27 @@ func (sc *scanner) neighbourScan(ctx context.Context, col collector, j neighbour
 				logf("%s %s: not started, %s", what, band, why)
 				return
 			}
-			bctx, cancel := context.WithTimeout(ctx, perBand)
-			t0 := time.Now()
-			res, err := col.Scan(bctx, band)
-			cancel()
-			if err != nil {
-				logf("%s %s: %v", what, band, err)
-				continue
-			}
-			// neighbours only: a legacy ScanResult.Spectrum is never
-			// reported (spectrum_table comes from the spectrum runner)
-			sc.addBSS(band, apstate.ScanResult{Band: res.Band, Time: res.Time, BSS: res.BSS})
-			logf("%s %s: %d networks in %s", what, band, len(res.BSS), time.Since(t0).Round(100*time.Millisecond))
+			sc.surveyBand(ctx, col, what, band, perBand, logf)
 		}
 	}()
 	return "", true
+}
+
+// surveyBand runs one band's neighbour scan (col.Scan, within perBand)
+// into scan_table, for what; the caller holds the scan (begin).
+func (sc *scanner) surveyBand(ctx context.Context, col collector, what, band string, perBand time.Duration, logf func(string, ...any)) {
+	bctx, cancel := context.WithTimeout(ctx, perBand)
+	t0 := time.Now()
+	res, err := col.Scan(bctx, band)
+	cancel()
+	if err != nil {
+		logf("%s %s: %v", what, band, err)
+		return
+	}
+	// neighbours only: a legacy ScanResult.Spectrum is never reported
+	// (spectrum_table comes from the spectrum runner)
+	sc.addBSS(band, apstate.ScanResult{Band: res.Band, Time: res.Time, BSS: res.BSS})
+	logf("%s %s: %d networks in %s", what, band, len(res.BSS), time.Since(t0).Round(100*time.Millisecond))
 }
 
 // merge adds the scan state to the inform fields.

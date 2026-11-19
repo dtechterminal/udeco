@@ -253,6 +253,7 @@ func (e *incompleteError) Is(target error) bool { return target == ErrIncomplete
 //	r.RestoreTable(rows, at) // a table saved before an agent restart, into an empty runner
 //	r.FitRestored(ctx)       // drops its rows the radio does not list now (after a caps change)
 //	col.WithoutScan(ctx, fn) // run fn (health check) when no scan is running
+//	wl.NewSpectrumRunner(radio, band, backend) // another driver's runner (spectrum_ext.go)
 //
 // One runner exists per radio and lives as long as the Collector; it keeps
 // the radio's sticky unmeasured channels and its fallback (sweep) mode in
@@ -287,7 +288,8 @@ func (e *incompleteError) Is(target error) bool { return target == ErrIncomplete
 // The ctx given to Run must allow the gate (GateTries × GateDefer, 60 s) plus
 // the Budget (45 s); the Budget clock starts at SCANNING.
 type SpectrumRunner struct {
-	c           *Collector
+	c           *Collector      // nil for an external runner
+	ext         SpectrumBackend // NewSpectrumRunner: measures instead of c (spectrum_ext.go)
 	radio, band string
 
 	mu        sync.Mutex
@@ -402,17 +404,21 @@ func (s *SpectrumRunner) FitRestored(ctx context.Context) (kept, dropped int, er
 	if !restored {
 		return 0, 0, nil
 	}
-	st, err := s.c.static(ctx)
+	blocks, err := s.listedBlocks(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
-	var specs []chanspec
-	for _, r := range st.radios {
-		if r.name == s.radio {
-			specs = r.specs
-		}
+	type key struct{ w, ch, freq int }
+	listed := map[key]bool{}
+	has20 := false
+	for _, bl := range blocks {
+		listed[key{bl.Width, bl.Channel, bl.CenterFreq}] = true
+		has20 = has20 || bl.Width == 20
 	}
-	if len(blocksFor(specs, s.band, 20)) == 0 {
+	if !has20 {
+		if s.ext != nil {
+			return 0, 0, errNoListed(s.radio, s.band)
+		}
 		return 0, 0, fmt.Errorf("wl -i %s: no %s channel listed", s.radio, s.band)
 	}
 	s.mu.Lock()
@@ -420,15 +426,10 @@ func (s *SpectrumRunner) FitRestored(ctx context.Context) (kept, dropped int, er
 	if !s.restored { // a band or a clear replaced it meanwhile
 		return 0, 0, nil
 	}
-	type key struct{ ch, freq int }
 	out := map[int][]SpectrumRow{}
 	for w, rs := range s.rows {
-		listed := map[key]bool{}
-		for _, bl := range blocksFor(specs, s.band, w) {
-			listed[key{bl.Parts[0], chanFreq(bl.Center, s.band)}] = true
-		}
 		for _, r := range rs {
-			if r.Width == w && listed[key{r.Channel, r.CenterFreq}] {
+			if r.Width == w && listed[key{w, r.Channel, r.CenterFreq}] {
 				out[w] = append(out[w], r)
 				kept++
 			} else {
@@ -486,6 +487,9 @@ func (s *SpectrumRunner) setPhase(p SpectrumPhase, manual bool, cb func(Spectrum
 // Run measures the radio's band once and builds rows at the requested
 // widths. See the package section above for the sequence and the errors.
 func (s *SpectrumRunner) Run(ctx context.Context, req SpectrumRequest) (*SpectrumResult, error) {
+	if s.ext != nil {
+		return s.runExt(ctx, req)
+	}
 	plan := DefaultScanPlan()
 	if req.Plan != nil {
 		plan = *req.Plan
@@ -516,20 +520,27 @@ func (s *SpectrumRunner) Run(ctx context.Context, req SpectrumRequest) (*Spectru
 		d.Err = err.Error()
 	}
 
+	s.finish(rows, d.Done, err, req.OnPhase)
+	return &SpectrumResult{Radio: s.radio, Band: s.band, Rows: rows, Status: s.Status(), Diag: *d}, err
+}
+
+// finish ends a band: idle; on success the new table (measured at done),
+// abnormal cleared; on a failure other than a skipped radio, abnormal set
+// and the old table kept.
+func (s *SpectrumRunner) finish(rows map[int][]SpectrumRow, done time.Time, err error, onPhase func(SpectrumPhase)) {
 	s.mu.Lock()
 	s.phase = PhaseIdle
 	switch {
 	case err == nil:
 		// the runner keeps its own copy: the caller owns the returned rows
-		s.rows, s.tableTime, s.abnormal, s.restored = copyRows(rows), d.Done, false, false
+		s.rows, s.tableTime, s.abnormal, s.restored = copyRows(rows), done, false, false
 	case !errors.Is(err, ErrRadioSkipped):
 		s.abnormal = true
 	}
 	s.mu.Unlock()
-	if req.OnPhase != nil {
-		req.OnPhase(PhaseIdle)
+	if onPhase != nil {
+		onPhase(PhaseIdle)
 	}
-	return &SpectrumResult{Radio: s.radio, Band: s.band, Rows: rows, Status: s.Status(), Diag: *d}, err
 }
 
 // chanAcc collects one 20 MHz channel's calls in a band.
