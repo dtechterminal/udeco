@@ -12,18 +12,24 @@
 #     loop running).
 #   - Gateway silent for ROLLBACK_AFTER s: if the running agent build is not
 #     the confirmed one ($D/good.md5) and udeco-ap.gz.prev is, swaps .prev back
-#     in (the failed build is kept as .bad) and restarts the agent.
+#     in (the failed build is kept as .bad) and restarts the agent. A
+#     udeco-ap.json.prev (the config the .prev build ran with) is swapped back
+#     with it, as the older build may refuse the new config (kept as
+#     udeco-ap.json.bad); install it with the .prev build when a deploy
+#     changes the config.
 #   - Gateway silent for REBOOT_AFTER s, and the unit up for at least
 #     MIN_UPTIME s: reboots. On the second guard reboot in a row it writes
 #     $D/force-observe first, so the agent comes back observing and leaves
 #     the unit's own settings alone.
 #   - Gateway answering for HEALTHY_AFTER s: confirms the running build
-#     (good.md5) and clears the reboot strikes.
+#     (good.md5), drops udeco-ap.json.prev (it belongs to the build no
+#     longer confirmed) and clears the reboot strikes.
 # Actions go to $D/guard.events (persistent, last 50 lines) and the guard's
 # log to $R/guard.log. A kernel hang is left to the kernel's own watchdog: a
 # shell can't run then.
 D=${UDECO_D:-/flash2/udeco}
 R=${UDECO_R:-/tmp/udeco-bin}
+UP=${UDECO_UPTIME:-/proc/uptime}
 
 guard() {
 	GW=192.168.0.1
@@ -35,7 +41,7 @@ guard() {
 	[ -f $D/guard.conf ] && . $D/guard.conf
 	exec 8>$R/guard.lock
 	flock -n 8 || exit 0
-	upt() { cut -d. -f1 /proc/uptime; }
+	upt() { cut -d. -f1 $UP; }
 	md5() { md5sum "$1" 2>/dev/null | cut -c1-32; }
 	log() { echo "$(date '+%Y-%m-%d %H:%M:%S') up=$(upt) $*" >> $R/guard.log; }
 	event() {
@@ -69,6 +75,7 @@ guard() {
 				if [ -n "$cur" ] && [ "$cur" != "$(cat $D/good.md5 2>/dev/null)" ]; then
 					echo $cur > $D/good.md5
 					event "build $cur confirmed good (gateway reachable for ${HEALTHY_AFTER}s)"
+					[ -f $D/udeco-ap.json.prev ] && rm -f $D/udeco-ap.json.prev && event "udeco-ap.json.prev dropped (it went with the build before $cur)"
 				fi
 				[ -f $D/guard.strikes ] && rm -f $D/guard.strikes && event "reboot strikes cleared"
 				confirmed=1
@@ -87,8 +94,15 @@ guard() {
 				good=$(cat $D/good.md5 2>/dev/null)
 				if [ -n "$good" ] && [ "$cur" != "$good" ] && [ "$(md5 $D/udeco-ap.gz.prev)" = "$good" ]; then
 					cp $D/udeco-ap.gz $D/udeco-ap.gz.bad && cp $D/udeco-ap.gz.prev $D/udeco-ap.gz && rm -f $R/udeco-ap
+					# the config the confirmed build ran with (an older build
+					# exits at once on a config it does not know)
+					cfg=""
+					if [ -f $D/udeco-ap.json.prev ] && [ "$(md5 $D/udeco-ap.json.prev)" != "$(md5 $D/udeco-ap.json)" ]; then
+						cp $D/udeco-ap.json $D/udeco-ap.json.bad && cp $D/udeco-ap.json.prev $D/udeco-ap.json &&
+							cfg=", udeco-ap.json replaced by udeco-ap.json.prev (kept as udeco-ap.json.bad)"
+					fi
 					[ -f $R/agent.pid ] && kill $(cat $R/agent.pid) 2>/dev/null
-					event "ROLLBACK: gateway silent ${down}s: build $cur replaced by the confirmed $good (kept as udeco-ap.gz.bad), agent restarted"
+					event "ROLLBACK: gateway silent ${down}s: build $cur replaced by the confirmed $good (kept as udeco-ap.gz.bad)$cfg, agent restarted"
 				else
 					log "no rollback: running build ${cur:-none} is the confirmed one or no confirmed .prev"
 				fi

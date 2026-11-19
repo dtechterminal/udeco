@@ -222,9 +222,23 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 - **Partial:** WPA3 on 5 GHz only (the 2.4 GHz driver has no SAE). The driver
   accepts the profile, but no SAE client has been seen yet.
 - **Not on this platform:** speed limits.
+- **LAN ports (`"model": "UHDIW"`):** the unit can instead report as a
+  UAP-IW-HD: LAN ports 1-3, port 4 absent, the uplink as rear port 5. With
+  Enable Port VLAN on, the controller's port VLANs apply to ports 2 and 3
+  (port 1 only with `ports_unlocked`; the uplink never). Untested on the
+  unit: tagged VLANs on ports 2-3. Give ports 2 and 3 explicit port
+  profiles before turning Port VLAN on: the default "All" trunks every site
+  network onto them.
+- **Changing the model** (U7LT to UHDIW or back) of an adopted unit needs a
+  Forget and a new adoption: the controller keeps the model it adopted. The
+  agent records that model in its state and, while the config differs,
+  logs `MODEL NOT CHANGED IN UNIFI` and claims no port VLANs. Forget drops
+  the AP's name, AP groups and radio settings, so note them first.
 - **Gateway guard** (`deploy/jio-start.sh`): if the unit loses the gateway, it
   rolls back to the previous build after 180 s and reboots after 480 s. A new
-  build is confirmed after 30 minutes healthy.
+  build is confirmed after 30 minutes healthy. A deploy that changes the
+  config keeps the old one as `udeco-ap.json.prev` next to
+  `udeco-ap.gz.prev`; the rollback restores both.
 
 ## Layout
 
