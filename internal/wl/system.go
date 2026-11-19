@@ -170,25 +170,11 @@ func parseARP(s string) map[string]string {
 	return m
 }
 
-// fdbRecordSize is sizeof(struct __fdb_entry) on this kernel: mac[6],
-// port_no u8, is_local u8, ageing_timer_value u32 (USER_HZ ticks, host
-// order: little-endian on ARM), port_hi u8, pad[3].
+// fdbRecordSize is sizeof(struct __fdb_entry) (apstate.ParseBrforward).
 const fdbRecordSize = 16
 
 // parseBrforward decodes the binary /sys/class/net/<br>/brforward.
-func parseBrforward(b []byte) []apstate.FDBEntry {
-	var out []apstate.FDBEntry
-	for off := 0; off+fdbRecordSize <= len(b); off += fdbRecordSize {
-		r := b[off : off+fdbRecordSize]
-		out = append(out, apstate.FDBEntry{
-			MAC:   net.HardwareAddr(r[0:6]).String(),
-			Port:  int(r[12])<<8 | int(r[6]),
-			Local: r[7] != 0,
-			Age:   int64(binary.LittleEndian.Uint32(r[8:12])) / 100,
-		})
-	}
-	return out
-}
+func parseBrforward(b []byte) []apstate.FDBEntry { return apstate.ParseBrforward(b) }
 
 var ethName = regexp.MustCompile(`^eth[0-9]+$`)
 

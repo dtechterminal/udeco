@@ -451,11 +451,16 @@ func (s *Snapshot) gatewayPort() *Port {
 // number port (Port.BridgePort).
 func (s *Snapshot) PortMACs(port int) []map[string]any { return s.portMACs(port) }
 
-func (s *Snapshot) portMACs(port int) []map[string]any {
+func (s *Snapshot) portMACs(port int) []map[string]any { return MACRows(s.FDB, port, 1, s.MAC) }
+
+// MACRows: the mac_table rows of the MACs learned on bridge port number
+// port of one bridge's FDB (one row per MAC, its youngest entry), all on
+// VLAN vlan; the bridge's own addresses and own are left out.
+func MACRows(fdb []FDBEntry, port, vlan int, own string) []map[string]any {
 	age := map[string]int64{}
 	var order []string
-	for _, e := range s.FDB {
-		if e.Port != port || e.Local || e.MAC == s.MAC {
+	for _, e := range fdb {
+		if e.Port != port || e.Local || e.MAC == own {
 			continue
 		}
 		if a, ok := age[e.MAC]; !ok {
@@ -467,7 +472,7 @@ func (s *Snapshot) portMACs(port int) []map[string]any {
 	}
 	rows := []map[string]any{}
 	for _, mac := range order {
-		rows = append(rows, map[string]any{"mac": mac, "age": age[mac], "vlan": 1, "static": false})
+		rows = append(rows, map[string]any{"mac": mac, "age": age[mac], "vlan": vlan, "static": false})
 	}
 	return rows
 }

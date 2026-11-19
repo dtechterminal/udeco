@@ -159,6 +159,15 @@ func (a *agent) portFields(f map[string]any, s *apstate.Snapshot) {
 			}
 		}
 	}
+	for _, phys := range jioports.LANPorts {
+		if _, ok := macs[phys]; ok {
+			continue
+		}
+		// a port on a native VLAN is in br-vN, not in the LAN bridge
+		if rows, ok := jioports.VLANMACs(a.o.root, phys); ok {
+			macs[phys] = rows
+		}
+	}
 	if a.ports.ctr == nil {
 		a.ports.ctr = jioports.NewCounters()
 	}
