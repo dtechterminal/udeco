@@ -334,3 +334,87 @@ func TestStaEventsFromHostapd(t *testing.T) {
 		t.Fatalf("events %v", got)
 	}
 }
+
+// A BSS's first covered reading takes the reading before it as the
+// baseline: the socket events held from that reading's collection window
+// were already in its vap_table (and its diff), so they are not told a
+// second time. Every way a socket comes to be attached (the agent starts,
+// a re-attach after a missed PONG, hostapd restarting with a new socket)
+// gives no event of its own; an event after that reading was taken still
+// counts, once.
+func TestStaEventsAttachNoSpurious(t *testing.T) {
+	const a, x, y, z = "aa:bb:cc:00:01:0a", "aa:bb:cc:00:01:0b", "aa:bb:cc:00:01:0c", "aa:bb:cc:00:01:0d"
+	t0 := time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)
+	vifs := map[string]string{"wl12": "wifi1ap1"}
+	at := func(i int) time.Time { return t0.Add(time.Duration(i) * 10 * time.Second) }
+	read := func(e *staEvents, i int, since time.Time, stas [][2]any, evs ...hapdmon.Event) {
+		t.Helper()
+		e.observe(staReading(100+int64(i)*10, map[string][][2]any{"wifi1ap1": stas}),
+			// the reading takes 2 s: the events in it were in its window
+			&staFeed{read: at(i), now: at(i).Add(2 * time.Second), since: map[string]time.Time{"wl12": since}, vifs: vifs, evs: evs})
+	}
+	count := func(e *staEvents, mac, kind string) int {
+		n := 0
+		for _, ev := range e.queue {
+			if ev["mac"] == mac && ev["event_type"] == kind {
+				n++
+			}
+		}
+		return n
+	}
+
+	t.Run("agent start", func(t *testing.T) {
+		var e staEvents
+		since := t0.Add(-time.Minute)
+		// x joins and y leaves while the seeding reading is taken; it
+		// shows both
+		read(&e, 0, since, [][2]any{{a, -60}, {x, -61}},
+			staLive("wl12", x, hapdmon.Connected, at(0).Add(time.Second)),
+			staLive("wl12", y, hapdmon.Disconnected, at(0).Add(500*time.Millisecond)))
+		// z joins after the seeding reading was taken
+		read(&e, 1, since, [][2]any{{a, -60}, {x, -61}, {z, -62}},
+			staLive("wl12", z, hapdmon.Connected, at(0).Add(3*time.Second)))
+		for i := 2; i < 6; i++ {
+			read(&e, i, since, [][2]any{{a, -60}, {x, -61}, {z, -62}})
+		}
+		if len(e.queue) != 1 || count(&e, z, staEvAssoc) != 1 {
+			t.Fatalf("queue %v, want z's association only", e.queue)
+		}
+	})
+
+	t.Run("re-attach after a missed PONG", func(t *testing.T) {
+		var e staEvents
+		read(&e, 0, t0.Add(-time.Minute), [][2]any{{a, -60}})
+		read(&e, 1, t0.Add(-time.Minute), [][2]any{{a, -60}})
+		// attached again between readings 1 and 2: reading 2 is the
+		// diff's, and x joins while it is taken
+		since := at(1).Add(5 * time.Second)
+		read(&e, 2, since, [][2]any{{a, -60}, {x, -61}}, staLive("wl12", x, hapdmon.Connected, at(2).Add(time.Second)))
+		for i := 3; i < 7; i++ {
+			read(&e, i, since, [][2]any{{a, -60}, {x, -61}})
+		}
+		if len(e.queue) != 1 || count(&e, x, staEvAssoc) != 1 {
+			t.Fatalf("queue %v, want x's association once", e.queue)
+		}
+	})
+
+	t.Run("hostapd restart", func(t *testing.T) {
+		var e staEvents
+		read(&e, 0, t0.Add(-time.Minute), [][2]any{{a, -60}, {y, -63}})
+		read(&e, 1, t0.Add(-time.Minute), [][2]any{{a, -60}, {y, -63}})
+		// hostapd restarted with a new socket, attached again before
+		// reading 2; while reading 2 is taken y leaves and x joins, and
+		// after it was taken a leaves
+		since := at(1).Add(5 * time.Second)
+		read(&e, 2, since, [][2]any{{a, -60}, {x, -61}},
+			staLive("wl12", y, hapdmon.Disconnected, at(2).Add(500*time.Millisecond)),
+			staLive("wl12", x, hapdmon.Connected, at(2).Add(time.Second)),
+			staLive("wl12", a, hapdmon.Disconnected, at(2).Add(3*time.Second)))
+		for i := 3; i < 7; i++ {
+			read(&e, i, since, [][2]any{{x, -61}})
+		}
+		if len(e.queue) != 3 || count(&e, y, staEvLeave) != 1 || count(&e, x, staEvAssoc) != 1 || count(&e, a, staEvLeave) != 1 {
+			t.Fatalf("queue %v, want y's leave, x's association, a's leave, once each", e.queue)
+		}
+	})
+}

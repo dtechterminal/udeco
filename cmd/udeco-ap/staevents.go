@@ -61,6 +61,11 @@ import (
 //   - the reading diff is not used, but a reading that disagrees with the
 //     socket's account staSettle readings in a row (an event lost while
 //     hostapd restarted) wins.
+//   - a BSS's first covered reading (the agent started, the socket was
+//     attached again after a missed PONG or a hostapd restart) builds on
+//     the reading before it, which used the diff: that reading was taken
+//     after it started, so a station it already shows on the BSS is no
+//     association again for a CONNECTED from while it was taken.
 //
 // A BSS that is not covered (no socket, just attached, the Garage) keeps
 // the reading diff below.
@@ -90,6 +95,8 @@ type staEvents struct {
 	dropped int
 	held    []hapdmon.Event // socket events from after the last reading started
 	read    time.Time       // when the last reading started (zero: no socket feed)
+	taken   time.Time       // when the last reading had been taken (its feed's now)
+	cov     map[string]bool // the VAPs the last reading covered
 	odd     map[string]int  // "mac|vap|+/-": readings in a row a covered VAP disagreed
 }
 
@@ -124,7 +131,8 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 		}
 	}
 	var evs []hapdmon.Event
-	covered := map[string]bool{}
+	covered, fresh := map[string]bool{}, map[string]bool{}
+	var taken time.Time
 	if feed != nil {
 		// events from before the reading started are in it; the others
 		// wait for the next one
@@ -145,7 +153,15 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 				covered[n] = true
 			}
 		}
-		e.read = feed.read
+		// a VAP covered for the first time builds on the last reading,
+		// which used the diff and showed what happened while it was taken
+		for n := range covered {
+			if !e.cov[n] {
+				fresh[n] = true
+			}
+		}
+		taken = e.taken
+		e.read, e.taken, e.cov = feed.read, feed.now, covered
 	}
 	if !e.seeded {
 		e.prev, e.seeded = cur, true
@@ -162,6 +178,9 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 			continue
 		}
 		touched[ev.MAC] = true
+		if p, ok := e.prev[ev.MAC]; ok && p.vap == vap && ev.Kind == hapdmon.Connected && fresh[vap] && ev.At.Before(taken) {
+			continue // the last reading (the diff's) had it there already
+		}
 		e.live(ev, vap, names, cur, up-int64(feed.now.Sub(ev.At).Round(time.Second)/time.Second))
 	}
 	// the other BSSes: the reading diff. A client counts as gone from a VAP
