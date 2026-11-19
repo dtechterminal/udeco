@@ -23,7 +23,10 @@
 #     the unit's own settings alone.
 #   - Gateway answering for HEALTHY_AFTER s: confirms the running build
 #     (good.md5), drops udeco-ap.json.prev (it belongs to the build no
-#     longer confirmed) and clears the reboot strikes.
+#     longer confirmed) and clears the reboot strikes. Each installed build
+#     is confirmed on its own: a new udeco-ap.gz (a deploy or a rollback,
+#     told by its inode, size and time from ls) starts the HEALTHY_AFTER
+#     count again.
 # Actions go to $D/guard.events (persistent, last 50 lines) and the guard's
 # log to $R/guard.log. A kernel hang is left to the kernel's own watchdog: a
 # shell can't run then.
@@ -55,6 +58,10 @@ guard() {
 	rolled=""
 	confirmed=""
 	spawned=""
+	# the installed build, cheaply (no md5 every 10 s): a deploy renames a
+	# new file into place, a rollback copies over it
+	build() { ls -lni $D/udeco-ap.gz 2>/dev/null; }
+	built=$(build)
 	while [ -f $D/start.sh ]; do
 		# the supervisor: restart it when nothing holds its lock (the agent
 		# inherits the lock, so an orphaned agent still counts as running)
@@ -64,6 +71,14 @@ guard() {
 			if [ -z "$spawned" ]; then event "supervisor not running: starting it"; else log "supervisor not running: starting it again"; fi
 			spawned=$now
 			nohup sh $D/start.sh 8>&- >/dev/null 2>&1 </dev/null &
+		fi
+		b=$(build)
+		if [ "$b" != "$built" ]; then
+			# another build: it is confirmed after its own healthy time
+			built=$b
+			confirmed=""
+			[ -n "$up_since" ] && up_since=$now
+			log "udeco-ap.gz changed: the healthy time starts again"
 		fi
 		if ping -c 2 -w 5 $GW >/dev/null 2>&1; then
 			[ -n "$down_since" ] && event "gateway $GW answers again after $((now - down_since))s"

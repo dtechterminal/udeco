@@ -41,10 +41,12 @@ func runGuard(t *testing.T, files map[string]string, conf string, steps int) gua
 		}
 	}
 	stop := 5000 + 10*steps
-	conf += `
+	// hook <uptime> runs at each sleep; a test's conf may define it
+	conf = "hook() { :; }\n" + conf + `
 REBOOT=false
 sleep() {
 	n=$(cut -d. -f1 $UP); n=$((n + 10)); echo "$n.00 0.00" > $UP
+	hook $n
 	[ $n -ge ` + strconv.Itoa(stop) + ` ] && rm -f $D/start.sh
 	return 0
 }
@@ -142,5 +144,25 @@ func TestJioGuardConfirmDropsConfigPrev(t *testing.T) {
 	}
 	if g.file(t, "udeco-ap.json.prev") != "<none>" || g.file(t, "udeco-ap.json") != guardUHDIW {
 		t.Errorf("json.prev %q json %q", g.file(t, "udeco-ap.json.prev"), g.file(t, "udeco-ap.json"))
+	}
+}
+
+// TestJioGuardConfirmsEachBuild: a build deployed while the gateway stays
+// up (the guard keeps running; only the agent restarts) is confirmed once
+// it has run HEALTHY_AFTER, as the boot-time build was. Otherwise good.md5
+// stays on the boot-time build, the deploy keeps that one as .prev and the
+// build in between is lost as a rollback target.
+func TestJioGuardConfirmsEachBuild(t *testing.T) {
+	g := runGuard(t, map[string]string{
+		"udeco-ap.gz": guardOldBuild, "udeco-ap.gz.prev": "older\n", "good.md5": md5hex("older\n") + "\n",
+		"udeco-ap.json": guardU7LT,
+	}, "GW=203.0.113.1\nHEALTHY_AFTER=30\nping() { return 0; }\n"+
+		// the deploy at uptime 5100: a new file renamed into place
+		"hook() { [ $1 = 5100 ] && printf 'new build\\n' > $D/udeco-ap.gz.new && mv $D/udeco-ap.gz.new $D/udeco-ap.gz; return 0; }\n", 20)
+	if got := strings.TrimSpace(g.file(t, "good.md5")); got != md5hex(guardNewBuild) {
+		t.Errorf("good.md5 %q, want the build deployed at 5100 (%s); events:\n%s", got, md5hex(guardNewBuild), g.events)
+	}
+	if strings.Count(g.events, "confirmed good") != 2 {
+		t.Errorf("want both builds confirmed; events:\n%s", g.events)
 	}
 }

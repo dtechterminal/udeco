@@ -54,7 +54,12 @@
 #
 # Disruption: the agent restart takes the AP's UniFi connection away for
 # about 20 s. Wi-Fi is not restarted by the restart itself; the new agent
-# restarts a radio only if its plan differs from what the old one applied.
+# restarts a radio only if the profile it writes for that radio differs
+# byte for byte from the one installed (or the radio does not serve its
+# plan). A build that adds profile keys (DTIM, 802.11k/v, U-APSD, ...)
+# usually changes the profile, so its first provision restarts each radio
+# that serves an SSID once, and every client of that radio reassociates.
+# A rollback to an older build (by hand or by the guard) does the same.
 set -euo pipefail
 
 ALLOWED_HOST=192.168.0.51
@@ -68,7 +73,7 @@ WAIT_EXIT=330     # s: the old agent finishing its job (one Wi-Fi job is at most
 host=$ALLOWED_HOST ucg=192.168.0.1 port=18080
 force_host=0 force=0 preflight_only=0 build_only=0
 
-usage() { sed -n '3,57p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { sed -n '3,62p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 die() { echo "jio-ap: $*" >&2; exit 1; }
 
 is_ipv4() {
@@ -274,7 +279,7 @@ cur=\$(md5sum $GZ 2>/dev/null | cut -d' ' -f1)
 good=\$(cat $DIR/good.md5 2>/dev/null || true)
 prev=\$(md5sum $GZ.prev 2>/dev/null | cut -d' ' -f1)
 if [ -n \"\$good\" ] && [ \"\$prev\" = \"\$good\" ] && [ \"\$cur\" != \"\$good\" ]; then
-	echo \"  $GZ.prev kept: it is the confirmed build \$good (the installed \${cur:-none} is not)\"
+	echo \"  $GZ.prev kept: it is the confirmed build \$good; the installed \${cur:-none} is not confirmed and is replaced without a copy\"
 elif [ -n \"\$cur\" ] && [ \"\$cur\" != $gz_md5 ]; then
 	cp -p $GZ $GZ.prev
 fi
