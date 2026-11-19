@@ -266,6 +266,9 @@ func (a *agent) tick(ctx context.Context) {
 	}
 	a.wifiTick(ctx)
 	a.health(ctx)
+	if a.takeover.Load() {
+		a.portsApply(ctx, "tick") // a port someone moved is put back (ports.go)
+	}
 }
 
 // wifiTick runs bcmwifi.Tick while the agent's Wi-Fi is live: driver MAC
@@ -324,6 +327,10 @@ func (a *agent) provision(ctx context.Context, pv provision) {
 		a.logf("wifi: system_cfg %s waits for decosys.Enforce to succeed (and any TP-Link Wi-Fi rebuild or upgrade to finish) before any chanspec is pinned", pv.hash)
 		return
 	}
+	// LAN ports (ports.go): their VLAN bridges are kept through the Wi-Fi
+	// apply, and the ports follow the switch section once the Wi-Fi is done
+	a.portsPrepare(pv)
+	defer a.portsApply(ctx, "system_cfg "+pv.hash)
 	w.users, w.usersSet = in.Users, true
 	a.syncUsers(w.users, true)
 	full = a.radsecProvision(ctx, full, in) // RADIUS over TLS through the local proxy (radsec.go)
@@ -478,7 +485,8 @@ func (a *agent) dropToObserve(ctx context.Context, why string) {
 	m := filepath.Join(a.o.base, observeMarker)
 	a.event(fmt.Sprintf("!!!!! Wi-Fi is back with TP-Link (%s): restoring TP-Link's services and dropping to OBSERVE mode until %s is removed !!!!!", why, m))
 	a.takeover.Store(false)
-	a.siteApply() // site SSH logins end with the takeover (sitessh.go)
+	a.portsRestore(ctx) // the LAN ports back on the untagged LAN (ports.go)
+	a.siteApply()       // site SSH logins end with the takeover (sitessh.go)
 	a.worker.applied, a.worker.pending, a.worker.full = nil, nil, nil
 	a.ftDrop() // no more FT-SAE key holders to announce (ftsae.go)
 	a.policy.Store(nil)
@@ -523,6 +531,9 @@ func (a *agent) logIntent(pv provision) (bcmwifi.Desired, translate.Intent) {
 	d.Guest, gn = guestPolicy(d, translate.GuestPolicy(translate.ParseCfg(pv.systemCfg)), gwMAC, gw)
 	a.logf("wifi: controller plan from system_cfg %s (%s): %v", pv.hash, pv.why, in)
 	for _, n := range append(append(notes, dn...), gn...) {
+		if a.portsOn() && strings.HasPrefix(n, "switch: ") {
+			continue // the switch section is the ports' (ports.go)
+		}
 		a.logf("wifi: not carried: %s", n)
 	}
 	return d, in

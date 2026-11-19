@@ -435,6 +435,10 @@ func (s *Snapshot) gatewayPort() *Port {
 // portMACs: the mac_table rows of one br-lan port, one per MAC (the
 // youngest entry when a MAC shows up on more than one VLAN). The FDB carries
 // no VLAN, so every row is on VLAN 1, the untagged LAN.
+// PortMACs is the mac_table of the wired clients learned on br-lan port
+// number port (Port.BridgePort).
+func (s *Snapshot) PortMACs(port int) []map[string]any { return s.portMACs(port) }
+
 func (s *Snapshot) portMACs(port int) []map[string]any {
 	age := map[string]int64{}
 	var order []string

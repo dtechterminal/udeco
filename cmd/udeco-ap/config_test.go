@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/models"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
@@ -149,5 +150,30 @@ func TestJioPlatformConfig(t *testing.T) {
 	}
 	if _, err := parseConfig([]byte(`{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","platform":"x","model":"UAL6"}`)); err == nil {
 		t.Errorf("unknown platform accepted")
+	}
+}
+
+// TestJioPortsConfig: the JCOW414 may be reported as UHDIW (U7LT stays
+// valid), and ports_unlocked takes LAN ports 1-3 on UHDIW only.
+func TestJioPortsConfig(t *testing.T) {
+	base := `{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","takeover":true,"apply":true,"platform":"jio-mtk"`
+	for _, good := range []string{`,"model":"UHDIW"}`, `,"model":"uhdiw","ports_unlocked":[1]}`, `,"model":"UHDIW","ports_unlocked":[1,2,3]}`, `,"model":"U7LT"}`} {
+		c, err := parseConfig([]byte(base + good))
+		if err != nil {
+			t.Errorf("refused %s: %v", good, err)
+			continue
+		}
+		if !models.JCOW414Models[c.Model] {
+			t.Errorf("%s: model %q", good, c.Model)
+		}
+	}
+	for _, bad := range []string{`,"model":"UHDIW","ports_unlocked":[4]}`, `,"model":"UHDIW","ports_unlocked":[0]}`,
+		`,"model":"UHDIW","ports_unlocked":[1,1]}`, `,"model":"U7LT","ports_unlocked":[1]}`, `,"model":"U6IW"}`} {
+		if _, err := parseConfig([]byte(base + bad)); err == nil {
+			t.Errorf("accepted %s", bad)
+		}
+	}
+	if _, err := parseConfig([]byte(`{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","model":"UAL6","ports_unlocked":[1]}`)); err == nil {
+		t.Errorf("ports_unlocked accepted on the Deco")
 	}
 }

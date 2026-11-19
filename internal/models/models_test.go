@@ -191,3 +191,42 @@ func TestU7LTAgentProfile(t *testing.T) {
 		t.Errorf("WPA3 radio caps: ng %#x na %#x", p.Radios["ng"].RadioCaps2, p.Radios["na"].RadioCaps2)
 	}
 }
+
+// TestUHDIWAgentProfile: the JCOW414 reported as a UAP-IW-HD keeps the
+// AC-Lite's honest words (2x2 on both radios, WPA3 on 5 GHz only, the
+// unit's own power), and claims the switch bits only with PortVLAN.
+func TestUHDIWAgentProfile(t *testing.T) {
+	m, ok := Lookup("UHDIW")
+	if !ok || m.RearUplinkPort() != 5 || m.Gen != 5 {
+		t.Fatalf("UHDIW catalogue %+v ok=%v rear %d", m, ok, m.RearUplinkPort())
+	}
+	heAX := map[string]bool{"ng": false, "na": false}
+	p, ok := DecoAgentProfileWith(m, heAX, DecoAgentFeatures{LockAP: true})
+	if !ok || p.Model != "UHDIW" || p.WifiCaps != WifiCapLockAP || p.FWCaps&(FWCapQCASwitch|FWCapOWRTSwitch) != 0 {
+		t.Fatalf("profile ok=%v model %s wifi_caps %#x fw_caps %#x", ok, p.Model, p.WifiCaps, p.FWCaps)
+	}
+	for b, max := range map[string]int{"ng": 20, "na": 23} {
+		r := p.Radios[b]
+		if r.NSS != 2 || r.RadioCaps != RadioCapMIMO2 || r.MaxTx != max {
+			t.Errorf("%s: nss %d radio_caps %#x max_tx %d, want 2x2 and %d dBm", b, r.NSS, r.RadioCaps, r.MaxTx, max)
+		}
+	}
+	if p.Radios["na"].IEEEModes != decoAgentIEEEModesNAn || p.Radios["ng"].IEEEModes != decoAgentIEEEModesNGn {
+		t.Errorf("ieee modes %+v", p.Radios)
+	}
+	p, _ = DecoAgentProfileWith(m, heAX, DecoAgentFeatures{WPA3: true, PortVLAN: true})
+	if p.FWCaps&FWCapQCASwitch == 0 || p.FWCaps&FWCapOWRTSwitch == 0 {
+		t.Errorf("fw_caps %#x without the switch bits", p.FWCaps)
+	}
+	if p.Radios["na"].RadioCaps2&RadioCap2WPA3 == 0 || p.Radios["ng"].RadioCaps2 != 0 {
+		t.Errorf("WPA3 radio caps: ng %#x na %#x", p.Radios["ng"].RadioCaps2, p.Radios["na"].RadioCaps2)
+	}
+	// a model without ports never claims a switch
+	l, _ := Lookup("U7LT")
+	if p, _ := DecoAgentProfileWith(l, heAX, DecoAgentFeatures{PortVLAN: true}); p.FWCaps&(FWCapQCASwitch|FWCapOWRTSwitch) != 0 {
+		t.Errorf("U7LT claims a switch: fw_caps %#x", p.FWCaps)
+	}
+	if DecoAgentTakeoverFWCaps&(FWCapQCASwitch|FWCapOWRTSwitch) != FWCapQCASwitch|FWCapOWRTSwitch {
+		t.Errorf("a drop to observe would keep the switch bits")
+	}
+}

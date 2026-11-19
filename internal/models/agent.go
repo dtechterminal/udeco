@@ -96,11 +96,28 @@ const (
 	// block, from AF_PACKET taps on the agent's vifs (internal/mcinspect).
 	FW3CapMulticastInspect = 0x80
 
+	// FWCapQCASwitch (fw_caps 0x10, the controller's hasQCASwitch): the
+	// AP has a managed switch. Network 10.6.109 (XHjguBsIf, the UAP
+	// system_cfg builder) writes only "switch.status=disabled" without it;
+	// with it the device keeps switch_vlan_enabled (the device panel's
+	// "Enable Port VLAN", shown for the uidb hybrid uap+usw models) and its
+	// port_overrides, and system_cfg gets switch.vlan.* and switch.port.*
+	// (internal/jioports reads them). Claimed only with
+	// DecoAgentFeatures.PortVLAN.
+	FWCapQCASwitch = 0x10
+	// FWCapOWRTSwitch (fw_caps 0x100, hasOWRTSwitch): the switch tags
+	// VLANs. Without it the controller refuses a port override whose
+	// forward is "all" or "customize" on a QCA-switch AP
+	// (VLAN_TAGGING_UNSUPPORTED, com.ubnt.ace.api.e.CqACYAR) and allows
+	// native-only ports; with it an in-wall AP takes up to 96 VLANs.
+	// Claimed only with DecoAgentFeatures.PortVLAN.
+	FWCapOWRTSwitch = 0x100
+
 	// DecoAgentTakeover* are the bits that need the agent to own Wi-Fi: a
 	// drop to observe mode clears them from the session at once.
 	DecoAgentTakeoverWifiCaps  = WifiCapRFScan | WifiCapMinRateCtrl | WifiCapWPAPSKFile | WifiCapLockAP
 	DecoAgentTakeoverWifiCaps2 = WifiCap2RoamAssist
-	DecoAgentTakeoverFWCaps    = FWCapRadiusFilter | FWCapHotspot2
+	DecoAgentTakeoverFWCaps    = FWCapRadiusFilter | FWCapHotspot2 | FWCapQCASwitch | FWCapOWRTSwitch
 	DecoAgentTakeoverFW2Caps   = FW2CapRadSec | FW2CapMdnsSdBridge
 	DecoAgentTakeoverFW3Caps   = FW3CapMulticastInspect
 	// FWCapSHA512SSH (fw_caps 0x400, docs/internals.md "Capability words"):
@@ -136,15 +153,18 @@ const (
 )
 
 // DecoAgentProfile is the profile cmd/udeco-ap reports for model code m
-// (only UAL6 is supported; ok is false otherwise). Identity, firmware
-// version and power range come from the catalogue entry; the capability
+// (UAL6 on the Deco, U7LT or UHDIW on the JCOW414; ok is false otherwise).
+// Identity, firmware version and power range come from the catalogue entry
+// (a JCOW414 model's power is capped at the unit's own); the capability
 // words are the deliberately reduced set above:
 //
 //   - fw_caps 3 | 0x400 | 0x1000 | 0x4000 | 0x400000 | 0x1000000: the
 //     placeholder bits plus SHA-512 SSH passwords (the agent verifies and
 //     installs $6$ hashes), SNMPv3, multi-block / inverted WLAN schedules
 //     and encrypted syslog; RADIUS filter (0x20000000) with f.RadiusFilter
-//     and Hotspot 2.0 (0x800000) with f.Hotspot2; no RADIUS DAE;
+//     and Hotspot 2.0 (0x800000) with f.Hotspot2; QCA switch and OWRT
+//     switch (0x10 | 0x100) with f.PortVLAN on a model with LAN ports;
+//     no RADIUS DAE;
 //   - fw2_caps RadSec (0x80000) with f.RadSec and mDNS service bridge
 //     (0x10000000) with f.MdnsBridge, else 0 (not sent);
 //   - fw3_caps 0x40 (path monitoring), plus multicast inspect (0x80) with
@@ -296,23 +316,44 @@ type DecoAgentFeatures struct {
 	// Hotspot2: bcmwifi renders the WLAN's Hotspot 2.0 config (takeover
 	// with the hotspot2 config key): fw_caps Hotspot 2.0.
 	Hotspot2 bool
+	// PortVLAN: the agent applies the controller's per-port VLANs to the
+	// unit's LAN ports (internal/jioports; takeover on a JCOW414 reported
+	// as UHDIW): fw_caps QCA switch and OWRT switch.
+	PortVLAN bool
 }
+
+// JCOW414Models are the models a JioFiber JCOW414 (MT7603 2x2 2.4 GHz,
+// MT7663 2x2 5 GHz, four switch ports) can be reported as: the
+// UAP-AC-Lite (no ports) and the UAP-IW-HD (four front ports and the rear
+// uplink, the only Wi-Fi 5 UniFi AP with four LAN ports).
+var JCOW414Models = map[string]bool{"U7LT": true, "UHDIW": true}
+
+// jcow414MaxTx: the JCOW414's power at TxPower=100 % (internal/mtkwifi
+// JCOW414); a model's larger catalogue maximum is not claimed.
+var jcow414MaxTx = map[string]int{"ng": 20, "na": 23}
 
 // DecoAgentProfileWith is DecoAgentProfile with the optional features f.
 func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (inform.Profile, bool) {
-	if m.Code != "UAL6" && m.Code != "U7LT" {
+	jcow := JCOW414Models[m.Code]
+	if m.Code != "UAL6" && !jcow {
 		return inform.Profile{}, false
 	}
 	p := inform.Profile{Model: m.Code, Display: m.Display, Version: m.Version,
 		WifiCaps: DecoAgentWifiCaps, FWCaps: DecoAgentFWCaps, FW3Caps: DecoAgentFW3Caps,
 		Radios: map[string]inform.RadioProfile{}}
-	if m.Code == "U7LT" {
-		// the JCOW414 (UAP-AC-Lite profile): SAE only in its 5 GHz driver,
-		// so WPA3 is claimed only when the feature says so, and on na only
+	if jcow {
+		// the JCOW414 (UAP-AC-Lite or UAP-IW-HD profile): SAE only in its
+		// 5 GHz driver, so WPA3 is claimed only when the feature says so,
+		// and on na only
 		p.WifiCaps = 0
 		if f.WPA3 {
 			p.WifiCaps = WifiCapWPA3
 		}
+	}
+	// the switch bits: only a model with LAN ports, and only when the
+	// agent applies their VLANs
+	if f.PortVLAN && m.RearUplinkPort() > 0 {
+		p.FWCaps |= FWCapQCASwitch | FWCapOWRTSwitch
 	}
 	set := func(on bool, word *int64, bit int64) {
 		if on {
@@ -333,7 +374,10 @@ func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (i
 	for _, r := range m.Radios {
 		rp := inform.RadioProfile{NSS: r.NSS, MinTx: r.MinTx, MaxTx: r.MaxTx, Is11ac: r.Band == "na",
 			RadioCaps: RadioCapsMIMO(r.NSS)}
-		wpa3 := f.WPA3 && !(m.Code == "U7LT" && r.Band == "ng")
+		if hw := jcow414MaxTx[r.Band]; jcow && hw > 0 && rp.MaxTx > hw {
+			rp.MaxTx = hw
+		}
+		wpa3 := f.WPA3 && !(jcow && r.Band == "ng")
 		set(wpa3, &rp.RadioCaps2, DecoAgentRadioCaps2)
 		set(wpa3 && f.WPA3FT, &rp.RadioCaps2, RadioCap2WPA3FT)
 		ax := heAX == nil || heAX[r.Band]

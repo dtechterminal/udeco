@@ -62,6 +62,7 @@ type topology struct {
 	announce    atomic.Pointer[lldpAnnounce]
 	gwIP        atomic.Value // string: the gateway's IP (guest policy)
 	gwMAC       atomic.Value // string: the gateway's MAC (guest policy: the only L2 peer guests may reach)
+	uplinkName  atomic.Value // string: uplink, for the worker (port VLANs never change it)
 }
 
 type lldpAnnounce struct {
@@ -198,6 +199,7 @@ func (a *agent) observeReading(s *apstate.Snapshot, f map[string]any) {
 			a.logf("uplink: %s", up)
 		}
 		t.uplink, a.uplink = up, up
+		t.uplinkName.Store(up)
 		if a.takeover.Load() && a.wifi != nil {
 			// VLAN devices follow at the next plan or tick (bcmwifi)
 			a.submit("uplink "+up, func(context.Context) { a.wifi.SetUplink(up) })
@@ -218,6 +220,9 @@ func (a *agent) observeReading(s *apstate.Snapshot, f map[string]any) {
 	}
 
 	a.uplinkFields(f, s, ports, gw)
+	if a.portsOn() {
+		a.portFields(f, s)
+	}
 	a.steerReading(s, now)
 	a.roamReading(s, now)
 }

@@ -234,6 +234,7 @@ type agent struct {
 	sl       *syslogState              // remote syslog (syslogfwd.go)
 	snmp     *snmpState                // SNMP agent (snmp.go)
 	ftp      *ftPeerState              // FT-SAE peer discovery (ftsae.go)
+	ports    portState                 // LAN ports (ports.go)
 
 	// loop goroutine only
 	prev       *apstate.Snapshot
@@ -494,6 +495,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	// capability bit
 	a.uplink = detectUplink(s)
 	a.topo.uplink = a.uplink
+	a.topo.uplinkName.Store(a.uplink)
 	if a.takeover.Load() {
 		a.setLAN(s)
 		// Caps: bcmwifi.Plan checks each channel and width against the
@@ -509,6 +511,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 			a.logf("uplink port: not found from the gateway's FDB entry (bcmwifi picks the only br-lan port with carrier)")
 		}
 	}
+	portVLAN := a.portsSetup() // LAN ports (jio-mtk as UHDIW: ports.go)
 	_, canSteer := a.wifi.(steerer)
 	_, canRoam := a.wifi.(roamer)
 	ft, canFTSAE := a.wifi.(ftSAEServer)
@@ -524,7 +527,8 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	p, ok := models.DecoAgentProfileWith(m, heAX, models.DecoAgentFeatures{BandSteer: canSteer, RFScan: deco,
 		MinRate: own && a.cfg.MinRates, PPSK: deco, LockAP: own, RoamAssist: own && canRoam,
 		RadiusFilter: deco, MulticastInspect: deco, WPA3: own && a.cfg.WPA3, WPA3FT: own && a.cfg.WPA3 && canFTSAE,
-		RadSec: deco, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2})
+		RadSec: deco, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2,
+		PortVLAN: own && portVLAN})
 	if !ok {
 		return fmt.Errorf("model %s has no agent capability words", a.cfg.Model)
 	}

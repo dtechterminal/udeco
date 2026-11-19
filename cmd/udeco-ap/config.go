@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/antoniocosta/unifi-openwrt/internal/models"
 )
 
 // DefaultConfigPath is where persist_shell.sh starts the agent from.
@@ -72,8 +73,18 @@ type Config struct {
 	Hotspot2 bool `json:"hotspot2,omitempty"`
 	// Platform is the unit the agent runs on: "" = a TP-Link Deco X20
 	// (Broadcom, model UAL6); "jio-mtk" = a JioFiber JCOW414 used as a plain
-	// AP (MediaTek, model U7LT; internal/mtkwifi, internal/jiosys).
+	// AP (MediaTek, model U7LT or UHDIW; internal/mtkwifi, internal/jiosys).
+	// As UHDIW (UAP-IW-HD) the unit's LAN ports 1-3 show in UniFi as the
+	// in-wall AP's front ports 1-3 and its port 4 (the uplink) as the rear
+	// port 5, and the controller's port VLANs are applied to ports 1-3
+	// (internal/jioports, ports.go).
 	Platform string `json:"platform,omitempty"`
+	// PortsUnlocked (platform jio-mtk, model UHDIW) lists the LAN ports
+	// (1-3) whose VLANs the controller may change. Ports 2 and 3 always
+	// may; port 1 (the tenant's router) only when listed here, so its
+	// untagged LAN stays as it is whatever the controller sends. Port 4 is
+	// the uplink and is never changed (beyond the VLAN devices on it).
+	PortsUnlocked []int `json:"ports_unlocked,omitempty"`
 }
 
 // PlatformJio is the JioFiber JCOW414 (MediaTek) platform.
@@ -120,8 +131,18 @@ func (c *Config) validate() error {
 			return fmt.Errorf("config: model %q: only UAL6 is supported (its capability words are chosen for this hardware)", c.Model)
 		}
 	case PlatformJio:
-		if c.Model != "U7LT" {
-			return fmt.Errorf("config: model %q: platform %s is reported as U7LT (UAP-AC-Lite): set \"model\": \"U7LT\"", c.Model, c.Platform)
+		if !models.JCOW414Models[c.Model] {
+			return fmt.Errorf("config: model %q: platform %s is reported as U7LT (UAP-AC-Lite) or UHDIW (UAP-IW-HD, with its LAN ports): set \"model\": \"U7LT\" or \"UHDIW\"", c.Model, c.Platform)
+		}
+		if len(c.PortsUnlocked) > 0 && c.Model != "UHDIW" {
+			return fmt.Errorf("config: ports_unlocked needs model UHDIW (the only model reported with LAN ports)")
+		}
+		seen := map[int]bool{}
+		for _, p := range c.PortsUnlocked {
+			if p < 1 || p > 3 || seen[p] {
+				return fmt.Errorf("config: ports_unlocked %v: want distinct LAN ports 1-3 (port 4 is the uplink and is never changed)", c.PortsUnlocked)
+			}
+			seen[p] = true
 		}
 		// wpa3: SAE on the 5 GHz radio only (the MT7663 driver has it)
 		for name, on := range map[string]bool{"min_rates": c.MinRates, "mdns_bridge": c.MdnsBridge,
@@ -132,6 +153,9 @@ func (c *Config) validate() error {
 		}
 	default:
 		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
+	}
+	if len(c.PortsUnlocked) > 0 && !c.jio() {
+		return errors.New("config: ports_unlocked is for platform " + PlatformJio + " only")
 	}
 	if c.SSHDPort < 1 || c.SSHDPort > 65535 || c.SSHDPort == 22 {
 		return fmt.Errorf("config: sshd_port %d: want 1-65535 and never 22 (the unit's own dropbear)", c.SSHDPort)
