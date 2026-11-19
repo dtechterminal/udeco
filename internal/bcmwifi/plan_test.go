@@ -388,13 +388,15 @@ func TestLED(t *testing.T) {
 	f := newFakeDev(t)
 	a := newTestApplier(f, false)
 	ctx := context.Background()
-	for _, m := range []string{LEDOff, LEDLocate, LEDLocateOff} {
+	for _, m := range []string{LEDOn, LEDOff, LEDLocate, LEDLocateOff} {
 		if err := a.LED(ctx, m); err != nil {
 			t.Fatal(err)
 		}
 	}
 	got := f.mutating()
 	want := []string{
+		`ubus call leds conn {"state":"online"}`, // conn-indicator is stopped: clear its last state
+		`ubus call leds off {"state":"done"}`,
 		`ubus call leds off {"state":"off"}`,
 		`ubus call leds off {"state":"done"}`,
 		`ubus call leds zigbee {"state":"identifying"}`,
