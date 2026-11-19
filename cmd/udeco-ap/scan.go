@@ -62,6 +62,10 @@ type scanner struct {
 	results map[string]apstate.ScanResult
 	runners map[string]*wl.SpectrumRunner // by band, once a spectrum command used them
 	events  []*scanEvent                  // EVT_AP_QuickScanEvent still to send, at most one per band
+	saved   map[string]*savedTable        // tables saved before the restart, not restored yet (specsave.go)
+
+	saveMu    sync.Mutex // one write of the saved tables at a time
+	savedJSON []byte     // under saveMu: what the file on flash holds (nil = no file)
 }
 
 // scanEvent is the EVT_AP_QuickScanEvent of a band that ended with a table.

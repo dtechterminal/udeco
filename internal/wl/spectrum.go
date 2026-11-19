@@ -250,6 +250,7 @@ func (e *incompleteError) Is(target error) bool { return target == ErrIncomplete
 //	res.Diag         // per channel classes, calls, BSSes, airtime, drops
 //	r.Status()       // the same status at any time; Status().Age(now) in seconds
 //	r.ClearTable()   // a manual spectrum-scan clears both radios first (§7)
+//	r.RestoreTable(rows, at) // a table saved before an agent restart, into an empty runner
 //	col.WithoutScan(ctx, fn) // run fn (health check) when no scan is running
 //
 // One runner exists per radio and lives as long as the Collector; it keeps
@@ -356,6 +357,29 @@ func (s *SpectrumRunner) ClearTable() {
 	s.mu.Lock()
 	s.rows, s.tableTime = nil, time.Time{}
 	s.mu.Unlock()
+}
+
+// RestoreTable puts back a table measured at at before the agent
+// restarted (cmd/udeco-ap keeps the last good one per band on flash). It
+// goes in only when the runner has no table, so a band measured since (or
+// running now and finishing later) wins; Status then reports it as any
+// table, with Age counting from at. Abnormal and the phase are left as
+// they are. It reports whether the table went in; rows are copied.
+func (s *SpectrumRunner) RestoreTable(rows map[int][]SpectrumRow, at time.Time) bool {
+	n := 0
+	for _, rs := range rows {
+		n += len(rs)
+	}
+	if n == 0 || at.IsZero() {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.tableTime.IsZero() || s.rows != nil {
+		return false
+	}
+	s.rows, s.tableTime = copyRows(rows), at
+	return true
 }
 
 func (s *SpectrumRunner) isSticky(ch int) bool {

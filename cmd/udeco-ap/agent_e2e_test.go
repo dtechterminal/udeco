@@ -499,6 +499,7 @@ type e2e struct {
 	cfg  *Config
 	logs *logBuf
 	a    *agent
+	opts options // what the agent was built with (rebuild)
 
 	mu      sync.Mutex
 	sysOpts []decosys.Options
@@ -601,13 +602,25 @@ func newE2E(t *testing.T, systemCfg string, takeover bool, mods ...func(*Config,
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.a = a
+	e.a, e.opts = a, o
 	t.Cleanup(func() {
 		if t.Failed() {
 			t.Logf("agent log:\n%s", e.logs.all())
 		}
 	})
 	return e
+}
+
+// rebuild replaces the (stopped) agent with a new one on the same unit,
+// controller and config: an agent restart, so a new process with a new wl
+// collector (nothing of the old one's memory, spectrum runners included).
+func (e *e2e) rebuild() {
+	e.opts.col = e2eCollector{wl.New(wl.Options{Root: e.unit.root, Run: e.unit})}
+	a, err := newAgent(e.cfg, e.opts)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	e.a = a
 }
 
 func (e *e2e) start() {

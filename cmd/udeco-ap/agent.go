@@ -281,6 +281,9 @@ type agent struct {
 	rateSeen map[string]bool
 	// rateNoted: the not-supported note for rate-update was logged
 	rateNoted bool
+	// specNoted: per band, the last restore hold or error logged
+	// (specsave.go); loop goroutine
+	specNoted map[string]string
 }
 
 func newAgent(cfg *Config, o options) (*agent, error) {
@@ -540,6 +543,11 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 		RadSec: deco, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2})
 	if !ok {
 		return fmt.Errorf("model %s has no agent capability words", a.cfg.Model)
+	}
+	if deco {
+		// the last good spectrum tables from before the restart, restored
+		// by the next informs (specsave.go)
+		a.loadSpectrum()
 	}
 	a.profile = p
 	a.radioCaps = map[string]apstate.RadioCaps{}
@@ -851,6 +859,9 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 			rc.RadioCaps2 &^= models.RadioCap2WPA3 | models.RadioCap2WPA3FT
 			a.radioCaps[b] = rc
 		}
+	}
+	if a.takeover.Load() && !a.cfg.jio() {
+		a.restoreSpectrum(ctx, a.o.now()) // saved tables, once plausible (specsave.go)
 	}
 	a.scans.merge(f, &c, info, time.Now())
 	// a queued station event rides this inform; the changes this reading

@@ -1293,3 +1293,43 @@ func TestSpectrumStatusClear(t *testing.T) {
 		t.Errorf("cleared %+v", st)
 	}
 }
+
+// TestSpectrumRestoreTable: a table saved before an agent restart goes back
+// into an empty runner with its own measurement time (Age counts from it),
+// as a copy; a runner that already has a table (a band measured since)
+// keeps it; ClearTable and a new band replace a restored table as any other.
+func TestSpectrumRestoreTable(t *testing.T) {
+	r := t4Replay(t, "t4_wl0_chunked.txt", "wl0", "ng", 0)
+	c := newSpecCollector(t, r)
+	s := spectrumOf(t, c, "ng")
+	at := r.clk.Now().Add(-3 * time.Hour)
+	saved := map[int][]SpectrumRow{20: {{Channel: 1, Width: 20, CenterFreq: 2412, Utilization: 7, Interference: -80}}}
+	if s.RestoreTable(nil, at) || s.RestoreTable(saved, time.Time{}) {
+		t.Error("restored an empty table or one without a time")
+	}
+	if !s.RestoreTable(saved, at) {
+		t.Fatal("not restored into an empty runner")
+	}
+	saved[20][0].Utilization = 99 // the runner keeps a copy
+	st := s.Status()
+	if st.Age(r.clk.Now()) != 3*3600 || len(st.Rows[20]) != 1 || st.Rows[20][0].Utilization != 7 || st.Abnormal {
+		t.Errorf("restored status %+v age %d", st, st.Age(r.clk.Now()))
+	}
+	if s.RestoreTable(map[int][]SpectrumRow{40: {{Channel: 1, Width: 40}}}, at.Add(time.Hour)) {
+		t.Error("a second restore replaced the table")
+	}
+	// a new band replaces it
+	if _, err := s.Run(context.Background(), SpectrumRequest{SkipGate: true}); err != nil {
+		t.Fatal(err)
+	}
+	if st := s.Status(); len(st.Rows[20]) != 11 || st.Age(r.clk.Now()) != 0 {
+		t.Errorf("after a band: %d rows, age %d", len(st.Rows[20]), st.Age(r.clk.Now()))
+	}
+	if s.RestoreTable(saved, at) {
+		t.Error("restored over a measured table")
+	}
+	s.ClearTable()
+	if !s.RestoreTable(saved, at) || s.Status().Rows[20][0].Utilization != 99 {
+		t.Error("not restored after a clear")
+	}
+}

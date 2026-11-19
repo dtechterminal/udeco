@@ -1,0 +1,368 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package main
+
+// The last good spectrum table of each band survives an agent restart and a
+// reboot (2026-11-20: the release deploy of 2026-11-19 restarted every
+// agent, the informs stopped carrying spectrum_table and the AP's
+// Environment section stayed empty until the next scan).
+//
+// Saved: filepath.Join(base, wifiStateSub, spectrumFile), on the Deco
+// /tp_data/udeco/state/spectrum.json (ubifs flash, mounted sync), one small
+// versioned JSON file (spectrumSave: model, and per band the radio, the
+// wall-clock time the table was measured and its rows; about 1.5 kB for a
+// quick-scan of both bands, under 6 kB for a manual all-widths scan). It is
+// written (tmp + rename, 0600) only when a band gets a new good table and
+// when a manual spectrum-scan clears the tables first (CE §2.2: the saved
+// copy follows, cleared, then each new table), and only when the bytes
+// differ from what the file holds. A failed band leaves the table, and so
+// the file, as it was (CE §6). A failed write is logged; the table stays in
+// memory.
+//
+// Restored: read at start (setup, takeover on the Deco only) and put into
+// the band's spectrum runner (wl.SpectrumRunner.RestoreTable) at the next
+// inform; from then on it is reported exactly as a live table:
+// spectrum_table rows and spectrum_table_time = the true age from the
+// saved wall-clock time, until a new band replaces it or a spectrum-scan
+// clears it. Checked first: a file of another version or model, or that
+// does not parse, is dropped whole; a band whose radio is not the unit's
+// radio for that band now (another radio layout), whose rows do not belong
+// to the band, or that was measured more than spectrumMaxAge ago is
+// dropped. One measured after the current time (the clock is not set yet
+// right after a boot) is held, not dropped, and re-checked at every inform
+// until the clock has passed it. A band measured since the start always
+// wins over a saved one.
+//
+// No EVT_AP_QuickScanEvent for a restored table: the event means "a scan
+// just ended" and would add a fake one. What the controller then does with
+// the table (Network 11.1.50 decompiled, docs/deco/spectrum-controller-
+// expectations.md §5 "VERIFIED 2026-11-19", agent-design.md "Storing on the
+// controller"): every inform's non-empty spectrum_table, sent while no
+// quick-scan is in progress, replaces the copy the controller keeps in its
+// in-memory radio_table_stats, and spectrum_table_time (an age) becomes the
+// epoch now - age, so the restored table shows the time it was measured.
+// The controller writes spectrum results to its database only on
+// EVT_AP_QuickScanEvent (which also stamps spectrum_scan_timestamp = now and
+// upserts the event's row) or on a quickscan_scanning true -> false
+// transition; a restored table brings neither, so it lives in the
+// controller's in-memory copy only, refreshed by every inform (also after a
+// controller restart), spectrum_scan_timestamp keeps what the database had,
+// and Radio AI's prescan, which waits for that timestamp, does not take the
+// restored table as a fresh scan. UNVERIFIED on the units: that the
+// Environment section (stat/spectrum-scan, built from radio_table_stats)
+// shows this in-memory copy before the next scan saves one.
+//
+// Neighbour results (scan_table) are neither saved nor restored. keepSeen
+// keeps a missed neighbour 10 min, and the home listen (homelisten.go)
+// refills the own-channel neighbours within homeListenEvery (1 min) of the
+// start, so a restored list would matter for about a minute; a reboot
+// outlasts keepSeen anyway; and the list changes at almost every listen
+// (signal, age), so keeping it on flash would mean a write a minute.
+//
+// jio-mtk has no spectrum runners: nothing is read, restored or written
+// there (setup loads only with RF_SCAN claimed; saveSpectrum returns at
+// once). Observe mode runs no scans and claims no RF_SCAN: nothing is
+// loaded either, and a file left from takeover stays as it is.
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
+	"sort"
+	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+)
+
+const (
+	spectrumFile    = "spectrum.json"    // under the state directory (flash)
+	spectrumVersion = 1                  // spectrumSave.Version
+	spectrumMaxAge  = 7 * 24 * time.Hour // an older saved table is dropped
+)
+
+// spectrumSave is the file: the unit's model and the last good table per
+// band ("ng", "na").
+type spectrumSave struct {
+	Version int                    `json:"version"`
+	Model   string                 `json:"model"`
+	Bands   map[string]*savedTable `json:"bands"`
+}
+
+// savedTable is one band's table: the radio that measured it, when (wall
+// clock) and its rows by width.
+type savedTable struct {
+	Radio string                   `json:"radio"`
+	Time  time.Time                `json:"time"`
+	Rows  map[int][]wl.SpectrumRow `json:"rows"`
+}
+
+func (a *agent) spectrumPath() string {
+	return a.dev(filepath.Join(a.o.base, wifiStateSub, spectrumFile))
+}
+
+// loadSpectrum reads the saved tables at start (takeover on the Deco); the
+// next informs restore them (restoreSpectrum).
+func (a *agent) loadSpectrum() {
+	if a.o.base == "" { // a bare agent in a unit test: no flash
+		return
+	}
+	p := a.spectrumPath()
+	b, err := os.ReadFile(p)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			a.logf("spectrum: reading the saved tables %s: %v (none restored)", p, err)
+		}
+		return
+	}
+	tables, dropped, err := parseSpectrumSave(b, a.cfg.Model)
+	if err != nil {
+		a.logf("spectrum: saved tables in %s dropped: %v", p, err)
+	}
+	for _, band := range slices.Sorted(maps.Keys(dropped)) {
+		a.logf("spectrum: saved %s table dropped: %s", band, dropped[band])
+	}
+	a.scans.loadSaved(tables, b)
+}
+
+// parseSpectrumSave checks a saved file: the whole of it (err: version,
+// model, JSON) and each band (dropped, by band, with the reason).
+func parseSpectrumSave(b []byte, model string) (tables map[string]*savedTable, dropped map[string]string, err error) {
+	var s spectrumSave
+	if err := json.Unmarshal(b, &s); err != nil {
+		return nil, nil, fmt.Errorf("unparsable: %v", err)
+	}
+	if s.Version != spectrumVersion {
+		return nil, nil, fmt.Errorf("version %d, this agent reads %d", s.Version, spectrumVersion)
+	}
+	if s.Model != model {
+		return nil, nil, fmt.Errorf("saved on another model (%q, this unit is %q)", s.Model, model)
+	}
+	tables, dropped = map[string]*savedTable{}, map[string]string{}
+	for band, t := range s.Bands {
+		switch {
+		case band != "ng" && band != "na":
+			dropped[band] = "not a band this agent scans"
+		case t == nil || t.Radio == "" || t.Time.IsZero():
+			dropped[band] = "no radio or no time"
+		default:
+			if err := checkSavedRows(band, t.Rows); err != nil {
+				dropped[band] = err.Error()
+				continue
+			}
+			tables[band] = t
+		}
+	}
+	return tables, dropped, nil
+}
+
+// checkSavedRows: rows of band at a width the runner builds, each row in
+// its width's list and in the band.
+func checkSavedRows(band string, rows map[int][]wl.SpectrumRow) error {
+	lo, hi := 2400, 2500
+	if band == "na" {
+		lo, hi = 4900, 5925
+	}
+	n := 0
+	for w, rs := range rows {
+		if !slices.Contains([]int{20, 40, 80, 160}, w) {
+			return fmt.Errorf("rows at %d MHz", w)
+		}
+		for _, r := range rs {
+			if r.Width != w || r.Channel <= 0 || r.CenterFreq < lo || r.CenterFreq > hi {
+				return fmt.Errorf("row ch %d %d MHz at %d MHz under %d MHz is not a %s row", r.Channel, r.Width, r.CenterFreq, w, band)
+			}
+			n++
+		}
+	}
+	if n == 0 {
+		return fmt.Errorf("no rows")
+	}
+	return nil
+}
+
+// restoreSpectrum puts the saved tables back into their runners, once each
+// is plausible at now (loop goroutine, every inform; nothing to do once
+// they are all restored or dropped).
+func (a *agent) restoreSpectrum(ctx context.Context, now time.Time) {
+	for _, band := range a.scans.savedBands() {
+		t := a.scans.savedTable(band)
+		if t == nil {
+			continue
+		}
+		if t.Time.After(now) {
+			if a.specNoted[band] != "held" {
+				a.logf("spectrum: the saved %s table (measured %s) is held until the clock passes that time (now %s)",
+					band, t.Time.UTC().Format(time.RFC3339), now.UTC().Format(time.RFC3339))
+				a.noteSpectrum(band, "held")
+			}
+			continue
+		}
+		if age := now.Sub(t.Time); age > spectrumMaxAge {
+			a.scans.forgetSaved(band, t)
+			a.logf("spectrum: saved %s table dropped: measured %s ago, older than 7 days", band, age.Round(time.Minute))
+			continue
+		}
+		r, err := a.o.col.Spectrum(ctx, band)
+		if err != nil {
+			if a.specNoted[band] != err.Error() {
+				a.logf("spectrum: saved %s table not restored yet: %v (retried at the next inform)", band, err)
+				a.noteSpectrum(band, err.Error())
+			}
+			continue
+		}
+		if r.Radio() != t.Radio {
+			a.scans.forgetSaved(band, t)
+			a.logf("spectrum: saved %s table dropped: measured on radio %s, the unit's is %s", band, t.Radio, r.Radio())
+			continue
+		}
+		n := 0
+		for _, rs := range t.Rows {
+			n += len(rs)
+		}
+		switch a.scans.restore(band, t, r) {
+		case restoredOK:
+			a.logf("spectrum: restored the %s table measured %s ago on %s (%d rows; reported as measured, no EVT_AP_QuickScanEvent)",
+				band, now.Sub(t.Time).Round(time.Second), r.Radio(), n)
+		case restoredNewer:
+			a.logf("spectrum: saved %s table not restored: %s has a newer table", band, r.Radio())
+		}
+	}
+}
+
+func (a *agent) noteSpectrum(band, s string) {
+	if a.specNoted == nil {
+		a.specNoted = map[string]string{}
+	}
+	a.specNoted[band] = s
+}
+
+// saveSpectrum writes the tables to flash when they changed (the band
+// goroutine of a spectrum command, after a new good table or a clear).
+func (a *agent) saveSpectrum() {
+	if a.o.base == "" || a.cfg.jio() {
+		return
+	}
+	sc := a.scans
+	sc.saveMu.Lock()
+	defer sc.saveMu.Unlock()
+	s := sc.saveState(a.cfg.Model)
+	if len(s.Bands) == 0 && sc.savedJSON == nil { // nothing saved, nothing to save
+		return
+	}
+	b, err := json.Marshal(s)
+	if err != nil || bytes.Equal(b, sc.savedJSON) {
+		return
+	}
+	p := a.spectrumPath()
+	tmp := p + ".tmp"
+	err = os.MkdirAll(filepath.Dir(p), 0o700)
+	if err == nil {
+		err = os.WriteFile(tmp, b, 0o600)
+	}
+	if err == nil {
+		err = os.Rename(tmp, p)
+	}
+	if err != nil {
+		os.Remove(tmp)
+		a.logf("spectrum: saving the tables to %s: %v (kept in memory; a restart would start without them)", p, err)
+		return
+	}
+	sc.savedJSON = b
+}
+
+// loadSaved keeps the tables read at start until they are restored, and
+// the file's bytes (savedJSON: what is on flash).
+func (sc *scanner) loadSaved(tables map[string]*savedTable, file []byte) {
+	sc.mu.Lock()
+	sc.saved = tables
+	sc.mu.Unlock()
+	sc.saveMu.Lock()
+	sc.savedJSON = file
+	sc.saveMu.Unlock()
+}
+
+// savedBands lists the bands with a saved table not restored yet.
+func (sc *scanner) savedBands() []string {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	if len(sc.saved) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(sc.saved))
+	for b := range sc.saved {
+		out = append(out, b)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (sc *scanner) savedTable(band string) *savedTable {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	return sc.saved[band]
+}
+
+// forgetSaved drops band's saved table if it is still t.
+func (sc *scanner) forgetSaved(band string, t *savedTable) {
+	sc.mu.Lock()
+	if sc.saved[band] == t {
+		delete(sc.saved, band)
+	}
+	sc.mu.Unlock()
+}
+
+// dropSaved forgets every table not restored yet: a spectrum-scan clears
+// all tables first, saved ones included.
+func (sc *scanner) dropSaved() {
+	sc.mu.Lock()
+	sc.saved = nil
+	sc.mu.Unlock()
+}
+
+const (
+	restoredGone  = iota // dropped meanwhile (a spectrum-scan cleared it)
+	restoredOK           // in the runner, reported from now on
+	restoredNewer        // the runner has a table measured since
+)
+
+// restore puts band's saved table t into r and keeps r for the informs.
+func (sc *scanner) restore(band string, t *savedTable, r *wl.SpectrumRunner) int {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	if sc.saved[band] != t {
+		return restoredGone
+	}
+	delete(sc.saved, band)
+	if !r.RestoreTable(t.Rows, t.Time) {
+		return restoredNewer
+	}
+	sc.runners[band] = r
+	return restoredOK
+}
+
+// saveState is what the file should hold: each runner's table, and the
+// saved tables still waiting to be restored (held for the clock) for bands
+// without one.
+func (sc *scanner) saveState(model string) spectrumSave {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	s := spectrumSave{Version: spectrumVersion, Model: model, Bands: map[string]*savedTable{}}
+	for band, t := range sc.saved {
+		s.Bands[band] = t
+	}
+	for band, r := range sc.runners {
+		st := r.Status()
+		if len(st.Rows) == 0 || st.TableTime.IsZero() {
+			continue
+		}
+		// measured (or restored) since: a held saved table is older
+		delete(sc.saved, band)
+		s.Bands[band] = &savedTable{Radio: st.Radio, Time: st.TableTime.UTC(), Rows: st.Rows}
+	}
+	return s
+}
