@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 	"unsafe"
@@ -19,28 +20,41 @@ import (
 // fakeMT7603 is mt7603eap.ko's private ioctls on the test unit, as the
 // module does them (offchan.go top; Ghidra and the 2026-11-20 live test):
 // `show mibinfo` prints the MIB block to the kernel log; ApOffChanScan for
-// a listed channel prints the visit's start line, writes the visit's score
-// into the channel's slot and prints the end line on the way back home; an
-// unlisted channel is refused without a line; 0x2014 answers the slots,
-// 0x8999 the channel list.
+// a listed channel prints the visit's start line (ApSiteSurveyNew_by_wdev),
+// the MLME's "start offchannel scan" line (APMlmeScanReqAction) and its
+// stay-time line (ScanNextChannel), writes the visit's score into the
+// channel's slot and prints the end line on the way back home; an unlisted
+// channel is refused without a line, and the ioctl fails with EINVAL
+// (Set_ApOffChanScan_Proc returns 0 on ChannelSanity, RTMPAPPrivIoctlSet
+// maps 0 to -EINVAL); 0x2014 answers the slots, 0x8999 the channel list.
 type fakeMT7603 struct {
-	d      *klogDev
-	ck     *clock
-	list   []int       // the driver's channel list; nil: OID 0x8999 fails
-	busy   map[int]int // channel -> busy µs over the dwell
-	stale  map[int]int // channel -> visits whose slot is not written
-	extra  map[int]int // channel -> visits overlapped by another channel's request
-	noEnd  bool        // no "End of SCAN" line (a debug level below 3)
-	away   int         // the end line restores to this channel (0: home)
-	home   int         // the radio's channel
-	slots  [55][2]uint32
-	calls  []string // "<t> show mibinfo", "<t> set ...", "<t> oid 0x2014"
-	hook   func(call string)
-	setErr error
+	d     *klogDev
+	ck    *clock
+	list  []int       // the driver's channel list; nil: OID 0x8999 fails
+	busy  map[int]int // channel -> busy µs over the dwell
+	stale map[int]int // channel -> visits whose slot is not written
+	extra map[int]int // channel -> visits overlapped by another channel's request
+	// hijack: channel -> visits ended by a scan already running (one that
+	// prints no start line): our start line, a slot written with that
+	// scan's busy time (hijackBusy), its end line, and no visit of ours
+	hijack     map[int]int
+	hijackBusy int
+	silent     map[int]int           // channel -> sets that succeed with no visit and no line ("Network is down")
+	slowShow   map[int]time.Duration // channel -> the pre-clear before its visit takes this long (once)
+	noEnd      bool                  // no level-3 lines: no "start offchannel scan", stay-time or "End of SCAN" (a debug level below 3)
+	away       int                   // the end line restores to this channel (0: home)
+	home       int                   // the radio's channel
+	slots      [55][2]uint32
+	calls      []string // "<t> show mibinfo", "<t> set ...", "<t> oid 0x2014"
+	hook       func(call string)
+	setErr     error
+
+	pendingSlow bool // a pre-clear the next set's slowShow applies to
 }
 
 func newFakeMT7603(d *klogDev, ck *clock) *fakeMT7603 {
-	f := &fakeMT7603{d: d, ck: ck, list: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, busy: map[int]int{}, stale: map[int]int{}, extra: map[int]int{}, home: 6}
+	f := &fakeMT7603{d: d, ck: ck, list: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, busy: map[int]int{}, stale: map[int]int{}, extra: map[int]int{},
+		hijack: map[int]int{}, silent: map[int]int{}, slowShow: map[int]time.Duration{}, home: 6}
 	// slots past the list hold heap garbage
 	for i := 11; i < 55; i++ {
 		f.slots[i] = [2]uint32{0xdeadbeef, uint32(i * 7)}
@@ -59,11 +73,18 @@ func (f *fakeMT7603) Show(ifname, what string) error {
 	f.note("show " + ifname + " " + what)
 	if what == "mibinfo" {
 		f.d.log.WriteString(mibFixtureLines)
+		// the next visit's channel is not known here: slowShow applies to
+		// the visit after the pre-clear (the next set)
+		f.pendingSlow = true
 	}
 	return nil
 }
 
-func (f *fakeMT7603) Set(ifname, arg string) error {
+func (f *fakeMT7603) Set(ifname string, b []byte) error {
+	if len(b) == 0 || b[len(b)-1] != 0 {
+		return errors.New("fake: set argument not NUL-terminated")
+	}
+	arg := string(b[:len(b)-1])
 	f.note("set " + ifname + " " + arg)
 	if f.setErr != nil {
 		return f.setErr
@@ -72,11 +93,31 @@ func (f *fakeMT7603) Set(ifname, arg string) error {
 	if _, err := fmt.Sscanf(arg, "ApOffChanScan=passive:%d:%d", &ch, &ms); err != nil {
 		return errors.New("fake: bad set " + arg)
 	}
+	if d, ok := f.slowShow[ch]; ok && f.pendingSlow {
+		// the time from the pre-clear to this request
+		delete(f.slowShow, ch)
+		f.ck.t = f.ck.t.Add(d)
+	}
+	f.pendingSlow = false
 	idx := slices.Index(f.list, ch)
 	if idx < 0 {
-		return nil // ChannelSanity: "wrong channel number" (debug only), no visit
+		return syscall.EINVAL // ChannelSanity: "wrong channel number" (debug only), no visit
+	}
+	if f.silent[ch] > 0 {
+		f.silent[ch]--
+		return nil
 	}
 	fmt.Fprintf(&f.d.log, "<4>ApSiteSurveyNew_by_wdev channel_index:%d channel:%d time:%d\n", idx, ch, ms)
+	if f.hijack[ch] > 0 {
+		f.hijack[ch]--
+		f.slots[idx] = [2]uint32{uint32(max(0, 100-f.hijackBusy/4000)), uint32(ch)}
+		fmt.Fprintf(&f.d.log, "<4>SYNC - End of SCAN, restore to 20MHz channel %d, Total BSS[03]\n", f.home)
+		return nil
+	}
+	if !f.noEnd {
+		fmt.Fprintf(&f.d.log, "<4>[APMlmeScanReqAction][2098] start offchannel scan on %d : channel list index = 0\n", ch)
+		fmt.Fprintf(&f.d.log, "<4>[ScanNextChannel][696] stay time configured of channel index = 0 time = %d\n", ms)
+	}
 	if f.extra[ch] > 0 {
 		f.extra[ch]--
 		fmt.Fprintf(&f.d.log, "<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:1 time:%d\n", ms)
@@ -300,7 +341,7 @@ type refusingMT7603 struct {
 	list []int
 }
 
-func (f *refusingMT7603) Set(ifname, arg string) error {
+func (f *refusingMT7603) Set(ifname string, arg []byte) error {
 	f.fakeMT7603.list = f.list
 	defer func() { f.fakeMT7603.list = nil }()
 	return f.fakeMT7603.Set(ifname, arg)
@@ -366,6 +407,12 @@ func TestParseVisitLog(t *testing.T) {
 	v = parseVisitLog("<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:1 time:200\n"+log, "ng", 4)
 	if v.others != 1 {
 		t.Errorf("another channel's visit: %+v", v)
+	}
+	// channel 0 is a full-band survey of either radio: a foreign scan, not
+	// nothing
+	v = parseVisitLog(log+"<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:0 time:0\n", "ng", 4)
+	if v.others != 1 {
+		t.Errorf("a full-band survey's start line: %+v", v)
 	}
 }
 
@@ -535,5 +582,196 @@ func TestIwreqLayout(t *testing.T) {
 	}
 	if _, err := newIwreq("a-very-long-ifname", buf, 0); err == nil {
 		t.Error("an over-long name accepted")
+	}
+}
+
+// A set the driver takes without starting a visit (Set_ApOffChanScan_Proc
+// returns non-zero from its "Network is down" branch, which the ioctl
+// reports as success) is not a refused channel: it leaves no row and no
+// error, so the table would go out with a hole. It is retried; missed
+// twice, the band fails.
+func TestOffChanSilentSet(t *testing.T) {
+	c, f, _, _ := offChanUnit(t)
+	ctx := context.Background()
+	f.silent[4] = 1
+	r, _ := c.Spectrum(ctx, "ng")
+	res, err := r.Run(ctx, wl.SpectrumRequest{})
+	if err != nil {
+		t.Fatalf("one silent set, retried: %v", err)
+	}
+	if got := f.sets(); len(got) != 12 || got[11] != 4 {
+		t.Errorf("visits %v: want 1..11 and 4 again", got)
+	}
+	if len(res.Rows[20]) != 11 {
+		t.Errorf("%d rows, want 11", len(res.Rows[20]))
+	}
+	f.calls = nil
+	f.silent[4] = 2
+	if _, err := r.Run(ctx, wl.SpectrumRequest{}); !errors.Is(err, wl.ErrIncomplete) {
+		t.Errorf("silent twice: %v", err)
+	}
+}
+
+// A scan already running when the request comes (a driver scan through
+// ApSiteSurvey prints no start line) takes our list index and ends with its
+// own end line: our start line and one end line, the slot naming our
+// channel, but the MLME never started our visit ("start offchannel scan"
+// missing) and the slot holds that scan's busy time. Not trusted: visited
+// again.
+func TestOffChanHijackedVisit(t *testing.T) {
+	c, f, _, _ := offChanUnit(t)
+	ctx := context.Background()
+	f.busy[4] = 8000
+	f.hijack[4], f.hijackBusy = 1, 160000
+	r, _ := c.Spectrum(ctx, "ng")
+	res, err := r.Run(ctx, wl.SpectrumRequest{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := f.sets(); len(got) != 12 || got[11] != 4 {
+		t.Errorf("visits %v: want 1..11 and 4 again", got)
+	}
+	for _, row := range res.Rows[20] {
+		if row.Channel == 4 && row.Utilization != 4 {
+			t.Errorf("ch 4 utilization %d, want 4 (the real visit, not the other scan's 80)", row.Utilization)
+		}
+	}
+}
+
+// Another `show mibinfo` during a visit (an agent reading, or someone on
+// the unit) read-clears Prim CCA Time partway through the dwell: the slot's
+// busy time is too low. Two MIB blocks in the visit's log: not trusted.
+func TestOffChanSecondMibRead(t *testing.T) {
+	c, f, d, _ := offChanUnit(t)
+	ctx := context.Background()
+	once := true
+	f.hook = func(call string) {
+		if once && strings.Contains(call, "passive:3:") {
+			once = false
+			d.log.WriteString(mibFixtureLines)
+		}
+	}
+	r, _ := c.Spectrum(ctx, "ng")
+	if _, err := r.Run(ctx, wl.SpectrumRequest{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := f.sets(); len(got) != 12 || got[11] != 3 {
+		t.Errorf("visits %v: want 1..11 and 3 again", got)
+	}
+}
+
+// The pre-clear must come right before the request, or the home channel's
+// busy time in between is counted as the visit's (live: ~1.2 ms). A visit
+// whose pre-clear-to-request time is long is not trusted; the longest time
+// of the band is in the diag.
+func TestOffChanPreClearGap(t *testing.T) {
+	c, f, _, _ := offChanUnit(t)
+	ctx := context.Background()
+	f.slowShow[2] = 30 * time.Millisecond
+	r, _ := c.Spectrum(ctx, "ng")
+	res, err := r.Run(ctx, wl.SpectrumRequest{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := f.sets(); len(got) != 12 || got[11] != 2 {
+		t.Errorf("visits %v: want 1..11 and 2 again", got)
+	}
+	if !slices.ContainsFunc(res.Diag.Notes, func(n string) bool { return strings.Contains(n, "pre-clear to request") }) {
+		t.Errorf("no pre-clear gap in the notes %q", res.Diag.Notes)
+	}
+}
+
+// A Collect already reading the radio (it holds c.mu, and its `show
+// mibinfo` would read-clear the counter in a visit's dwell) is waited for
+// before the first visit.
+func TestOffChanWaitsForCollect(t *testing.T) {
+	c, f, _, _ := offChanUnit(t)
+	ctx := context.Background()
+	visited := make(chan struct{})
+	var once bool
+	f.hook = func(call string) {
+		if !once && strings.HasPrefix(call, "show ") {
+			once = true
+			close(visited)
+		}
+	}
+	r, _ := c.Spectrum(ctx, "ng")
+	c.mu.Lock() // a Collect in flight
+	done := make(chan error, 1)
+	go func() {
+		_, err := r.Run(ctx, wl.SpectrumRequest{})
+		done <- err
+	}()
+	select {
+	case <-visited:
+		c.mu.Unlock()
+		<-done
+		t.Fatal("a visit started while a Collect was reading the radio")
+	case <-time.After(300 * time.Millisecond):
+	}
+	c.mu.Unlock()
+	if err := <-done; err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(f.sets()) != 11 {
+		t.Errorf("visits %v", f.sets())
+	}
+}
+
+// While a sweep or survey runs, Collect never asks the driver, even for a
+// radio it has no reading of yet (none to keep).
+func TestCollectNoReadWhileScanning(t *testing.T) {
+	c, _, d, _ := offChanUnit(t)
+	c.scanning.Store(true)
+	if _, err := c.Collect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, cmd := range d.iwpriv() {
+		if strings.HasPrefix(cmd, "iwpriv ra0 ") {
+			t.Errorf("asked %q while scanning", cmd)
+		}
+	}
+	if _, ok := c.cache["ra0"]; ok {
+		t.Error("an empty reading was kept")
+	}
+}
+
+// On the home channel the radio stays where our own stations are: their
+// uplink in the dwell is not other networks' use (spectrum-design §4.1
+// leaves our own traffic out). The stations' receive airtime the collector
+// estimates (µs a second) is taken off the home visit's busy time.
+func TestOffChanHomeOwnUplink(t *testing.T) {
+	c, f, d, ck := offChanUnit(t)
+	ctx := context.Background()
+	f.busy[6], f.busy[1] = 40000, 40000
+	table := d.next["ra0"]
+	c.cache["ra0"] = &radioReading{at: ck.t, staRx: 100_000} // 10 % of the air
+	r, _ := c.Spectrum(ctx, "ng")
+	res, err := r.Run(ctx, wl.SpectrumRequest{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	for _, row := range res.Rows[20] {
+		switch row.Channel {
+		case 6:
+			if row.Utilization != 10 {
+				t.Errorf("home ch 6 utilization %d, want 10 (40 ms busy less 20 ms of our stations' uplink, of 200)", row.Utilization)
+			}
+		case 1:
+			if row.Utilization != 20 {
+				t.Errorf("ch 1 utilization %d, want 20 (off the home channel nothing is taken off)", row.Utilization)
+			}
+		}
+	}
+	// a stale estimate (after an apply) or an old one is not used
+	c.cache["ra0"] = &radioReading{at: ck.t, staRx: 100_000, stale: true}
+	d.survey["ra0"], d.next["ra0"], d.reads = "ra0       get_site_survey:\nTotal=0\n", table, 0 // a new survey again
+	if res, err = r.Run(ctx, wl.SpectrumRequest{}); err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	for _, row := range res.Rows[20] {
+		if row.Channel == 6 && row.Utilization != 20 {
+			t.Errorf("stale estimate used: home utilization %d", row.Utilization)
+		}
 	}
 }

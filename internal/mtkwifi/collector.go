@@ -282,14 +282,22 @@ func driverReads(rd RadioDef) (counts, busy, mib bool) {
 
 // reading returns the radio's cached driver reading, read again when it is
 // older than CacheTTL, when the set of BSSes up changed, or after
-// Invalidate. During a site survey (Scan) the old reading stands: iwconfig
-// may show the scan channel then. While the applier restarts a radio, and
+// Invalidate. During a site survey (Scan) or an off-channel sweep the old
+// reading stands, or an empty one without it, and the driver is not asked:
+// iwconfig may show the scan channel then, and `show mibinfo` would clear
+// the busy counter a visit is measuring. While the applier restarts a radio, and
 // for its settle time after, the old reading stands too (restartgate.go);
 // without one the reading is empty and not kept. c.mu is held.
 func (c *Collector) reading(ctx context.Context, rd RadioDef, up []string, now time.Time) *radioReading {
 	main := rd.Ifaces[0]
 	old := c.cache[main]
-	if old != nil && (c.scanning.Load() || (!old.stale && now.Sub(old.at) < c.o.CacheTTL && now.Sub(old.at) >= 0 && slices.Equal(old.up, up))) {
+	if c.scanning.Load() {
+		if old != nil {
+			return old
+		}
+		return &radioReading{at: now, up: up, essid: map[string]string{}}
+	}
+	if old != nil && !old.stale && now.Sub(old.at) < c.o.CacheTTL && now.Sub(old.at) >= 0 && slices.Equal(old.up, up) {
 		return old
 	}
 	done, ok := c.driverRead()

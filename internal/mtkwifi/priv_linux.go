@@ -36,7 +36,7 @@ func (p sockPriv) ioctl(ifname string, req uintptr, buf []byte, flags uint16) er
 
 func (p sockPriv) Show(ifname, what string) error { return p.ioctl(ifname, ioctlShow, cstr(what), 0) }
 
-func (p sockPriv) Set(ifname, arg string) error { return p.ioctl(ifname, ioctlSet, cstr(arg), 0) }
+func (p sockPriv) Set(ifname string, arg []byte) error { return p.ioctl(ifname, ioctlSet, arg, 0) }
 
 func (p sockPriv) OID(ifname string, flags uint16, buf []byte) error {
 	return p.ioctl(ifname, ioctlOID, buf, flags)

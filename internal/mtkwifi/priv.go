@@ -26,8 +26,11 @@ const (
 type privIO interface {
 	// Show is `iwpriv <ifname> show <what>` (output to the kernel log).
 	Show(ifname, what string) error
-	// Set is `iwpriv <ifname> set <arg>` (arg "Key=value").
-	Set(ifname, arg string) error
+	// Set is `iwpriv <ifname> set <arg>`: arg is "Key=value" as cstr
+	// gives it, built by the caller ahead of time (the off-channel visit
+	// builds it before its pre-clear, so nothing is allocated between the
+	// two).
+	Set(ifname string, arg []byte) error
 	// OID fills buf with the reply of OID oid (flags as sent: a set OID
 	// has oidSet in it); the length sent is len(buf).
 	OID(ifname string, flags uint16, buf []byte) error

@@ -183,7 +183,7 @@ func (c *Collector) freshSurvey(ctx context.Context, band, main string) (*apstat
 	if err != nil {
 		return nil, err
 	}
-	c.scanning.Store(true)
+	c.startScanning()
 	defer c.scanning.Store(false)
 	// run before scanning ends: the next `show mibinfo` ask would measure
 	// Prim CCA Time over an interval that held the scan, off the channel
@@ -218,6 +218,30 @@ func (c *Collector) freshSurvey(ctx context.Context, band, main string) (*apstat
 	c.seen[band] = &surveySeen{table: last, at: now, bss: bss}
 	c.mu.Unlock()
 	return &apstate.ScanResult{Band: band, Time: now, BSS: append([]apstate.BSS(nil), bss...)}, nil
+}
+
+// startScanning sets scanning once no Collect is reading the driver: one
+// that has already passed reading's check (it holds c.mu throughout) would
+// still ask `show mibinfo`, whose read-clear of Prim CCA Time would land in
+// the scan (in an off-channel visit's dwell: a busy time too low, trusted).
+// From here on no Collect asks the driver until scanning ends.
+func (c *Collector) startScanning() {
+	c.mu.Lock()
+	c.scanning.Store(true)
+	c.mu.Unlock()
+}
+
+// ownUplink is our stations' receive airtime (µs a second) from the
+// radio's last reading, when it is fresh and was not invalidated by an
+// apply (0: none).
+func (c *Collector) ownUplink(main string, now time.Time) int64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	rr := c.cache[main]
+	if rr == nil || rr.stale || now.Sub(rr.at) < 0 || now.Sub(rr.at) > ownAirKeep {
+		return 0
+	}
+	return max(rr.staRx, 0)
 }
 
 // mibGap: the radio left its channel (a site survey) since its last `show

@@ -232,7 +232,8 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   the band; the radio returns to its own channel after each visit and never
   restarts) and reads how long the channel was busy, then surveys the
   neighbours. The unit then reports a per-channel table (utilisation from
-  the busy time, interference from the strongest neighbour on the channel;
+  the busy time, on its own channel less its own clients' estimated
+  traffic; interference from the strongest neighbour on the channel;
   20 and 40 MHz rows), as a real AP does, so the Environment page shows
   2.4 GHz charts; the last table is kept in `/flash2/udeco/state/` and
   comes back after a restart. The 5 GHz radio (MT7663) has no such
@@ -247,7 +248,9 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   yet measured on the unit: how long clients stall during a 5 GHz survey,
   whether the survey's end is detected correctly on the quiet 5 GHz DFS
   channels, and a sweep run by the agent itself (the visits were verified
-  with a probe). Check these before turning it on.
+  with a probe; the agent also needs the driver's "start offchannel scan"
+  log line for each visit, read from the module but not yet seen on the
+  unit). Check these before turning it on.
 - **LAN ports (`"model": "UHDIW"`):** the unit can instead report as a
   UAP-IW-HD: LAN ports 1-3, port 4 absent, the uplink as rear port 5. With
   Enable Port VLAN on, the controller's port VLANs apply to ports 2 and 3
