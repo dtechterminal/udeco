@@ -1,0 +1,12 @@
+HTC_ICV_Err_TH=5
+ Channel busy time Threshold = 600000
+ One sec channel busy time = 74060
+ One sec primary channel busy time = 21600
+ One sec My Tx Airtime = 8782
+ One sec My Rx Airtime = 0
+ IPI Idle time = 1042235167
+MIB Status Control=0x0
+CCA_NAV_Tx_Time=0x0
+Prim CCA Time=0x0
+===Per-MBSS Related MIB Counters===
+BSS0 RTSTxCnt=0, RTSRetryCnt=0, BAMissCnt=0

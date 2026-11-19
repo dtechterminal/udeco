@@ -17,7 +17,9 @@ import (
 // Fixtures in testdata were read on the JCOW414 (2026-11-19, read-only):
 // get_site_survey of both radios (neighbours' SSIDs and BSSIDs replaced,
 // columns kept), and the kernel log after `show stacountinfo` (ra0) and
-// `show bgndscaninfo` (rai0), with the lines around them.
+// `show bgndscaninfo` (rai0), with the lines around them. mibinfo_ra0.klog
+// (2026-11-20): the busy-time lines of `show mibinfo` (ra0) as read; the
+// MIB counter lines after them carry the names read, with zero values.
 
 func fixture(t *testing.T, name string) string {
 	t.Helper()
@@ -135,6 +137,7 @@ type klogDev struct {
 	next   map[string]string // iface -> the survey after `set SiteSurvey=1`
 	reads  int               // get_site_survey calls since the last set
 	after  int               // reads before next takes over
+	hook   func(cmd string)  // runs ahead of each iwpriv (nil: none)
 }
 
 func newKlogDev(t *testing.T) *klogDev {
@@ -154,6 +157,9 @@ func (d *klogDev) Run(ctx context.Context, name string, args ...string) ([]byte,
 		return d.fakeDev.Run(ctx, name, args...)
 	}
 	d.fakeDev.log = append(d.fakeDev.log, name+" "+strings.Join(args, " "))
+	if d.hook != nil {
+		d.hook(name + " " + strings.Join(args, " "))
+	}
 	switch args[1] {
 	case "show":
 		d.log.WriteString(d.prints[args[0]+" "+args[2]])
@@ -227,7 +233,7 @@ func TestCollectCachesDriverReads(t *testing.T) {
 		t.Fatal(err)
 	}
 	reads := d.iwpriv()
-	if len(reads) != 4 { // ra0 stainfo, stacountinfo; rai0 stainfo, bgndscaninfo
+	if len(reads) != 5 { // ra0 stainfo, stacountinfo, mibinfo; rai0 stainfo, bgndscaninfo
 		t.Fatalf("first Collect ran %v", reads)
 	}
 	ng := radioOf(s, "ng")
@@ -249,7 +255,7 @@ func TestCollectCachesDriverReads(t *testing.T) {
 		t.Errorf("a station without counters got some: %+v", st)
 	}
 	if ng.Survey != (apstate.Survey{}) {
-		t.Errorf("2.4 GHz survey %+v: the MT7603 has no busy time", ng.Survey)
+		t.Errorf("2.4 GHz survey %+v: its mibinfo printed nothing", ng.Survey)
 	}
 
 	// 1 s later: the driver is not asked again, sysfs is read again
@@ -258,8 +264,8 @@ func TestCollectCachesDriverReads(t *testing.T) {
 	if s, err = c.Collect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := d.iwpriv(); len(got) != 4 {
-		t.Errorf("Collect within the cache time ran %v", got[4:])
+	if got := d.iwpriv(); len(got) != 5 {
+		t.Errorf("Collect within the cache time ran %v", got[5:])
 	}
 	if v := radioOf(s, "ng").VAPs[0]; v.Stats["tx_bytes"] != 777 || len(v.Stations) == 0 {
 		t.Errorf("cached Collect: ra0 tx_bytes %d, %d stations", v.Stats["tx_bytes"], len(v.Stations))
@@ -270,22 +276,22 @@ func TestCollectCachesDriverReads(t *testing.T) {
 		t.Errorf("na survey %+v, want active 1000 busy 5 tx 4", sv)
 	}
 
-	// past the cache time: read again
+	// past the cache time: read again (mibinfo not: 6 s < mibInterval)
 	ck.t = ck.t.Add(defaultCacheTTL)
 	if _, err = c.Collect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := d.iwpriv(); len(got) != 8 {
-		t.Errorf("Collect after the cache time: %d iwpriv calls, want 8", len(got))
+	if got := d.iwpriv(); len(got) != 9 {
+		t.Errorf("Collect after the cache time: %d iwpriv calls, want 9", len(got))
 	}
-	// Invalidate (after an apply): read again at once
+	// Invalidate (after an apply): read again at once (mibinfo still not)
 	c.Invalidate()
 	ck.t = ck.t.Add(time.Second)
 	if _, err = c.Collect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := d.iwpriv(); len(got) != 12 {
-		t.Errorf("Collect after Invalidate: %d iwpriv calls, want 12", len(got))
+	if got := d.iwpriv(); len(got) != 13 {
+		t.Errorf("Collect after Invalidate: %d iwpriv calls, want 13", len(got))
 	}
 	// the counters reading fails: the stations keep their last counts (a
 	// drop to 0 would count all their traffic again)
@@ -302,8 +308,8 @@ func TestCollectCachesDriverReads(t *testing.T) {
 			}
 		}
 	}
-	if got := d.iwpriv(); len(got) != 16 {
-		t.Fatalf("%d iwpriv calls, want 16", len(got))
+	if got := d.iwpriv(); len(got) != 17 {
+		t.Fatalf("%d iwpriv calls, want 17", len(got))
 	}
 	// a site survey runs: the last reading stands
 	c.scanning.Store(true)
@@ -312,8 +318,8 @@ func TestCollectCachesDriverReads(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.scanning.Store(false)
-	if got := d.iwpriv(); len(got) != 16 {
-		t.Errorf("Collect during a survey asked the driver: %v", got[16:])
+	if got := d.iwpriv(); len(got) != 17 {
+		t.Errorf("Collect during a survey asked the driver: %v", got[17:])
 	}
 }
 
