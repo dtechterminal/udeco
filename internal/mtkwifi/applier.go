@@ -51,11 +51,16 @@ type Applier struct {
 	blocked []string
 	failed  string // hash of the last Desired that failed to apply
 	uplink  string
+	// station ACLs: the SSIDs' MAC filters (UniFi's Lock to AP arrives as
+	// lock2ap deny entries on every other AP) folded with the block list.
+	desired bcmwifi.Desired     // the last Desired planned (its MAC filters)
+	acl     map[string]ifaceACL // by BSS netdev: what was last written
 }
 
 const (
-	ownedFile    = "mtk-owned"   // RunDir: the agent's profiles are installed
-	appliedFile  = "mtk-applied" // RunDir: hash of the plans live now
+	ownedFile    = "mtk-owned"    // RunDir: the agent's profiles are installed
+	appliedFile  = "mtk-applied"  // RunDir: hash of the plans live now
+	aclFile      = "mtk-acl.json" // RunDir: the station ACLs last written (lost with the driver's at reboot)
 	baselineDir  = "mtk-baseline"
 	lastGoodFile = "last-good.json"
 )
@@ -140,6 +145,8 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 		if h, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, appliedFile))); err == nil &&
 			strings.TrimSpace(string(h)) == plansHash(want) && a.check(ctx, want) == nil {
 			a.live = want
+			a.desired = d
+			a.planACL(&p, want)
 			return p, nil
 		}
 	}
@@ -163,7 +170,25 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 					chanText(w.Channel), w.Width, w.TxPct, strings.Join(names, ", "))})
 		}
 	}
+	a.desired = d
+	a.planACL(&p, want)
 	return p, nil
+}
+
+// planACL adds a step when the station ACLs want differ from what was last
+// written (a lock, an unlock, a MAC filter edit): Apply then rewrites them
+// in place, with no radio restart.
+func (a *Applier) planACL(p *bcmwifi.Plan, want map[string]RadioPlan) {
+	if a.acl == nil {
+		// an agent restart: the driver still holds what the last run wrote
+		if b, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, aclFile))); err == nil {
+			_ = json.Unmarshal(b, &a.acl)
+		}
+	}
+	if w := wantACLs(a.desired, want, a.o.Layout, a.blocked); !sameACLs(w, a.acl) {
+		p.Steps = append(p.Steps, bcmwifi.Step{Kind: bcmwifi.StepCmd,
+			Desc: "station ACLs (MAC filters, Lock to AP, blocks) live (iwpriv)"})
+	}
 }
 
 func chanText(c int) string {
@@ -231,7 +256,9 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 	if err := a.cleanVLANs(ctx, want); err != nil {
 		a.o.Logf("mtkwifi: removing unused VLAN bridges: %v", err)
 	}
-	a.applyACL(ctx)
+	if err := a.applyACL(ctx, want); err != nil {
+		a.o.Logf("mtkwifi: station ACLs: %v", err)
+	}
 	return os.WriteFile(a.dev(filepath.Join(a.o.RunDir, appliedFile)), []byte(plansHash(want)+"\n"), 0o644)
 }
 
@@ -721,30 +748,162 @@ func (a *Applier) SetBlocked(ctx context.Context, macs []string) error {
 	if a.live == nil {
 		return nil
 	}
-	return a.applyACL(ctx)
+	return a.applyACL(ctx, a.live)
 }
 
-func (a *Applier) applyACL(ctx context.Context) error {
+// ifaceACL is one BSS's driver access list: Policy 0 off, 1 allow only
+// MACs, 2 deny MACs (upper case, sorted).
+type ifaceACL struct {
+	Policy int
+	MACs   []string
+}
+
+// maxACL is the driver's access-list size per BSS (MAX_NUM_OF_ACL_LIST).
+const maxACL = 64
+
+// wantACLs is each served BSS's access list: the SSID's MAC filter (allow:
+// only its MACs, less any blocked; deny: its MACs) with the block list
+// denied everywhere, as bcmwifi's computeACL does on the Deco.
+func wantACLs(d bcmwifi.Desired, want map[string]RadioPlan, layout []RadioDef, blocked []string) map[string]ifaceACL {
+	byID := map[string]*bcmwifi.MACFilter{}
+	for _, s := range d.SSIDs {
+		byID[s.ID] = s.MACFilter
+	}
+	isBlocked := map[string]bool{}
+	for _, m := range blocked {
+		isBlocked[strings.ToUpper(m)] = true
+	}
+	out := map[string]ifaceACL{}
+	for _, rd := range layout {
+		for i, b := range want[rd.Band].BSS {
+			if i >= len(rd.Ifaces) {
+				break
+			}
+			deny := map[string]bool{}
+			for m := range isBlocked {
+				deny[m] = true
+			}
+			var acl ifaceACL
+			if mf := byID[b.ID]; mf != nil {
+				switch mf.Policy {
+				case "allow":
+					acl.Policy, acl.MACs = 1, []string{}
+					seen := map[string]bool{}
+					for _, m := range mf.MACs {
+						m = strings.ToUpper(m)
+						if !isBlocked[m] && !seen[m] {
+							seen[m] = true
+							acl.MACs = append(acl.MACs, m)
+						}
+					}
+				case "deny":
+					for _, m := range mf.MACs {
+						deny[strings.ToUpper(m)] = true
+					}
+				}
+			}
+			if acl.Policy == 0 && len(deny) > 0 {
+				acl.Policy = 2
+				for m := range deny {
+					acl.MACs = append(acl.MACs, m)
+				}
+			}
+			sort.Strings(acl.MACs)
+			out[rd.Ifaces[i]] = acl
+		}
+	}
+	return out
+}
+
+// sameACLs compares two sets of access lists; a BSS with the list off is
+// the same as one not listed.
+func sameACLs(a, b map[string]ifaceACL) bool {
+	key := func(m map[string]ifaceACL) string {
+		var ks []string
+		for k, x := range m {
+			if x.Policy != 0 {
+				ks = append(ks, fmt.Sprintf("%s=%d:%s", k, x.Policy, strings.Join(x.MACs, ",")))
+			}
+		}
+		sort.Strings(ks)
+		return strings.Join(ks, ";")
+	}
+	return key(a) == key(b)
+}
+
+// applyACL writes every up BSS's access list (iwpriv, no restart) and
+// disconnects the stations it newly keeps out: MACs newly denied, or taken
+// off an allow list. BSSes not served get the list cleared.
+func (a *Applier) applyACL(ctx context.Context, want map[string]RadioPlan) error {
+	w := wantACLs(a.desired, want, a.o.Layout, a.blocked)
 	var errs []string
 	for _, ifc := range a.upIfaces() {
-		cmds := []string{"ACLClearAll=1", "AccessPolicy=0"}
-		if len(a.blocked) > 0 {
-			cmds = []string{"ACLClearAll=1", "AccessPolicy=2"}
-			for _, m := range a.blocked {
+		acl := w[ifc]
+		macs := acl.MACs
+		if len(macs) > maxACL {
+			a.o.Logf("mtkwifi: %s: %d access-list entries, the driver holds %d: the rest are not applied", ifc, len(macs), maxACL)
+			macs = macs[:maxACL]
+		}
+		cmds := []string{"ACLClearAll=1", "AccessPolicy=" + strconv.Itoa(acl.Policy)}
+		if acl.Policy != 0 {
+			for _, m := range macs {
 				cmds = append(cmds, "ACLAddEntry="+m)
 			}
 		}
+		failed := false
 		for _, c := range cmds {
 			if err := a.run(ctx, "iwpriv", ifc, "set", c); err != nil {
 				errs = append(errs, err.Error())
+				failed = true
 				break
 			}
 		}
+		if failed {
+			continue
+		}
+		for _, m := range keptOut(a.acl[ifc], acl) {
+			_ = a.run(ctx, "iwpriv", ifc, "set", "DisConnectSta="+m)
+		}
+	}
+	a.acl = w
+	if b, err := json.Marshal(w); err == nil {
+		_ = os.WriteFile(a.dev(filepath.Join(a.o.RunDir, aclFile)), b, 0o600)
 	}
 	if len(errs) > 0 {
 		return errors.New(strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+// keptOut lists the MACs that next keeps out and prev let in: newly denied,
+// or dropped from an allow list.
+func keptOut(prev, next ifaceACL) []string {
+	in := func(xs []string, m string) bool {
+		for _, x := range xs {
+			if x == m {
+				return true
+			}
+		}
+		return false
+	}
+	var out []string
+	switch next.Policy {
+	case 2:
+		for _, m := range next.MACs {
+			if prev.Policy != 2 || !in(prev.MACs, m) {
+				out = append(out, m)
+			}
+		}
+	case 1:
+		if prev.Policy == 1 {
+			for _, m := range prev.MACs {
+				if !in(next.MACs, m) {
+					out = append(out, m)
+				}
+			}
+		}
+	}
+	return out
 }
 
 func (a *Applier) LED(context.Context, string) error { return nil }

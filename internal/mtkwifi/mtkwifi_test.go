@@ -457,6 +457,84 @@ func TestBlockedAndKick(t *testing.T) {
 	}
 }
 
+// TestLockToAP: UniFi's Lock to AP reaches the other APs as lock2ap deny
+// entries in each SSID's MAC filter. They are written in place (no radio
+// restart), folded with the block list, and the locked client is
+// disconnected; an unlock clears them without a restart either.
+func TestLockToAP(t *testing.T) {
+	f := newFakeDev(t)
+	a := newApplier(f)
+	ctx := context.Background()
+	d := home()
+	p, _ := a.Plan(ctx, d)
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := a.Plan(ctx, d); !p.Empty() {
+		t.Fatalf("unchanged Desired planned steps: %+v", p.Steps)
+	}
+	// lock the purifier elsewhere: deny on every SSID here
+	locked := home()
+	for i := range locked.SSIDs {
+		locked.SSIDs[i].MACFilter = &bcmwifi.MACFilter{Policy: "deny", MACs: []string{"c8:5c:cc:d1:2e:c7"}}
+	}
+	a.SetBlocked(ctx, []string{"aa:bb:cc:dd:ee:ff"})
+	p, _ = a.Plan(ctx, locked)
+	if len(p.Steps) != 1 || !strings.Contains(p.Steps[0].Desc, "station ACLs") {
+		t.Fatalf("lock plan %+v", p.Steps)
+	}
+	n := len(f.log)
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	j := strings.Join(f.log[n:], "\n")
+	if strings.Contains(j, "ifconfig") {
+		t.Errorf("a lock restarted a radio: %v", f.log[n:])
+	}
+	for _, want := range []string{"iwpriv ra0 set AccessPolicy=2", "iwpriv ra0 set ACLAddEntry=C8:5C:CC:D1:2E:C7",
+		"iwpriv ra0 set ACLAddEntry=AA:BB:CC:DD:EE:FF", "iwpriv rai0 set ACLAddEntry=C8:5C:CC:D1:2E:C7",
+		"iwpriv ra0 set DisConnectSta=C8:5C:CC:D1:2E:C7"} {
+		if !strings.Contains(j, want) {
+			t.Errorf("missing %q in %v", want, f.log[n:])
+		}
+	}
+	if p, _ := a.Plan(ctx, locked); !p.Empty() {
+		t.Errorf("lock re-planned: %+v", p.Steps)
+	}
+	// an agent restart keeps the lock without a step (RunDir holds it)
+	b := newApplier(f)
+	b.SetBlocked(ctx, []string{"aa:bb:cc:dd:ee:ff"}) // the agent stores it before planning
+	if p, _ := b.Plan(ctx, locked); !p.Empty() {
+		t.Errorf("restart with a lock planned steps: %+v", p.Steps)
+	}
+	// unlock: back to the block list only, still no restart
+	p, _ = a.Plan(ctx, d)
+	n = len(f.log)
+	if err := a.Apply(ctx, p); err != nil || len(p.Steps) != 1 {
+		t.Fatalf("unlock: %v %+v", err, p.Steps)
+	}
+	j = strings.Join(f.log[n:], "\n")
+	if strings.Contains(j, "ifconfig") || strings.Contains(j, "ACLAddEntry=C8:5C") || !strings.Contains(j, "ACLAddEntry=AA:BB") {
+		t.Errorf("unlock: %v", f.log[n:])
+	}
+}
+
+func TestWantACLsAllow(t *testing.T) {
+	d := home()
+	d.SSIDs[0].MACFilter = &bcmwifi.MACFilter{Policy: "allow", MACs: []string{"aa:aa:aa:aa:aa:aa", "bb:bb:bb:bb:bb:bb"}}
+	ps, _ := plans(d, JCOW414, false)
+	w := wantACLs(d, ps, JCOW414, []string{"BB:BB:BB:BB:BB:BB"})
+	if a := w["ra0"]; a.Policy != 1 || len(a.MACs) != 1 || a.MACs[0] != "AA:AA:AA:AA:AA:AA" {
+		t.Errorf("allow list ra0 = %+v", a)
+	}
+	if a := w["ra1"]; a.Policy != 2 || len(a.MACs) != 1 {
+		t.Errorf("block-only ra1 = %+v", a)
+	}
+	if k := keptOut(ifaceACL{Policy: 1, MACs: []string{"A", "B"}}, ifaceACL{Policy: 1, MACs: []string{"A"}}); len(k) != 1 || k[0] != "B" {
+		t.Errorf("keptOut allow = %v", k)
+	}
+}
+
 func TestTxPower(t *testing.T) {
 	for _, c := range []struct {
 		r    bcmwifi.Radio

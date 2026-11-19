@@ -522,7 +522,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	// multicast inspect, RadSec) exist on the Deco only
 	deco := own && !a.cfg.jio()
 	p, ok := models.DecoAgentProfileWith(m, heAX, models.DecoAgentFeatures{BandSteer: canSteer, RFScan: deco,
-		MinRate: own && a.cfg.MinRates, PPSK: deco, LockAP: deco, RoamAssist: own && canRoam,
+		MinRate: own && a.cfg.MinRates, PPSK: deco, LockAP: own, RoamAssist: own && canRoam,
 		RadiusFilter: deco, MulticastInspect: deco, WPA3: own && a.cfg.WPA3, WPA3FT: own && a.cfg.WPA3 && canFTSAE,
 		RadSec: deco, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2})
 	if !ok {
