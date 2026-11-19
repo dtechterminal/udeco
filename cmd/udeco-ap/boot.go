@@ -20,6 +20,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -427,6 +428,7 @@ const eventMax = 64 << 10
 // hand-back, alarms) on /tp_data: written only when one happens, never per
 // inform, and cut to its newest half past eventMax.
 type eventLog struct {
+	mu     sync.Mutex // the worker, the loop and the port monitor add events
 	path   string
 	root   string
 	clock  func() time.Time
@@ -435,6 +437,8 @@ type eventLog struct {
 }
 
 func (e *eventLog) add(msg string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.logf("EVENT: %s", msg)
 	if e.path == "" {
 		return

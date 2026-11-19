@@ -148,6 +148,7 @@ type timing struct {
 	lldpEvery     time.Duration // LLDP transmit interval (30 s)
 	selfCheck     time.Duration // R10 self-check summary (5 min)
 	informTO      time.Duration // one inform POST, connect to last byte (10 s)
+	portsWatch    time.Duration // the LAN port monitor's pass (5 s; ports.go)
 }
 
 func (t *timing) fill() {
@@ -174,6 +175,7 @@ func (t *timing) fill() {
 	def(&t.lldpEvery, 30*time.Second)
 	def(&t.selfCheck, 5*time.Minute)
 	def(&t.informTO, 10*time.Second)
+	def(&t.portsWatch, 5*time.Second)
 }
 
 // options are the agent's environment; tests replace the edges.
@@ -421,6 +423,10 @@ func (a *agent) run(parent context.Context) error {
 	if a.takeover.Load() {
 		a.bg.Add(1)
 		go func() { defer a.bg.Done(); a.workerLoop(ctx) }()
+		if a.ports.mgr != nil {
+			a.bg.Add(1)
+			go func() { defer a.bg.Done(); a.portsWatchLoop(ctx) }() // ports.go
+		}
 		a.startHomeListen(ctx)
 		a.startupJobs()
 	} else if a.x.S.Adopted {
@@ -922,6 +928,7 @@ func (a *agent) guestAuthorized(s *apstate.Snapshot, now time.Time) map[string]b
 // informOnce). ok=false counts as a bad answer.
 func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 	x := a.x
+	start := a.o.now() // a port change finished before this is confirmed by its reply (ports.go)
 	a.drainAcks()
 	f := a.fields(ctx)
 	x.Extra = func() map[string]any { return f }
@@ -975,6 +982,7 @@ func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 		a.logf("%v", err)
 		return o, false
 	}
+	a.portsInformed(start)
 	for _, e := range o.Events {
 		if !strings.HasPrefix(e, "noop ") || o.Immediate {
 			a.logf("%s", e)

@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
@@ -85,6 +86,27 @@ type Config struct {
 	// untagged LAN stays as it is whatever the controller sends. Port 4 is
 	// the uplink and is never changed (beyond the VLAN devices on it).
 	PortsUnlocked []int `json:"ports_unlocked,omitempty"`
+	// PortsConfirmS (model UHDIW) is how long a port change waits for an
+	// inform the controller answers before it is reverted (30-900 s; 0 =
+	// 90). PortsLossS is how long the controller may stay unreachable
+	// before every port the agent may change goes back on the LAN
+	// (60-3600 s; 0 = 300). The port monitor: ports.go.
+	PortsConfirmS int `json:"ports_confirm_s,omitempty"`
+	PortsLossS    int `json:"ports_loss_s,omitempty"`
+}
+
+func (c *Config) portsConfirm() time.Duration {
+	if c.PortsConfirmS == 0 {
+		return defaultPortsConfirm
+	}
+	return time.Duration(c.PortsConfirmS) * time.Second
+}
+
+func (c *Config) portsLoss() time.Duration {
+	if c.PortsLossS == 0 {
+		return defaultPortsLoss
+	}
+	return time.Duration(c.PortsLossS) * time.Second
 }
 
 // PlatformJio is the JioFiber JCOW414 (MediaTek) platform.
@@ -137,6 +159,15 @@ func (c *Config) validate() error {
 		if len(c.PortsUnlocked) > 0 && c.Model != "UHDIW" {
 			return fmt.Errorf("config: ports_unlocked needs model UHDIW (the only model reported with LAN ports)")
 		}
+		if (c.PortsConfirmS != 0 || c.PortsLossS != 0) && c.Model != "UHDIW" {
+			return fmt.Errorf("config: ports_confirm_s and ports_loss_s need model UHDIW (the only model reported with LAN ports)")
+		}
+		if c.PortsConfirmS != 0 && (c.PortsConfirmS < 30 || c.PortsConfirmS > 900) {
+			return fmt.Errorf("config: ports_confirm_s %d: want 30-900 seconds (default 90)", c.PortsConfirmS)
+		}
+		if c.PortsLossS != 0 && (c.PortsLossS < 60 || c.PortsLossS > 3600) {
+			return fmt.Errorf("config: ports_loss_s %d: want 60-3600 seconds (default 300)", c.PortsLossS)
+		}
 		seen := map[int]bool{}
 		for _, p := range c.PortsUnlocked {
 			if p < 1 || p > 3 || seen[p] {
@@ -154,8 +185,8 @@ func (c *Config) validate() error {
 	default:
 		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
 	}
-	if len(c.PortsUnlocked) > 0 && !c.jio() {
-		return errors.New("config: ports_unlocked is for platform " + PlatformJio + " only")
+	if (len(c.PortsUnlocked) > 0 || c.PortsConfirmS != 0 || c.PortsLossS != 0) && !c.jio() {
+		return errors.New("config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform " + PlatformJio + " only")
 	}
 	if c.SSHDPort < 1 || c.SSHDPort > 65535 || c.SSHDPort == 22 {
 		return fmt.Errorf("config: sshd_port %d: want 1-65535 and never 22 (the unit's own dropbear)", c.SSHDPort)

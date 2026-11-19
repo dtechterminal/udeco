@@ -48,9 +48,17 @@ type Manager struct {
 	o      Options
 	locked map[int]bool
 	noted  map[string]bool // notes already logged (one line per change)
-	// failed: unit port -> the setting whose change failed and was rolled
-	// back; not retried until the controller wants something else
-	failed map[int]string
+	// failed: unit port -> the setting whose change failed or was
+	// reverted, and where the port is kept meanwhile; not retried until
+	// the controller wants something else
+	failed map[int]failure
+}
+
+// failure is a port's setting that failed to apply or was reverted (the
+// controller never confirmed it), and where the port is kept instead.
+type failure struct {
+	want string   // PortWant.String of the setting
+	back PortWant // the plain LAN (zero) or the setting the port had before
 }
 
 // New returns a Manager; nothing changes until Apply.
@@ -61,7 +69,7 @@ func New(o Options) *Manager {
 	if o.Uplink == nil {
 		o.Uplink = func() string { return Untagged(UplinkPhys) }
 	}
-	m := &Manager{o: o, locked: map[int]bool{1: true}, noted: map[string]bool{}, failed: map[int]string{}}
+	m := &Manager{o: o, locked: map[int]bool{1: true}, noted: map[string]bool{}, failed: map[int]failure{}}
 	for _, p := range o.Unlocked {
 		delete(m.locked, p)
 	}
@@ -179,6 +187,14 @@ type Report struct {
 	Notes  []string       // what was not carried out, and why
 	Failed map[int]error  // by unit port: the change failed and the port was put back on the LAN
 	Ports  map[int]string // by unit port: what the port is now (changed ports only)
+	// Before: by unit port, the setting the port had before Apply changed
+	// it (changed and failed ports; a state no setting describes counts as
+	// the plain LAN). Not set by a dry run.
+	Before map[int]PortWant
+}
+
+func newReport() Report {
+	return Report{Failed: map[int]error{}, Ports: map[int]string{}, Before: map[int]PortWant{}}
 }
 
 func (r *Report) note(f string, args ...any) { r.Notes = append(r.Notes, fmt.Sprintf(f, args...)) }
@@ -188,7 +204,7 @@ func (r *Report) note(f string, args ...any) { r.Notes = append(r.Notes, fmt.Spr
 // VLANs); the other ports go on. Locked ports and the uplink are never
 // touched; a locked port's wanted change is reported in the notes.
 func (m *Manager) Apply(ctx context.Context, w Want) Report {
-	r := Report{Failed: map[int]error{}, Ports: map[int]string{}}
+	r := newReport()
 	m.Prepare(w)
 	uplink := m.o.Uplink()
 	for _, p := range LANPorts {
@@ -209,22 +225,33 @@ func (m *Manager) Apply(ctx context.Context, w Want) Report {
 		case m.is(l, want):
 			delete(m.failed, p)
 			continue
-		case m.failed[p] == want.String():
-			r.note("port %d: %s failed to apply before and was put back on the LAN: not retried until the controller sends another setting", p, want)
+		case m.failed[p].want == want.String():
+			// before anything else: a port whose move and rollback both
+			// failed (in no bridge) is put back, never moved to want
+			if m.holdBack(ctx, p, l, &r) {
+				r.note("port %d: %s failed to apply before (or was reverted) and was put back on %s: not retried until the controller sends another setting", p, want, place(m.failed[p].back))
+			}
 			continue
 		}
-		delete(m.failed, p)
 		if m.o.DryRun {
 			r.Steps++
 			r.Ports[p] = want.String()
 			m.o.Logf("ports: dry run: port %d would be %s (now %s)", p, want, m.describe(l))
 			continue
 		}
+		before, ok := m.setting(l)
+		if f, failed := m.failed[p]; failed {
+			before = f.back // where the port belongs, whatever it is now
+		} else if !ok {
+			before = PortWant{}
+		}
+		delete(m.failed, p)
+		r.Before[p] = before
 		n, err := m.applyPort(ctx, p, want, l)
 		r.Steps += n
 		if err != nil {
 			r.Failed[p] = err
-			m.failed[p] = want.String()
+			m.failed[p] = failure{want: want.String()}
 			if rerr := m.rollback(ctx, p); rerr != nil {
 				err = fmt.Errorf("%v; putting it back on the LAN: %v", err, rerr)
 				r.Failed[p] = err
@@ -292,6 +319,147 @@ func (m *Manager) applyPort(ctx context.Context, p int, want PortWant, l Live) (
 	return steps, nil
 }
 
+// place is where back puts a port, in words.
+func place(back PortWant) string {
+	if back.Default() {
+		return "the LAN"
+	}
+	return back.String()
+}
+
+// setting is l as a PortWant; ok=false when no setting describes it (a
+// bridge that is neither the LAN nor a VLAN's, a tagged device outside
+// its VLAN's bridge).
+func (m *Manager) setting(l Live) (PortWant, bool) {
+	pw := PortWant{Native: -1}
+	switch s := vlanBrRE.FindStringSubmatch(l.Bridge); {
+	case l.Bridge == "":
+	case l.Bridge == m.o.B.LANBridge():
+		pw.Native = 0
+	case s != nil:
+		pw.Native, _ = strconv.Atoi(s[1])
+	default:
+		return PortWant{}, false
+	}
+	for v := range l.Tagged {
+		if l.TaggedBr[v] != "br-v"+strconv.Itoa(v) {
+			return PortWant{}, false
+		}
+		pw.Tagged = append(pw.Tagged, v)
+	}
+	sort.Ints(pw.Tagged)
+	return pw, true
+}
+
+// holdBack keeps a port whose setting failed (or was reverted) where it
+// was put back: when it is not there (its move and the rollback both
+// failed, or someone moved it) it is put back again. It reports whether
+// the port was already there; a put-back that fails again is a note, and
+// the next call retries it.
+func (m *Manager) holdBack(ctx context.Context, p int, l Live, r *Report) bool {
+	f := m.failed[p]
+	if m.is(l, f.back) {
+		return true
+	}
+	if m.o.DryRun {
+		return false
+	}
+	err := m.putBack(ctx, p, &f.back)
+	m.failed[p] = f
+	if err != nil {
+		r.note("port %d is not on %s (it is %s): putting it back failed: %v (retried)", p, place(f.back), m.describe(m.live(p)), err)
+		return false
+	}
+	r.Steps++
+	r.Ports[p] = f.back.String()
+	return false
+}
+
+// putBack moves port p to *back and checks it got there. When back is
+// not the plain LAN and that fails, the port goes on the plain LAN and
+// *back becomes the plain LAN.
+func (m *Manager) putBack(ctx context.Context, p int, back *PortWant) error {
+	if !back.Default() {
+		_, err := m.applyPort(ctx, p, *back, m.live(p))
+		if err == nil {
+			return nil
+		}
+		m.o.Logf("ports: port %d: putting it back to %s: %v: the plain LAN instead", p, back, err)
+		*back = PortWant{}
+	}
+	err := m.rollback(ctx, p)
+	if l := m.live(p); !m.is(l, PortWant{}) {
+		return errors.Join(err, fmt.Errorf("port %d is %s, not on the LAN", p, m.describe(l)))
+	}
+	return nil
+}
+
+// managed reports whether the agent may change port p now: not locked and
+// not the uplink.
+func (m *Manager) managed(p int) bool { return !m.Locked(p) && Untagged(p) != m.o.Uplink() }
+
+// OffLAN lists the ports the agent may change that are not on the plain
+// LAN now (untagged LAN, no tagged VLANs).
+func (m *Manager) OffLAN() []int {
+	var out []int
+	for _, p := range LANPorts {
+		if m.managed(p) && !m.is(m.live(p), PortWant{}) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// Revert undoes changes the controller never confirmed: port p goes back
+// to back[p] (the plain LAN when that fails) and failed[p], the setting
+// that was live, is not applied again until the controller sends another
+// setting for the port. A port that cannot be put back is in Failed;
+// Apply and Settle retry it until it is back.
+func (m *Manager) Revert(ctx context.Context, back map[int]PortWant, failed map[int]string) Report {
+	r := newReport()
+	if m.o.DryRun {
+		return r
+	}
+	for _, p := range LANPorts {
+		b, ok := back[p]
+		if !ok || !m.managed(p) {
+			continue
+		}
+		f := failure{want: failed[p], back: b}
+		if !m.is(m.live(p), f.back) {
+			if err := m.putBack(ctx, p, &f.back); err != nil {
+				r.Failed[p] = err
+			} else {
+				r.Steps++
+				r.Ports[p] = f.back.String()
+			}
+		}
+		m.failed[p] = f
+	}
+	m.o.B.SetPortVLANs(m.usedVLANs())
+	return r
+}
+
+// MarkFailed keeps want off port p (which is on the plain LAN) until the
+// controller sends another setting for it.
+func (m *Manager) MarkFailed(p int, want string) { m.failed[p] = failure{want: want} }
+
+// Settle puts back every port whose setting failed or was reverted and
+// that is not where it was put (its put-back failed, or someone moved
+// it); what still fails is in the notes and is retried at the next call.
+func (m *Manager) Settle(ctx context.Context) Report {
+	r := newReport()
+	for _, p := range LANPorts {
+		if _, ok := m.failed[p]; ok && m.managed(p) {
+			m.holdBack(ctx, p, m.live(p), &r)
+		}
+	}
+	if r.Steps > 0 {
+		m.o.B.SetPortVLANs(m.usedVLANs())
+	}
+	return r
+}
+
 // rollback puts port p back as the vendor has it: untagged LAN, no tagged
 // VLANs.
 func (m *Manager) rollback(ctx context.Context, p int) error {
@@ -311,18 +479,27 @@ func (m *Manager) rollback(ctx context.Context, p int) error {
 }
 
 // Restore puts every LAN port the controller may change back on the
-// untagged LAN without tagged VLANs (the agent hands the unit back). Locked
-// ports and the uplink are not touched.
+// untagged LAN without tagged VLANs (the agent hands the unit back, or the
+// controller is unreachable) and checks each got there. Locked ports and
+// the uplink are not touched.
 func (m *Manager) Restore(ctx context.Context) Report {
-	r := Report{Failed: map[int]error{}, Ports: map[int]string{}}
+	r := newReport()
 	if m.o.DryRun {
 		return r
 	}
 	for _, p := range LANPorts {
-		if m.Locked(p) || m.is(m.live(p), PortWant{}) {
+		if !m.managed(p) {
 			continue
 		}
-		if err := m.rollback(ctx, p); err != nil {
+		if f, ok := m.failed[p]; ok {
+			f.back = PortWant{} // kept on the LAN from now on, not on a setting from before
+			m.failed[p] = f
+		}
+		if m.is(m.live(p), PortWant{}) {
+			continue
+		}
+		var back PortWant
+		if err := m.putBack(ctx, p, &back); err != nil {
 			r.Failed[p] = err
 			continue
 		}

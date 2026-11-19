@@ -229,6 +229,28 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   unit: tagged VLANs on ports 2-3. Give ports 2 and 3 explicit port
   profiles before turning Port VLAN on: the default "All" trunks every site
   network onto them.
+- **Port monitor:** a port change that cuts the unit off from the
+  controller undoes itself, since telnet over the LAN is the only way in.
+  - *Confirm or revert:* every change to a port waits for an inform the
+    controller answers that started after the change. With none within
+    `ports_confirm_s` (default 90 s, 30-900), the ports of that change go
+    back to their previous settings, and the agent logs
+    `EVENT: PORTS REVERTED (no inform reached the controller ...)`. The
+    reverted setting is not applied again until the controller sends a
+    different one for that port. Moves back to the plain LAN need no
+    confirmation.
+  - *Controller loss:* when no inform is answered for `ports_loss_s`
+    (default 300 s, 60-3600), every port the agent may change goes back on
+    the plain LAN, and the agent logs
+    `EVENT: PORTS REVERTED (controller unreachable ...)`. Port settings
+    stay off until informs are answered again, then come back through the
+    confirm window. A setting taken off this way twice in a row is not
+    applied again until the controller sends a different one.
+  - *Startup:* no port setting is applied before the first answered inform.
+  - A port that cannot be put back is retried every 5 s until it is on the
+    LAN. Port 1 (when locked) and the uplink are never touched. Events also
+    go to `events.log` next to the config. To re-apply a reverted setting,
+    change the port's profile in UniFi (or restart the agent).
 - **Changing the model** (U7LT to UHDIW or back) of an adopted unit needs a
   Forget and a new adoption: the controller keeps the model it adopted. The
   agent records that model in its state and, while the config differs,

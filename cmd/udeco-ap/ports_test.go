@@ -26,10 +26,13 @@ type portsWifi struct {
 	mu  sync.Mutex
 	br  map[string]string // dev -> bridge ("" = none)
 	ops []string
+	// fail: PortToBridge("dev vid") fails, leaving dev in no bridge
+	// (brctl delif done, addif failed)
+	fail map[string]bool
 }
 
 func newPortsWifi(w *fakeWifi) *portsWifi {
-	p := &portsWifi{fakeWifi: w, br: map[string]string{}}
+	p := &portsWifi{fakeWifi: w, br: map[string]string{}, fail: map[string]bool{}}
 	for i := 1; i <= 4; i++ {
 		p.br[jioports.Untagged(i)] = "bdg2"
 	}
@@ -55,6 +58,10 @@ func (p *portsWifi) PortToBridge(_ context.Context, dev string, vid int) error {
 	defer p.mu.Unlock()
 	if strings.HasPrefix(dev, "eth0.4") {
 		return fmt.Errorf("uplink")
+	}
+	if p.fail[dev+" "+strconv.Itoa(vid)] {
+		p.br[dev] = ""
+		return fmt.Errorf("brctl addif %s: failed", dev)
 	}
 	switch {
 	case vid < 0:
