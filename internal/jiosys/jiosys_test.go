@@ -36,7 +36,7 @@ func TestMatch(t *testing.T) {
 		{[]string{"/pfrm2.0/bin/rasterize"}, "rasterize"[:0]},            // "ras" is no prefix match (too short)
 		{[]string{"/pfrm2.0/bin/smartcableONTAppX"}, "smartcableONTApp"}, // long patterns match a prefix
 		{[]string{"/usr/sbin/telnetd"}, ""},
-		{[]string{"/pfrm2.0/bin/lighttpd", "-f", "/pfrm2.0/etc/lighttpd.conf"}, ""},
+		{[]string{"/pfrm2.0/bin/lighttpd", "-f", "/pfrm2.0/etc/lighttpd.conf"}, "lighttpd"}, // web UI kept down
 		{[]string{"/tmp/udeco-bin/udeco-ap", "-config", "/flash2/udeco/udeco-ap.json"}, ""},
 	} {
 		if got := match(c.argv, DefaultKeepDown); got != c.want {

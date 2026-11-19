@@ -6,7 +6,8 @@
 // services down (the owner's boot script, /flash2/pfrm2.0/etc/customInit,
 // kills them once at boot, but dms, ras, captivePortald and the service
 // hosts start after it and ignore SIGTERM). It installs no firewall and
-// never restarts a Jio service: telnet and the web UI stay as they are, and
+// never restarts a Jio service: telnet stays as it is (the web UI is kept
+// down too), and
 // a hand-back leaves the unit as the owner's script wants it.
 package jiosys
 
@@ -33,10 +34,11 @@ import (
 // dnsmasq, lighttpd, telnetd and tcapi (svchost cfg.svc) working.
 var DefaultKeepDown = []string{"omci", "ponmgr", "ont_dc", "ont_stb_bind", "dms", "ras", "dimclient",
 	"igmptable_sig", "captivePortald", "qosMain", "nscand", "smartcableONTApp", "runsmartcableONTApp",
-	"pon.svc", "wan.svc", "wan_related.svc", "central_ctrl.svc", "other.svc", "voip.svc", "mesh.svc", "easyMeshd"}
+	"pon.svc", "wan.svc", "wan_related.svc", "central_ctrl.svc", "other.svc", "voip.svc", "mesh.svc", "easyMeshd",
+	"lighttpd"} // the web UI: the owner asked for it down too (2026-11-19)
 
 // protected are never signalled, whatever the patterns say.
-var protected = []string{"telnetd", "lighttpd", "getty", "init", "udeco-ap", "cfg.svc", "dnsmasq"}
+var protected = []string{"telnetd", "getty", "init", "udeco-ap", "cfg.svc", "dnsmasq"}
 
 // KindStop is the decosys step kind of a process stopped here.
 const KindStop = "stop-jio"
