@@ -70,7 +70,16 @@ type Config struct {
 	// by default until the Interworking IE and GAS path through wl is
 	// verified on the X20 (docs/deco/features/hotspot2.md).
 	Hotspot2 bool `json:"hotspot2,omitempty"`
+	// Platform is the unit the agent runs on: "" = a TP-Link Deco X20
+	// (Broadcom, model UAL6); "jio-mtk" = a JioFiber JCOW414 used as a plain
+	// AP (MediaTek, model U7LT; internal/mtkwifi, internal/jiosys).
+	Platform string `json:"platform,omitempty"`
 }
+
+// PlatformJio is the JioFiber JCOW414 (MediaTek) platform.
+const PlatformJio = "jio-mtk"
+
+func (c *Config) jio() bool { return c != nil && c.Platform == PlatformJio }
 
 func loadConfig(path string) (*Config, error) {
 	b, err := os.ReadFile(path)
@@ -105,8 +114,23 @@ func (c *Config) validate() error {
 		return fmt.Errorf("config: console_ip %q: want an IPv4 address", c.ConsoleIP)
 	}
 	c.Model = strings.ToUpper(c.Model)
-	if c.Model != "UAL6" {
-		return fmt.Errorf("config: model %q: only UAL6 is supported (its capability words are chosen for this hardware)", c.Model)
+	switch c.Platform {
+	case "":
+		if c.Model != "UAL6" {
+			return fmt.Errorf("config: model %q: only UAL6 is supported (its capability words are chosen for this hardware)", c.Model)
+		}
+	case PlatformJio:
+		if c.Model != "U7LT" {
+			return fmt.Errorf("config: model %q: platform %s is reported as U7LT (UAP-AC-Lite): set \"model\": \"U7LT\"", c.Model, c.Platform)
+		}
+		for name, on := range map[string]bool{"wpa3": c.WPA3, "min_rates": c.MinRates, "mdns_bridge": c.MdnsBridge,
+			"hotspot2": c.Hotspot2, "egress": c.Egress} {
+			if on {
+				return fmt.Errorf("config: %s is not supported on platform %s", name, c.Platform)
+			}
+		}
+	default:
+		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
 	}
 	if c.SSHDPort < 1 || c.SSHDPort > 65535 || c.SSHDPort == 22 {
 		return fmt.Errorf("config: sshd_port %d: want 1-65535 and never 22 (the unit's own dropbear)", c.SSHDPort)

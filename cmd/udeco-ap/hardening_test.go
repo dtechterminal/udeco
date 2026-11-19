@@ -156,7 +156,7 @@ func TestGateStatus(t *testing.T) {
 		for pid, cl := range c.procs {
 			write("/proc/"+pid+"/cmdline", cl)
 		}
-		if open, why := gateStatus(root); open != c.open {
+		if open, why := gateStatus(root, gateFiles); open != c.open {
 			t.Errorf("%s: open=%v (%s)", c.name, open, why)
 		}
 	}

@@ -166,3 +166,23 @@ func TestDecoAgentRadioCapsMIMO(t *testing.T) {
 		}
 	}
 }
+
+// TestU7LTAgentProfile: the JCOW414 reports as a UAP-AC-Lite: 802.11n and
+// ac mode words, no WPA3 unless claimed.
+func TestU7LTAgentProfile(t *testing.T) {
+	m, ok := Lookup("U7LT")
+	if !ok {
+		t.Fatal("U7LT not in the catalogue")
+	}
+	heAX := map[string]bool{"ng": false, "na": false}
+	p, ok := DecoAgentProfileWith(m, heAX, DecoAgentFeatures{})
+	if !ok || p.WifiCaps&WifiCapWPA3 != 0 {
+		t.Fatalf("profile ok=%v wifi_caps %#x", ok, p.WifiCaps)
+	}
+	if p.Radios["ng"].IEEEModes != decoAgentIEEEModesNGn || p.Radios["na"].IEEEModes != decoAgentIEEEModesNAn || !p.Radios["na"].Is11ac {
+		t.Errorf("radios %+v", p.Radios)
+	}
+	if p, _ := DecoAgentProfileWith(m, heAX, DecoAgentFeatures{WPA3: true}); p.WifiCaps&WifiCapWPA3 == 0 {
+		t.Errorf("WPA3 feature not claimed")
+	}
+}

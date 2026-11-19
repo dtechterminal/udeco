@@ -212,6 +212,10 @@ func readMarker(path string) string {
 // in takeover mode it only installs the inbound fence (R5).
 var gateFiles = []string{"/tmp/done_boot", "/tmp/wifi_set_done", "/tmp/acsd2_channel_select_done"}
 
+// jioGateFiles: the JCOW414's rcS waits for /tmp/svc_load_ok (its service
+// hosts loaded) before it finishes booting.
+var jioGateFiles = []string{"/tmp/svc_load_ok"}
+
 const (
 	gateMinUptime = 120 // s
 	// gateGiveUp: with the uptime past this, missing marker files no longer
@@ -223,7 +227,7 @@ const (
 // gateStatus says whether the gate may open now and, if not, why. "Upgrade
 // in flight" and "boot chain running" are decosys's R17 detector
 // (decosys.InFlight), the same one Enforce holds on.
-func gateStatus(root string) (open bool, why string) {
+func gateStatus(root string, files []string) (open bool, why string) {
 	up, err := readUptime(root)
 	if err != nil {
 		return false, "uptime: " + err.Error()
@@ -236,7 +240,7 @@ func gateStatus(root string) (open bool, why string) {
 		return false, "TP-Link firmware upgrade in flight (" + strings.Join(g.Upgrade, "; ") + ")"
 	}
 	var missing []string
-	for _, f := range gateFiles {
+	for _, f := range files {
 		if _, err := os.Stat(filepath.Join(root, f)); err != nil {
 			missing = append(missing, f)
 		}
@@ -264,7 +268,11 @@ func gateStatus(root string) (open bool, why string) {
 func (a *agent) waitGate(ctx context.Context) error {
 	last, fenceErr := "", ""
 	for {
-		open, why := gateStatus(a.o.root)
+		files := gateFiles
+		if a.cfg.jio() {
+			files = jioGateFiles
+		}
+		open, why := gateStatus(a.o.root, files)
 		if open {
 			a.event("boot gate open: " + why)
 			return nil

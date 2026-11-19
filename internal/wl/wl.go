@@ -24,6 +24,7 @@ import (
 	"net"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -65,6 +66,11 @@ type Options struct {
 	CallTimeout time.Duration
 	// ScanTimeout bounds how long Scan waits for results (0 = 15 s).
 	ScanTimeout time.Duration
+	// Bridge is the LAN bridge the AP's identity, address and FDB are read
+	// from ("" = br-lan, the Deco's). Ports matches the wired port netdevs
+	// (nil = eth0, eth1, ...).
+	Bridge string
+	Ports  *regexp.Regexp
 }
 
 const (
@@ -115,6 +121,12 @@ func New(o Options) *Collector {
 	}
 	if o.ScanTimeout <= 0 {
 		o.ScanTimeout = defaultScanTimeout
+	}
+	if o.Bridge == "" {
+		o.Bridge = lanBridge
+	}
+	if o.Ports == nil {
+		o.Ports = ethName
 	}
 	return &Collector{
 		opt:     o,

@@ -57,10 +57,10 @@ func (c *Collector) readSystem(s *apstate.Snapshot) error {
 		s.Hostname = strings.TrimSpace(h)
 	}
 	s.Model, s.Release = c.productInfo()
-	if a, err := c.readFile("/sys/class/net/" + lanBridge + "/address"); err == nil {
+	if a, err := c.readFile("/sys/class/net/" + c.opt.Bridge + "/address"); err == nil {
 		s.MAC = strings.ToLower(strings.TrimSpace(a))
 	}
-	if addrs, err := c.ifAddrs(lanBridge); err == nil {
+	if addrs, err := c.ifAddrs(c.opt.Bridge); err == nil {
 		for _, a := range addrs {
 			if n, ok := a.(*net.IPNet); ok && n.IP.To4() != nil {
 				s.IP, s.Netmask = n.IP.String(), net.IP(n.Mask).String()
@@ -74,13 +74,18 @@ func (c *Collector) readSystem(s *apstate.Snapshot) error {
 	if a, err := c.readFile("/proc/net/arp"); err == nil {
 		s.ARP = parseARP(a)
 	}
-	if b, err := os.ReadFile(c.path("/sys/class/net/" + lanBridge + "/brforward")); err == nil {
+	if b, err := os.ReadFile(c.path("/sys/class/net/" + c.opt.Bridge + "/brforward")); err == nil {
 		s.FDB = parseBrforward(b)
 	}
 	s.Ports = c.readPorts()
 	s.LLDP = nil // no lldpd on the Deco
 	return nil
 }
+
+// ReadSystem fills the system fields of s (uptime, load, memory, the
+// bridge's MAC/address/FDB, the gateway, ARP and the wired ports); the
+// MediaTek collector shares it.
+func (c *Collector) ReadSystem(s *apstate.Snapshot) error { return c.readSystem(s) }
 
 func (c *Collector) readFile(p string) (string, error) {
 	b, err := os.ReadFile(c.path(p))
@@ -194,7 +199,7 @@ func (c *Collector) readPorts() []apstate.Port {
 	names, _ := c.netDevs()
 	var ports []apstate.Port
 	for _, n := range names {
-		if !ethName.MatchString(n) {
+		if !c.opt.Ports.MatchString(n) {
 			continue
 		}
 		dir := "/sys/class/net/" + n
@@ -211,7 +216,7 @@ func (c *Collector) readPorts() []apstate.Port {
 		stats := c.netStats(n)
 		p.RxBytes, p.TxBytes = stats["rx_bytes"], stats["tx_bytes"]
 		p.RxPkts, p.TxPkts = stats["rx_packets"], stats["tx_packets"]
-		if c.exists("/sys/class/net/" + lanBridge + "/brif/" + n) {
+		if c.exists("/sys/class/net/" + c.opt.Bridge + "/brif/" + n) {
 			if v, err := strconv.ParseInt(c.trimmed(dir+"/brport/port_no"), 0, 32); err == nil {
 				p.BridgePort = int(v)
 			}

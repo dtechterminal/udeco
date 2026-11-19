@@ -300,12 +300,20 @@ type DecoAgentFeatures struct {
 
 // DecoAgentProfileWith is DecoAgentProfile with the optional features f.
 func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (inform.Profile, bool) {
-	if m.Code != "UAL6" {
+	if m.Code != "UAL6" && m.Code != "U7LT" {
 		return inform.Profile{}, false
 	}
 	p := inform.Profile{Model: m.Code, Display: m.Display, Version: m.Version,
 		WifiCaps: DecoAgentWifiCaps, FWCaps: DecoAgentFWCaps, FW3Caps: DecoAgentFW3Caps,
 		Radios: map[string]inform.RadioProfile{}}
+	if m.Code == "U7LT" {
+		// the JCOW414 (UAP-AC-Lite profile): no SAE in its driver, so WPA3
+		// is claimed only when the feature says so
+		p.WifiCaps = 0
+		if f.WPA3 {
+			p.WifiCaps = WifiCapWPA3
+		}
+	}
 	set := func(on bool, word *int64, bit int64) {
 		if on {
 			*word |= bit

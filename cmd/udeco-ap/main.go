@@ -48,6 +48,9 @@ func main() {
 		log.Fatalf("udeco-ap: %v", err)
 	}
 	setupLog(cfg.Log, os.Stderr)
+	if cfg.jio() {
+		os.Setenv("PATH", jioPATH)
+	}
 	if err := run(cfg, filepath.Dir(*cfgPath)); err != nil && !errors.Is(err, context.Canceled) {
 		log.Printf("udeco-ap: %v", err)
 		os.Exit(1)

@@ -29,8 +29,10 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
 	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/antoniocosta/unifi-openwrt/internal/jiosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/lldp"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/pathmon"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
@@ -108,6 +110,10 @@ var (
 	_ sysManager  = (*decosys.Manager)(nil)
 	_ wifiApplier = (*bcmwifi.Applier)(nil)
 	_ steerer     = (*bcmwifi.Applier)(nil)
+	_ collector   = (*wl.Collector)(nil)
+	_ sysManager  = (*jiosys.Manager)(nil)
+	_ wifiApplier = (*mtkwifi.Applier)(nil)
+	_ collector   = (*mtkwifi.Collector)(nil)
 )
 
 type runner interface {
@@ -283,6 +289,22 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 	if o.run == nil {
 		o.run = execRunner{timeout: 30 * time.Second}
 	}
+	if cfg.jio() {
+		// JioFiber JCOW414: MediaTek driver, Jio services kept down, no
+		// firewall of the agent's own
+		if o.col == nil {
+			o.col = mtkwifi.NewCollector(mtkwifi.CollectorOptions{Root: o.root, Run: o.run, Model: "JCOW414"})
+		}
+		if o.newSys == nil {
+			o.newSys = func(so decosys.Options) sysManager { return jiosys.New(jiosys.Options{Root: so.Root, Logf: so.Logf}) }
+		}
+		if o.newWifi == nil {
+			o.newWifi = func(bo bcmwifi.Options) wifiApplier {
+				return mtkwifi.New(mtkwifi.Options{Root: bo.Root, Run: bo.Run, StateDir: bo.StateDir, RunDir: bo.RunDir,
+					Uplink: bo.Uplink, DryRun: bo.DryRun, Logf: bo.Logf})
+			}
+		}
+	}
 	if o.col == nil {
 		o.col = wl.New(wl.Options{Root: o.root, Run: o.run})
 	}
@@ -408,6 +430,10 @@ func (a *agent) phase1(ctx context.Context) {
 		a.logf("phase 1: inbound fence: %v (re-tried at every gate check and tick)", err)
 		return
 	}
+	if a.cfg.jio() {
+		a.logf("phase 1: no inbound fence on platform %s (telnet and the web UI stay as they are)", a.cfg.Platform)
+		return
+	}
 	a.logf("phase 1: inbound fence %s installed (TP-Link's :20001-20003/:80/:443 dropped, :%d only from %s)",
 		decosys.IngressChain, a.cfg.SSHDPort, a.cfg.ConsoleIP)
 }
@@ -490,10 +516,13 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	// bridge, Hotspot 2.0) need the agent to own Wi-Fi: observe mode
 	// claims none of them, and a drop to observe clears them (fields).
 	own := a.takeover.Load()
-	p, ok := models.DecoAgentProfileWith(m, heAX, models.DecoAgentFeatures{BandSteer: canSteer, RFScan: own,
-		MinRate: own && a.cfg.MinRates, PPSK: own, LockAP: own, RoamAssist: own && canRoam,
-		RadiusFilter: own, MulticastInspect: own, WPA3: own && a.cfg.WPA3, WPA3FT: own && a.cfg.WPA3 && canFTSAE,
-		RadSec: own, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2})
+	// hostapd/wl features (scans, PPSK, Lock to AP, RADIUS filter,
+	// multicast inspect, RadSec) exist on the Deco only
+	deco := own && !a.cfg.jio()
+	p, ok := models.DecoAgentProfileWith(m, heAX, models.DecoAgentFeatures{BandSteer: canSteer, RFScan: deco,
+		MinRate: own && a.cfg.MinRates, PPSK: deco, LockAP: deco, RoamAssist: own && canRoam,
+		RadiusFilter: deco, MulticastInspect: deco, WPA3: own && a.cfg.WPA3, WPA3FT: own && a.cfg.WPA3 && canFTSAE,
+		RadSec: deco, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2})
 	if !ok {
 		return fmt.Errorf("model %s has no agent capability words", a.cfg.Model)
 	}

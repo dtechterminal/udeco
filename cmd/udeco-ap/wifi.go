@@ -460,6 +460,9 @@ func (a *agent) wifiFailed(ctx context.Context, op string, err error) {
 // TODO(bcmwifi-owned): use an exported bcmwifi ownership query once there
 // is one; this reads bcmwifi's documented file layout.
 func (a *agent) wifiOwned() bool {
+	if o, ok := a.wifi.(interface{ Owned() bool }); ok {
+		return o.Owned()
+	}
 	for _, p := range []string{"wl0", "wl1"} {
 		if _, err := os.Stat(a.dev(filepath.Join(a.o.runDir, "hapd-"+p+".conf"))); err == nil {
 			return true

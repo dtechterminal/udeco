@@ -56,9 +56,10 @@ func (t syslogTarget) String() string {
 
 // syslogState is the forwarder (loop goroutine fields).
 type syslogState struct {
-	key  string // the system_cfg (adopted/cfgversion/N) last read
-	cur  syslogTarget
-	stop context.CancelFunc
+	key      string // the system_cfg (adopted/cfgversion/N) last read
+	cur      syslogTarget
+	stop     context.CancelFunc
+	jioNoted bool // the platform-has-no-logread note was logged
 }
 
 // syslogFollow starts, changes or stops the forwarding when the saved
@@ -76,7 +77,13 @@ func (a *agent) syslogFollow(ctx context.Context) {
 	}
 	sl.key = key
 	var want syslogTarget
-	if a.x.S.Adopted {
+	if a.x.S.Adopted && a.cfg.jio() && !sl.jioNoted {
+		// the JCOW414's syslogd keeps no shared buffer (-n -m 0): logread
+		// cannot follow it, so nothing is forwarded
+		sl.jioNoted = true
+		a.logf("remote syslog: not forwarded on platform %s (its syslogd has no buffer logread can follow)", a.cfg.Platform)
+	}
+	if a.x.S.Adopted && !a.cfg.jio() {
 		b, _ := os.ReadFile(a.sysCfgPath)
 		in, _ := translate.IntentFromCfg(string(b))
 		if s := in.Syslog; s != nil {

@@ -1,0 +1,766 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package mtkwifi
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+)
+
+// Runner executes commands on the device.
+type Runner interface {
+	Run(ctx context.Context, name string, args ...string) ([]byte, error)
+}
+
+// Options configures an Applier.
+type Options struct {
+	Root     string // "/" on the device
+	Run      Runner
+	StateDir string // last-good.json (0600, holds passphrases)
+	RunDir   string // ramfs: the vendor baseline of this boot, the owned marker
+	Bridge   string // the LAN bridge (bdg2)
+	Uplink   string // the uplink bridge port (eth0.4.1); VLAN devices go on its parent
+	DryRun   bool
+	Logf     func(string, ...any)
+	Layout   []RadioDef // nil = JCOW414
+	// VerifyTimeout bounds the wait for the BSSes after an apply (20 s).
+	VerifyTimeout time.Duration
+	sleep         func(context.Context, time.Duration) error
+}
+
+// Applier implements the agent's Wi-Fi applier on the MediaTek driver.
+type Applier struct {
+	o       Options
+	mu      sync.Mutex
+	live    map[string]RadioPlan // what this process applied or found live
+	blocked []string
+	failed  string // hash of the last Desired that failed to apply
+	uplink  string
+}
+
+const (
+	ownedFile    = "mtk-owned"   // RunDir: the agent's profiles are installed
+	appliedFile  = "mtk-applied" // RunDir: hash of the plans live now
+	baselineDir  = "mtk-baseline"
+	lastGoodFile = "last-good.json"
+)
+
+// New returns an Applier; nothing changes until Apply.
+func New(o Options) *Applier {
+	if o.Root == "" {
+		o.Root = "/"
+	}
+	if o.Bridge == "" {
+		o.Bridge = "bdg2"
+	}
+	if o.Logf == nil {
+		o.Logf = func(string, ...any) {}
+	}
+	if o.Layout == nil {
+		o.Layout = JCOW414
+	}
+	if o.VerifyTimeout <= 0 {
+		o.VerifyTimeout = 20 * time.Second
+	}
+	if o.sleep == nil {
+		o.sleep = func(ctx context.Context, d time.Duration) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(d):
+				return nil
+			}
+		}
+	}
+	return &Applier{o: o, uplink: o.Uplink}
+}
+
+func (a *Applier) dev(p string) string { return filepath.Join(a.o.Root, p) }
+
+func (a *Applier) run(ctx context.Context, name string, args ...string) error {
+	if a.o.DryRun {
+		a.o.Logf("mtkwifi: dry run: %s %s", name, strings.Join(redactArgs(args), " "))
+		return nil
+	}
+	out, err := a.o.Run.Run(ctx, name, args...)
+	if err != nil {
+		return fmt.Errorf("%s %s: %v %s", name, strings.Join(redactArgs(args), " "), err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func redactArgs(args []string) []string {
+	out := append([]string(nil), args...)
+	for i, s := range out {
+		if strings.HasPrefix(s, "WPAPSK") {
+			out[i] = "WPAPSK=<secret>"
+		}
+	}
+	return out
+}
+
+func plansHash(ps map[string]RadioPlan) string {
+	j, _ := json.Marshal(ps)
+	h := sha256.Sum256(j)
+	return hex.EncodeToString(h[:])
+}
+
+// Owned reports whether the agent's profiles are installed (the agent uses
+// it to tell a rollback that handed Wi-Fi back from one that did not).
+func (a *Applier) Owned() bool {
+	_, err := os.Stat(a.dev(filepath.Join(a.o.RunDir, ownedFile)))
+	return err == nil
+}
+
+// Plan compares d with what is live. A plan whose hash matches what this
+// boot applied last (an agent restart) is empty when the radios still
+// look like it: nothing is restarted.
+func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	want, notes := plans(d, a.o.Layout)
+	p := bcmwifi.Plan{Desired: d, Notes: notes}
+	cur := a.live
+	if cur == nil {
+		if h, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, appliedFile))); err == nil &&
+			strings.TrimSpace(string(h)) == plansHash(want) && a.check(ctx, want) == nil {
+			a.live = want
+			return p, nil
+		}
+	}
+	for _, rd := range a.o.Layout {
+		w := want[rd.Band]
+		c, ok := cur[rd.Band]
+		switch {
+		case ok && c.hash() == w.hash():
+		case ok && c.structural() == w.structural():
+			p.Steps = append(p.Steps, bcmwifi.Step{Kind: bcmwifi.StepCmd,
+				Desc: fmt.Sprintf("%s: hidden/isolation/client limits live (iwpriv)", rd.Band)})
+		case !w.On:
+			p.Steps = append(p.Steps, bcmwifi.Step{Kind: bcmwifi.StepCmd, Desc: rd.Band + ": radio off"})
+		default:
+			var names []string
+			for _, b := range w.BSS {
+				names = append(names, strconv.Quote(b.SSID))
+			}
+			p.Steps = append(p.Steps, bcmwifi.Step{Kind: bcmwifi.StepCmd,
+				Desc: fmt.Sprintf("%s: profile and restart (ch %s, %d MHz, %d%% power): %s", rd.Band,
+					chanText(w.Channel), w.Width, w.TxPct, strings.Join(names, ", "))})
+		}
+	}
+	return p, nil
+}
+
+func chanText(c int) string {
+	if c == 0 {
+		return "auto"
+	}
+	return strconv.Itoa(c)
+}
+
+// Apply makes p live. A failure rolls back to last-good (else to the
+// vendor's Wi-Fi of this boot) and the same Desired is not retried.
+func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	want, _ := plans(p.Desired, a.o.Layout)
+	h := plansHash(want)
+	if h == a.failed {
+		return bcmwifi.ErrDesiredFailed
+	}
+	if a.o.DryRun {
+		a.o.Logf("mtkwifi: dry run: %d step(s) not applied", len(p.Steps))
+		return nil
+	}
+	if err := a.captureBaseline(ctx); err != nil {
+		return fmt.Errorf("%w: %v", bcmwifi.ErrNoBaseline, err)
+	}
+	err := a.applyPlans(ctx, want, a.live)
+	if err == nil {
+		err = a.waitLive(ctx, want)
+	}
+	if err != nil {
+		a.failed = h
+		a.o.Logf("mtkwifi: apply failed: %v: rolling back", err)
+		if rerr := a.rollback(ctx); rerr != nil {
+			return fmt.Errorf("%v; rollback: %v", err, rerr)
+		}
+		return err
+	}
+	a.live = want
+	a.saveLastGood(want)
+	return nil
+}
+
+func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan) error {
+	if err := os.WriteFile(a.dev(filepath.Join(a.o.RunDir, ownedFile)), []byte("1\n"), 0o644); err != nil {
+		return err
+	}
+	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, appliedFile)))
+	for _, rd := range a.o.Layout {
+		w := want[rd.Band]
+		c, ok := cur[rd.Band]
+		var err error
+		switch {
+		case ok && c.hash() == w.hash():
+			continue
+		case ok && c.structural() == w.structural():
+			err = a.applyLive(ctx, rd, w)
+		default:
+			err = a.applyRadio(ctx, rd, w)
+		}
+		if err != nil {
+			return fmt.Errorf("%s: %w", rd.Band, err)
+		}
+	}
+	if err := a.cleanVLANs(ctx, want); err != nil {
+		a.o.Logf("mtkwifi: removing unused VLAN bridges: %v", err)
+	}
+	a.applyACL(ctx)
+	return os.WriteFile(a.dev(filepath.Join(a.o.RunDir, appliedFile)), []byte(plansHash(want)+"\n"), 0o644)
+}
+
+// applyRadio writes the radio's profile and restarts its BSSes (every
+// client of the radio reassociates).
+func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) error {
+	base, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, baselineDir, rd.Band+".dat")))
+	if err != nil {
+		return fmt.Errorf("baseline profile: %w", err)
+	}
+	for i := len(rd.Ifaces) - 1; i >= 0; i-- {
+		if err := a.run(ctx, "ifconfig", rd.Ifaces[i], "down"); err != nil {
+			return err
+		}
+	}
+	if !rp.On {
+		a.o.Logf("mtkwifi: %s: radio off", rd.Band)
+		return nil
+	}
+	if err := writeFile(a.dev(rd.Dat), profile(base, rd, rp), 0o600); err != nil {
+		return err
+	}
+	for i := range rp.BSS {
+		if err := a.run(ctx, "ifconfig", rd.Ifaces[i], "up"); err != nil {
+			return err
+		}
+	}
+	for i, b := range rp.BSS {
+		if err := a.bridgeTo(ctx, rd.Ifaces[i], b.VLAN); err != nil {
+			return err
+		}
+	}
+	a.o.Logf("mtkwifi: %s: %d SSID(s) up (ch %s, %d MHz)", rd.Band, len(rp.BSS), chanText(rp.Channel), rp.Width)
+	return nil
+}
+
+// applyLive sets the live settings of each BSS and keeps the profile in
+// step (a later restart re-reads it).
+func (a *Applier) applyLive(ctx context.Context, rd RadioDef, rp RadioPlan) error {
+	for i, b := range rp.BSS {
+		ifc := rd.Ifaces[i]
+		for _, kv := range []string{"HideSSID=" + b01(b.Hidden), "NoForwarding=" + b01(b.Isolate), "MaxStaNum=" + strconv.Itoa(b.MaxSta)} {
+			if err := a.run(ctx, "iwpriv", ifc, "set", kv); err != nil {
+				return err
+			}
+		}
+	}
+	base, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, baselineDir, rd.Band+".dat")))
+	if err != nil {
+		return err
+	}
+	return writeFile(a.dev(rd.Dat), profile(base, rd, rp), 0o600)
+}
+
+func writeFile(p string, b []byte, mode os.FileMode) error {
+	tmp := p + ".udeco"
+	if err := os.WriteFile(tmp, b, mode); err != nil {
+		return err
+	}
+	return os.Rename(tmp, p)
+}
+
+// ------------------------------------------------------------- bridging
+
+func vlanBridge(vid int) string { return "br-v" + strconv.Itoa(vid) }
+
+// vlanParent is the switch port device of the uplink: eth0.4 for eth0.4.1.
+func (a *Applier) vlanParent() (string, error) {
+	u := a.uplink
+	if u == "" {
+		return "", errors.New("no uplink port known: VLAN SSIDs cannot be bridged")
+	}
+	if i := strings.LastIndex(u, "."); i > 0 && strings.Count(u, ".") == 2 {
+		return u[:i], nil
+	}
+	return u, nil
+}
+
+func (a *Applier) exists(dev string) bool {
+	_, err := os.Stat(a.dev("/sys/class/net/" + dev))
+	return err == nil
+}
+
+func (a *Applier) bridgeOf(dev string) string {
+	l, err := os.Readlink(a.dev("/sys/class/net/" + dev + "/brport/bridge"))
+	if err != nil {
+		return ""
+	}
+	return filepath.Base(l)
+}
+
+// bridgeTo puts ifc into the LAN bridge (vid 0) or the VLAN's bridge.
+func (a *Applier) bridgeTo(ctx context.Context, ifc string, vid int) error {
+	br := a.o.Bridge
+	if vid > 0 {
+		var err error
+		if br, err = a.ensureVLAN(ctx, vid); err != nil {
+			return err
+		}
+	}
+	cur := a.bridgeOf(ifc)
+	if cur == br {
+		return nil
+	}
+	if cur != "" {
+		if err := a.run(ctx, "brctl", "delif", cur, ifc); err != nil {
+			return err
+		}
+	}
+	return a.run(ctx, "brctl", "addif", br, ifc)
+}
+
+func (a *Applier) ensureVLAN(ctx context.Context, vid int) (string, error) {
+	parent, err := a.vlanParent()
+	if err != nil {
+		return "", err
+	}
+	vdev, br := parent+"."+strconv.Itoa(vid), vlanBridge(vid)
+	if !a.exists(vdev) {
+		if err := a.run(ctx, "ip", "link", "add", "link", parent, "name", vdev, "type", "vlan", "id", strconv.Itoa(vid)); err != nil {
+			return "", err
+		}
+	}
+	if !a.exists(br) {
+		if err := a.run(ctx, "brctl", "addbr", br); err != nil {
+			return "", err
+		}
+	}
+	if a.bridgeOf(vdev) != br {
+		if err := a.run(ctx, "brctl", "addif", br, vdev); err != nil {
+			return "", err
+		}
+	}
+	for _, d := range []string{vdev, br} {
+		if err := a.run(ctx, "ip", "link", "set", d, "up"); err != nil {
+			return "", err
+		}
+	}
+	return br, nil
+}
+
+var vlanBr = regexp.MustCompile(`^br-v([0-9]+)$`)
+
+// cleanVLANs removes the agent's VLAN bridges no BSS uses any more.
+func (a *Applier) cleanVLANs(ctx context.Context, want map[string]RadioPlan) error {
+	used := map[int]bool{}
+	for _, rp := range want {
+		for _, b := range rp.BSS {
+			used[b.VLAN] = true
+		}
+	}
+	ents, err := os.ReadDir(a.dev("/sys/class/net"))
+	if err != nil {
+		return err
+	}
+	parent, _ := a.vlanParent()
+	for _, e := range ents {
+		m := vlanBr.FindStringSubmatch(e.Name())
+		if m == nil {
+			continue
+		}
+		vid, _ := strconv.Atoi(m[1])
+		if used[vid] {
+			continue
+		}
+		_ = a.run(ctx, "ip", "link", "set", e.Name(), "down")
+		if err := a.run(ctx, "brctl", "delbr", e.Name()); err != nil {
+			return err
+		}
+		if parent != "" && a.exists(parent+"."+m[1]) {
+			if err := a.run(ctx, "ip", "link", "del", parent+"."+m[1]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// ------------------------------------------------------------- reading
+
+func (a *Applier) isUp(dev string) bool {
+	b, err := os.ReadFile(a.dev("/sys/class/net/" + dev + "/flags"))
+	if err != nil {
+		return false
+	}
+	v, err := strconv.ParseInt(strings.TrimSpace(string(b)), 0, 64)
+	return err == nil && v&1 == 1
+}
+
+// essidRE: the MT7603 prints `ESSID:"name"  ` at the end of its line, the
+// MT7663 `ESSID:"name"  Nickname:""`.
+var essidRE = regexp.MustCompile(`(?m)ESSID:"(.*?)"(?:\s+Nickname:|[ \t]*\r?$)`)
+
+func (a *Applier) essid(ctx context.Context, ifc string) string {
+	out, err := a.o.Run.Run(ctx, "iwconfig", ifc)
+	if err != nil {
+		return ""
+	}
+	if m := essidRE.FindSubmatch(out); m != nil {
+		return string(m[1])
+	}
+	return ""
+}
+
+// check compares the radios with want: BSS netdevs up with their SSIDs and
+// bridges, the rest down.
+func (a *Applier) check(ctx context.Context, want map[string]RadioPlan) error {
+	var bad []string
+	for _, rd := range a.o.Layout {
+		rp := want[rd.Band]
+		for i, ifc := range rd.Ifaces {
+			if i >= len(rp.BSS) {
+				if a.isUp(ifc) {
+					bad = append(bad, ifc+" is up but serves nothing")
+				}
+				continue
+			}
+			b := rp.BSS[i]
+			if !a.isUp(ifc) {
+				bad = append(bad, ifc+" is down")
+				continue
+			}
+			if s := a.essid(ctx, ifc); s != b.SSID {
+				bad = append(bad, fmt.Sprintf("%s serves %q, not %q", ifc, s, b.SSID))
+			}
+			br := a.o.Bridge
+			if b.VLAN > 0 {
+				br = vlanBridge(b.VLAN)
+			}
+			if got := a.bridgeOf(ifc); got != br {
+				bad = append(bad, fmt.Sprintf("%s is in bridge %q, not %q", ifc, got, br))
+			}
+		}
+	}
+	if len(bad) > 0 {
+		return errors.New(strings.Join(bad, "; "))
+	}
+	return nil
+}
+
+func (a *Applier) waitLive(ctx context.Context, want map[string]RadioPlan) error {
+	deadline := time.Now().Add(a.o.VerifyTimeout)
+	for {
+		err := a.check(ctx, want)
+		if err == nil || time.Now().After(deadline) {
+			return err
+		}
+		if e := a.o.sleep(ctx, time.Second); e != nil {
+			return err
+		}
+	}
+}
+
+// Verify is the health check: the radios still serve what d asks.
+func (a *Applier) Verify(ctx context.Context, d bcmwifi.Desired) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	want, _ := plans(d, a.o.Layout)
+	return a.check(ctx, want)
+}
+
+// ------------------------------------------------------- baseline, rollback
+
+type baselineState struct {
+	Up      []string          // BSS netdevs up at takeover
+	Bridges map[string]string // netdev -> bridge at takeover
+}
+
+// captureBaseline saves the vendor's profiles and BSS state once per boot
+// (RunDir is ramfs; the vendor regenerates its profiles at every boot).
+func (a *Applier) captureBaseline(ctx context.Context) error {
+	dir := a.dev(filepath.Join(a.o.RunDir, baselineDir))
+	if _, err := os.Stat(filepath.Join(dir, "state.json")); err == nil {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	st := baselineState{Bridges: map[string]string{}}
+	for _, rd := range a.o.Layout {
+		b, err := os.ReadFile(a.dev(rd.Dat))
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, rd.Band+".dat"), b, 0o600); err != nil {
+			return err
+		}
+		for _, ifc := range rd.Ifaces {
+			if a.isUp(ifc) {
+				st.Up = append(st.Up, ifc)
+			}
+			if br := a.bridgeOf(ifc); br != "" {
+				st.Bridges[ifc] = br
+			}
+		}
+	}
+	j, _ := json.Marshal(st)
+	return os.WriteFile(filepath.Join(dir, "state.json"), j, 0o600)
+}
+
+// Rollback goes back to last-good; without one (or when it fails) to the
+// vendor's Wi-Fi of this boot.
+func (a *Applier) Rollback(ctx context.Context) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.rollback(ctx)
+}
+
+func (a *Applier) rollback(ctx context.Context) error {
+	if lg, err := a.loadLastGood(); err == nil {
+		err := a.applyPlans(ctx, lg, nil)
+		if err == nil {
+			err = a.waitLive(ctx, lg)
+		}
+		if err == nil {
+			a.live = lg
+			a.o.Logf("mtkwifi: rolled back to last-good")
+			return nil
+		}
+		a.o.Logf("mtkwifi: last-good did not come up (%v): restoring the vendor's Wi-Fi", err)
+	}
+	return a.restoreBaseline(ctx)
+}
+
+func (a *Applier) restoreBaseline(ctx context.Context) error {
+	dir := a.dev(filepath.Join(a.o.RunDir, baselineDir))
+	j, err := os.ReadFile(filepath.Join(dir, "state.json"))
+	if err != nil {
+		return fmt.Errorf("%w: %v", bcmwifi.ErrNoBaseline, err)
+	}
+	var st baselineState
+	if err := json.Unmarshal(j, &st); err != nil {
+		return err
+	}
+	for _, rd := range a.o.Layout {
+		for i := len(rd.Ifaces) - 1; i >= 0; i-- {
+			_ = a.run(ctx, "ifconfig", rd.Ifaces[i], "down")
+		}
+		b, err := os.ReadFile(filepath.Join(dir, rd.Band+".dat"))
+		if err != nil {
+			return err
+		}
+		if err := writeFile(a.dev(rd.Dat), b, 0o644); err != nil {
+			return err
+		}
+	}
+	for _, ifc := range st.Up {
+		_ = a.run(ctx, "ifconfig", ifc, "up")
+	}
+	for _, rd := range a.o.Layout {
+		for _, ifc := range rd.Ifaces {
+			cur, want := a.bridgeOf(ifc), st.Bridges[ifc]
+			if cur == want {
+				continue
+			}
+			if cur != "" {
+				_ = a.run(ctx, "brctl", "delif", cur, ifc)
+			}
+			if want != "" {
+				_ = a.run(ctx, "brctl", "addif", want, ifc)
+			}
+		}
+	}
+	_ = a.cleanVLANs(ctx, nil)
+	a.live = nil
+	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, ownedFile)))
+	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, appliedFile)))
+	a.o.Logf("mtkwifi: the vendor's Wi-Fi of this boot is back")
+	return nil
+}
+
+func (a *Applier) saveLastGood(ps map[string]RadioPlan) {
+	if a.o.StateDir == "" {
+		return
+	}
+	j, _ := json.Marshal(ps)
+	p := a.dev(filepath.Join(a.o.StateDir, lastGoodFile))
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err == nil {
+		if err := writeFile(p, j, 0o600); err != nil {
+			a.o.Logf("mtkwifi: saving last-good: %v", err)
+		}
+	}
+}
+
+func (a *Applier) loadLastGood() (map[string]RadioPlan, error) {
+	if a.o.StateDir == "" {
+		return nil, os.ErrNotExist
+	}
+	j, err := os.ReadFile(a.dev(filepath.Join(a.o.StateDir, lastGoodFile)))
+	if err != nil {
+		return nil, err
+	}
+	var ps map[string]RadioPlan
+	return ps, json.Unmarshal(j, &ps)
+}
+
+// ------------------------------------------------------------ the tick
+
+// Tick repairs bridge membership in place and reports drift only an apply
+// fixes (a BSS down or serving another SSID: something rewrote the driver).
+func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var r bcmwifi.TickReport
+	if a.live == nil {
+		return r, nil
+	}
+	for _, rd := range a.o.Layout {
+		rp := a.live[rd.Band]
+		for i, ifc := range rd.Ifaces {
+			if i >= len(rp.BSS) {
+				if a.isUp(ifc) {
+					r.Foreign = append(r.Foreign, ifc+" is up but serves nothing")
+					r.NeedsApply = true
+				}
+				continue
+			}
+			b := rp.BSS[i]
+			if !a.isUp(ifc) {
+				r.Foreign = append(r.Foreign, ifc+" went down")
+				r.NeedsApply = true
+				continue
+			}
+			if s := a.essid(ctx, ifc); s != b.SSID {
+				r.Foreign = append(r.Foreign, fmt.Sprintf("%s serves %q", ifc, s))
+				r.NeedsApply = true
+				continue
+			}
+			br := a.o.Bridge
+			if b.VLAN > 0 {
+				br = vlanBridge(b.VLAN)
+			}
+			if got := a.bridgeOf(ifc); got != br {
+				r.Foreign = append(r.Foreign, fmt.Sprintf("%s was in bridge %q", ifc, got))
+				if err := a.bridgeTo(ctx, ifc, b.VLAN); err != nil {
+					r.Problems = append(r.Problems, err.Error())
+				} else {
+					r.Steps++
+				}
+			}
+		}
+	}
+	return r, nil
+}
+
+// --------------------------------------------------- clients and the rest
+
+func (a *Applier) upIfaces() []string {
+	var out []string
+	for _, rd := range a.o.Layout {
+		for _, ifc := range rd.Ifaces {
+			if a.isUp(ifc) {
+				out = append(out, ifc)
+			}
+		}
+	}
+	return out
+}
+
+// Kick disconnects mac from every BSS.
+func (a *Applier) Kick(ctx context.Context, mac string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	mac = strings.ToUpper(mac)
+	var errs []string
+	for _, ifc := range a.upIfaces() {
+		if err := a.run(ctx, "iwpriv", ifc, "set", "DisConnectSta="+mac); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+// SetBlocked keeps macs off every BSS (the driver's deny list).
+func (a *Applier) SetBlocked(ctx context.Context, macs []string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	b := make([]string, 0, len(macs))
+	for _, m := range macs {
+		b = append(b, strings.ToUpper(m))
+	}
+	sort.Strings(b)
+	a.blocked = b
+	if a.live == nil {
+		return nil
+	}
+	return a.applyACL(ctx)
+}
+
+func (a *Applier) applyACL(ctx context.Context) error {
+	var errs []string
+	for _, ifc := range a.upIfaces() {
+		cmds := []string{"ACLClearAll=1", "AccessPolicy=0"}
+		if len(a.blocked) > 0 {
+			cmds = []string{"ACLClearAll=1", "AccessPolicy=2"}
+			for _, m := range a.blocked {
+				cmds = append(cmds, "ACLAddEntry="+m)
+			}
+		}
+		for _, c := range cmds {
+			if err := a.run(ctx, "iwpriv", ifc, "set", c); err != nil {
+				errs = append(errs, err.Error())
+				break
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func (a *Applier) LED(context.Context, string) error { return nil }
+
+func (a *Applier) ForgetFailed() {
+	a.mu.Lock()
+	a.failed = ""
+	a.mu.Unlock()
+}
+
+func (a *Applier) SetUplink(port string) {
+	a.mu.Lock()
+	a.uplink = port
+	a.mu.Unlock()
+}
+
+var errNoGuest = errors.New("mtkwifi: guest networks are not served on this unit")
+
+func (a *Applier) AuthorizeGuest(context.Context, string) error   { return errNoGuest }
+func (a *Applier) UnauthorizeGuest(context.Context, string) error { return errNoGuest }

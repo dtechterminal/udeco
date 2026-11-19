@@ -204,7 +204,11 @@ func (a *agent) observeReading(s *apstate.Snapshot, f map[string]any) {
 		}
 	}
 
-	a.loopGuard(ports, lldpPorts, now)
+	if !a.cfg.jio() {
+		// the JCOW414's bridge (bdg2) has a downstream router on another
+		// port by design; the loop guard acts on the Deco's br-lan only
+		a.loopGuard(ports, lldpPorts, now)
+	}
 
 	if mac, err := net.ParseMAC(s.MAC); err == nil && t.uplink != "" {
 		info := lldp.Info{ChassisMAC: mac, PortID: "eth0", TTL: 120, SysName: s.Hostname,

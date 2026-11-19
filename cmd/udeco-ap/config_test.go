@@ -134,3 +134,20 @@ func TestDesiredFrom(t *testing.T) {
 		t.Errorf("radius %v", s.Radius)
 	}
 }
+
+// TestJioPlatformConfig: platform jio-mtk reports as U7LT and refuses the
+// features its driver or system manager do not have.
+func TestJioPlatformConfig(t *testing.T) {
+	base := `{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","takeover":true,"apply":true,"platform":"jio-mtk"`
+	if c, err := parseConfig([]byte(base + `,"model":"U7LT"}`)); err != nil || !c.jio() {
+		t.Fatalf("jio config refused: %v", err)
+	}
+	for _, bad := range []string{`}`, `,"model":"U7LT","wpa3":true}`, `,"model":"U7LT","egress":true}`, `,"model":"UAL6"}`} {
+		if _, err := parseConfig([]byte(base + bad)); err == nil {
+			t.Errorf("accepted %s", bad)
+		}
+	}
+	if _, err := parseConfig([]byte(`{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","platform":"x","model":"UAL6"}`)); err == nil {
+		t.Errorf("unknown platform accepted")
+	}
+}

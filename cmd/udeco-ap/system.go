@@ -21,6 +21,10 @@ import (
 // whose PATH lacks /usr/sbin (wl, hostapd, brctl, iptables live there).
 const agentPATH = "/usr/sbin:/usr/bin:/sbin:/bin"
 
+// jioPATH: the JCOW414 keeps iwpriv/iwconfig in /userfs/bin and ip in
+// /pfrm2.0/bin.
+const jioPATH = "/userfs/bin:/pfrm2.0/bin:" + agentPATH
+
 // execRunner runs device commands (wl, hostapd_cli, ubus, iptables, ...).
 // It is the Runner of internal/wl, internal/decosys and internal/bcmwifi.
 type execRunner struct {
