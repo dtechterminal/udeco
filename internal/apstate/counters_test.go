@@ -429,3 +429,33 @@ func TestNoDataRadio(t *testing.T) {
 		}
 	}
 }
+
+// TestCUSelfWithinTotal: own tx and rx airtime, rounded each on its own,
+// may not stack above the busy time they are part of (12.5 % + 12.5 % of a
+// 25 % busy time is not 13 % + 13 %); a radio whose own counters really
+// exceed its busy time keeps its rounded figures.
+func TestCUSelfWithinTotal(t *testing.T) {
+	for _, c := range []struct {
+		name                  string
+		busy, tx, rx          int64 // per 10000 ms
+		total, selfTx, selfRx int
+	}{
+		{"two halves", 2500, 1250, 1250, 25, 13, 12},
+		{"rx rounds up more", 2510, 1260, 1250, 25, 13, 12},
+		{"tx rounds up more", 2510, 1250, 1260, 25, 12, 13},
+		{"total rounds down", 2540, 1270, 1270, 25, 13, 12},
+		{"no rounding over", 2500, 1240, 1240, 25, 12, 12},
+		{"own counters over busy", 2000, 1250, 1250, 20, 13, 13},
+	} {
+		mk := func(active int64, k int64) *Snapshot {
+			s := reading(100*k, vapSpec{band: "na", iface: "wl12", ssid: "Home"})
+			s.Radios[1].Survey = Survey{Active: active, Busy: c.busy * k, Tx: c.tx * k, Rx: c.rx * k}
+			return s
+		}
+		prev, cur := mk(10_000, 1), mk(20_000, 2)
+		rs := cur.Fields(prev, CfgInfo{}, nil)["radio_table_stats"].([]map[string]any)[1]
+		if rs["cu_total"] != c.total || rs["cu_self_tx"] != c.selfTx || rs["cu_self_rx"] != c.selfRx {
+			t.Errorf("%s: cu_total %v cu_self_tx %v cu_self_rx %v, want %d %d %d", c.name, rs["cu_total"], rs["cu_self_tx"], rs["cu_self_rx"], c.total, c.selfTx, c.selfRx)
+		}
+	}
+}

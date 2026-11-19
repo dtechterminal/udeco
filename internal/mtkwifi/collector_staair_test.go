@@ -95,9 +95,10 @@ func TestCollectStaAirtime(t *testing.T) {
 	r.wantCU("estimate within the busy time", s1, s2, 46, 10, 5)
 
 	// 10 s on (12 s since the last counts and ask): 432 Mbit each way is
-	// 6 s, 50 % each, past the 25 % busy time: both scaled to 12.5 %
+	// 6 s, 50 % each, past the 25 % busy time: both scaled to 12.5 %, sent
+	// as 13 % + 12 %, not 13 % + 13 % over the 25 % (apstate cuPcts)
 	d.prints["ra0 stacountinfo"] = staCountText(1000+9_000_000+54_000_000, 1000+4_500_000+54_000_000)
 	d.prints["ra0 mibinfo"] = withPrimCCA(t, "0x2dc6c0")
 	s3 := r.after(10 * time.Second)
-	r.wantCU("estimate capped by the busy time", s2, s3, 25, 13, 13)
+	r.wantCU("estimate capped by the busy time", s2, s3, 25, 13, 12)
 }

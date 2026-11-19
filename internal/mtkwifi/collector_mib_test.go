@@ -399,3 +399,30 @@ func TestRestartGapReportsNoSurvey(t *testing.T) {
 		t.Errorf("ng inform spanning the restart: cu_total %d cu_self_tx %d (reported %v), want 46 and 0", cu, tx, ok)
 	}
 }
+
+// TestMibAcrossScan: a site survey (Scan) takes the radio off its channel,
+// so the first `show mibinfo` ask after it, whose interval holds the scan,
+// gives no reading; the one after measures the channel again.
+func TestMibAcrossScan(t *testing.T) {
+	r := newMibRig(t)
+	r.c.o.FreshScan = true
+	old := fixture(t, "site_survey_ra0.txt")
+	r.d.survey["ra0"] = old
+	r.d.next["ra0"] = strings.Replace(old, "-67      57 ", "-66      59 ", 1)
+	r.d.after = 3 // the driver is still scanning for the first reads
+	r.after(0)
+	r.after(mibInterval)
+	if r.busy() == nil {
+		t.Fatal("no reading before the scan")
+	}
+	if _, err := r.c.Scan(context.Background(), "ng"); err != nil {
+		t.Fatal(err)
+	}
+	s1 := r.after(mibInterval)
+	if r.asks() != 3 || !radioOf(s1, "ng").NoSurvey || r.busy() != nil {
+		t.Errorf("first ask after the scan: %d asks, NoSurvey %v, reading %+v (want none: its interval held the scan)", r.asks(), radioOf(s1, "ng").NoSurvey, r.busy())
+	}
+	s2 := r.after(mibInterval)
+	s3 := r.after(time.Second)
+	r.wantCU("after the scan", s2, s3, 46, 0, 0)
+}

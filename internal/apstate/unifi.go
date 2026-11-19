@@ -219,9 +219,7 @@ func (s *Snapshot) FieldsWith(prev *Snapshot, info CfgInfo, caps map[string]Radi
 		if prev != nil {
 			if pr := prev.radio(r.Phy); pr != nil {
 				if d := r.Survey.Active - pr.Survey.Active; d > 0 {
-					cuTotal = pct(r.Survey.Busy-pr.Survey.Busy, d)
-					cuRx = pct(r.Survey.Rx-pr.Survey.Rx, d)
-					cuTx = pct(r.Survey.Tx-pr.Survey.Tx, d)
+					cuTotal, cuRx, cuTx = cuPcts(r.Survey.Busy-pr.Survey.Busy, r.Survey.Rx-pr.Survey.Rx, r.Survey.Tx-pr.Survey.Tx, d)
 				}
 			}
 		}
@@ -493,6 +491,29 @@ func (s *Snapshot) physPorts() []Port {
 		out = append(out, *p)
 	}
 	return out
+}
+
+// cuPcts is the channel use over active: busy, own rx and own tx time as
+// percentages, each rounded (pct). Own rx and tx are part of the busy time,
+// but two parts rounded up on their own can stack above the rounded total
+// (12.5 % + 12.5 % of a 25 % busy time as 13 % + 13 %); then the part that
+// rounding raised most (rx on a tie) gives back the excess. Own counters
+// that really exceed the busy time keep their figures.
+func cuPcts(busy, rx, tx, active int64) (cuTotal, cuRx, cuTx int) {
+	cuTotal, cuRx, cuTx = pct(busy, active), pct(rx, active), pct(tx, active)
+	if rx < 0 || tx < 0 || rx+tx > busy {
+		return
+	}
+	for cuRx+cuTx > cuTotal {
+		// raised by rounding, in units of active/100
+		upRx, upTx := int64(cuRx)*active-100*rx, int64(cuTx)*active-100*tx
+		if cuRx > 0 && (upRx >= upTx || cuTx == 0) {
+			cuRx--
+		} else {
+			cuTx--
+		}
+	}
+	return
 }
 
 func pct(a, b int64) int {

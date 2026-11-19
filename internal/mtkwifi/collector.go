@@ -812,9 +812,9 @@ type mibReading struct {
 	asked time.Time   // the Collect that asked (mibInterval)
 	at    time.Time   // when the request was made (the next reading's interval)
 	busy  *busySample // nil: no busy time (see mibBusy, or the radio went down since)
-	// gap: the radio was down, or behind the restart gate, since at (or
-	// there was no ask yet): the next ask has no previous one to measure
-	// from
+	// gap: the radio was down, behind the restart gate, or off its
+	// channel for a site survey (Scan) since at (or there was no ask
+	// yet): the next ask has no previous one to measure from
 	gap bool
 }
 

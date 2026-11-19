@@ -142,7 +142,8 @@ func (c *Collector) lastSurvey(band string, now time.Time) *apstate.ScanResult {
 // scan`; FreshScan only): `iwpriv <radio> set SiteSurvey=1`, then the table
 // is read every scanPoll until it differs from the one before the scan and
 // has stayed the same for scanSettle. The radio leaves its channel while
-// the driver scans; Collect keeps its last reading meanwhile.
+// the driver scans; Collect keeps its last reading meanwhile, and the next
+// `show mibinfo` ask after it gives no busy time (mibGap).
 func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult, error) {
 	if !c.o.FreshScan {
 		return nil, ErrUnsupported
@@ -170,6 +171,9 @@ func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult,
 	}
 	c.scanning.Store(true)
 	defer c.scanning.Store(false)
+	// run before scanning ends: the next `show mibinfo` ask would measure
+	// Prim CCA Time over an interval that held the scan, off the channel
+	defer c.mibGap(main)
 	if _, err := c.o.Run.Run(ctx, "iwpriv", main, "set", "SiteSurvey=1"); err != nil {
 		return nil, fmt.Errorf("iwpriv %s set SiteSurvey=1: %w", main, err)
 	}
@@ -200,6 +204,17 @@ func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult,
 	c.seen[band] = &surveySeen{table: last, at: now, bss: bss}
 	c.mu.Unlock()
 	return &apstate.ScanResult{Band: band, Time: now, BSS: append([]apstate.BSS(nil), bss...)}, nil
+}
+
+// mibGap: the radio left its channel (a site survey) since its last `show
+// mibinfo` ask, so the next ask has no previous one to measure from
+// (mibReading.gap); the reading from before stands until then.
+func (c *Collector) mibGap(main string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if m := c.mib[main]; m != nil {
+		m.gap = true
+	}
 }
 
 // ErrRadioDown: Scan of a radio whose interfaces are down (off, or no SSID
