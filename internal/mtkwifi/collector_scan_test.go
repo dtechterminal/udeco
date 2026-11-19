@@ -254,7 +254,7 @@ func TestCollectCachesDriverReads(t *testing.T) {
 	if st := byMAC["96:97:74:02:d6:8b"]; st.TxPackets != 0 || st.TxRetries != 0 {
 		t.Errorf("a station without counters got some: %+v", st)
 	}
-	if ng.Survey != (apstate.Survey{}) {
+	if ng.Survey != (apstate.Survey{}) || !ng.NoSurvey {
 		t.Errorf("2.4 GHz survey %+v: its mibinfo printed nothing", ng.Survey)
 	}
 

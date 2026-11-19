@@ -170,14 +170,18 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 			// kept, not dropped: a radio coming back from a restart is
 			// not read until the settle time is over (restartgate.go)
 			if rr := c.cache[main]; rr != nil {
-				rr.stale = true
+				// its busy time is not carried over the gap: the reading
+				// stands through the settle time, but without it (the
+				// radio may come back on another channel)
+				rr.stale, rr.busy = true, nil
 			}
-			delete(c.survey, rd.Band)
 			if m := c.mib[main]; m != nil {
 				// never asked while down; its last reading is not
 				// carried over the gap, but the interval still holds
 				m.busy = nil
 			}
+			r.Survey, _ = c.integrate(rd.Band, nil, now)
+			r.NoSurvey = true
 			s.Radios = append(s.Radios, r)
 			continue
 		}
@@ -206,7 +210,9 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 		if len(r.VAPs) > 0 {
 			r.SSID, r.BSSID = r.VAPs[0].SSID, r.VAPs[0].BSSID
 		}
-		r.Survey = c.integrate(rd.Band, rr.busy, now)
+		var ok bool
+		r.Survey, ok = c.integrate(rd.Band, rr.busy, now)
+		r.NoSurvey = !ok
 		s.Radios = append(s.Radios, r)
 	}
 	return s, nil
@@ -686,7 +692,10 @@ func parseBgndScanInfo(log string) (busySample, bool) {
 
 // mibInterval: `show mibinfo` (40-60 kernel-log lines a call) is asked at
 // most this often per radio, Invalidate or not (a new channel's busy time
-// shows within it); between, the last reading stands.
+// shows within it); between, the last reading stands. Not yet checked on
+// the unit: whether the call clears the MIB counters the driver's own
+// one-second busy bucket is built from (compare consecutive busy readings
+// with and without mibinfo calls).
 const mibInterval = 10 * time.Second
 
 // mibReading is a radio's last `show mibinfo` answer.
@@ -787,35 +796,48 @@ func mibBusy(added string, anchored bool, before string) *busySample {
 // surveyAcc turns the driver's one-second readings into the cumulative
 // survey counters the inform takes deltas of (Radio.Survey, ms): each
 // Collect adds the time since the previous one at the newest reading's
-// rates.
+// rates. The counters never go back (a drop would read as 0 % in the next
+// inform): time without a reading is not added.
 type surveyAcc struct {
-	last                 time.Time
-	active, busy, tx, rx float64 // ms
+	last                 time.Time // zero: no reading at the last Collect
+	active, busy, tx, rx float64   // ms
+	// measured: an interval was added since the last Collect without a
+	// reading (until then the radio reports no channel use)
+	measured bool
 }
 
 // surveyGap: a longer pause between Collects is not integrated (the
 // reading would stand for minutes it never saw).
 const surveyGap = 5 * time.Minute
 
-// integrate updates the band's counters with the reading b (nil: none,
-// the radio reports no channel use) and returns them. c.mu is held.
-func (c *Collector) integrate(band string, b *busySample, now time.Time) apstate.Survey {
-	if b == nil {
-		delete(c.survey, band)
-		return apstate.Survey{}
-	}
+// integrate updates the band's counters with the reading b (nil: none:
+// the radio is down or its driver gave no busy time) and returns them, and
+// whether the radio reports channel use (Radio.NoSurvey): only once a
+// reading has measured an interval since the last Collect without one, so
+// a missing reading, or the first one after it, is left out of the inform,
+// never sent as 0 %. c.mu is held.
+func (c *Collector) integrate(band string, b *busySample, now time.Time) (apstate.Survey, bool) {
 	a := c.survey[band]
 	if a == nil {
 		a = &surveyAcc{}
 		c.survey[band] = a
 	}
-	if dt := now.Sub(a.last); !a.last.IsZero() && dt > 0 && dt < surveyGap {
+	dt := now.Sub(a.last)
+	switch {
+	case b == nil:
+		a.last, a.measured = time.Time{}, false
+	case !a.last.IsZero() && dt > 0 && dt < surveyGap:
 		ms := float64(dt) / float64(time.Millisecond)
 		a.active += ms
 		a.busy += ms * float64(b.busy) / 1e6
 		a.tx += ms * float64(b.tx) / 1e6
 		a.rx += ms * float64(b.rx) / 1e6
+		a.last, a.measured = now, true
+	case !a.last.IsZero() && dt == 0:
+		// the same instant again: nothing to add
+	default:
+		// the first reading, or after a long pause: from here on
+		a.last, a.measured = now, false
 	}
-	a.last = now
-	return apstate.Survey{Active: int64(a.active), Busy: int64(a.busy), Tx: int64(a.tx), Rx: int64(a.rx)}
+	return apstate.Survey{Active: int64(a.active), Busy: int64(a.busy), Tx: int64(a.tx), Rx: int64(a.rx)}, a.measured
 }

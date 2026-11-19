@@ -166,11 +166,11 @@ func TestCollectMibInfo(t *testing.T) {
 	}
 
 	// the driver prints nothing: the log still holds both older blocks,
-	// neither is taken
+	// neither is taken: no channel use reported, the counters stand
 	d.prints["ra0 mibinfo"] = ""
 	ck.t = ck.t.Add(mibInterval)
-	if sv := collect().Survey; sv != (apstate.Survey{}) || mibCalls() != 3 {
-		t.Errorf("stale log: survey %+v after %d mibinfo calls", sv, mibCalls())
+	if r := collect(); !r.NoSurvey || r.Survey != after || mibCalls() != 3 {
+		t.Errorf("stale log: NoSurvey %v, survey %+v (want %+v) after %d mibinfo calls", r.NoSurvey, r.Survey, after, mibCalls())
 	}
 
 	// a radio that is down is never asked, and its reading is not carried
@@ -181,22 +181,25 @@ func TestCollectMibInfo(t *testing.T) {
 	d.setUp("ra0", false)
 	n := len(d.iwpriv())
 	ck.t = ck.t.Add(mibInterval)
-	collect()
+	if r := collect(); !r.NoSurvey {
+		t.Error("down radio reported channel use")
+	}
 	if got := d.iwpriv()[n:]; len(got) != 0 {
 		t.Errorf("down radio asked: %v", got)
 	}
 	d.setUp("ra0", true)
 	ck.t = ck.t.Add(time.Second)
-	if sv := collect().Survey; mibCalls() != 5 || sv.Busy != 0 {
-		// 11 s since the last ask: asked again at once
-		t.Errorf("back up: %d mibinfo calls, survey %+v", mibCalls(), sv)
+	if r := collect(); mibCalls() != 5 || !r.NoSurvey {
+		// 11 s since the last ask: asked again at once, but no interval
+		// measured yet
+		t.Errorf("back up: %d mibinfo calls, NoSurvey %v", mibCalls(), r.NoSurvey)
 	}
 	d.setUp("ra0", false)
 	collect()
 	d.setUp("ra0", true)
 	ck.t = ck.t.Add(defaultCacheTTL)
-	if sv := collect().Survey; mibCalls() != 5 || sv != (apstate.Survey{}) {
-		t.Errorf("back up within mibInterval: %d mibinfo calls, survey %+v", mibCalls(), sv)
+	if r := collect(); mibCalls() != 5 || !r.NoSurvey {
+		t.Errorf("back up within mibInterval: %d mibinfo calls, NoSurvey %v", mibCalls(), r.NoSurvey)
 	}
 
 	// the restart gate is shut: nothing is asked
@@ -223,5 +226,157 @@ func TestCollectMibInfo(t *testing.T) {
 	collect()
 	if len(during) != 1 || !during[0] || held {
 		t.Errorf("mibinfo under the gate: %v, still held %v", during, held)
+	}
+}
+
+// informCU is the channel use an inform from prev to cur reports for the
+// band (radio_table_stats), and whether it reports any.
+func informCU(t *testing.T, prev, cur *apstate.Snapshot, band string) (total, selfTx int, ok bool) {
+	t.Helper()
+	f := cur.Fields(prev, apstate.CfgInfo{}, nil)
+	for _, rs := range f["radio_table_stats"].([]map[string]any) {
+		if rs["radio"] != band {
+			continue
+		}
+		v, ok := rs["cu_total"]
+		if !ok {
+			return 0, 0, false
+		}
+		return v.(int), rs["cu_self_tx"].(int), true
+	}
+	t.Fatalf("no %s radio in the inform", band)
+	return 0, 0, false
+}
+
+// TestMibGapReportsNoSurvey: a `show mibinfo` that printed nothing (or only
+// an older call's block) leaves the 2.4 GHz channel use out of the inform
+// for as long as there is no reading, never a 0 % the controller would show
+// as an idle channel, and the survey counters do not restart from 0 (which
+// would read as 0 % in the next inform too).
+func TestMibGapReportsNoSurvey(t *testing.T) {
+	d := newKlogDev(t) // ra0 up, rai0 down
+	d.prints["ra0 stainfo"] = macDump
+	d.prints["ra0 mibinfo"] = fixture(t, "mibinfo_ra0.klog")
+	ck := &clock{t: time.Unix(1_000_000, 0)}
+	c := newTestCollector(d, ck, false)
+	collect := func() *apstate.Snapshot {
+		t.Helper()
+		s, err := c.Collect(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+
+	s0 := collect()
+	if !radioOf(s0, "ng").NoSurvey {
+		t.Error("first Collect: no interval measured yet, but channel use reported")
+	}
+	ck.t = ck.t.Add(time.Second)
+	s1 := collect()
+	if cu, tx, ok := informCU(t, s0, s1, "ng"); !ok || cu != 7 || tx != 1 {
+		t.Errorf("inform s0->s1: cu_total %d cu_self_tx %d (reported %v), want 7 and 1", cu, tx, ok)
+	}
+
+	// mibinfo prints nothing: no reading, and none reported
+	d.prints["ra0 mibinfo"] = ""
+	ck.t = ck.t.Add(mibInterval)
+	s2 := collect()
+	if r := radioOf(s2, "ng"); !r.NoSurvey || r.Survey != radioOf(s1, "ng").Survey {
+		t.Errorf("empty mibinfo: NoSurvey %v, survey %+v (want %+v kept)", r.NoSurvey, r.Survey, radioOf(s1, "ng").Survey)
+	}
+	if cu, _, ok := informCU(t, s1, s2, "ng"); ok {
+		t.Errorf("inform over an empty mibinfo reported cu_total %d", cu)
+	}
+
+	// back: the first reading has no interval yet, the next one does
+	d.prints["ra0 mibinfo"] = fixture(t, "mibinfo_ra0.klog")
+	ck.t = ck.t.Add(mibInterval)
+	s3 := collect()
+	if cu, _, ok := informCU(t, s2, s3, "ng"); ok {
+		t.Errorf("inform at the first reading after the gap reported cu_total %d", cu)
+	}
+	ck.t = ck.t.Add(time.Second)
+	s4 := collect()
+	if cu, tx, ok := informCU(t, s3, s4, "ng"); !ok || cu != 7 || tx != 1 {
+		t.Errorf("inform s3->s4: cu_total %d cu_self_tx %d (reported %v), want 7 and 1", cu, tx, ok)
+	}
+	// an inform spanning the gap takes the measured seconds only
+	if cu, tx, ok := informCU(t, s1, s4, "ng"); !ok || cu != 7 || tx != 1 {
+		t.Errorf("inform s1->s4: cu_total %d cu_self_tx %d (reported %v), want 7 and 1", cu, tx, ok)
+	}
+}
+
+// TestRestartGapReportsNoSurvey: a radio's busy time from before it went
+// down is not carried over the gap, also while the restart gate keeps the
+// old reading standing for the settle time; the channel use is left out of
+// the informs until a new reading has measured an interval.
+func TestRestartGapReportsNoSurvey(t *testing.T) {
+	d := newKlogDev(t)
+	d.setUp("rai0", true)
+	d.prints["ra0 stainfo"] = macDump
+	d.prints["ra0 mibinfo"] = fixture(t, "mibinfo_ra0.klog")
+	d.prints["rai0 stainfo"] = "<4>MAC                MODE  AID  BSS PSM WMM MIMOPS RSSI0/1/2/3         PhMd        BW       MCS         SGI      STBC      Idle   Rate      QosMap\n<4>sta_cnt=0\n"
+	d.prints["rai0 bgndscaninfo"] = fixture(t, "bgndscaninfo_rai0.klog")
+	ck := &clock{t: time.Unix(1_000_000, 0)}
+	c := newTestCollector(d, ck, false)
+	collect := func() *apstate.Snapshot {
+		t.Helper()
+		s, err := c.Collect(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	bands := []string{"ng", "na"}
+
+	collect()
+	ck.t = ck.t.Add(time.Second)
+	s1 := collect()
+	for _, b := range bands {
+		if r := radioOf(s1, b); r.NoSurvey || r.Survey.Active != 1000 {
+			t.Fatalf("%s before the restart: NoSurvey %v, survey %+v", b, r.NoSurvey, r.Survey)
+		}
+	}
+
+	// the applier restarts both radios: down, then up behind a shut gate
+	d.setUp("ra0", false)
+	d.setUp("rai0", false)
+	ck.t = ck.t.Add(time.Second)
+	down := collect()
+	d.setUp("ra0", true)
+	d.setUp("rai0", true)
+	c.FollowRestarts(gateFunc(func() (func(), bool) { return nil, false }))
+	ck.t = ck.t.Add(time.Second)
+	settle1 := collect()
+	ck.t = ck.t.Add(time.Second)
+	settle2 := collect()
+	for _, b := range bands {
+		for name, s := range map[string]*apstate.Snapshot{"down": down, "settle 1": settle1, "settle 2": settle2} {
+			if r := radioOf(s, b); !r.NoSurvey || r.Survey != radioOf(s1, b).Survey {
+				t.Errorf("%s %s: NoSurvey %v, survey %+v (want %+v, nothing integrated)", b, name, r.NoSurvey, r.Survey, radioOf(s1, b).Survey)
+			}
+		}
+		if cu, _, ok := informCU(t, settle1, settle2, b); ok {
+			t.Errorf("%s inform in the settle time reported cu_total %d (the old channel's)", b, cu)
+		}
+	}
+
+	// the gate opens: read again; each band reports once a new reading has
+	// measured an interval (mibinfo waits for mibInterval since its last ask)
+	c.FollowRestarts(gateFunc(func() (func(), bool) { return func() {}, true }))
+	var last *apstate.Snapshot
+	for range 8 {
+		ck.t = ck.t.Add(time.Second)
+		last = collect()
+	}
+	for _, b := range bands {
+		r := radioOf(last, b)
+		if r.NoSurvey || r.Survey.Active <= radioOf(s1, b).Survey.Active {
+			t.Errorf("%s after the settle time: NoSurvey %v, survey %+v (want more than %+v)", b, r.NoSurvey, r.Survey, radioOf(s1, b).Survey)
+		}
+	}
+	if cu, tx, ok := informCU(t, s1, last, "ng"); !ok || cu != 7 || tx != 1 {
+		t.Errorf("ng inform spanning the restart: cu_total %d cu_self_tx %d (reported %v), want 7 and 1", cu, tx, ok)
 	}
 }
