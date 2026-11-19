@@ -21,17 +21,31 @@ package main
 //
 // Restored: read at start (setup, takeover on the Deco only) and put into
 // the band's spectrum runner (wl.SpectrumRunner.RestoreTable) at the next
-// inform; from then on it is reported exactly as a live table:
-// spectrum_table rows and spectrum_table_time = the true age from the
-// saved wall-clock time, until a new band replaces it or a spectrum-scan
-// clears it. Checked first: a file of another version or model, or that
-// does not parse, is dropped whole; a band whose radio is not the unit's
-// radio for that band now (another radio layout), whose rows do not belong
-// to the band, or that was measured more than spectrumMaxAge ago is
-// dropped. One measured after the current time (the clock is not set yet
-// right after a boot) is held, not dropped, and re-checked at every inform
-// until the clock has passed it. A band measured since the start always
-// wins over a saved one.
+// inform that finds no Wi-Fi apply or rollback running; from then on it is
+// reported exactly as a live table: spectrum_table rows and
+// spectrum_table_time = the true age from the saved wall-clock time, until
+// a new band replaces it or a spectrum-scan clears it. Checked first: a
+// file of another version or model, or that does not parse, is dropped
+// whole; a band whose radio is not the unit's radio for that band now
+// (another radio layout), whose rows do not belong to the band, or that was
+// measured more than spectrumMaxAge ago is dropped. While the clock is not
+// set yet (before device.ClockSane: a Deco reads 2025-09-12 until NTP,
+// interference-audit X9) the table is held, not dropped, and re-checked at
+// every inform; once the clock is set, a table measured after it is
+// dropped (saved under a clock that ran ahead: its true age is unknown). A
+// band measured since the start always wins over a saved one.
+//
+// Fitted to the radio: a live band builds its rows only from what `wl
+// chanspecs` lists (widths and channels), so of a restored table only the
+// rows the radio lists now are kept (wl.SpectrumRunner.FitRestored; CE §4:
+// no rows for channels the unit cannot use), and a table with none left is
+// dropped. The caps are cached until an apply or a tick repair reads them
+// again, and a driver country set before the restart is applied only by
+// the first apply after it, so the fit runs again at every inform while a
+// restored table is reported (no wl call unless the caps were dropped);
+// the saved copy follows a change. Until that apply a table measured under
+// the old country is reported as fitted to the old channel list, for the
+// few informs before the controller's first configuration.
 //
 // No EVT_AP_QuickScanEvent for a restored table: the event means "a scan
 // just ended" and would add a fake one. What the controller then does with
@@ -44,13 +58,30 @@ package main
 // The controller writes spectrum results to its database only on
 // EVT_AP_QuickScanEvent (which also stamps spectrum_scan_timestamp = now and
 // upserts the event's row) or on a quickscan_scanning true -> false
-// transition; a restored table brings neither, so it lives in the
-// controller's in-memory copy only, refreshed by every inform (also after a
-// controller restart), spectrum_scan_timestamp keeps what the database had,
-// and Radio AI's prescan, which waits for that timestamp, does not take the
-// restored table as a fresh scan. UNVERIFIED on the units: that the
-// Environment section (stat/spectrum-scan, built from radio_table_stats)
-// shows this in-memory copy before the next scan saves one.
+// transition. The agent never sends the event for a restored table, so in
+// the usual case it lives in the controller's in-memory copy only,
+// refreshed by every inform (also after a controller restart). The
+// transition, though, is the controller's own state: it sets
+// quickscan_scanning true itself when it sends `cmd quick-scan` (and times
+// it out after 10 min). So when a quick-scan the controller sent does not
+// end with a new table of ours, the next inform without quickscan_scanning
+// carrying the restored table ends that quick-scan, and the controller
+// saves the restored table (with its true measurement time from
+// spectrum_table_time) to its database as that quick-scan's result. That
+// happens when the agent restarts while a quick-scan runs (a deploy during
+// Radio AI's nightly run), or when the restarted agent skips the
+// controller's quick-scan (memory shedding, a Wi-Fi apply such as the
+// startup one, a scan hold, another scan running: quickScan returns
+// without a table). INFERENCE: a real AP's controller does the same with
+// the rftable file the AP keeps (CE §6: a failed quick-scan leaves the
+// previous table, and the same transition then saves it). UNVERIFIED (not in the decompile notes):
+// whether that transition save also stamps spectrum_scan_timestamp, and so
+// whether Radio AI's prescan (which waits for that timestamp, freshData)
+// takes the restored table as a fresh scan. Without the transition,
+// spectrum_scan_timestamp keeps what the database had and the prescan does
+// not take it. UNVERIFIED on the units: that the Environment section
+// (stat/spectrum-scan, built from radio_table_stats) shows the in-memory
+// copy before the next scan saves one.
 //
 // Neighbour results (scan_table) are neither saved nor restored. keepSeen
 // keeps a missed neighbour 10 min, and the home listen (homelisten.go)
@@ -76,6 +107,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -186,20 +218,37 @@ func checkSavedRows(band string, rows map[int][]wl.SpectrumRow) error {
 }
 
 // restoreSpectrum puts the saved tables back into their runners, once each
-// is plausible at now (loop goroutine, every inform; nothing to do once
-// they are all restored or dropped).
+// is plausible at now, and fits every restored table to the channels the
+// radio lists now (loop goroutine, every inform; nothing to do once they
+// are all restored or dropped and no restored table is left). Nothing is
+// done while a Wi-Fi apply or rollback runs: the radios' channel lists are
+// in flux then.
 func (a *agent) restoreSpectrum(ctx context.Context, now time.Time) {
+	if a.wifiBusy.Load() {
+		return
+	}
 	for _, band := range a.scans.savedBands() {
 		t := a.scans.savedTable(band)
 		if t == nil {
 			continue
 		}
-		if t.Time.After(now) {
+		if now.Before(device.ClockSane) {
+			// the clock is not set yet (a Deco reads 2025-09-12 until NTP,
+			// interference-audit X9): no age can be told; held, not dropped
 			if a.specNoted[band] != "held" {
-				a.logf("spectrum: the saved %s table (measured %s) is held until the clock passes that time (now %s)",
+				a.logf("spectrum: the saved %s table (measured %s) is held until the clock is set (now %s)",
 					band, t.Time.UTC().Format(time.RFC3339), now.UTC().Format(time.RFC3339))
 				a.noteSpectrum(band, "held")
 			}
+			continue
+		}
+		if t.Time.After(now) {
+			// the clock is set and the table is from its future: it was
+			// saved under a clock that ran ahead, so its true age is unknown
+			// (holding it until the clock passes would report it as fresh)
+			a.scans.forgetSaved(band, t)
+			a.logf("spectrum: saved %s table dropped: measured %s, after the current time %s",
+				band, t.Time.UTC().Format(time.RFC3339), now.UTC().Format(time.RFC3339))
 			continue
 		}
 		if age := now.Sub(t.Time); age > spectrumMaxAge {
@@ -231,6 +280,42 @@ func (a *agent) restoreSpectrum(ctx context.Context, now time.Time) {
 		case restoredNewer:
 			a.logf("spectrum: saved %s table not restored: %s has a newer table", band, r.Radio())
 		}
+	}
+	a.fitRestored(ctx)
+}
+
+// fitRestored drops the rows of each restored table that the radio does
+// not list now (wl.SpectrumRunner.FitRestored): a live band never builds
+// them, and a table saved under another country or width cap may hold them
+// (CE §4: no rows for channels the unit cannot use). It runs at every
+// inform while a restored table is reported, since the caps are read again
+// after each apply (a driver country applied after the restart); the saved
+// copy follows a change.
+func (a *agent) fitRestored(ctx context.Context) {
+	changed := false
+	for _, band := range []string{"na", "ng"} {
+		r := a.scans.runner(band)
+		if r == nil {
+			continue
+		}
+		kept, dropped, err := r.FitRestored(ctx)
+		key := "fit " + band
+		switch {
+		case err != nil:
+			if a.specNoted[key] != err.Error() {
+				a.logf("spectrum: restored %s table not checked against the radio's channels: %v (kept; retried at the next inform)", band, err)
+				a.noteSpectrum(key, err.Error())
+			}
+		case dropped > 0 && kept == 0:
+			a.logf("spectrum: restored %s table dropped: none of its %d row(s) is listed by the radio now", band, dropped)
+			changed = true
+		case dropped > 0:
+			a.logf("spectrum: restored %s table: %d row(s) the radio does not list now dropped (%d kept)", band, dropped, kept)
+			changed = true
+		}
+	}
+	if changed {
+		a.saveSpectrum()
 	}
 }
 
@@ -299,6 +384,13 @@ func (sc *scanner) savedBands() []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// runner is band's spectrum runner, once a command or a restore used it.
+func (sc *scanner) runner(band string) *wl.SpectrumRunner {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	return sc.runners[band]
 }
 
 func (sc *scanner) savedTable(band string) *savedTable {

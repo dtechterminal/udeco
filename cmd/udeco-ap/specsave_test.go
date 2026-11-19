@@ -9,8 +9,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -74,8 +77,9 @@ func mergedRow(f map[string]any, band string) map[string]any {
 // TestSpectrumRestoreChecks: a good saved table comes back as a live one
 // (rows as saved, spectrum_table_time = the true age from its saved time);
 // one older than 7 days, from another model or radio layout, with a row
-// outside its band, of another version, or unparsable is dropped; one from
-// the future (the clock not set yet) is held until the clock has passed it.
+// outside its band, of another version, or unparsable is dropped; one read
+// while the clock is not set yet (before device.ClockSane) is held until it
+// is; one from the future of a clock that is set is dropped.
 func TestSpectrumRestoreChecks(t *testing.T) {
 	now := time.Now()
 	for _, c := range []struct {
@@ -130,30 +134,52 @@ func TestSpectrumRestoreChecks(t *testing.T) {
 		})
 	}
 
-	t.Run("future: held until the clock passes it", func(t *testing.T) {
+	t.Run("clock not set: held until it is", func(t *testing.T) {
 		cfg, _ := u6proSystemCfg(t)
 		e := newE2E(t, cfg, true)
-		at := now.Add(time.Hour)
+		// right after a boot the Deco reads 2025-09-12 until NTP (X9)
+		boot := time.Date(2025, 9, 12, 0, 1, 0, 0, time.UTC)
+		at := now.Add(-time.Hour)
 		writeSaved(t, e.unit.root, savedNA("UAL6", "wl1", at))
 		e.a.loadSpectrum()
 		for range 3 { // every inform re-checks; logged once
-			e.a.restoreSpectrum(context.Background(), now)
+			e.a.restoreSpectrum(context.Background(), boot)
 		}
 		f := informRows()
-		e.a.scans.merge(f, &apstate.Snapshot{}, apstate.CfgInfo{}, now)
+		e.a.scans.merge(f, &apstate.Snapshot{}, apstate.CfgInfo{}, boot)
 		if _, ok := mergedRow(f, "na")["spectrum_table"]; ok {
-			t.Fatal("a table from the future was reported")
+			t.Fatal("a table reported before the clock was set")
 		}
-		if n := strings.Count(e.logs.all(), "held until the clock"); n != 1 {
+		if n := strings.Count(e.logs.all(), "held until the clock is set"); n != 1 {
 			t.Errorf("%d hold logs, want 1:\n%s", n, e.logs.all())
 		}
-		// the clock is set: 2 h later than the boot clock, 1 h after the table
-		later := now.Add(2 * time.Hour)
-		e.a.restoreSpectrum(context.Background(), later)
+		// NTP set the clock: the table is an hour old
+		e.a.restoreSpectrum(context.Background(), now)
 		f = informRows()
-		e.a.scans.merge(f, &apstate.Snapshot{}, apstate.CfgInfo{}, later)
+		e.a.scans.merge(f, &apstate.Snapshot{}, apstate.CfgInfo{}, now)
 		if age, _ := mergedRow(f, "na")["spectrum_table_time"].(int); len(tableOf2(f, "na")) != 2 || age < 3600 || age > 3605 {
 			t.Errorf("after the clock was set: row %v", mergedRow(f, "na"))
+		}
+	})
+
+	// measured "later" than a clock that is set: saved under a clock that
+	// ran ahead, so its true age is unknown; holding it until the clock
+	// passes would report it as fresh then (and never drop it for age)
+	t.Run("future with the clock set: dropped", func(t *testing.T) {
+		cfg, _ := u6proSystemCfg(t)
+		e := newE2E(t, cfg, true)
+		writeSaved(t, e.unit.root, savedNA("UAL6", "wl1", now.Add(time.Hour)))
+		e.a.loadSpectrum()
+		e.a.restoreSpectrum(context.Background(), now)
+		if !strings.Contains(e.logs.all(), "saved na table dropped: measured") {
+			t.Errorf("no drop log:\n%s", e.logs.all())
+		}
+		later := now.Add(2 * time.Hour)
+		e.a.restoreSpectrum(context.Background(), later)
+		f := informRows()
+		e.a.scans.merge(f, &apstate.Snapshot{}, apstate.CfgInfo{}, later)
+		if tb := tableOf2(f, "na"); tb != nil {
+			t.Errorf("a table measured after the (set) clock was reported later: %v", tb)
 		}
 	})
 }
@@ -170,11 +196,11 @@ func TestSpectrumSaveOnChange(t *testing.T) {
 	cfg, _ := u6proSystemCfg(t)
 	e := newE2E(t, cfg, true)
 	now := time.Now()
-	// 5 GHz held: saved with a clock ahead of this one
-	ahead := now.Add(time.Hour)
+	// 5 GHz held: read before the clock is set (X9)
+	ahead := now.Add(-2 * time.Minute)
 	writeSaved(t, e.unit.root, savedNA("UAL6", "wl1", ahead))
 	e.a.loadSpectrum()
-	e.a.restoreSpectrum(context.Background(), now)
+	e.a.restoreSpectrum(context.Background(), time.Date(2025, 9, 12, 0, 1, 0, 0, time.UTC))
 
 	r, err := e.a.o.col.Spectrum(context.Background(), "ng")
 	if err != nil {
@@ -237,7 +263,7 @@ func TestSpectrumSaveOnChange(t *testing.T) {
 		t.Errorf("after the clear: %+v", v.Bands)
 	}
 	// and the held table is not restored any more
-	e.a.restoreSpectrum(context.Background(), ahead.Add(time.Minute))
+	e.a.restoreSpectrum(context.Background(), now)
 	if na, err := e.a.o.col.Spectrum(context.Background(), "na"); err != nil || na.Status().Rows != nil {
 		t.Errorf("the cleared held table came back: %v %v", na.Status().Rows, err)
 	}
@@ -274,5 +300,75 @@ func TestSpectrumRestoreNoOp(t *testing.T) {
 				t.Errorf("a table reported: %v", tableOf(m, "na"))
 			}
 		})
+	}
+}
+
+// TestSpectrumRestoreFitsRadio: a restored table keeps only the rows the
+// radio lists now (wl chanspecs: no DFS and no 160 MHz on the captured
+// .205 under US), as a live band would build them, and is fitted again
+// when the caps change (a driver country applied after the restart caps
+// 5 GHz at 40 MHz); the saved copy follows. Nothing is restored or fitted
+// while a Wi-Fi apply runs (its caps are in flux).
+func TestSpectrumRestoreFitsRadio(t *testing.T) {
+	now := time.Now()
+	cfg, _ := u6proSystemCfg(t)
+	e := newE2E(t, cfg, true)
+	m := savedNA("UAL6", "wl1", now.Add(-time.Hour))
+	rows := m["bands"].(map[string]any)["na"].(map[string]any)["rows"].(map[string]any)
+	row := func(ch, w, freq int) map[string]any {
+		return map[string]any{"channel": ch, "width": w, "center_freq": freq, "total_samples": 0, "interference": -85,
+			"utilization": 5, "perf_index": 0, "interference_type": []string{}, "other_bss_count": 0}
+	}
+	rows["80"] = append(rows["80"].([]map[string]any), row(52, 80, 5290)) // DFS: not listed
+	rows["40"] = []map[string]any{row(36, 40, 5190)}                      // 36l: listed
+	rows["160"] = []map[string]any{row(36, 160, 5250)}                    // no 160 MHz listed
+	writeSaved(t, e.unit.root, m)
+	e.a.loadSpectrum()
+
+	e.a.wifiBusy.Store(true)
+	e.a.restoreSpectrum(context.Background(), now)
+	f := informRows()
+	e.a.scans.merge(f, &apstate.Snapshot{}, apstate.CfgInfo{}, now)
+	if tb := tableOf2(f, "na"); tb != nil {
+		t.Fatalf("restored while a Wi-Fi apply runs: %v", tb)
+	}
+	e.a.wifiBusy.Store(false)
+
+	inform := func() []map[string]any {
+		e.a.restoreSpectrum(context.Background(), now)
+		f := informRows()
+		e.a.scans.merge(f, &apstate.Snapshot{}, apstate.CfgInfo{}, now)
+		return tableOf2(f, "na")
+	}
+	key := func(tb []map[string]any) []string {
+		var out []string
+		for _, r := range tb {
+			out = append(out, fmt.Sprintf("%v/%v", r["channel"], r["width"]))
+		}
+		sort.Strings(out)
+		return out
+	}
+	if got := key(inform()); !slices.Equal(got, []string{"149/80", "36/40", "36/80"}) {
+		t.Errorf("restored rows %v, want the listed 36/40, 36/80, 149/80", got)
+	}
+	if !strings.Contains(e.logs.all(), "2 row(s) the radio does not list now dropped") {
+		t.Errorf("no fit log:\n%s", e.logs.all())
+	}
+
+	// the driver country applied after the restart lists 20/40 MHz only
+	e.unit.mu.Lock()
+	e.unit.extra["wl1 chanspecs"] = "36 (0xd024)\n40 (0xd028)\n44 (0xd02c)\n48 (0xd030)\n40u (0xd926)\n48u (0xd92e)\n36l (0xd826)\n44l (0xd82e)"
+	e.unit.mu.Unlock()
+	e.a.o.col.Invalidate()
+	if got := key(inform()); !slices.Equal(got, []string{"36/40"}) {
+		t.Errorf("after the caps changed: %v, want 36/40 only", got)
+	}
+	b, err := os.ReadFile(savedFilePath(e.unit.root))
+	var v spectrumSave
+	if err == nil {
+		err = json.Unmarshal(b, &v)
+	}
+	if err != nil || v.Bands["na"] == nil || len(v.Bands["na"].Rows) != 1 || len(v.Bands["na"].Rows[40]) != 1 {
+		t.Errorf("saved copy after the fit: %v %s", err, b)
 	}
 }

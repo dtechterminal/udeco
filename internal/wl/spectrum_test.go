@@ -1333,3 +1333,74 @@ func TestSpectrumRestoreTable(t *testing.T) {
 		t.Error("not restored after a clear")
 	}
 }
+
+// TestSpectrumFitRestored: a restored table keeps only the rows the radio
+// lists now (`wl chanspecs`, as a live band builds them), re-checked after
+// the caps are read again (a country or width change applied after the
+// restart); a table with none left is dropped; a measured table is never
+// touched.
+func TestSpectrumFitRestored(t *testing.T) {
+	r := t4Replay(t, "t4_wl0_chunked.txt", "wl0", "ng", 0)
+	c := newSpecCollector(t, r)
+	s := spectrumOf(t, c, "ng")
+	at := r.clk.Now().Add(-time.Hour)
+	saved := map[int][]SpectrumRow{
+		20: {{Channel: 1, Width: 20, CenterFreq: 2412, Utilization: 7},
+			{Channel: 13, Width: 20, CenterFreq: 2472}, // not listed under US
+			{Channel: 6, Width: 20, CenterFreq: 2422}}, // ch 6 is not at 2422
+		40: {{Channel: 1, Width: 40, CenterFreq: 2422, Utilization: 9}}, // 1l
+	}
+	if !s.RestoreTable(saved, at) {
+		t.Fatal("not restored")
+	}
+	kept, dropped, err := s.FitRestored(context.Background())
+	if err != nil || kept != 2 || dropped != 2 {
+		t.Fatalf("fit: kept %d dropped %d err %v", kept, dropped, err)
+	}
+	st := s.Status()
+	if len(st.Rows[20]) != 1 || st.Rows[20][0].Channel != 1 || len(st.Rows[40]) != 1 || !st.TableTime.Equal(at) {
+		t.Errorf("after the fit: %+v", st)
+	}
+	// unchanged caps: nothing more to drop
+	if kept, dropped, err := s.FitRestored(context.Background()); err != nil || kept != 2 || dropped != 0 {
+		t.Errorf("second fit: kept %d dropped %d err %v", kept, dropped, err)
+	}
+	// the radio now lists 20 MHz only (bw_cap 20 after an apply): the 40
+	// MHz row goes once the caps are read again
+	r.base.over = map[string][]response{"wl -i wl0 chanspecs": {{out: "1 (0x1001)\n6 (0x1006)\n11 (0x100b)\n"}}}
+	c.Invalidate()
+	if kept, dropped, err := s.FitRestored(context.Background()); err != nil || kept != 1 || dropped != 1 || s.Status().Rows[40] != nil {
+		t.Errorf("after the caps changed: kept %d dropped %d err %v rows %v", kept, dropped, err, s.Status().Rows)
+	}
+	// none left: the table goes
+	r.base.over = map[string][]response{"wl -i wl0 chanspecs": {{out: "6 (0x1006)\n11 (0x100b)\n"}}}
+	c.Invalidate()
+	if kept, dropped, err := s.FitRestored(context.Background()); err != nil || kept != 0 || dropped != 1 {
+		t.Errorf("none listed: kept %d dropped %d err %v", kept, dropped, err)
+	}
+	if st := s.Status(); st.Rows != nil || !st.TableTime.IsZero() {
+		t.Errorf("an empty restored table kept: %+v", st)
+	}
+	// a measured table is the radio's own: never fitted
+	r.base.over = nil
+	c.Invalidate()
+	if _, err := s.Run(context.Background(), SpectrumRequest{SkipGate: true}); err != nil {
+		t.Fatal(err)
+	}
+	r.base.over = map[string][]response{"wl -i wl0 chanspecs": {{out: "6 (0x1006)\n"}}}
+	c.Invalidate()
+	if kept, dropped, err := s.FitRestored(context.Background()); err != nil || kept != 0 || dropped != 0 || len(s.Status().Rows[20]) != 11 {
+		t.Errorf("a measured table was fitted: kept %d dropped %d err %v rows %d", kept, dropped, err, len(s.Status().Rows[20]))
+	}
+	// a restore after a clear is fitted again; a radio that lists no
+	// channel of the band (caps unreadable mid-change) keeps the table
+	s.ClearTable()
+	if !s.RestoreTable(saved, at) {
+		t.Fatal("not restored after a clear")
+	}
+	r.base.over = map[string][]response{"wl -i wl0 chanspecs": {{out: "36 (0xd024)\n"}}}
+	c.Invalidate()
+	if _, _, err := s.FitRestored(context.Background()); err == nil || len(s.Status().Rows[20]) != 3 {
+		t.Errorf("no ng channel listed: err %v rows %v", err, s.Status().Rows)
+	}
+}
