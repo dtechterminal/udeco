@@ -29,6 +29,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
 	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
 	"github.com/antoniocosta/unifi-openwrt/internal/jiosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/lldp"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
@@ -539,6 +540,9 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	// the Wi-Fi handles first: whether bcmwifi can steer decides a
 	// capability bit
 	a.uplink = detectUplink(s)
+	if a.cfg.jio() {
+		a.uplink = jioports.Untagged(jioports.UplinkPhys) // wired WAN socket (topology.go)
+	}
 	a.topo.uplink = a.uplink
 	a.topo.uplinkName.Store(a.uplink)
 	if a.takeover.Load() {

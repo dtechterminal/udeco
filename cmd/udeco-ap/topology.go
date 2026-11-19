@@ -43,6 +43,7 @@ import (
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
+	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
 	"github.com/antoniocosta/unifi-openwrt/internal/lldp"
 )
 
@@ -185,6 +186,12 @@ func (a *agent) observeReading(s *apstate.Snapshot, f map[string]any) {
 	sort.Strings(carrier)
 	up := t.uplink
 	switch hearing := intersect(lldpPorts, carrier); {
+	case a.cfg.jio():
+		// the JCOW414's uplink is its WAN socket, by wiring: a gateway MAC
+		// seen on a LAN port (a downstream router reflecting the LAN, seen
+		// 2026-11-19 on port 1) must not move it, or SetUplink and the
+		// port code would treat the tenant's port as the uplink
+		up = jioports.Untagged(jioports.UplinkPhys)
 	case contains(carrier, fdbPort):
 		up = fdbPort
 	case len(hearing) == 1:
