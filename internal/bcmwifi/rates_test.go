@@ -100,9 +100,10 @@ func TestMinRatesOffByDefault(t *testing.T) {
 	}
 }
 
-// Feature flag on: the rateset is set while the BSS is down, before hostapd
-// starts; a changed minimum reconciles the radio; the hand-back restores
-// TP-Link's rateset.
+// Feature flag on: the rateset is set while the radio is down (the X20
+// refuses it otherwise, like dwds and rrm), before the BSS comes up; a
+// changed minimum reconciles the radio; the hand-back restores TP-Link's
+// rateset, also inside a radio down/up.
 func TestMinRatesOn(t *testing.T) {
 	ctx := context.Background()
 	f := newFakeDev(t)
@@ -136,8 +137,10 @@ func TestMinRatesOn(t *testing.T) {
 	if err := a.handback(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if !f.called("wl -i wl12 rateset 6b 9 12b 18 24b 36 48 54") || !f.called("wl -i wl02 rateset 1b 2b 5.5b 6 9 11b 12 18 24 36 48 54") {
-		t.Error("TP-Link's rateset not restored")
+	// the driver state, not the attempt: the restore steps are optional and
+	// a write refused while the radio is up ("Not down") would pass unseen
+	if f.state["wl12 rateset"] != "6(b) 9 12(b) 18 24(b) 36 48 54" || f.state["wl02 rateset"] != "1(b) 2(b) 5.5(b) 6 9 11(b) 12 18 24 36 48 54" {
+		t.Errorf("TP-Link's rateset not restored: wl12 %q, wl02 %q", f.state["wl12 rateset"], f.state["wl02 rateset"])
 	}
 	if f.state["wl05 rateset"] != "" && f.state["wl05 rateset"] != "1(b) 2(b) 5.5(b) 6 9 11(b) 12 18 24 36 48 54" {
 		t.Errorf("wl05 rateset %q after hand-back, want TP-Link's", f.state["wl05 rateset"])

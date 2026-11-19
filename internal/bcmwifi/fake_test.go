@@ -438,6 +438,10 @@ func (f *fakeDev) wl(args []string) ([]byte, error) {
 			return []byte(fakeRateset("6(b) 9 12(b) 18 24(b) 36 48 54")), nil
 		}
 		return []byte(fakeRateset("1(b) 2(b) 5.5(b) 6 9 11(b) 12 18 24 36 48 54")), nil
+	case rest[0] == "rateset" && f.state[fakeRadioOf(iface)+" radio"] != "down":
+		// Seen on the X20 2026-11-19 (r10's provision): rateset writes
+		// are refused like dwds and rrm unless the radio is down.
+		return []byte("wl: Not down\n"), errors.New("exit status 211")
 	case rest[0] == "rateset":
 		var toks []string
 		for _, r := range rest[1:] {
