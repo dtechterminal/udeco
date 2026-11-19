@@ -62,8 +62,14 @@ type Radio struct {
 	Encryption  string
 	VHT, HE     bool // hardware supports 802.11ac / ax
 	Survey      Survey
-	Stats       map[string]int64
-	Stations    []Station
+	// NoSurvey: the collector cannot read channel busy time (jio-mtk), so
+	// the radio reports no channel utilization rather than a measured 0%.
+	NoSurvey bool `json:",omitempty"`
+	// NoTxCounters: the driver gives no per-station TX packet/retry counts
+	// (jio-mtk), so station and VAP rows report no retries rather than 0%.
+	NoTxCounters bool `json:",omitempty"`
+	Stats        map[string]int64
+	Stations     []Station
 	// VAPs: on a phy-level Radio, one entry per AP interface on that radio
 	// (each carries its own SSID, BSSID, Stats, Stations).
 	VAPs []Radio
