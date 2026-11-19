@@ -413,7 +413,16 @@ if [ -f $GZ ]; then
 	fi
 fi
 [ -x \$B ] || exit 0
-exec \$B -config $CFG </dev/null >/dev/null 2>&1
+# the agent's log lives in RAM next to it, kept under 2 MB (the agent
+# appends, so truncating is safe); exec keeps the pid in agent.pid valid
+mkdir -p $RAMDIR && chmod 700 $RAMDIR || exit 1
+L=$RAMDIR/agent.log
+if [ -f \$L ] && [ \$(wc -c <\$L) -gt 2097152 ]; then
+	tail -c 262144 \$L >\$L.1; : >\$L
+fi
+logger -t udeco "starting udeco-ap" 2>/dev/null
+echo \$\$ >$RAMDIR/agent.pid
+exec \$B -config $CFG </dev/null >>\$L 2>&1
 LAUNCH
 chmod 755 $START.tmp
 mv $START.tmp $START
