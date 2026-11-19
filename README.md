@@ -9,8 +9,9 @@ it and shows its clients and stats, the same as for a real UniFi AP.
 > **Tested setup.** Three Deco X20 V2 units on wired backhaul (TP-Link firmware
 > 1.3.0 Build 20250912, kernel 4.1, Broadcom `wl`, hostapd 2.9). They are
 > adopted into UniFi Network 11.1.50 on a UCG. Both the mesh master and the
-> satellites work. Parity as of 19 Nov 2026. Other Deco models and firmware
-> are untested.
+> satellites work. All three run release `d9dd8fe` (19 Nov 2026), and this
+> parity table was re-checked against that build. Other Deco models and
+> firmware are untested.
 
 ## Feature parity with a U6-Lite
 
@@ -72,7 +73,7 @@ Status key:
 | 802.11r for WPA3 (FT-SAE) | Off | Advertising FT-SAE stopped WPA3 phones (iPhone, Apple Watch, Pixel, Samsung) from joining at all; only WPA2-only IoT stayed connected. With `"ft_sae": false` in the agent config they rejoined within a minute (verified 2026-11-19). |
 | Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | |
 | Band steering, minimum RSSI, max clients | Built | Band steering uses 802.11v nudges. |
-| Minimum data rates | Not yet | Off. `wl rateset` needs the whole radio down; the step will be moved inside a radio down/up. |
+| Minimum data rates | Built | Off by default (`"min_rates": true` enables it). `wl rateset` runs inside a radio down/up, which drops that radio's clients; if the driver still refuses, Wi-Fi is handed back to TP-Link. |
 
 ### Radios and RF
 
@@ -82,7 +83,7 @@ Status key:
 | Country | Partial | The driver's India table (IN/0) has no 80 MHz channel. Stock TP-Link firmware runs these units as US/0, so the agent's `driver_country` setting does the same. |
 | Power presets (low/medium/high) | Built | |
 | Neighbour and rogue-AP list | Verified | Refreshed every minute with a passive listen on the AP's own channel. A full scan from UniFi adds the other channels. |
-| Spectrum scan | Partial | 2.4 GHz is complete; 5 GHz has 36–48 only. Channels 149–165 and DFS are missing because of our scan code, not the radio. |
+| Spectrum scan | Partial | 2.4 GHz is complete; 5 GHz has 36–48. Channels 149–165 are reported as unmeasured, not as clean all-zero rows. DFS is not scanned. |
 | DFS channels | Not yet | The agent has no radar or CAC handling yet, so it stays on 36–48 and 149–165. |
 | 160 MHz | n/a | A U6-Lite has none either. |
 
@@ -93,18 +94,20 @@ Status key:
 | Client list with signal, rates, traffic, Wi-Fi generation | Verified | Only stations the driver reports as associated are listed. The driver keeps leftover records of departed clients, and reporting those made clients flap between APs. |
 | Connect, leave and roam events | Partial | `STA_ASSOC_TRACKER` association and leave events are sent, so a departed client leaves UniFi at once (not after about 5 minutes). The success and failure connection-timing events are not sent. |
 | Reconnect, block, unblock | Verified | |
-| Locate, LED on/off | Verified | UniFi's LED colour can't be carried. |
-| SSID and user-group speed limits | Built | |
-| Per-client speed limits | Built | UniFi's `rate-update` command (a client's own user group). The limit is kept across restarts and applied on whichever SSID of the unit the client joins. Not on the JioFiber Garage AP. |
-| Lock client to AP | Not yet | |
+| Locate, LED on/off | Verified | LED on is steady green, including right after a reboot (the agent also sets the LED daemon's connection state to `online`, so a unit no longer stays red). Off goes dark. Locate blinks green and stops on Unlocate. UniFi's LED colour can't be carried. |
+| Per-client speed limits | Verified | UniFi's `rate-update` command (a client's own user group). A 512/768 kbit/s group held at 460 kbit/s down and 652 kbit/s up, and full speed returned when the client went back to the default group. The limit is kept across restarts and applied on whichever SSID of the unit the client joins. Trade-off: accelerated flows bypass tc, so the Broadcom flow cache is off on a unit while any limit is set there (see [client-rate-limit](docs/deco/features/client-rate-limit.md)). Not on the JioFiber Garage AP. |
+| SSID and user-group speed limits | Built | Same tc and flow-cache path as per-client limits, not yet measured on its own. |
+| Lock client to AP | Verified | Six clients are locked in production. Each unit puts the clients locked elsewhere in its deny lists, updated live without a hostapd restart ([lock-to-ap](docs/deco/features/lock-to-ap.md)). |
+| Per-client TX retries | Verified | `wifi_tx_attempts`, retries and the retry % appear on each client's page. |
 
 ### Guest networks
 
 | Feature | Deco | Notes |
 |---|---|---|
-| Guest-to-LAN blocking | Built | ebtables allows only the gateway, DHCP and DNS. |
-| Guest isolation across APs, gateway-hosted guest portal | Not yet verified | |
-| Captive-portal redirect on the AP | Not possible | ebtables here has no redirect or DNAT target. |
+| Guest-to-LAN blocking | Verified | A guest reaches the gateway and the internet, never LAN hosts (ebtables `UDECO-GIN`/`GOUT`). |
+| Gateway-hosted guest portal (authorise / unauthorise) | Verified | Before authorisation a guest gets DHCP, DNS and the portal ports only. `authorize-guest` opens the internet within one inform; `unauthorize-guest` closes it again. |
+| Guest isolation across APs | Built | Frames between guests on different APs are dropped by design; not tested with two guest clients. |
+| Captive-portal redirect on the AP | Not possible | Verified on the unit: this ebtables has no `redirect` target. A guest has to open the portal page themselves. |
 
 ### Stats and uplink
 
@@ -120,8 +123,26 @@ Status key:
 
 - **TP-Link services stopped:** the agent stops the TP-Link services that would undo its config: mesh controller, auto channel, cloud, app server and Wi-Fi triggers. Kept on purpose: procd, netifd, crond, dropbear, LEDs, `eapd`, `apsd`, and the idle backhaul supplicant on satellites.
 - **No internet for the unit itself:** an egress firewall blocks the unit's own traffic to the internet; the controller stays reachable.
-- **Rollback:** a failed apply hands Wi-Fi back to TP-Link with every SSID and client restored, then drops to observe mode.
+- **Inbound fence and single instance:** TP-Link's app and web ports (20001–20003, 80, 443) are dropped, and a second copy of the agent exits at once.
+- **Rollback:** a failed apply hands Wi-Fi back to TP-Link with every SSID and client restored (flow cache back on), then drops to observe mode.
+- **Reboot cause:** `/tp_data/udeco/alive` records whether the previous boot ended with a clean stop, so an unexplained reboot shows up in `events.log`.
 - **Persistence:** the agent and its config live on flash in `/tp_data/udeco` and are started from the unit's existing cron hook ([packaging/deco](packaging/deco/README.md)). Undo it by deleting `start.sh` and rebooting.
+
+### Second platform: JioFiber JCOW414 (`jio-mtk`)
+
+The same agent also runs a JioFiber JCOW414 (MediaTek EN7528, MT7603 + MT7663)
+as a UniFi AP, with platform `jio-mtk` (`internal/mtkwifi`, `internal/jiosys`).
+In use as the home "Garage AP", adopted as a UAP-AC-Lite:
+
+- **Verified:** adopt and provision; SSIDs per AP group with WPA2 and VLANs
+  (`eth0.4.N` into `br-vN`); radio channel, width and power; client list and
+  stats. Jio's services are stopped (a plain AP, telnet kept).
+- **Partial:** WPA3 on 5 GHz only (the 2.4 GHz driver has no SAE). The profile
+  is accepted by the driver, but no SAE client has been seen yet.
+- **Not on this platform:** per-client speed limits.
+- **Gateway guard** (`deploy/jio-start.sh`): if the unit loses
+  192.168.0.1, it rolls back to the previous build after 180 s and reboots
+  after 480 s. A build is confirmed after 30 min healthy.
 
 ### Running it
 
@@ -132,7 +153,10 @@ Build it with:
 GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o udeco-ap ./cmd/udeco-ap
 ```
 
-Install it as described in [packaging/deco](packaging/deco/README.md). The
+Install it with `deploy/deco-ap.sh <unit-ip>` (builds, checks the unit,
+installs to `/tp_data/udeco` with md5 verification; `--force-host` for units
+other than the canary) or by hand as described in
+[packaging/deco](packaging/deco/README.md). The
 design, the device findings and the interference audit are in
 [docs/deco/](docs/deco/). The older off-device approach (`cmd/udeco`, TP-Link's
 app protocol from one container) is described in
