@@ -82,6 +82,12 @@ func TestSurveySec(t *testing.T) {
 		"WPA2/AES":              "WPA2-Enterprise (AES/CCMP)",
 		"OWE/AES":               "Open (OWE)",
 		"WPAPSKWPA2PSK/TKIPAES": "WPA2-Personal (TKIP/AES/CCMP)",
+		// the MT7603 (mt7603eap.ko has no WPA3/SAE names, only "UNKNOW")
+		// prints an AKM it does not know as UNKNOW: a WPA cipher still
+		// means a protected network, never an open one
+		"UNKNOW/AES":     "WPA2-Personal (AES/CCMP)",
+		"UNKNOW/TKIPAES": "WPA2-Personal (TKIP/AES/CCMP)",
+		"UNKNOW/NONE":    "Open",
 	} {
 		if got := apstate.SecurityLabel(surveySec(in)); got != want {
 			t.Errorf("%s: %q, want %q", in, got, want)

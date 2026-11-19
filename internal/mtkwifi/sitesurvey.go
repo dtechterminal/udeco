@@ -284,6 +284,12 @@ func surveySec(s string) apstate.SecInfo {
 	default:
 		si.Ciphers = []string{cipher}
 	}
+	// a WPA cipher with an AKM the driver does not name ("UNKNOW/AES": the
+	// MT7603 has no SAE name) is a protected network: an RSN element
+	// without a readable AKM, never Open
+	if len(si.Ciphers) > 0 && !si.WPA && !si.RSN {
+		si.RSN = true
+	}
 	if si.WPA || si.RSN {
 		si.Privacy = true
 	}
