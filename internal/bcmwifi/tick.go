@@ -55,7 +55,10 @@ func (a *Applier) current() *Desired {
 // per-client rate limits for the stations associated now. Each datapath
 // repair is followed by a flow-cache flush (R21). The agent calls it every
 // tick (60 s) while it owns Wi-Fi; it does nothing when the agent does not
-// own Wi-Fi, and with DryRun it only logs.
+// own Wi-Fi, and with DryRun it only logs. Each radio's TWT state is logged
+// when it changes; one that differs from the config is set only inside a
+// radio down/up Tick makes anyway (a client vif's dwds), never by a restart
+// of its own (twt.go).
 func (a *Applier) Tick(ctx context.Context) (TickReport, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -77,6 +80,7 @@ func (a *Applier) Tick(ctx context.Context) (TickReport, error) {
 	for _, f := range p.Foreign {
 		a.o.Logf("bcmwifi: tick: foreign state: %s", f)
 	}
+	a.logTWT(p)
 	if a.o.DryRun {
 		a.logPlan("dry-run tick", p)
 		return r, nil

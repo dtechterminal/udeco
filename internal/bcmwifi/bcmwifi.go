@@ -119,6 +119,12 @@ type Options struct {
 	// config (wpa3 and ft_sae). Without it the agent does not claim
 	// radio_caps2 0x2 and an SSID keeps FT-PSK and SAE without FT.
 	FTSAE bool
+	// NoTWT keeps TP-Link's TWT setting on the radios (`wl twt enab 0`).
+	// TWT is on in a zero Options, as a U6 Pro sets twt_responder 3 on
+	// every VAP; the agent sets NoTWT from its config (twt false). The
+	// state is written only inside a radio down/up the plan makes anyway
+	// (twt.go).
+	NoTWT bool
 	// Ctrl sends one command to the hostapd control socket of vif
 	// (CtrlDir/<vif>) and returns the reply. nil = a unix datagram socket
 	// under Root. Used for the commands that carry a secret (SET r0kh/r1kh
@@ -160,6 +166,8 @@ type Applier struct {
 	// RunDir/fc-off); fcNote: the last fc status problem logged (fcache.go)
 	fcOff  bool
 	fcNote string
+	// twtSeen: band -> the TWT line Tick logged last (twt.go)
+	twtSeen map[string]string
 
 	sleep func(time.Duration)
 	poll  time.Duration

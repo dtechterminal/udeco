@@ -69,6 +69,7 @@ Status key:
 | Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | |
 | Band steering, minimum RSSI, max clients | Built | Band steering uses 802.11v nudges. |
 | Minimum data rates | Built | Off by default (`"min_rates": true`). `wl rateset` runs inside a radio down/up, which drops that radio's clients. |
+| Target Wake Time (TWT) | Built | On by default (`"twt": false` turns it off), as a U6 Pro. Turned on by hand on one unit (`wl twt enab 1` after `wl down`): a Pixel's station info then shows TWT capable; an iPhone showed no TWT. |
 
 ### Radios and RF
 
@@ -174,7 +175,15 @@ You need root SSH on each unit; how to get it is out of scope here.
    With `"takeover": false` the agent only reports to UniFi and changes
    nothing. With `"apply": false` it logs its plans without applying them.
    Optional keys, all off by default: `wpa3`, `min_rates`, `mdns_bridge`,
-   `hotspot2`, `mgmt_sources`.
+   `hotspot2`, `mgmt_sources`. One optional key is on by default: `twt`
+   (802.11ax Target Wake Time on both radios, as a real U6 Pro runs it;
+   `"twt": false` keeps TP-Link's off). The driver takes it only while the
+   radio is down, so the agent sets it inside a radio restart it makes
+   anyway (takeover at boot, a channel, country or SSID change) and never
+   restarts a radio for TWT alone. A unit already running the agent picks
+   it up at its next such restart; until then the log says
+   `radio na: TWT enab 0, config wants 1: set at the next radio down/up`.
+   Handing Wi-Fi back to TP-Link restores its TWT state.
 
 2. **Deploy.** From a machine with Go and SSH access to the unit:
 

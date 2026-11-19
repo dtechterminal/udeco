@@ -30,7 +30,13 @@ type baseRadio struct {
 	Hostapd  []string `json:"hostapd,omitempty"` // TP-Link hostapd argv
 	Macmode  string   `json:"macmode,omitempty"` // the primary's driver MAC filter
 	Maclist  []string `json:"maclist,omitempty"`
+	TWT      string   `json:"twt,omitempty"` // wl twt enab ("0"/"1"; "" = unreadable or an older agent's baseline)
 }
+
+// tplinkTWT is TP-Link's TWT state (tplink_brcm.sh runs `wl twt 0`; the
+// X20's radios read `twt enab` 0 under TP-Link), restored when the baseline
+// lacks it (twt.go).
+const tplinkTWT = "0"
 
 type baseVif struct {
 	Vif     string      `json:"vif"`
@@ -104,6 +110,9 @@ func (a *Applier) captureBaseline(ctx context.Context) error {
 		}
 		if m := a.readMAC(ctx, p); m.Known {
 			r.Macmode, r.Maclist = itoa(m.Mode), m.List
+		}
+		if n := a.readTWT(ctx, p); n >= 0 {
+			r.TWT = itoa(n)
 		}
 		b.Radios = append(b.Radios, r)
 		for i := 1; i <= maxVifIndex; i++ {
@@ -295,19 +304,28 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		return nil
 	}
 
-	// 3: PHY and the primary's MAC filter, on the radios the agent had.
+	// 3: PHY, TWT and the primary's MAC filter, on the radios the agent
+	// had. No hostapd runs on them now, so a radio down/up for TWT alone
+	// drops nobody.
 	for _, r := range radios {
 		if r.running {
 			continue
 		}
 		br := baseRadioOf(r.p)
+		twt := a.twtRestore(ctx, r.p, br)
 		if br == nil || a.radioMatches(ctx, *br) {
+			if twt != nil {
+				st = append(st, optStep("radio down to restore TWT", "wl", "-i", r.p, "down"), *twt)
+			}
 			st = append(st, ensureUp(r.p))
 		} else {
 			wl := func(desc string, args ...string) Step {
 				return cmdStep(desc, append([]string{"wl", "-i", r.p}, args...)...)
 			}
 			st = append(st, wl("radio down", "down"))
+			if twt != nil {
+				st = append(st, *twt)
+			}
 			if br.Country != "" {
 				st = append(st, wl("restore country", "country", br.Country))
 			}
@@ -449,6 +467,22 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		}
 	}
 	return st, b, nil
+}
+
+// twtRestore is the step that puts TP-Link's TWT state back on a radio
+// (radio down only): the baseline's, else tplinkTWT. nil when the live
+// state already is that, or cannot be read.
+func (a *Applier) twtRestore(ctx context.Context, primary string, br *baseRadio) *Step {
+	want := tplinkTWT
+	if br != nil && br.TWT != "" {
+		want = br.TWT
+	}
+	live := a.readTWT(ctx, primary)
+	if live < 0 || itoa(live) == want {
+		return nil
+	}
+	s := optStep("restore TP-Link TWT", "wl", "-i", primary, "twt", "enab", want)
+	return &s
 }
 
 // radioMatches reports whether the radio's live PHY equals r.

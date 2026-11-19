@@ -110,6 +110,16 @@ type Config struct {
 	// cached survey feeds the neighbour list. Needs takeover (observe mode
 	// runs no scans); ignored, with a log line, on the Deco (wl scans).
 	SiteSurvey bool `json:"site_survey,omitempty"`
+	// TWT (takeover, Deco only) is 802.11ax Target Wake Time on both
+	// radios: absent or true turns it on (`wl twt enab 1`), as a real U6
+	// Pro sets twt_responder 3 on every VAP whatever the controller sends;
+	// false keeps TP-Link's off (`twt enab 0`), for a client population
+	// that handles TWT badly. bcmwifi.Options.NoTWT: the driver takes it
+	// only while the radio is down, so it is set inside a radio restart
+	// the agent makes anyway (a takeover, a channel, country or hostapd
+	// change), never by a restart of its own; the hand-back restores
+	// TP-Link's state (internal/bcmwifi/twt.go).
+	TWT *bool `json:"twt,omitempty"`
 }
 
 func (c *Config) portsConfirm() time.Duration {
@@ -195,7 +205,7 @@ func (c *Config) validate() error {
 		// wpa3: SAE on the 5 GHz radio only (the MT7663 driver has it);
 		// min_rates: the 2.4 GHz radio's BasicRate (mtkwifi minRate)
 		for name, on := range map[string]bool{"mdns_bridge": c.MdnsBridge,
-			"hotspot2": c.Hotspot2, "egress": c.Egress} {
+			"hotspot2": c.Hotspot2, "egress": c.Egress, "twt": c.TWT != nil} {
 			if on {
 				return fmt.Errorf("config: %s is not supported on platform %s", name, c.Platform)
 			}
@@ -230,6 +240,9 @@ func (c *Config) validate() error {
 	if c.Hotspot2 && !c.Takeover {
 		return errors.New("config: hotspot2 needs takeover (observe mode serves no Wi-Fi of its own)")
 	}
+	if c.TWT != nil && !c.Takeover {
+		return errors.New("config: twt needs takeover (observe mode never changes the unit)")
+	}
 	if c.SiteSurvey && !c.Takeover {
 		return errors.New("config: site_survey needs takeover (observe mode runs no scans and claims no RF scan)")
 	}
@@ -262,6 +275,9 @@ func (c *Config) validate() error {
 // cannot serve. ft_sae false is for a client population that handles a
 // refused FT authentication badly.
 func (c *Config) ftSAE() bool { return c.WPA3 && (c.FTSAE == nil || *c.FTSAE) }
+
+// twt: TWT is on unless the twt key is false.
+func (c *Config) twt() bool { return c.TWT == nil || *c.TWT }
 
 func (c *Config) controllerIP() string {
 	u, _ := url.Parse(c.InformURL)

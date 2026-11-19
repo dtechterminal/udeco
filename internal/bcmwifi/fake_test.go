@@ -465,6 +465,24 @@ func (f *fakeDev) wl(args []string) ([]byte, error) {
 		// radio is down (wl down), whatever the BSS state, even when the
 		// value does not change.
 		return []byte("wl: Not down\n"), errors.New("exit status 211")
+	case rest[0] == "twt" && (len(rest) == 1 || len(rest) == 2 && rest[1] == "enab"):
+		// Seen on the Bedroom Deco 2026-11-20: `wl twt` and `wl twt enab`
+		// print the radio's TWT enable state, 0 under TP-Link.
+		v, ok := f.state[fakeRadioOf(iface)+" twt"]
+		if !ok {
+			v = "0"
+		}
+		return []byte(v + "\n"), nil
+	case rest[0] == "twt" && len(rest) == 3 && rest[1] == "enab" && f.state[fakeRadioOf(iface)+" radio"] != "down":
+		// Same day: `wl twt enab 1` is refused while the radio is up and
+		// taken after `wl down`.
+		return []byte("wl: Not down\n"), errors.New("exit status 211")
+	case rest[0] == "twt" && len(rest) == 3 && rest[1] == "enab":
+		f.state[fakeRadioOf(iface)+" twt"] = rest[2]
+		return nil, nil
+	case rest[0] == "twt":
+		// TP-Link's `wl twt 0` form is not modelled: no test may rely on it.
+		return []byte("wl: unsupported twt form\n"), errors.New("exit status 1")
 	case rest[0] == "rateset" && len(rest) == 1:
 		if v, ok := f.state[iface+" rateset"]; ok {
 			return []byte(fakeRateset(v)), nil
@@ -798,7 +816,8 @@ func (f *fakeDev) mutating() [][]string {
 		switch c[0] {
 		case "wl":
 			rest := c[3:]
-			if len(rest) == 1 && rest[0] != "up" && rest[0] != "down" || rest[0] == "bw_cap" && len(rest) == 2 {
+			if len(rest) == 1 && rest[0] != "up" && rest[0] != "down" || rest[0] == "bw_cap" && len(rest) == 2 ||
+				rest[0] == "twt" && len(rest) == 2 && rest[1] == "enab" {
 				continue
 			}
 		case "hostapd_cli":

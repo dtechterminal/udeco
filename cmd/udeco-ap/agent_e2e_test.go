@@ -243,6 +243,10 @@ func (u *e2eUnit) wlGetter(args []string) (wlOut, bool) {
 	if len(rest) == 1 && rest[0] == "fbt" {
 		return wlOut{b: []byte("0\n")}, true
 	}
+	if len(rest) == 2 && rest[0] == "twt" && rest[1] == "enab" && len(iface) == 3 {
+		// not captured; read under TP-Link on the Bedroom Deco (2026-11-20)
+		return wlOut{b: []byte("0\n")}, true
+	}
 	if len(rest) == 1 && rest[0] == "closednet" {
 		rest = []string{"closed"}
 	}

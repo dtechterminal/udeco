@@ -120,9 +120,10 @@ func (a *Applier) ForgetFailed() {
 //     rate-limit trees;
 //  3. from RunDir/tplink-baseline.json (captured at takeover in this boot):
 //     restore the radio's country, bw_cap, chanspec and txpwr_degrade if
-//     they differ, make sure the radio is up (a failed apply may have
-//     stopped between `wl down` and `wl up`), and restore the primary's MAC
-//     filter;
+//     they differ, and its TWT state (the baseline's, else TP-Link's 0;
+//     radio down only, twt.go) if it differs, make sure the radio is up (a
+//     failed apply may have stopped between `wl down` and `wl up`), and
+//     restore the primary's MAC filter;
 //  4. restart TP-Link's hostapd with its own argv as captured (normally
 //     `hostapd -B -P /tmp/wlN.1_hapd.pid /tmp/wlN.1_hapd.conf`,
 //     /tmp/wlN_hapd.* on a master), using TP-Link's untouched conf, and wait
