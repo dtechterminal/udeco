@@ -4,6 +4,7 @@ package mtkwifi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -95,6 +96,12 @@ func (c *Collector) HomeScan(ctx context.Context, band string) (*apstate.ScanRes
 		// (restartgate.go)
 		return c.lastSurvey(band, c.o.now()), nil
 	}
+	if !c.isUp(main) {
+		// the radio is off or serves nothing: its driver is not asked
+		// (as Collect), and it reports no neighbours
+		done()
+		return &apstate.ScanResult{Band: band, Time: c.o.now()}, nil
+	}
 	table, err := c.readSurvey(ctx, main)
 	done()
 	if err != nil {
@@ -154,6 +161,9 @@ func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult,
 		return nil, ErrRadioRestart
 	}
 	defer done()
+	if !c.isUp(main) {
+		return nil, ErrRadioDown
+	}
 	before, err := c.readSurvey(ctx, main)
 	if err != nil {
 		return nil, err
@@ -191,6 +201,10 @@ func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult,
 	c.mu.Unlock()
 	return &apstate.ScanResult{Band: band, Time: now, BSS: append([]apstate.BSS(nil), bss...)}, nil
 }
+
+// ErrRadioDown: Scan of a radio whose interfaces are down (off, or no SSID
+// served on it); the driver is not asked.
+var ErrRadioDown = errors.New("mtkwifi: the radio is down: no site survey")
 
 // surveyTail is a survey row from the BSSID on: BSSID, Security, RSSI,
 // Signal(%), W-Mode (on the MT7663 run together with the RSSI again:

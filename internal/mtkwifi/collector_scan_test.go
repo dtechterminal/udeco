@@ -184,6 +184,9 @@ type clock struct{ t time.Time }
 
 func (c *clock) now() time.Time { return c.t }
 
+// mono is the clock as a monotonic reading (the applier's settle time).
+func (c *clock) mono() time.Duration { return c.t.Sub(time.Unix(0, 0)) }
+
 func newTestCollector(d *klogDev, ck *clock, fresh bool) *Collector {
 	return NewCollector(CollectorOptions{Root: d.root, Run: d, FreshScan: fresh, now: ck.now,
 		klog:  func() ([]byte, error) { return []byte(d.log.String()), nil },
@@ -318,6 +321,7 @@ func TestHomeScanCachedSurvey(t *testing.T) {
 	d := newKlogDev(t)
 	table := fixture(t, "site_survey_rai0.txt")
 	d.survey["rai0"] = table
+	d.setUp("rai0", true)
 	ck := &clock{t: time.Unix(1_000_000, 0)}
 	c := newTestCollector(d, ck, false)
 	ctx := context.Background()
@@ -413,5 +417,27 @@ func TestFreshScan(t *testing.T) {
 	ran := false
 	if err := c.WithoutScan(ctx, func(context.Context) error { ran = true; return nil }); err != nil || !ran {
 		t.Errorf("WithoutScan: %v, ran %v", err, ran)
+	}
+}
+
+// TestHomeScanSkipsDownRadio: a radio whose interfaces are down (off, or
+// serving nothing) is not asked for its site survey; HomeScan gives no
+// rows and Scan refuses.
+func TestHomeScanSkipsDownRadio(t *testing.T) {
+	d := newKlogDev(t)
+	d.survey["rai0"] = fixture(t, "site_survey_rai0.txt")
+	ck := &clock{t: time.Unix(1_000_000, 0)}
+	c := newTestCollector(d, ck, true)
+	ctx := context.Background()
+	if r, err := c.HomeScan(ctx, "na"); err != nil || len(r.BSS) != 0 {
+		t.Errorf("HomeScan of a down radio: %v, %v", r, err)
+	}
+	sctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+	if _, err := c.Scan(sctx, "na"); err == nil {
+		t.Error("Scan of a down radio started")
+	}
+	if got := d.iwpriv(); len(got) > 0 {
+		t.Errorf("driver asked about a down radio: %d commands, first %q", len(got), got[0])
 	}
 }

@@ -3,6 +3,7 @@
 package mtkwifi
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -43,17 +44,22 @@ type Options struct {
 	VerifyTimeout time.Duration
 	// Settle: how long after a radio restart the collector's driver reads
 	// stay off (20 s; restartgate.go).
-	Settle   time.Duration
-	sleep    func(context.Context, time.Duration) error
-	now      func() time.Time
+	Settle time.Duration
+	sleep  func(context.Context, time.Duration) error
+	// mono is a monotonic clock (time since an arbitrary start, > 0): the
+	// settle time of radio restarts runs on it, never on the wall clock
+	mono     func() time.Duration
 	writeLED func(path, s string) error // one LED table row (tests record them)
 }
 
 // Applier implements the agent's Wi-Fi applier on the MediaTek driver.
 type Applier struct {
-	o       Options
-	mu      sync.Mutex
-	live    map[string]RadioPlan // what this process applied or found live
+	o    Options
+	mu   sync.Mutex
+	live map[string]RadioPlan // what this process applied or found live
+	// adopted: the radios Plan found serving what this build writes,
+	// before this process applied anything (adopt); Apply starts from them
+	adopted map[string]RadioPlan
 	blocked []string
 	failed  string // hash of the last Desired that failed to apply
 	uplink  string
@@ -70,7 +76,7 @@ type Applier struct {
 	locating bool
 	// the collector's driver reads against radio restarts (restartgate.go):
 	// gate's write side is held through Apply and Rollback; quietUntil
-	// (unix ns) is the end of the last restart's settle time
+	// (Options.mono, ns) is the end of the last restart's settle time
 	gate       sync.RWMutex
 	quietUntil atomic.Int64
 	onChange   atomic.Pointer[func(context.Context)] // OnChange
@@ -104,8 +110,8 @@ func New(o Options) *Applier {
 	if o.Settle <= 0 {
 		o.Settle = defaultSettle
 	}
-	if o.now == nil {
-		o.now = time.Now
+	if o.mono == nil {
+		o.mono = monoSince(time.Now())
 	}
 	if o.sleep == nil {
 		o.sleep = func(ctx context.Context, d time.Duration) error {
@@ -171,7 +177,10 @@ func (a *Applier) Owned() bool {
 
 // Plan compares d with what is live. A plan whose hash matches what this
 // boot applied last (an agent restart) is empty when the radios still
-// look like it: nothing is restarted.
+// look like it: nothing is restarted. With another hash (another build),
+// each radio whose installed profile is the one this build writes, and
+// that serves it, is kept (adopt). A radio is restarted only when what a
+// restart makes live changes (change).
 func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -180,8 +189,18 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 	cur := a.live
 	if cur == nil {
 		if h, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, appliedFile))); err == nil &&
-			strings.TrimSpace(string(h)) == plansHash(want) && a.check(ctx, want) == nil {
+			strings.TrimSpace(string(h)) == plansHash(want) && a.check(ctx, want, true) == nil {
 			a.live = want
+			a.desired = d
+			a.planACL(&p, want)
+			return p, nil
+		}
+		// another build's plan (its hash differs): the radios that serve
+		// what this one writes are kept as they are
+		cur = a.adopt(ctx, want)
+		a.adopted = cur
+		if len(cur) == len(a.o.Layout) {
+			a.live, a.adopted = cur, nil
 			a.desired = d
 			a.planACL(&p, want)
 			return p, nil
@@ -190,9 +209,9 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 	for _, rd := range a.o.Layout {
 		w := want[rd.Band]
 		c, ok := cur[rd.Band]
-		switch {
-		case ok && c.hash() == w.hash():
-		case ok && c.structural() == w.structural():
+		switch ch := a.change(rd, c, ok, w); {
+		case ch == radioKeep:
+		case ch == radioLive:
 			p.Steps = append(p.Steps, bcmwifi.Step{Kind: bcmwifi.StepCmd,
 				Desc: fmt.Sprintf("%s: hidden/isolation/client limits live (iwpriv)", rd.Band)})
 		case !w.On:
@@ -210,6 +229,76 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 	a.desired = d
 	a.planACL(&p, want)
 	return p, nil
+}
+
+// radioChange is what one radio needs to go from what it serves to a plan.
+type radioChange int
+
+const (
+	radioKeep    radioChange = iota // nothing
+	radioLive                       // iwpriv and the profile, no restart (applyLive)
+	radioRestart                    // profile and restart, or off (applyRadio)
+)
+
+// change says what radio rd needs to go from c (ok: c is what it serves)
+// to w. A restart only when what a restart makes live differs
+// (restartKey): a plan difference the written profile does not show (a
+// setting equal to the vendor's) is no reason to drop the radio's clients.
+func (a *Applier) change(rd RadioDef, c RadioPlan, ok bool, w RadioPlan) radioChange {
+	switch {
+	case !ok:
+		return radioRestart
+	case c.hash() == w.hash(), !c.On && !w.On:
+		return radioKeep
+	}
+	if base, err := a.baseline(rd); err == nil {
+		if restartKey(base, rd, c) == restartKey(base, rd, w) {
+			return radioLive
+		}
+		return radioRestart
+	}
+	if c.structural() == w.structural() {
+		return radioLive
+	}
+	return radioRestart
+}
+
+// baseline is the vendor's profile of rd captured this boot.
+func (a *Applier) baseline(rd RadioDef) ([]byte, error) {
+	return os.ReadFile(a.dev(filepath.Join(a.o.RunDir, baselineDir, rd.Band+".dat")))
+}
+
+// adopt returns the radios that already serve want although this process
+// has applied nothing: the agent's last apply of this boot finished
+// (mtk-applied; it may be another build's, whose plan JSON and so hash
+// differ), the radio's installed profile is byte for byte the one this
+// build writes for want, and its netdevs serve want (up, SSIDs, bridges).
+// A radio off in want needs only its netdevs down. Restarting such a radio
+// would change nothing but drop its clients (a new build deployed with the
+// controller's settings unchanged).
+func (a *Applier) adopt(ctx context.Context, want map[string]RadioPlan) map[string]RadioPlan {
+	if _, err := os.Stat(a.dev(filepath.Join(a.o.RunDir, appliedFile))); err != nil || !a.Owned() {
+		return nil
+	}
+	out := map[string]RadioPlan{}
+	for _, rd := range a.o.Layout {
+		w := want[rd.Band]
+		if w.On {
+			base, err := a.baseline(rd)
+			if err != nil {
+				continue
+			}
+			if cur, err := os.ReadFile(a.dev(rd.Dat)); err != nil || !bytes.Equal(cur, profile(base, rd, w)) {
+				continue
+			}
+		}
+		if err := a.checkRadio(ctx, rd, w, true); err != nil {
+			continue
+		}
+		a.o.Logf("mtkwifi: %s already serves this plan (another build applied it): not restarted", rd.Band)
+		out[rd.Band] = w
+	}
+	return out
 }
 
 // planACL adds a step when the station ACLs want differ from what was last
@@ -253,7 +342,12 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	if err := a.captureBaseline(ctx); err != nil {
 		return fmt.Errorf("%w: %v", bcmwifi.ErrNoBaseline, err)
 	}
-	err := a.applyPlans(ctx, want, a.live)
+	cur := a.live
+	if cur == nil {
+		cur = a.adopted // what Plan found already live
+	}
+	a.adopted = nil
+	err := a.applyPlans(ctx, want, cur)
 	if err == nil {
 		err = a.waitLive(ctx, want)
 	}
@@ -279,11 +373,11 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 		w := want[rd.Band]
 		c, ok := cur[rd.Band]
 		var err error
-		switch {
-		case ok && c.hash() == w.hash():
+		switch a.change(rd, c, ok, w) {
+		case radioKeep:
 			continue
-		case ok && c.structural() == w.structural():
-			err = a.applyLive(ctx, rd, w)
+		case radioLive:
+			err = a.applyLive(ctx, rd, c, w)
 		default:
 			err = a.applyRadio(ctx, rd, w)
 		}
@@ -303,7 +397,7 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 // applyRadio writes the radio's profile and restarts its BSSes (every
 // client of the radio reassociates).
 func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) error {
-	base, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, baselineDir, rd.Band+".dat")))
+	base, err := a.baseline(rd)
 	if err != nil {
 		return fmt.Errorf("baseline profile: %w", err)
 	}
@@ -334,10 +428,13 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 	return nil
 }
 
-// applyLive sets the live settings of each BSS and keeps the profile in
-// step (a later restart re-reads it).
-func (a *Applier) applyLive(ctx context.Context, rd RadioDef, rp RadioPlan) error {
+// applyLive sets the live settings of each BSS that changed from c and
+// keeps the profile in step (a later restart re-reads it).
+func (a *Applier) applyLive(ctx context.Context, rd RadioDef, c, rp RadioPlan) error {
 	for i, b := range rp.BSS {
+		if i < len(c.BSS) && c.BSS[i].Hidden == b.Hidden && c.BSS[i].Isolate == b.Isolate && c.BSS[i].MaxSta == b.MaxSta {
+			continue
+		}
 		ifc := rd.Ifaces[i]
 		for _, kv := range []string{"HideSSID=" + b01(b.Hidden), "NoForwarding=" + b01(b.Isolate), "MaxStaNum=" + strconv.Itoa(b.MaxSta)} {
 			if err := a.run(ctx, "iwpriv", ifc, "set", kv); err != nil {
@@ -345,7 +442,7 @@ func (a *Applier) applyLive(ctx context.Context, rd RadioDef, rp RadioPlan) erro
 			}
 		}
 	}
-	base, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, baselineDir, rd.Band+".dat")))
+	base, err := a.baseline(rd)
 	if err != nil {
 		return err
 	}
@@ -511,33 +608,47 @@ func (a *Applier) essid(ctx context.Context, ifc string) string {
 }
 
 // check compares the radios with want: BSS netdevs up with their SSIDs and
-// bridges, the rest down.
-func (a *Applier) check(ctx context.Context, want map[string]RadioPlan) error {
+// bridges, the rest down. ssids false: sysfs only, no iwconfig (a radio
+// restart's settle time, restartgate.go).
+func (a *Applier) check(ctx context.Context, want map[string]RadioPlan, ssids bool) error {
 	var bad []string
 	for _, rd := range a.o.Layout {
-		rp := want[rd.Band]
-		for i, ifc := range rd.Ifaces {
-			if i >= len(rp.BSS) {
-				if a.isUp(ifc) {
-					bad = append(bad, ifc+" is up but serves nothing")
-				}
-				continue
+		if err := a.checkRadio(ctx, rd, want[rd.Band], ssids); err != nil {
+			bad = append(bad, err.Error())
+		}
+	}
+	if len(bad) > 0 {
+		return errors.New(strings.Join(bad, "; "))
+	}
+	return nil
+}
+
+// checkRadio is check for one radio.
+func (a *Applier) checkRadio(ctx context.Context, rd RadioDef, rp RadioPlan, ssids bool) error {
+	var bad []string
+	for i, ifc := range rd.Ifaces {
+		if i >= len(rp.BSS) {
+			if a.isUp(ifc) {
+				bad = append(bad, ifc+" is up but serves nothing")
 			}
-			b := rp.BSS[i]
-			if !a.isUp(ifc) {
-				bad = append(bad, ifc+" is down")
-				continue
-			}
+			continue
+		}
+		b := rp.BSS[i]
+		if !a.isUp(ifc) {
+			bad = append(bad, ifc+" is down")
+			continue
+		}
+		if ssids {
 			if s := a.essid(ctx, ifc); s != b.SSID {
 				bad = append(bad, fmt.Sprintf("%s serves %q, not %q", ifc, s, b.SSID))
 			}
-			br := a.o.Bridge
-			if b.VLAN > 0 {
-				br = vlanBridge(b.VLAN)
-			}
-			if got := a.bridgeOf(ifc); got != br {
-				bad = append(bad, fmt.Sprintf("%s is in bridge %q, not %q", ifc, got, br))
-			}
+		}
+		br := a.o.Bridge
+		if b.VLAN > 0 {
+			br = vlanBridge(b.VLAN)
+		}
+		if got := a.bridgeOf(ifc); got != br {
+			bad = append(bad, fmt.Sprintf("%s is in bridge %q, not %q", ifc, got, br))
 		}
 	}
 	if len(bad) > 0 {
@@ -549,7 +660,7 @@ func (a *Applier) check(ctx context.Context, want map[string]RadioPlan) error {
 func (a *Applier) waitLive(ctx context.Context, want map[string]RadioPlan) error {
 	deadline := time.Now().Add(a.o.VerifyTimeout)
 	for {
-		err := a.check(ctx, want)
+		err := a.check(ctx, want, true)
 		if err == nil || time.Now().After(deadline) {
 			return err
 		}
@@ -559,12 +670,13 @@ func (a *Applier) waitLive(ctx context.Context, want map[string]RadioPlan) error
 	}
 }
 
-// Verify is the health check: the radios still serve what d asks.
+// Verify is the health check: the radios still serve what d asks. Within
+// a radio restart's settle time the SSIDs are not read (sysfs only).
 func (a *Applier) Verify(ctx context.Context, d bcmwifi.Desired) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	want, _ := plans(d, a.o.Layout, a.o.WPA3)
-	return a.check(ctx, want)
+	return a.check(ctx, want, !a.settling())
 }
 
 // ------------------------------------------------------- baseline, rollback
@@ -708,6 +820,7 @@ func (a *Applier) loadLastGood() (map[string]RadioPlan, error) {
 
 // Tick repairs bridge membership in place and reports drift only an apply
 // fixes (a BSS down or serving another SSID: something rewrote the driver).
+// Within a radio restart's settle time the SSIDs are not read.
 func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -715,6 +828,7 @@ func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 	if a.live == nil {
 		return r, nil
 	}
+	ssids := !a.settling()
 	for _, rd := range a.o.Layout {
 		rp := a.live[rd.Band]
 		for i, ifc := range rd.Ifaces {
@@ -731,10 +845,12 @@ func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 				r.NeedsApply = true
 				continue
 			}
-			if s := a.essid(ctx, ifc); s != b.SSID {
-				r.Foreign = append(r.Foreign, fmt.Sprintf("%s serves %q", ifc, s))
-				r.NeedsApply = true
-				continue
+			if ssids {
+				if s := a.essid(ctx, ifc); s != b.SSID {
+					r.Foreign = append(r.Foreign, fmt.Sprintf("%s serves %q", ifc, s))
+					r.NeedsApply = true
+					continue
+				}
 			}
 			br := a.o.Bridge
 			if b.VLAN > 0 {
@@ -797,6 +913,9 @@ func (a *Applier) SetBlocked(ctx context.Context, macs []string) error {
 	if a.live == nil {
 		return nil
 	}
+	if a.acl != nil && sameACLs(wantACLs(a.desired, a.live, a.o.Layout, a.blocked), a.acl) {
+		return nil // the driver has it (the agent sets the list before and after each apply)
+	}
 	return a.applyACL(ctx, a.live)
 }
 
@@ -806,6 +925,9 @@ type ifaceACL struct {
 	Policy int
 	MACs   []string
 }
+
+// aclUnknown: a BSS whose list could not be written (applyACL).
+const aclUnknown = -1
 
 // maxACL is the driver's access-list size per BSS (MAX_NUM_OF_ACL_LIST).
 const maxACL = 64
@@ -908,6 +1030,9 @@ func (a *Applier) applyACL(ctx context.Context, want map[string]RadioPlan) error
 			}
 		}
 		if failed {
+			// not known to the driver: never the same as any list, so the
+			// next SetBlocked or plan writes it again
+			w[ifc] = ifaceACL{Policy: aclUnknown}
 			continue
 		}
 		for _, m := range keptOut(a.acl[ifc], acl) {

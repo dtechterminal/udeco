@@ -66,7 +66,7 @@ func TestCollectorKeepsOffRestartingRadios(t *testing.T) {
 	var probes, during int
 	hr := hookRun{klogDev: d}
 	a := New(Options{Root: d.root, Run: &hr, RunDir: "/tmp/udeco", StateDir: "/state", Uplink: "eth0.4.1",
-		VerifyTimeout: time.Millisecond, sleep: func(context.Context, time.Duration) error { return nil }, now: ck.now})
+		VerifyTimeout: time.Millisecond, sleep: func(context.Context, time.Duration) error { return nil }, mono: ck.mono})
 	c.FollowRestarts(a)
 	fresh.FollowRestarts(a)
 	// a fresh survey that never ends (the table does not change) is cut
@@ -192,7 +192,7 @@ func TestRestartWaitsForReadInFlight(t *testing.T) {
 		}
 	}}
 	a := New(Options{Root: d.root, Run: &hr, RunDir: "/tmp/udeco", StateDir: "/state", Uplink: "eth0.4.1",
-		VerifyTimeout: time.Millisecond, sleep: func(context.Context, time.Duration) error { return nil }, now: ck.now})
+		VerifyTimeout: time.Millisecond, sleep: func(context.Context, time.Duration) error { return nil }, mono: ck.mono})
 	ctx := context.Background()
 	p, err := a.Plan(ctx, home())
 	if err != nil {
@@ -229,5 +229,101 @@ func TestRestartWaitsForReadInFlight(t *testing.T) {
 		t.Error("driver read refused after the settle time")
 	} else {
 		done()
+	}
+}
+
+// TestSettleIgnoresWallClockSteps: the settle time runs on the monotonic
+// clock. The agent's clock keeping steps the wall clock (58 s on the unit,
+// 2026-11-19); a step right after a radio restart neither ends the settle
+// time early nor stretches it.
+func TestSettleIgnoresWallClockSteps(t *testing.T) {
+	f := newFakeDev(t)
+	// the wall clock steps; the monotonic clock only moves on
+	var elapsed time.Duration
+	a := New(Options{Root: f.root, Run: f, RunDir: "/tmp/udeco", mono: func() time.Duration { return elapsed }})
+	elapsed = time.Hour
+	wall := time.Now()
+	a.restarted()
+	elapsed += time.Second // and settimeofday moves the wall clock 58 s on
+	if _, ok := a.DriverRead(); ok {
+		t.Errorf("the settle time ended 1 s after a restart (wall clock now %v)", wall.Add(58*time.Second))
+	}
+	elapsed += defaultSettle
+	if done, ok := a.DriverRead(); !ok {
+		t.Error("the settle time did not end on time")
+	} else {
+		done()
+	}
+}
+
+// TestApplierKeepsOffDriverWhileSettling: right after an apply restarted
+// the radios, the routine jobs that follow it (the blocked list again, the
+// enforce tick, the health check) send the driver nothing: no unchanged
+// ACL rewrite, no iwconfig. After the settle time the tick and the health
+// check read the SSIDs again.
+func TestApplierKeepsOffDriverWhileSettling(t *testing.T) {
+	f := newFakeDev(t)
+	ck := &clock{t: time.Unix(1_000_000, 0)}
+	a := New(Options{Root: f.root, Run: f, RunDir: "/tmp/udeco", StateDir: "/state", Uplink: "eth0.4.1",
+		VerifyTimeout: time.Millisecond, sleep: func(context.Context, time.Duration) error { return nil }, mono: ck.mono})
+	ctx := context.Background()
+	if err := a.SetBlocked(ctx, []string{"aa:bb:cc:dd:ee:ff"}); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := a.Plan(ctx, home())
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	n := len(f.log)
+	if err := a.SetBlocked(ctx, []string{"AA:BB:CC:DD:EE:FF"}); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := a.Tick(ctx); err != nil || r.NeedsApply {
+		t.Errorf("tick while settling: %+v %v", r, err)
+	}
+	if err := a.Verify(ctx, home()); err != nil {
+		t.Errorf("verify while settling: %v", err)
+	}
+	if got := f.log[n:]; len(got) > 0 {
+		t.Errorf("driver commands while the radios settle: %v", got)
+	}
+	ck.t = ck.t.Add(defaultSettle + time.Second)
+	n = len(f.log)
+	a.Tick(ctx)
+	if err := a.Verify(ctx, home()); err != nil {
+		t.Errorf("verify after settling: %v", err)
+	}
+	if !strings.Contains(strings.Join(f.log[n:], "\n"), "iwconfig ra0") {
+		t.Errorf("no SSID read after the settle time: %v", f.log[n:])
+	}
+	// a changed block list is written at once, settling or not
+	n = len(f.log)
+	a.SetBlocked(ctx, []string{"aa:bb:cc:dd:ee:00"})
+	if !strings.Contains(strings.Join(f.log[n:], "\n"), "ACLAddEntry=AA:BB:CC:DD:EE:00") {
+		t.Errorf("changed block list not written: %v", f.log[n:])
+	}
+}
+
+// TestACLWriteFailureRetried: a BSS whose access list could not be written
+// is written again by the next SetBlocked, even with the list unchanged.
+func TestACLWriteFailureRetried(t *testing.T) {
+	f := newFakeDev(t)
+	a := newApplier(f)
+	ctx := context.Background()
+	p, _ := a.Plan(ctx, home())
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	f.fail["iwpriv ra1 set ACLClearAll"] = true
+	if err := a.SetBlocked(ctx, []string{"aa:bb:cc:dd:ee:ff"}); err == nil {
+		t.Fatal("no error for the failed write")
+	}
+	delete(f.fail, "iwpriv ra1 set ACLClearAll")
+	n := len(f.log)
+	if err := a.SetBlocked(ctx, []string{"aa:bb:cc:dd:ee:ff"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(f.log[n:], "\n"), "iwpriv ra1 set ACLAddEntry=AA:BB:CC:DD:EE:FF") {
+		t.Errorf("failed BSS not written again: %v", f.log[n:])
 	}
 }

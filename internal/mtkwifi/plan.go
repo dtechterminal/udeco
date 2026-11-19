@@ -75,10 +75,12 @@ type BSS struct {
 	Hidden  bool
 	Isolate bool
 	MaxSta  int
-	VLAN    int  // 0 = the LAN bridge
-	RRM     bool // 802.11k (RRMEnable)
-	BTM     bool // 802.11v BSS transition management (WNMEnable)
-	UAPSD   bool // U-APSD (APSDCapable); only where RadioDef.UAPSD
+	VLAN    int // 0 = the LAN bridge
+	// omitempty: a plan asking for none of them marshals (and hashes) as
+	// one saved by an older agent did
+	RRM   bool `json:",omitempty"` // 802.11k (RRMEnable)
+	BTM   bool `json:",omitempty"` // 802.11v BSS transition management (WNMEnable)
+	UAPSD bool `json:",omitempty"` // U-APSD (APSDCapable); only where RadioDef.UAPSD
 }
 
 // RadioPlan is what one radio serves. The zero value of each per-radio
@@ -103,11 +105,13 @@ type RadioPlan struct {
 	IgmpSn bool `json:",omitempty"`
 }
 
-// structural is everything that needs the radio restarted: the BSS list
-// with names, security, keys and 802.11k/v/U-APSD, the channel, width,
-// power, DTIM, basic rates and IGMP snooping (profile() patches the vendor
-// baseline, read only when a radio's BSSes come up). Hidden,
-// Isolate and MaxSta are live.
+// structural is everything that may need the radio restarted: the BSS
+// list with names, security, keys and 802.11k/v/U-APSD, the channel,
+// width, power, DTIM, basic rates and IGMP snooping (profile() patches the
+// vendor baseline, read only when a radio's BSSes come up). Hidden,
+// Isolate and MaxSta are live. The applier restarts a radio only when what
+// it would write differs (restartKey); structural is the fallback without
+// a baseline profile.
 func (r RadioPlan) structural() string {
 	c := r
 	c.BSS = nil
@@ -117,6 +121,27 @@ func (r RadioPlan) structural() string {
 	}
 	j, _ := json.Marshal(c)
 	return string(j)
+}
+
+// restartKey is what a restart of the radio would make live: the profile
+// rendered from base without the live settings (Hidden, Isolate, MaxSta),
+// with the netdevs brought up and the bridges they go in. Two plans with
+// the same key need no restart between them, whatever else differs in
+// them (a setting the vendor's profile already has, such as IGMP snooping
+// on or DTIM 2).
+func restartKey(base []byte, rd RadioDef, r RadioPlan) string {
+	if !r.On {
+		return "off"
+	}
+	c := r
+	c.BSS = nil
+	var vlans []string
+	for _, b := range r.BSS {
+		b.Hidden, b.Isolate, b.MaxSta = false, false, 0
+		c.BSS = append(c.BSS, b)
+		vlans = append(vlans, strconv.Itoa(b.VLAN))
+	}
+	return strings.Join(vlans, ",") + "\n" + string(profile(base, rd, c))
 }
 
 func (r RadioPlan) hash() string {

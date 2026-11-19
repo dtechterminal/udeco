@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+// monoSince is the default Options.mono: time since the process's first
+// Applier, from the monotonic clock (time.Since uses it; wall-clock steps
+// do not move it).
+func monoSince(start time.Time) func() time.Duration {
+	return func() time.Duration { return time.Since(start) }
+}
+
 // Radio restarts and driver reads. The MT7603/MT7663 drivers are probed
 // (iwconfig, iwpriv show ..., get_site_survey) by the collector on its own
 // schedule: every inform, the 1 s live view and the minute's home listen.
@@ -18,7 +25,12 @@ import (
 //     They wait for a driver read already under way to finish; a read that
 //     would start meanwhile does not wait, it is skipped.
 //   - Each radio restart (applyRadio, restoreBaseline) closes the gate for
-//     Settle (20 s) from its end.
+//     Settle (20 s) from its end, measured on the monotonic clock: the
+//     agent's clock keeping steps the wall clock (clock.go), and a step
+//     must neither end the settle time early nor stretch it.
+//   - The applier's own routine reads keep off the driver while it settles
+//     too: Tick and Verify skip their iwconfig SSID reads (sysfs only), and
+//     an unchanged station ACL is not written again (SetBlocked).
 //   - A skipped read gives the collector's last reading (or none): the
 //     inform loop, the live view and the home listen never wait on an
 //     apply.
@@ -48,7 +60,8 @@ func (a *Applier) DriverRead() (func(), bool) {
 	return a.gate.RUnlock, true
 }
 
-func (a *Applier) settling() bool { return a.o.now().UnixNano() < a.quietUntil.Load() }
+// settling: a radio restart's settle time is not over (monotonic clock).
+func (a *Applier) settling() bool { return int64(a.o.mono()) < a.quietUntil.Load() }
 
 // changingRadios closes the gate for an Apply or Rollback (a.mu held):
 // driver reads under way finish first, new ones are skipped until the
@@ -60,5 +73,5 @@ func (a *Applier) changingRadios() func() {
 
 // restarted starts the settle time of a radio restart that just ended.
 func (a *Applier) restarted() {
-	a.quietUntil.Store(a.o.now().Add(a.o.Settle).UnixNano())
+	a.quietUntil.Store(int64(a.o.mono() + a.o.Settle))
 }
