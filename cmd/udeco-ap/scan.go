@@ -183,13 +183,16 @@ func (sc *scanner) addBSS(band string, res apstate.ScanResult) {
 	sc.mu.Unlock()
 }
 
-// neighbourScan is `cmd scan`: bands one after the other in the background,
-// scan_table only; done runs when it finishes. A band starts only while
-// blocked returns "" (agent.scanBlock). It returns false (and never calls
-// done) when a scan is already running.
-func (sc *scanner) neighbourScan(ctx context.Context, col collector, bands []string, perBand time.Duration,
+// neighbourScan is `cmd scan` (what names the command in the logs; on a
+// collector without a spectrum runner also spectrum-scan and quick-scan,
+// sitesurvey.go): bands one after the other in the background, scan_table
+// only, with neither spectrum_scanning nor quickscan_scanning set; done
+// runs when it finishes. A band starts only while blocked returns ""
+// (agent.scanBlock). It returns false (and never calls done) when a scan
+// is already running.
+func (sc *scanner) neighbourScan(ctx context.Context, col collector, what string, bands []string, perBand time.Duration,
 	logf func(string, ...any), blocked func() string, done func()) (busy string, ok bool) {
-	if busy, ok := sc.begin("scan", false, false); !ok {
+	if busy, ok := sc.begin(what, false, false); !ok {
 		return busy, false
 	}
 	go func() {
@@ -197,7 +200,7 @@ func (sc *scanner) neighbourScan(ctx context.Context, col collector, bands []str
 		defer sc.end()
 		for _, band := range bands {
 			if why := blocked(); why != "" {
-				logf("scan %s: not started, %s", band, why)
+				logf("%s %s: not started, %s", what, band, why)
 				return
 			}
 			bctx, cancel := context.WithTimeout(ctx, perBand)
@@ -205,13 +208,13 @@ func (sc *scanner) neighbourScan(ctx context.Context, col collector, bands []str
 			res, err := col.Scan(bctx, band)
 			cancel()
 			if err != nil {
-				logf("scan %s: %v", band, err)
+				logf("%s %s: %v", what, band, err)
 				continue
 			}
 			// neighbours only: a legacy ScanResult.Spectrum is never
 			// reported (spectrum_table comes from the spectrum runner)
 			sc.addBSS(band, apstate.ScanResult{Band: res.Band, Time: res.Time, BSS: res.BSS})
-			logf("scan %s: %d networks in %s", band, len(res.BSS), time.Since(t0).Round(100*time.Millisecond))
+			logf("%s %s: %d networks in %s", what, band, len(res.BSS), time.Since(t0).Round(100*time.Millisecond))
 		}
 	}()
 	return "", true

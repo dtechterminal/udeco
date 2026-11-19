@@ -1,0 +1,197 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package main
+
+// site_survey (platform jio-mtk): the controller's scan commands run the
+// MediaTek driver's site survey; the spectrum commands, which have no
+// runner on that unit, run it for their band(s) and report scan_table only.
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
+)
+
+func TestSiteSurveyConfig(t *testing.T) {
+	jio := `{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","takeover":true,"platform":"jio-mtk","model":"UHDIW"`
+	c, err := parseConfig([]byte(jio + `}`))
+	if err != nil || c.SiteSurvey {
+		t.Fatalf("default: %v, site_survey %v", err, c != nil && c.SiteSurvey)
+	}
+	if c, err = parseConfig([]byte(jio + `,"site_survey":true}`)); err != nil || !c.SiteSurvey {
+		t.Fatalf("jio-mtk with site_survey: %v", err)
+	}
+	// the Deco scans with wl whatever the key says: accepted, ignored (and
+	// logged at start, TestSiteSurveyWiring)
+	deco := `{"inform_url":"http://192.168.0.1:8080/inform","console_ip":"192.168.0.1","site_survey":true}`
+	if _, err = parseConfig([]byte(deco)); err != nil {
+		t.Fatalf("Deco with site_survey: %v", err)
+	}
+	if _, err = parseConfig([]byte(jio + `,"site_survey":"yes"}`)); err == nil {
+		t.Error("site_survey \"yes\" accepted")
+	}
+}
+
+// site_survey reaches mtkwifi.CollectorOptions.FreshScan on jio-mtk (the
+// collector then supports Scan, so RF_SCAN is claimed); on the Deco it is
+// ignored with a log line.
+func TestSiteSurveyWiring(t *testing.T) {
+	for _, on := range []bool{false, true} {
+		h := newHarness(t, func(c *Config, o *options) {
+			c.Takeover, c.Platform, c.Model, c.SiteSurvey = true, PlatformJio, "U7LT", on
+			o.col = nil // the real mtkwifi collector
+		})
+		col, ok := h.a.o.col.(*mtkwifi.Collector)
+		if !ok {
+			t.Fatalf("jio-mtk collector %T", h.a.o.col)
+		}
+		if col.ScanSupported() != on || col.SpectrumBySurvey() != on {
+			t.Errorf("site_survey %v: ScanSupported %v, SpectrumBySurvey %v", on, col.ScanSupported(), col.SpectrumBySurvey())
+		}
+		if got := strings.Contains(h.logs.all(), "site_survey: on"); got != on {
+			t.Errorf("site_survey %v: start log %q", on, h.logs.all())
+		}
+	}
+	h := newHarness(t, func(c *Config, o *options) { c.SiteSurvey = true })
+	if !strings.Contains(h.logs.all(), "site_survey: ignored") {
+		t.Errorf("Deco with site_survey: no log line: %q", h.logs.all())
+	}
+}
+
+// surveyCol is a collector without a spectrum runner (jio-mtk) whose
+// spectrum commands run the neighbour survey when on.
+type surveyCol struct {
+	*fakeCol
+	on bool
+}
+
+func (c surveyCol) ScanSupported() bool    { return c.on }
+func (c surveyCol) SpectrumBySurvey() bool { return c.on }
+
+// informs is every inform the controller got so far.
+func (c *ctl) all() []map[string]any {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]map[string]any(nil), c.informs...)
+}
+
+// noSpectrumState: no inform claimed a spectrum run (spectrum_scanning or
+// quickscan_scanning true: their true -> false makes the controller store
+// the empty table), carried a spectrum_table or an EVT_AP_QuickScanEvent.
+func noSpectrumState(t *testing.T, h *harness) {
+	t.Helper()
+	for i, m := range h.ctl.all() {
+		if m["spectrum_scanning"] == true || m["quickscan_scanning"] != nil {
+			t.Errorf("inform %d: spectrum_scanning %v quickscan_scanning %v", i, m["spectrum_scanning"], m["quickscan_scanning"])
+		}
+		if m["notif_payload"] != nil || m["inform_as_notif"] != nil {
+			t.Errorf("inform %d: notification %v", i, m["notif_payload"])
+		}
+		rows, _ := m["radio_table"].([]any)
+		for _, r := range rows {
+			if rr, _ := r.(map[string]any); rr["spectrum_table"] != nil {
+				t.Errorf("inform %d: %s spectrum_table %v", i, rr["radio"], rr["spectrum_table"])
+			}
+		}
+	}
+}
+
+// surveyed: the na scan_table carries the survey's neighbour.
+func surveyed(t *testing.T, h *harness) bool {
+	m := h.ctl.last()
+	if m == nil || m["radio_table"] == nil {
+		return false
+	}
+	rows, _ := radioRow(t, m, "na")["scan_table"].([]any)
+	for _, r := range rows {
+		if r.(map[string]any)["bssid"] == "11:22:33:44:55:66" {
+			return true
+		}
+	}
+	return false
+}
+
+// With site_survey on, quick-scan (one band) and spectrum-scan (both, 5
+// GHz first) run the neighbour survey and report scan_table only.
+func TestSpectrumCommandsRunSurvey(t *testing.T) {
+	for _, tc := range []struct {
+		cmd, log string
+		want     []string
+	}{
+		{`{"_type":"cmd","cmd":"quick-scan","scan-band":1,"scan-bw":40}`, "quick-scan", []string{"scan:na"}},
+		{`{"_type":"cmd","cmd":"spectrum-scan","spectrum-cfg":"","infinite":false}`, "spectrum-scan", []string{"scan:na", "scan:ng"}},
+	} {
+		h := newHarness(t, func(c *Config, o *options) {
+			c.Takeover = true
+			o.col = surveyCol{fakeCol: o.col.(*fakeCol), on: true}
+		})
+		h.ctl.queue(adoptReply, tc.cmd)
+		h.start()
+		eventually(t, tc.log+" survey reported", func() bool { return surveyed(t, h) })
+		eventually(t, tc.log+" survey ended", func() bool { return !h.a.scans.busy() })
+		n := h.ctl.count()
+		eventually(t, "an inform after the survey", func() bool { return h.ctl.count() > n+1 })
+		h.stop()
+		var scans []string
+		for _, c := range h.rec.list() {
+			if strings.HasPrefix(c, "scan:") || strings.HasPrefix(c, "spectrum:") {
+				scans = append(scans, c)
+			}
+		}
+		if strings.Join(scans, " ") != strings.Join(tc.want, " ") {
+			t.Errorf("%s: ran %v, want %v", tc.log, scans, tc.want)
+		}
+		if !strings.Contains(h.logs.all(), tc.log+": no spectrum runner on this unit: neighbour site survey") {
+			t.Errorf("%s: no log of the survey instead: %q", tc.log, h.logs.all())
+		}
+		noSpectrumState(t, h)
+	}
+}
+
+// With site_survey off, the spectrum commands scan nothing and say so;
+// no inform claims a spectrum run.
+func TestSpectrumCommandsWithoutSurvey(t *testing.T) {
+	h := newHarness(t, func(c *Config, o *options) {
+		c.Takeover = true
+		o.col = surveyCol{fakeCol: o.col.(*fakeCol), on: false}
+	})
+	h.ctl.queue(adoptReply,
+		`{"_type":"cmd","cmd":"quick-scan","scan-band":0,"scan-bw":20}`,
+		`{"_type":"cmd","cmd":"spectrum-scan","spectrum-cfg":"","infinite":false}`)
+	h.start()
+	eventually(t, "both refused", func() bool { return strings.Count(h.logs.all(), "site_survey is off") >= 2 })
+	n := h.ctl.count()
+	eventually(t, "an inform after", func() bool { return h.ctl.count() > n+1 })
+	h.stop()
+	for _, c := range h.rec.list() {
+		if strings.HasPrefix(c, "scan:") || strings.HasPrefix(c, "spectrum:") {
+			t.Errorf("ran %s: %v", c, h.rec.list())
+		}
+	}
+	noSpectrumState(t, h)
+}
+
+// An apply or rollback running (scanBlock) refuses the survey a spectrum
+// command would run, as every other scan.
+func TestSpectrumSurveyBlocked(t *testing.T) {
+	h := newHarness(t, func(c *Config, o *options) {
+		c.Takeover = true
+		o.col = surveyCol{fakeCol: o.col.(*fakeCol), on: true}
+	})
+	h.a.wifiBusy.Store(true)
+	h.ctl.queue(adoptReply,
+		`{"_type":"cmd","cmd":"quick-scan","scan-band":1,"scan-bw":20}`,
+		`{"_type":"cmd","cmd":"spectrum-scan","spectrum-cfg":"","infinite":false}`)
+	h.start()
+	eventually(t, "both refused", func() bool {
+		return strings.Count(h.logs.all(), "skipped, a Wi-Fi apply or rollback is running") >= 2
+	})
+	h.stop()
+	for _, c := range h.rec.list() {
+		if strings.HasPrefix(c, "scan:") || strings.HasPrefix(c, "spectrum:") {
+			t.Errorf("ran %s during an apply: %v", c, h.rec.list())
+		}
+	}
+	noSpectrumState(t, h)
+}

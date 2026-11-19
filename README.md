@@ -222,6 +222,18 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 - **Partial:** WPA3 on 5 GHz only (the 2.4 GHz driver has no SAE). The driver
   accepts the profile, but no SAE client has been seen yet.
 - **Not on this platform:** speed limits.
+- **Neighbour scans (`"site_survey": true`, off by default):** UniFi's
+  scan commands run the driver's site survey (`iwpriv <radio> set
+  SiteSurvey=1`), which takes the radio off its channel for a few seconds,
+  and the unit then claims RF scan. A scan from UniFi surveys both bands;
+  the Environment page's spectrum scan (both bands) and the nightly quick
+  scan (one band) have no spectrum measurement on this driver, so they run
+  the same survey and fill only the neighbour list: no channel-utilisation
+  table is reported. Surveys run only on a command from UniFi, one at a
+  time, never during a Wi-Fi apply, a radio restart or the 20 s after it,
+  and never on a radio that is down. Off, the neighbour list comes only
+  from the driver's cached survey. Not yet measured on the unit: how long
+  clients stall during a survey.
 - **LAN ports (`"model": "UHDIW"`):** the unit can instead report as a
   UAP-IW-HD: LAN ports 1-3, port 4 absent, the uplink as rear port 5. With
   Enable Port VLAN on, the controller's port VLANs apply to ports 2 and 3

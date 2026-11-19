@@ -326,7 +326,11 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		// JioFiber JCOW414: MediaTek driver, Jio services kept down, no
 		// firewall of the agent's own
 		if o.col == nil {
-			o.col = mtkwifi.NewCollector(mtkwifi.CollectorOptions{Root: o.root, Run: o.run, Model: "JCOW414"})
+			o.col = mtkwifi.NewCollector(mtkwifi.CollectorOptions{Root: o.root, Run: o.run, Model: "JCOW414",
+				FreshScan: cfg.SiteSurvey})
+		}
+		if cfg.SiteSurvey {
+			o.logf("site_survey: on: the controller's scan, spectrum-scan and quick-scan commands run a driver site survey (the radio leaves its channel for a few seconds); never periodic")
 		}
 		if o.newSys == nil {
 			o.newSys = func(so decosys.Options) sysManager {
@@ -339,6 +343,9 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 					Uplink: bo.Uplink, DryRun: bo.DryRun, WPA3: bo.WPA3, Logf: bo.Logf})
 			}
 		}
+	}
+	if cfg.SiteSurvey && !cfg.jio() {
+		o.logf("site_survey: ignored: it is for platform %s (the Deco scans with wl)", PlatformJio)
 	}
 	if o.col == nil {
 		o.col = wl.New(wl.Options{Root: o.root, Run: o.run})
