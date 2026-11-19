@@ -160,9 +160,7 @@ func TestMonitorEvents(t *testing.T) {
 		t.Fatalf("events %+v", evs)
 	}
 	stop()
-	if h12.monitors() != 0 {
-		t.Errorf("not detached on stop")
-	}
+	waitFor(t, "DETACH on stop", func() bool { return h12.monitors() == 0 })
 	if ents, _ := os.ReadDir(local); len(ents) != 0 {
 		t.Errorf("local sockets left behind: %v", ents)
 	}

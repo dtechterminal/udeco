@@ -155,6 +155,7 @@ type timing struct {
 	clockRetry    time.Duration // clock re-check after no time source answered (1 min)
 	logPoll       time.Duration // remote syslog on jio-mtk: log file poll (1 s; logfollow.go)
 	portsRetry    time.Duration // the longest inform wait while a port change waits for confirmation (15 s)
+	roamSustain   time.Duration // a client below the Roaming Assistant threshold this long, at least (roaming.go)
 }
 
 func (t *timing) fill() {
@@ -187,6 +188,7 @@ func (t *timing) fill() {
 	def(&t.clockRetry, clockRetry)
 	def(&t.logPoll, logPoll)
 	def(&t.portsRetry, 15*time.Second)
+	def(&t.roamSustain, roamSustain)
 }
 
 // options are the agent's environment; tests replace the edges.

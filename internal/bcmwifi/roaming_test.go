@@ -67,7 +67,8 @@ func TestRoamAssist(t *testing.T) {
 	f.reset()
 	req := RoamRequest{Vif: "wl12", MAC: strings.ToUpper(staBTMOK), DisassocTBTT: 100, Candidates: []Neighbor{
 		{BSSID: own, Band: "na", Channel: 44},                  // the station's own BSS: left out
-		{BSSID: strings.ToUpper(ng), Band: "ng", Channel: 6},   // own 2.4 GHz BSS
+		{BSSID: strings.ToUpper(ng), Band: "ng", Channel: 6},   // this AP's 2.4 GHz BSS: left out (live bug 2026-11-19)
+		{BSSID: laa(ng), Band: "ng", Channel: 6},               // the same with another first octet: left out
 		{BSSID: "02:00:00:00:77:02", Band: "na", Channel: 149}, // a sibling AP heard by a scan
 		{BSSID: "junk", Band: "na", Channel: 36},               // bad: left out
 		{BSSID: "02:00:00:00:77:03", Band: "6e", Channel: 37},  // no such radio here: left out
@@ -77,7 +78,7 @@ func TestRoamAssist(t *testing.T) {
 	}
 	want := "hostapd_cli -p /var/run/udeco-hostapd -i wl12 bss_tm_req " + staBTMOK +
 		" disassoc_imminent=1 disassoc_timer=100 pref=1 abridged=1" +
-		" neighbor=" + ng + ",2223,81,6,7 neighbor=02:00:00:00:77:02,6319,125,149,9"
+		" neighbor=02:00:00:00:77:02,6319,125,149,9"
 	if !f.called(want) {
 		t.Errorf("missing %q in %v", want, f.mutating())
 	}
@@ -102,6 +103,8 @@ func TestRoamAssist(t *testing.T) {
 		{"station without BTM", RoamRequest{Vif: "wl02", MAC: staNoBTM, Candidates: cand, DisassocTBTT: 100}, ErrNoBTM},
 		{"no candidate", RoamRequest{Vif: "wl12", MAC: staBTMOK, DisassocTBTT: 100}, ErrNoCandidate},
 		{"only its own BSS", RoamRequest{Vif: "wl12", MAC: staBTMOK, Candidates: []Neighbor{{BSSID: own, Band: "na", Channel: 44}}}, ErrNoCandidate},
+		{"only this AP's BSSes", RoamRequest{Vif: "wl12", MAC: staBTMOK, Candidates: []Neighbor{
+			{BSSID: own, Band: "na", Channel: 44}, {BSSID: ng, Band: "ng", Channel: 6}}}, ErrNoCandidate},
 	} {
 		if err := a.RoamAssist(ctx, c.r); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", c.name, err, c.want)
@@ -139,4 +142,13 @@ func TestStaBTM(t *testing.T) {
 			t.Errorf("%q: BTM", s)
 		}
 	}
+}
+
+// laa is a BSSID with another first octet (the X20 derives its BSSIDs as
+// such variants of one address).
+func laa(b string) string {
+	if b[:2] == "a2" {
+		return "b2" + b[2:]
+	}
+	return "a2" + b[2:]
 }
