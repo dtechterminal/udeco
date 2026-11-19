@@ -38,8 +38,10 @@ type Config struct {
 	// MinRates (takeover only) applies the controller's minimum data rates
 	// as each BSS's wl rateset (bcmwifi.Options.MinRates). Off by default
 	// until `wl rateset` per BSS is verified on the X20 (minrate.go). On
-	// platform jio-mtk it sets each radio's BasicRate (mtkwifi); off, the
-	// agent drops the minimums before the plan (jioMinRates).
+	// platform jio-mtk it sets the 2.4 GHz radio's BasicRate (mtkwifi; the
+	// 5 GHz driver forces its own basic rates, so a 5 GHz minimum is only
+	// noted); off, the agent drops the minimums before the plan
+	// (jioMinRates).
 	MinRates bool `json:"min_rates,omitempty"`
 	// WPA3 (takeover only) claims radio_caps2 WPA3 and lets bcmwifi serve
 	// SAE (bcmwifi.Options.WPA3). Off by default until SAE is verified on
@@ -126,7 +128,7 @@ func (c *Config) validate() error {
 			return fmt.Errorf("config: model %q: platform %s is reported as U7LT (UAP-AC-Lite): set \"model\": \"U7LT\"", c.Model, c.Platform)
 		}
 		// wpa3: SAE on the 5 GHz radio only (the MT7663 driver has it);
-		// min_rates: each radio's BasicRate (mtkwifi minRate)
+		// min_rates: the 2.4 GHz radio's BasicRate (mtkwifi minRate)
 		for name, on := range map[string]bool{"mdns_bridge": c.MdnsBridge,
 			"hotspot2": c.Hotspot2, "egress": c.Egress} {
 			if on {

@@ -94,11 +94,9 @@ type RadioPlan struct {
 	BSS     []BSS
 	// DTIM is DtimPeriod (one per radio in both drivers); 0 = the vendor's.
 	DTIM int `json:",omitempty"`
-	// MinRSSI refuses associations below it (dBm), AssocReqRssiThres on
-	// every BSS; 0 = off (the key is not written).
-	MinRSSI int `json:",omitempty"`
 	// BasicRate is the driver's BasicRate bitmap (bit 0 = 1 Mb/s ... bit
 	// 11 = 54 Mb/s, basicRateKbps); 0 = the vendor's (351 on 2.4 GHz).
+	// 2.4 GHz only: on 5 GHz the driver forces 6, 12 and 24 Mb/s basic.
 	BasicRate int `json:",omitempty"`
 	// IgmpSn writes IgmpSnEnable=1 (multicast enhancement). false keeps
 	// the vendor's value (1 on both radios): never written as 0.
@@ -107,8 +105,8 @@ type RadioPlan struct {
 
 // structural is everything that needs the radio restarted: the BSS list
 // with names, security, keys and 802.11k/v/U-APSD, the channel, width,
-// power, DTIM, minimum RSSI, basic rates and IGMP snooping (profile() patches
-// the vendor baseline, read only when a radio's BSSes come up). Hidden,
+// power, DTIM, basic rates and IGMP snooping (profile() patches the vendor
+// baseline, read only when a radio's BSSes come up). Hidden,
 // Isolate and MaxSta are live.
 func (r RadioPlan) structural() string {
 	c := r

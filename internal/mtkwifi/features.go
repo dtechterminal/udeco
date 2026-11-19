@@ -14,10 +14,10 @@ import (
 //
 // Every one is written to the driver profile (profile()), so a change
 // restarts the radio: structural() keeps them. The drivers have them per
-// BSS (RRMEnable, WNMEnable, AssocReqRssiThres, APSDCapable on the MT7663)
-// or per radio only (DtimPeriod, BasicRate, IgmpSnEnable); a per-SSID
-// setting the driver has per radio is folded (DTIM: the lowest; minimum
-// rate: only when every SSID of the radio has one) with a note. What the
+// BSS (RRMEnable, WNMEnable, APSDCapable on the MT7663) or per radio only
+// (DtimPeriod, BasicRate, IgmpSnEnable); a per-SSID setting the driver has
+// per radio is folded (DTIM: the lowest; minimum rate: only when every SSID
+// of the radio has one, 2.4 GHz only) with a note. What the
 // controller asks for and this unit does not do is noted, never dropped
 // silently; an SSID whose safety depends on a missing feature (RADIUS MAC
 // authentication) is not served at all.
@@ -105,14 +105,12 @@ func radioFeatures(rp *RadioPlan, rd RadioDef, ri bcmwifi.Radio, served []bcmwif
 		note("%s: DTIM is one value per radio in this driver: %d for every SSID (asked: %v)", band, rp.DTIM, dtims)
 	}
 
-	// minimum RSSI: AssocReqRssiThres refuses associations below it (the
-	// driver takes -100..-1; 0 is off)
-	switch {
-	case ri.MinRSSI < 0 && ri.MinRSSI >= -100:
-		rp.MinRSSI = ri.MinRSSI
-		note("%s: minimum RSSI %d dBm refuses associations below it; associated stations are not disconnected", band, ri.MinRSSI)
-	case ri.MinRSSI != 0:
-		note("%s: minimum RSSI %d dBm is out of range (-100..-1): off", band, ri.MinRSSI)
+	// minimum RSSI: neither driver reads AssocReqRssiThres from the
+	// profile; in mt7603eap.ko and in the MT7663 kernel driver it is only
+	// an iwpriv set command (Set_AP_ASSOC_REQ_RSSI_THRESHOLD), so it waits
+	// for a live iwpriv path
+	if ri.MinRSSI != 0 {
+		note("%s: minimum RSSI %d dBm not applied (the driver takes it only through iwpriv, not from its profile)", band, ri.MinRSSI)
 	}
 
 	for _, b := range rp.BSS {
@@ -147,7 +145,10 @@ func radioFeatures(rp *RadioPlan, rd RadioDef, ri bcmwifi.Radio, served []bcmwif
 // has one BasicRate per radio and no supported-rates or beacon-rate
 // setting, so a minimum only changes which rates are basic. It is applied
 // only when every SSID of the radio has one: an SSID without a minimum
-// keeps the vendor's basic rates for the whole radio.
+// keeps the vendor's basic rates for the whole radio. Never on 5 GHz: both
+// drivers' UpdateBasicRateBitmap, for a channel above 14, clears the
+// 802.11b bits and ORs in 6, 12 and 24 Mb/s (0x150), so 6 Mb/s stays the
+// lowest basic rate whatever BasicRate says.
 func minRate(rp *RadioPlan, band string, served []bcmwifi.SSID, note func(string, ...any)) {
 	var without []string
 	var asked []int
@@ -173,11 +174,15 @@ func minRate(rp *RadioPlan, band string, served []bcmwifi.SSID, note func(string
 	if minK == 0 {
 		return
 	}
+	if band != "ng" {
+		note("%s: minimum data rate %s Mb/s not applied (the driver always keeps 6, 12 and 24 Mb/s as basic rates on 5 GHz)", band, mbps(minK))
+		return
+	}
 	if len(without) > 0 {
 		note("%s: the minimum data rate is per radio in this driver and SSID(s) %q have none: the vendor's basic rates are kept", band, without)
 		return
 	}
-	bm, low := basicRate(band, minK, noCCK)
+	bm, low := basicRate(minK, noCCK)
 	if bm == 0 {
 		note("%s: minimum data rate %s Mb/s: no rate of the band meets it: the vendor's basic rates are kept", band, mbps(minK))
 		return
@@ -200,25 +205,19 @@ var basicRateKbps = [12]int{1000, 2000, 5500, 11000, 6000, 9000, 12000, 18000, 2
 
 const cckBits = 0xf // 1, 2, 5.5, 11 Mb/s
 
-// defaultBasic are the basic rates kept at and above a minimum: the 2.4 GHz
-// vendor set (351) and 802.11a's mandatory 6, 12 and 24 Mb/s on 5 GHz (the
-// vendor's 5 GHz BasicRate=15 names only 802.11b rates, which that band
-// does not have).
-var defaultBasic = map[string]int{"ng": 351, "na": 1<<4 | 1<<6 | 1<<8}
+// defaultBasic are the 2.4 GHz basic rates kept at and above a minimum:
+// the vendor set (351).
+const defaultBasic = 351
 
-// basicRate is the BasicRate bitmap for a minimum of kbps on band: the
-// lowest rate of the band at or above kbps (low) plus the default basic
-// rates above it, without the 802.11b ones when noCCK. 0 when no rate meets
-// kbps. Basic rates are the ones every client must support: the result
-// never adds an 802.11b rate the vendor's set does not already require, and
-// adds at most one OFDM rate, which every 802.11g/n/ac client has.
-func basicRate(band string, kbps int, noCCK bool) (bitmap, low int) {
-	first := 0
-	if band == "na" {
-		first = 4 // OFDM only
-	}
+// basicRate is the 2.4 GHz BasicRate bitmap for a minimum of kbps: the
+// lowest rate at or above kbps (low) plus the default basic rates above it,
+// without the 802.11b ones when noCCK. 0 when no rate meets kbps. Basic
+// rates are the ones every client must support: the result never adds an
+// 802.11b rate the vendor's set does not already require, and adds at most
+// one OFDM rate, which every 802.11g/n client has.
+func basicRate(kbps int, noCCK bool) (bitmap, low int) {
 	lowBit := -1
-	for i := first; i < len(basicRateKbps); i++ {
+	for i := range basicRateKbps {
 		if r := basicRateKbps[i]; r >= kbps && (lowBit < 0 || r < basicRateKbps[lowBit]) {
 			lowBit = i
 		}
@@ -228,7 +227,7 @@ func basicRate(band string, kbps int, noCCK bool) (bitmap, low int) {
 	}
 	low = basicRateKbps[lowBit]
 	for i, r := range basicRateKbps {
-		if defaultBasic[band]&(1<<i) != 0 && r >= low {
+		if defaultBasic&(1<<i) != 0 && r >= low {
 			bitmap |= 1 << i
 		}
 	}
@@ -272,9 +271,6 @@ func profileFeatures(kv map[string]string, base []byte, rd RadioDef, rp RadioPla
 	if rd.UAPSD {
 		// per BSS on the MT7663 ("APSDCapable[%d]=%d"); the MT7603 has none
 		kv["APSDCapable"] = listKey(base, "APSDCapable", n, apsd, "0")
-	}
-	if rp.MinRSSI < 0 {
-		kv["AssocReqRssiThres"] = listKey(nil, "AssocReqRssiThres", n, nil, strconv.Itoa(rp.MinRSSI))
 	}
 	if rp.DTIM > 0 {
 		kv["DtimPeriod"] = strconv.Itoa(rp.DTIM)

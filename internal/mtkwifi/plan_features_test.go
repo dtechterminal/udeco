@@ -3,6 +3,7 @@
 package mtkwifi
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -167,25 +168,25 @@ func TestRRMAndWNM(t *testing.T) {
 	wantKeys(t, "ng off", profile(baseNG(), JCOW414[0], ps["ng"]), map[string]string{"RRMEnable": "0;0;0;0", "WNMEnable": "0;0;1;1"})
 }
 
-// TestMinRSSI: the radio's minimum RSSI is AssocReqRssiThres on every BSS;
-// off, the key is not written; out of range, noted and off.
+// TestMinRSSI: neither driver reads AssocReqRssiThres from the profile
+// (in mt7603eap.ko and the MT7663 kernel driver it is only an entry of the
+// iwpriv set table, Set_AP_ASSOC_REQ_RSSI_THRESHOLD; the profile parsers
+// never reference the string), so writing it would change nothing but
+// restart the radio. The minimum RSSI is noted as not applied, the key is
+// never written and the plan does not change with it.
 func TestMinRSSI(t *testing.T) {
 	d := twoSSIDs()
-	d.Radios["ng"] = bcmwifi.Radio{Enabled: true, Channel: 6, Width: 20, MinRSSI: -75}
-	ps, notes := plans(d, JCOW414, false)
-	if ps["ng"].MinRSSI != -75 || ps["na"].MinRSSI != 0 {
-		t.Errorf("MinRSSI ng %d na %d", ps["ng"].MinRSSI, ps["na"].MinRSSI)
-	}
-	wantKeys(t, "ng", profile(baseNG(), JCOW414[0], ps["ng"]), map[string]string{"AssocReqRssiThres": "-75;-75;-75;-75"})
-	wantKeys(t, "na", profile(baseNA(), JCOW414[1], ps["na"]), map[string]string{"AssocReqRssiThres": ""})
-	if !strings.Contains(joined(notes), "ng: minimum RSSI -75 dBm refuses associations below it") {
-		t.Errorf("notes %q", notes)
-	}
-	for _, bad := range []int{-101, 5} {
-		d.Radios["ng"] = bcmwifi.Radio{Enabled: true, Channel: 6, Width: 20, MinRSSI: bad}
-		ps, notes = plans(d, JCOW414, false)
-		if ps["ng"].MinRSSI != 0 || !strings.Contains(joined(notes), "is out of range (-100..-1): off") {
-			t.Errorf("MinRSSI %d: plan %d notes %q", bad, ps["ng"].MinRSSI, notes)
+	ps0, _ := plans(d, JCOW414, false)
+	for _, v := range []int{-75, -101, 5} {
+		d.Radios["ng"] = bcmwifi.Radio{Enabled: true, Channel: 6, Width: 20, MinRSSI: v}
+		ps, notes := plans(d, JCOW414, false)
+		if ps["ng"].hash() != ps0["ng"].hash() {
+			t.Errorf("MinRSSI %d changes the plan (a radio restart for nothing)", v)
+		}
+		wantKeys(t, "ng", profile(baseNG(), JCOW414[0], ps["ng"]), map[string]string{"AssocReqRssiThres": ""})
+		if j := joined(notes); !strings.Contains(j, fmt.Sprintf("ng: minimum RSSI %d dBm not applied", v)) ||
+			strings.Contains(j, "refuses associations") {
+			t.Errorf("MinRSSI %d: notes %q", v, notes)
 		}
 	}
 }
@@ -246,12 +247,8 @@ func TestBasicRateBitmap(t *testing.T) {
 		{"ng", 18000, false, 384, 18000},
 		{"ng", 54000, false, 2048, 54000},
 		{"ng", 55000, false, 0, 0},
-		{"na", 6000, false, 336, 6000},
-		{"na", 1000, false, 336, 6000}, // no 802.11b rates on 5 GHz
-		{"na", 24000, false, 256, 24000},
-		{"na", 36000, false, 512, 36000},
 	} {
-		bm, low := basicRate(c.band, c.kbps, c.noCCK)
+		bm, low := basicRate(c.kbps, c.noCCK)
 		if bm != c.bitmap || low != c.lowKb {
 			t.Errorf("basicRate(%s, %d, %t) = %d, %d; want %d, %d", c.band, c.kbps, c.noCCK, bm, low, c.bitmap, c.lowKb)
 		}
@@ -262,12 +259,16 @@ func TestBasicRateBitmap(t *testing.T) {
 }
 
 // TestMinRate: BasicRate only when every SSID of the radio has a minimum
-// (the lowest of them); otherwise the vendor's value stays.
+// (the lowest of them); otherwise the vendor's value stays. 5 GHz never:
+// both drivers' UpdateBasicRateBitmap clears the 802.11b bits and ORs in
+// 0x150 (6, 12 and 24 Mb/s) whenever the channel is above 14, so no
+// BasicRate can raise the lowest basic rate there.
 func TestMinRate(t *testing.T) {
 	d := twoSSIDs()
 	ps, _ := plans(d, JCOW414, false)
 	wantKeys(t, "no minimum", profile(baseNG(), JCOW414[0], ps["ng"]), map[string]string{"BasicRate": "351"})
 	wantKeys(t, "no minimum", profile(baseNA(), JCOW414[1], ps["na"]), map[string]string{"BasicRate": "15"})
+	na0 := ps["na"]
 
 	// one SSID of two with a minimum: per radio, so the vendor's is kept
 	d.SSIDs[0].MinRateKbps = map[string]int{"ng": 12000, "na": 24000}
@@ -276,13 +277,15 @@ func TestMinRate(t *testing.T) {
 	if ps["ng"].BasicRate != 0 {
 		t.Errorf("ng BasicRate %d with an SSID without a minimum", ps["ng"].BasicRate)
 	}
-	if ps["na"].BasicRate != 256 {
-		t.Errorf("na BasicRate %d", ps["na"].BasicRate)
+	// 5 GHz: noted, the vendor's BasicRate kept, no radio restart
+	if ps["na"].BasicRate != 0 || ps["na"].hash() != na0.hash() {
+		t.Errorf("na BasicRate %d (plan changed: %t)", ps["na"].BasicRate, ps["na"].hash() != na0.hash())
 	}
-	wantKeys(t, "na", profile(baseNA(), JCOW414[1], ps["na"]), map[string]string{"BasicRate": "256"})
+	wantKeys(t, "na", profile(baseNA(), JCOW414[1], ps["na"]), map[string]string{"BasicRate": "15"})
 	j := joined(notes)
 	if !strings.Contains(j, `ng: the minimum data rate is per radio in this driver and SSID(s) ["iot"] have none`) ||
-		!strings.Contains(j, "na: minimum data rate 24 Mb/s is applied as the lowest basic rate (BasicRate=256)") ||
+		!strings.Contains(j, "na: minimum data rate 24 Mb/s not applied") ||
+		strings.Contains(j, "na: minimum data rate 24 Mb/s is applied") ||
 		strings.Contains(j, "beacon rate") {
 		t.Errorf("notes %q", notes)
 	}
@@ -302,10 +305,11 @@ func TestMinRate(t *testing.T) {
 	}
 
 	// no rate meets it
-	d.SSIDs[0].MinRateKbps["na"] = 60000
+	d.SSIDs[0].MinRateKbps["ng"] = 60000
+	d.SSIDs[1].MinRateKbps["2g"] = 60000
 	ps, notes = plans(d, JCOW414, false)
-	if ps["na"].BasicRate != 0 || !strings.Contains(joined(notes), "na: minimum data rate 60 Mb/s: no rate of the band meets it") {
-		t.Errorf("na %d notes %q", ps["na"].BasicRate, notes)
+	if ps["ng"].BasicRate != 0 || !strings.Contains(joined(notes), "ng: minimum data rate 60 Mb/s: no rate of the band meets it") {
+		t.Errorf("ng %d notes %q", ps["ng"].BasicRate, notes)
 	}
 }
 
@@ -347,7 +351,6 @@ func TestFeaturesStructural(t *testing.T) {
 		"BTM":       func(r *RadioPlan) { r.BSS[0].BTM = !r.BSS[0].BTM },
 		"UAPSD":     func(r *RadioPlan) { r.BSS[0].UAPSD = !r.BSS[0].UAPSD },
 		"DTIM":      func(r *RadioPlan) { r.DTIM = 3 },
-		"MinRSSI":   func(r *RadioPlan) { r.MinRSSI = -80 },
 		"BasicRate": func(r *RadioPlan) { r.BasicRate = 344 },
 		"IgmpSn":    func(r *RadioPlan) { r.IgmpSn = true },
 	}
@@ -371,11 +374,11 @@ func TestFeaturesStructural(t *testing.T) {
 // settings (no spurious plan difference).
 func TestFeaturesRadioOff(t *testing.T) {
 	d := twoSSIDs()
-	d.Radios["na"] = bcmwifi.Radio{Enabled: false, MinRSSI: -70}
+	d.Radios["na"] = bcmwifi.Radio{Enabled: false}
 	d.SSIDs[0].DTIM = map[string]int{"na": 3}
 	d.SSIDs[0].MulticastToUnicast = true
 	ps, _ := plans(d, JCOW414, false)
-	if na := ps["na"]; na.On || na.DTIM != 0 || na.MinRSSI != 0 || na.IgmpSn || na.BasicRate != 0 || len(na.BSS) != 0 {
+	if na := ps["na"]; na.On || na.DTIM != 0 || na.IgmpSn || na.BasicRate != 0 || len(na.BSS) != 0 {
 		t.Errorf("na off: %+v", na)
 	}
 }
