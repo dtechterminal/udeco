@@ -4,9 +4,12 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -271,5 +274,65 @@ func TestPortFieldsMACs(t *testing.T) {
 	}
 	if f["if_table"].([]map[string]any)[0]["num_port"] != jioports.NumPorts || f["lldp_table"].([]map[string]any)[0]["local_port_idx"] != jioports.UplinkIdx {
 		t.Errorf("if_table %v lldp %v", f["if_table"], f["lldp_table"])
+	}
+}
+
+// TestPortFieldsVLANMACs: with port 1 on native VLAN 4 its device eth0.1.1
+// is in br-v4, not in the LAN bridge, so its clients come from br-v4's FDB
+// (on 2026-11-20 the tenants showed under the gateway's port, not the AP).
+func TestPortFieldsVLANMACs(t *testing.T) {
+	root := t.TempDir()
+	put := func(p string, b []byte) {
+		t.Helper()
+		full := filepath.Join(root, p)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rec := func(mac string, port int, local bool, ticks uint32) []byte {
+		r := make([]byte, 16)
+		hw, _ := net.ParseMAC(mac)
+		copy(r, hw)
+		r[6] = byte(port)
+		if local {
+			r[7] = 1
+		}
+		binary.LittleEndian.PutUint32(r[8:12], ticks)
+		return r
+	}
+	var fdb []byte
+	fdb = append(fdb, rec("0a:5e:a5:03:4f:21", 1, false, 300)...) // phone behind the tenant's AP
+	fdb = append(fdb, rec("54:af:97:74:f4:37", 1, false, 100)...) // the tenant's AP
+	fdb = append(fdb, rec("1c:6a:1b:c5:04:c1", 2, false, 0)...)   // gateway, via eth0.4.4
+	fdb = append(fdb, rec("b6:a0:c6:17:e3:f2", 1, true, 0)...)    // eth0.1.1's own
+	put("/sys/class/net/br-v4/brforward", fdb)
+	put("/sys/class/net/br-v4/brif/eth0.1.1", nil)
+	put("/sys/class/net/br-v4/brif/eth0.4.4", nil)
+	put("/sys/class/net/eth0.1.1/brport/port_no", []byte("0x1\n"))
+
+	a := &agent{cfg: &Config{Platform: PlatformJio, Model: "UHDIW"}, o: options{root: root}}
+	s := &apstate.Snapshot{MAC: "b4:a7:c6:17:e3:f3",
+		Ports: []apstate.Port{{Name: "eth0.1.1", Up: true}, {Name: "eth0.2.1", Up: true, BridgePort: 2},
+			{Name: "eth0.4.1", Up: true, BridgePort: 4}},
+		FDB: []apstate.FDBEntry{{MAC: "aa:bb:cc:dd:ee:02", Port: 2, Age: 1}}}
+	f := map[string]any{}
+	a.portFields(f, s)
+	rows := f["port_table"].([]map[string]any)
+	got := map[string]any{}
+	for _, r := range rows[0]["mac_table"].([]map[string]any) {
+		got[r["mac"].(string)] = r["vlan"]
+	}
+	want := map[string]any{"0a:5e:a5:03:4f:21": 4, "54:af:97:74:f4:37": 4}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("port 1 mac_table %v, want %v", rows[0]["mac_table"], want)
+	}
+	if m := rows[1]["mac_table"].([]map[string]any); len(m) != 1 || m[0]["vlan"] != 1 {
+		t.Errorf("port 2 mac_table %v", m)
+	}
+	if m := rows[2]["mac_table"].([]map[string]any); len(m) != 0 {
+		t.Errorf("port 3 mac_table %v", m)
 	}
 }

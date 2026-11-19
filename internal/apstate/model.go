@@ -3,6 +3,8 @@
 package apstate
 
 import (
+	"encoding/binary"
+	"net"
 	"time"
 )
 
@@ -109,4 +111,24 @@ type Port struct {
 	RxDropped, TxDropped int64
 	RxMulticast          int64
 	BridgePort           int // port number in br-lan, 0 = not a br-lan member
+}
+
+// fdbRecordSize is sizeof(struct __fdb_entry): mac[6], port_no u8,
+// is_local u8, ageing_timer_value u32 (USER_HZ ticks, host order:
+// little-endian on the ARM Decos and the mipsle JCOW414), port_hi u8, pad[3].
+const fdbRecordSize = 16
+
+// ParseBrforward decodes the binary /sys/class/net/<br>/brforward.
+func ParseBrforward(b []byte) []FDBEntry {
+	var out []FDBEntry
+	for off := 0; off+fdbRecordSize <= len(b); off += fdbRecordSize {
+		r := b[off : off+fdbRecordSize]
+		out = append(out, FDBEntry{
+			MAC:   net.HardwareAddr(r[0:6]).String(),
+			Port:  int(r[12])<<8 | int(r[6]),
+			Local: r[7] != 0,
+			Age:   int64(binary.LittleEndian.Uint32(r[8:12])) / 100,
+		})
+	}
+	return out
 }
