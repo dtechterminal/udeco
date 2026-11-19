@@ -67,11 +67,13 @@ func normClientRates(in map[string]RateLimit) map[string]RateLimit {
 // in line at once. It returns the number of stations whose limit was added,
 // changed or removed (their flows are flushed). When the agent does not own
 // Wi-Fi the list is only stored and every tree is removed, as SyncRateLimits
-// does.
+// does. The list is taken even when RunDir cannot be written (only logged):
+// Tick, which retries a failed sync, shapes from it.
 func (a *Applier) SetClientRates(ctx context.Context, rates map[string]RateLimit) (int, error) {
 	m := normClientRates(rates)
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.clientRates = m
 	if a.o.DryRun {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -82,10 +84,11 @@ func (a *Applier) SetClientRates(ctx context.Context, rates map[string]RateLimit
 	} else {
 		b, _ := json.MarshalIndent(m, "", " ")
 		if err := writeFileAtomic(a.fsPath(a.clientRatesPath()), b, 0o644); err != nil {
-			return 0, err
+			// an agent restart before the startup hand-over shapes from
+			// the old file until then
+			a.o.Logf("bcmwifi: per-client limits: keeping them in %s: %v", a.clientRatesPath(), err)
 		}
 	}
-	a.clientRates = m
 	d := a.current()
 	if d == nil {
 		return a.syncShaping(ctx, nil)

@@ -92,6 +92,8 @@ capability words. Nothing new is advertised.
   restarts and unit reboots; startup hands it over). bcmwifi also keeps it in
   `RunDir/client-rates.json` (ramfs), so an agent restart's first Tick, which
   runs before the startup jobs, does not tear down the per-client classes.
+  A failed write there is only logged: the new list is still the one shaped,
+  now and by every later Tick.
 - When the agent does not own Wi-Fi (before the first apply, after a
   hand-back), the list is only stored, as with the SSID-wide limits.
 - Cost: only vifs with a limited station carry a tree. While the list is

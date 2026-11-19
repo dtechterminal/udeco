@@ -4,6 +4,8 @@ package bcmwifi
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -251,5 +253,36 @@ func TestClientRatesUnreadableVifKept(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(f.tc["ifb1"], "\n"), "htb 1:") {
 		t.Error("upload tree of the unreadable vif removed")
+	}
+}
+
+// A list that cannot be kept in RunDir is still the one shaped, now and at
+// every Tick (the agent's log says a failure is retried at the next tick).
+func TestClientRatesRunDirUnwritable(t *testing.T) {
+	ctx := context.Background()
+	f := newFakeDev(t)
+	a := newTestApplier(f, false)
+	d := twoSSIDs()
+	applyOK(t, a, d)
+	main5 := vifOf(t, a, d, "a-main", "na")
+	f.state[main5+" assoclist"] = "assoclist " + strings.ToUpper(sta1)
+	// a directory where the file goes: the rename onto it fails
+	if err := os.MkdirAll(filepath.Join(a.fsPath(a.clientRatesPath()), "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f.tcCalls = nil
+	if n, err := a.SetClientRates(ctx, map[string]RateLimit{sta1: {DownKbps: 3000}}); n != 1 || err != nil {
+		t.Fatalf("SetClientRates = %d, %v", n, err)
+	}
+	if !f.tcCalled("class add dev " + main5 + " parent 1: classid 1:10 htb rate 3000kbit ceil 3000kbit") {
+		t.Errorf("limit not shaped: %v", f.tcCalls)
+	}
+	// Tick keeps it (it does not fall back to the list it had)
+	f.tcCalls = nil
+	if r, err := a.Tick(ctx); err != nil || r.RateLimitChanges != 0 {
+		t.Fatalf("Tick %+v %v", r, err)
+	}
+	if !strings.Contains(strings.Join(f.tc[main5], "\n"), "htb 1:") {
+		t.Error("Tick removed the per-client limit")
 	}
 }
