@@ -51,7 +51,23 @@ type State struct {
 	// so the naming may only change when the controller forgets the device
 	// (cmd/udeco-ap radionames.go).
 	RadioNames string `json:"radio_names,omitempty"`
+	// ClientRates: per-client speed limits from the controller's
+	// rate-update cmd (client MAC -> limits), kept until a rate-update
+	// clears them.
+	ClientRates map[string]ClientRate `json:"client_rates,omitempty"`
 }
+
+// ClientRate is one client's speed limit (cmd rate-update) in kbit/s; 0 =
+// not limited that way. Set is when it was last set (unix s).
+type ClientRate struct {
+	DownKbps int   `json:"down,omitempty"`
+	UpKbps   int   `json:"up,omitempty"`
+	Set      int64 `json:"set,omitempty"`
+}
+
+// MaxClientRates bounds State.ClientRates: the controller never says when a
+// forgotten client's limit is gone, so the oldest entry makes room.
+const MaxClientRates = 512
 
 func NewState(informURL string) State {
 	return State{Key: inform.DefaultKeyHex, CfgVersion: "0", InformURL: informURL, Version: inform.U7PG2Version}
@@ -263,6 +279,12 @@ type Reply struct {
 	End        int64   `json:"end"`         // authorize-guest: end time (unix s), if sent
 	ScanBand   *IntArg `json:"scan-band"`   // cmd quick-scan: 0 = 2.4 GHz, 1 = 5 GHz, 2 = 6 GHz
 	ScanBW     *IntArg `json:"scan-bw"`     // cmd quick-scan: channel width in MHz
+	// cmd rate-update: the client's limits in kbit/s, -1 = none that way
+	// (the _min ones, always 64, are read and not used)
+	DLMax *IntArg `json:"dl_max"`
+	ULMax *IntArg `json:"ul_max"`
+	DLMin *IntArg `json:"dl_min"`
+	ULMin *IntArg `json:"ul_min"`
 }
 
 // IntArg is a reply argument sent as a JSON number or as a numeric string.
@@ -288,6 +310,9 @@ var QuickScanBands = map[int]string{0: "ng", 1: "na", 2: "6e"}
 func init() {
 	// read by the quick-scan cmd below (replyFields lives in unhandled.go)
 	replyFields["scan-band"], replyFields["scan-bw"] = true, true
+	for _, k := range []string{"dl_max", "ul_max", "dl_min", "ul_min"} {
+		replyFields[k] = true // cmd rate-update
+	}
 }
 
 // Outcome tells the loop what happened and what to do next.
@@ -299,7 +324,7 @@ type Outcome struct {
 	Reset      bool          // controller sent setdefault (device was removed)
 	SystemCfg  bool          // a setparam carried a system_cfg (saved as system_cfg.txt)
 	CfgVersion string        // the cfgversion the reply carried ("" = none)
-	Actions    []string      // for a real AP: "reboot", "led:on", "led:off", "locate:on", "locate:off", "kick:<mac>", "block", "unblock:<mac>", "scan", "spectrum-scan", "quick-scan:<band>:<bw>", "guest-auth:<mac>", "guest-unauth:<mac>"
+	Actions    []string      // for a real AP: "reboot", "led:on", "led:off", "locate:on", "locate:off", "kick:<mac>", "block", "unblock:<mac>", "scan", "spectrum-scan", "quick-scan:<band>:<bw>", "guest-auth:<mac>", "guest-unauth:<mac>", "rate-update:<mac>"
 }
 
 // Handle applies a decoded reply to the session.
@@ -658,10 +683,69 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 		o.Immediate = true
 		o.Actions = append(o.Actions, fmt.Sprintf("quick-scan:%s:%d", band, bw))
 		o.Events = append(o.Events, fmt.Sprintf("cmd quick-scan band=%s bw=%d", band, bw))
+	case "rate-update":
+		x.rateUpdate(r, js, now, o)
 	default:
 		o.Events = append(o.Events, fmt.Sprintf("cmd %q: ignored", r.Cmd))
 		x.note("cmd", r.Cmd, redactReply(js), now, o)
 	}
+}
+
+// rateUpdate records the controller's per-client speed limit (cmd
+// rate-update: mac, dl_max, ul_max in kbit/s, -1 = no limit; sent when a
+// client of a non-default user group shows up on the AP, and when its
+// group or the group's limits change). Both -1 removes the client's entry.
+// The "rate-update:<mac>" action asks the AP to apply the whole list.
+func (x *Session) rateUpdate(r Reply, js []byte, now time.Time, o *Outcome) {
+	m := ParseMACs(r.MAC)
+	if len(m) != 1 {
+		o.Events = append(o.Events, fmt.Sprintf("cmd rate-update: bad mac %q: ignored", r.MAC))
+		return
+	}
+	if r.DLMax == nil && r.ULMax == nil {
+		o.Events = append(o.Events, "cmd rate-update without dl_max/ul_max: ignored")
+		x.note("cmd", r.Cmd, redactReply(js), now, o)
+		return
+	}
+	lim := func(v *IntArg) int {
+		if v == nil || *v <= 0 {
+			return 0
+		}
+		return int(*v)
+	}
+	mac, down, up := m[0], lim(r.DLMax), lim(r.ULMax)
+	old, had := x.S.ClientRates[mac]
+	switch {
+	case down == 0 && up == 0:
+		if had {
+			delete(x.S.ClientRates, mac)
+			o.Changed = true
+		}
+	case !had || old.DownKbps != down || old.UpKbps != up:
+		if x.S.ClientRates == nil {
+			x.S.ClientRates = map[string]ClientRate{}
+		}
+		if !had && len(x.S.ClientRates) >= MaxClientRates {
+			oldest := ""
+			for k, v := range x.S.ClientRates {
+				if oldest == "" || v.Set < x.S.ClientRates[oldest].Set || v.Set == x.S.ClientRates[oldest].Set && k < oldest {
+					oldest = k
+				}
+			}
+			delete(x.S.ClientRates, oldest)
+			o.Events = append(o.Events, fmt.Sprintf("cmd rate-update: more than %d client limits, %s's dropped", MaxClientRates, oldest))
+		}
+		x.S.ClientRates[mac] = ClientRate{DownKbps: down, UpKbps: up, Set: now.Unix()}
+		o.Changed = true
+	}
+	kb := func(n int) string {
+		if n == 0 {
+			return "none"
+		}
+		return strconv.Itoa(n) + "kbit"
+	}
+	o.Actions = append(o.Actions, "rate-update:"+mac)
+	o.Events = append(o.Events, fmt.Sprintf("cmd rate-update %s down=%s up=%s", mac, kb(down), kb(up)))
 }
 
 // MaskHex hides 32-hex keys in a string (for logging raw replies).

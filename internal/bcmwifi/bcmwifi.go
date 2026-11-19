@@ -153,6 +153,8 @@ type Applier struct {
 	now     func() time.Time
 	ftPeers []ftpeer.Peer           // other units' FT key holders (SetFTPeers)
 	ftLive  map[string]*ftLiveState // primary -> entries added to its running hostapd (ftpeers.go)
+	// clientRates: per-client limits (clientrate.go); nil = not loaded yet
+	clientRates map[string]RateLimit
 
 	sleep func(time.Duration)
 	poll  time.Duration

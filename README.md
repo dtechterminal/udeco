@@ -95,7 +95,7 @@ Status key:
 | Reconnect, block, unblock | Verified | |
 | Locate, LED on/off | Verified | UniFi's LED colour can't be carried. |
 | SSID and user-group speed limits | Built | |
-| Per-client speed limits | Not yet | UniFi sends these as a separate `rate-update` command, which the agent ignores. |
+| Per-client speed limits | Built | UniFi's `rate-update` command (a client's own user group). The limit is kept across restarts and applied on whichever SSID of the unit the client joins. Not on the JioFiber Garage AP. |
 | Lock client to AP | Not yet | |
 
 ### Guest networks
