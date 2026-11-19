@@ -1,4 +1,147 @@
-# unifi-openwrt: OpenWrt access points as UniFi access points
+# udeco: TP-Link Deco X20 as a UniFi U6-Lite
+
+This repo is a fork of [unifi-openwrt](#upstream-unifi-openwrt) (below). It adds
+`udeco-ap`, an agent that runs **on** each TP-Link Deco X20 unit. The agent takes
+the unit's Wi-Fi over from TP-Link's firmware, and a UniFi Network controller
+adopts the unit as a **U6-Lite** (`UAL6`). From then on the controller configures
+it and shows its clients and stats, the same as for a real UniFi AP.
+
+> **Tested setup.** Three Deco X20 V2 units on wired backhaul (TP-Link firmware
+> 1.3.0 Build 20250912, kernel 4.1, Broadcom `wl`, hostapd 2.9). They are
+> adopted into UniFi Network 11.1.50 on a UCG. Both the mesh master and the
+> satellites work. Parity as of 19 Nov 2026. Other Deco models and firmware
+> are untested.
+
+## Feature parity with a U6-Lite
+
+Status key:
+
+- **Verified:** working on the Decos with the controller.
+- **Built:** written and unit-tested, with the device commands confirmed on a unit, but not yet proven end to end.
+- **Partial:** works, with the gap named.
+- **Not yet:** possible, not built.
+- **Not possible:** this hardware, driver or hostapd build can't do it.
+
+### Hardware
+
+| | Real U6-Lite | Deco X20 V2 |
+|---|---|---|
+| Wi-Fi | Wi-Fi 6, dual band | Wi-Fi 6, dual band (clients negotiate HE) |
+| Streams | 2×2 on each band | 2×2 on each band |
+| Widest channel | 80 MHz on 5 GHz | 80 MHz on 5 GHz, 40 MHz on 2.4 GHz |
+| Transmit power | 20 dBm on 2.4 GHz, 25 dBm on 5 GHz | 24 dBm target on 2.4 GHz, 23.5 dBm target on 5 GHz |
+| 5 GHz channels | All channels for the country, DFS included | 36–48 and 149–165 (DFS not used, see below) |
+| SSIDs per band | 8 | 5 (one driver slot is hostapd's hidden anchor) |
+| Ethernet | 1 × GbE | 2 × GbE |
+| Power | PoE | DC adapter |
+| LED | White/blue ring | Green, red and a cyan blink (TP-Link's LED daemon) |
+
+### Management
+
+| Feature | Deco | Notes |
+|---|---|---|
+| Adopt, provision, Forget, re-adopt | Verified | Adopted over SSH. Config sync uses the cfgversion handshake. A forgotten unit was re-adopted without a Wi-Fi restart. |
+| Live 1-second stats | Verified | Follows the controller's 1 s / 10 s inform interval. |
+| Restart from UniFi | Verified | Each unit is back on UniFi about 3 minutes after the reboot. It runs stock TP-Link Wi-Fi until the agent's boot gate opens (at least 120 s). |
+| Firmware upgrade | Not possible | By design: upgrade offers are answered and ignored, and Ubiquiti firmware is never flashed. |
+| Topology (LLDP) | Verified | UniFi shows the parent switch port. The agent also hears the gateway's LLDP. |
+| Device SSH keys and site logins | Verified | Site SSH keys pushed from UniFi let the site user log in; root login stays key-only. |
+| Encrypted remote syslog | Verified | Uses the controller's AES-GCM syslog format. |
+| SNMP, mDNS bridge | Built | |
+
+### SSIDs and security
+
+| Feature | Deco | Notes |
+|---|---|---|
+| Open, WPA2-Personal | Verified | PMF optional or required. |
+| WPA2/WPA3 transition, WPA3 (SAE) | Partial | Served. SAE has not been confirmed live with a WPA3-only client. |
+| Hidden SSID, enable/disable | Verified | |
+| VLAN per SSID | Verified | One bridge per VLAN on the uplink. |
+| MAC allow/deny lists | Verified | Uses the driver's macmode together with hostapd's ACL. |
+| WLAN schedules | Verified | An SSID goes off within seconds of its off-window starting. |
+| WPA2/WPA3 Enterprise, RADIUS MAC auth, private PSK, Hotspot 2.0 | Built | Not tested against a real RADIUS server. An SSID whose server is unusable is refused, never brought up open. |
+| Enhanced Open (OWE) | Not possible | This hostapd build has no OWE. Such an SSID is refused. |
+| RADIUS-assigned VLANs | Not possible | No dynamic VLAN support in this hostapd. |
+
+### Roaming and client tuning
+
+| Feature | Deco | Notes |
+|---|---|---|
+| 802.11k, 802.11v | Verified | |
+| 802.11r (FT-PSK, FT-SAE) | Built | Live on every SSID. The units exchange FT key holders over signed announcements on the LAN. A client doing a fast transition has not been observed yet. |
+| Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | |
+| Band steering, minimum RSSI, max clients | Built | Band steering uses 802.11v nudges. |
+| Minimum data rates | Not yet | Off. `wl rateset` needs the whole radio down; the step will be moved inside a radio down/up. |
+
+### Radios and RF
+
+| Feature | Deco | Notes |
+|---|---|---|
+| Channel, width, transmit power | Verified | Includes 80 MHz on 5 GHz. |
+| Country | Partial | The driver's India table (IN/0) has no 80 MHz channel. Stock TP-Link firmware runs these units as US/0, so the agent's `driver_country` setting does the same. |
+| Power presets (low/medium/high) | Built | |
+| Neighbour and rogue-AP list | Verified | Refreshed every minute with a passive listen on the AP's own channel. A full scan from UniFi adds the other channels. |
+| Spectrum scan | Partial | 2.4 GHz is complete; 5 GHz has 36–48 only. Channels 149–165 and DFS are missing because of our scan code, not the radio. |
+| DFS channels | Not yet | The agent has no radar or CAC handling yet, so it stays on 36–48 and 149–165. |
+| 160 MHz | n/a | A U6-Lite has none either. |
+
+### Clients
+
+| Feature | Deco | Notes |
+|---|---|---|
+| Client list with signal, rates, traffic, Wi-Fi generation | Verified | Only stations the driver reports as associated are listed. The driver keeps leftover records of departed clients, and reporting those made clients flap between APs. |
+| Connect, leave and roam events | Partial | `STA_ASSOC_TRACKER` association and leave events are sent, so a departed client leaves UniFi at once (not after about 5 minutes). The success and failure connection-timing events are not sent. |
+| Reconnect, block, unblock | Verified | |
+| Locate, LED on/off | Verified | UniFi's LED colour can't be carried. |
+| SSID and user-group speed limits | Built | |
+| Per-client speed limits | Not yet | UniFi sends these as a separate `rate-update` command, which the agent ignores. |
+| Lock client to AP | Not yet | |
+
+### Guest networks
+
+| Feature | Deco | Notes |
+|---|---|---|
+| Guest-to-LAN blocking | Built | ebtables allows only the gateway, DHCP and DNS. |
+| Guest isolation across APs, gateway-hosted guest portal | Not yet verified | |
+| Captive-portal redirect on the AP | Not possible | ebtables here has no redirect or DNAT target. |
+
+### Stats and uplink
+
+| Feature | Deco | Notes |
+|---|---|---|
+| Channel utilisation, CPU, memory, uptime, load | Verified | |
+| Wi-Fi Experience (AP and client) | Verified | |
+| Uplink traffic | Verified | With a UniFi gateway, the controller credits the AP with its clients' traffic. |
+| Wired uplink | Verified | |
+| Wireless mesh uplink | Not planned | TP-Link's mesh is switched off at takeover; all units are wired. |
+
+### What the Deco side adds
+
+- **TP-Link services stopped:** the agent stops the TP-Link services that would undo its config: mesh controller, auto channel, cloud, app server and Wi-Fi triggers. Kept on purpose: procd, netifd, crond, dropbear, LEDs, `eapd`, `apsd`, and the idle backhaul supplicant on satellites.
+- **No internet for the unit itself:** an egress firewall blocks the unit's own traffic to the internet; the controller stays reachable.
+- **Rollback:** a failed apply hands Wi-Fi back to TP-Link with every SSID and client restored, then drops to observe mode.
+- **Persistence:** the agent and its config live on flash in `/tp_data/udeco` and are started from the unit's existing cron hook ([packaging/deco](packaging/deco/README.md)). Undo it by deleting `start.sh` and rebooting.
+
+### Running it
+
+The agent needs root SSH on each unit; how to get that is out of scope here.
+Build it with:
+
+```sh
+GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o udeco-ap ./cmd/udeco-ap
+```
+
+Install it as described in [packaging/deco](packaging/deco/README.md). The
+design, the device findings and the interference audit are in
+[docs/deco/](docs/deco/). The older off-device approach (`cmd/udeco`, TP-Link's
+app protocol from one container) is described in
+[docs/deco/README.md](docs/deco/README.md).
+
+---
+
+# Upstream: unifi-openwrt
+
+The rest of this README is the upstream project's: OpenWrt access points as UniFi access points.
 
 Keep your old **OpenWrt** access point useful in a **UniFi** network, long after its maker stopped
 supporting it. A small daemon on the AP speaks the UniFi inform protocol, so a UniFi controller adopts
@@ -211,6 +354,8 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags='-s -w' 
 | Path | What |
 |---|---|
 | `cmd/uow` | the daemon |
+| `cmd/udeco-ap`, `internal/bcmwifi`, `internal/wl`, `internal/decosys` | the Deco X20 agent: controller side, Broadcom Wi-Fi backend, `wl` reader, TP-Link service control |
+| `packaging/deco` | persistent install on a Deco |
 | `cmd/owprobe`, `cmd/owplan`, `cmd/owctl` | development helpers: print the inform fields for an AP over SSH, print the UCI plan for a saved system_cfg, run one AP action |
 | `internal/` | protocol (`inform`, `device`), OpenWrt side (`openwrt`), settings translation (`translate`), model catalogue (`models`), read-only UniFi API client (`unifiapi`) |
 | `packaging/` | files installed on the AP, `install.sh`, the OpenWrt package Makefile |
