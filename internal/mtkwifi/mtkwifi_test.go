@@ -278,7 +278,11 @@ func (f *fakeDev) Run(_ context.Context, name string, args ...string) ([]byte, e
 	case "ip":
 		switch {
 		case args[0] == "link" && args[1] == "add":
-			f.mkdev(args[4], 0)
+			for i, a := range args[:len(args)-1] { // ip link add link <parent> name <dev> ...
+				if a == "name" {
+					f.mkdev(args[i+1], 0)
+				}
+			}
 		case args[0] == "link" && args[1] == "set":
 			f.setUp(args[2], args[3] == "up")
 		case args[0] == "link" && args[1] == "del":

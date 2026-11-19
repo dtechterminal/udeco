@@ -55,6 +55,9 @@ type Applier struct {
 	// lock2ap deny entries on every other AP) folded with the block list.
 	desired bcmwifi.Desired     // the last Desired planned (its MAC filters)
 	acl     map[string]ifaceACL // by BSS netdev: what was last written
+	// portVLANs: the VLAN bridges the LAN ports use (internal/jioports,
+	// SetPortVLANs); cleanVLANs keeps them
+	portVLANs map[int]bool
 }
 
 const (
@@ -402,9 +405,12 @@ func (a *Applier) ensureVLAN(ctx context.Context, vid int) (string, error) {
 
 var vlanBr = regexp.MustCompile(`^br-v([0-9]+)$`)
 
-// cleanVLANs removes the agent's VLAN bridges no BSS uses any more.
+// cleanVLANs removes the agent's VLAN bridges neither a BSS nor a LAN port
+// (SetPortVLANs) uses any more. A LAN port's device still in a bridge being
+// removed is rescued first (rescuePorts): its untagged device goes back to
+// the LAN bridge, a tagged one is deleted.
 func (a *Applier) cleanVLANs(ctx context.Context, want map[string]RadioPlan) error {
-	used := map[int]bool{}
+	used := a.portVLANsUsed()
 	for _, rp := range want {
 		for _, b := range rp.BSS {
 			used[b.VLAN] = true
@@ -422,6 +428,11 @@ func (a *Applier) cleanVLANs(ctx context.Context, want map[string]RadioPlan) err
 		}
 		vid, _ := strconv.Atoi(m[1])
 		if used[vid] {
+			continue
+		}
+		if err := a.rescuePorts(ctx, e.Name()); err != nil {
+			// a LAN port might be left in no bridge: keep the bridge
+			a.o.Logf("mtkwifi: %s kept: moving a LAN port out of it failed: %v", e.Name(), err)
 			continue
 		}
 		_ = a.run(ctx, "ip", "link", "set", e.Name(), "down")
