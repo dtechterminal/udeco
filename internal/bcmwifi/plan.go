@@ -122,6 +122,8 @@ type Plan struct {
 
 	takeover   bool // a TP-Link hostapd was running: Apply captures a baseline first
 	disruptive bool // a radio is reconciled in full (hostapd restarted)
+	// twt: band -> the radio's TWT line, also in Notes (Tick logs changes)
+	twt map[string]string
 }
 
 // Empty reports whether the plan changes nothing.
@@ -192,6 +194,14 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 		}
 		p.Steps = append(p.Steps, rp.Steps...)
 		p.Notes = append(p.Notes, rp.Notes...)
+		if lr := ls.Radios[rl.Primary]; lr != nil {
+			line := "radio " + rl.Band + ": " + twtStatus(rl.Primary, lr.TWT, !a.o.NoTWT, rp.TWTSet)
+			p.Notes = append(p.Notes, line)
+			if p.twt == nil {
+				p.twt = map[string]string{}
+			}
+			p.twt[rl.Band] = line
+		}
 		p.Foreign = append(p.Foreign, rp.Foreign...)
 		p.disruptive = p.disruptive || rp.Reconcile
 	}
@@ -293,8 +303,10 @@ func (a *Applier) vlanDownSteps(vid int) []Step {
 // radioProfile re-asserts TP-Link's post-wlconf radio tweaks
 // (tplink_brcm.sh wifi_features_set) while the radio is down. They persist
 // in the driver, so this only matters if something reset them; failures are
-// tolerated.
-func radioProfile(primary, band string) []Step {
+// tolerated. TWT is the exception: on (twt enab 1, as a U6 Pro) unless the
+// config turns it off, which is TP-Link's `twt 0` (twt.go). Both X20
+// radios are HE (`he 1` here), so both get it.
+func radioProfile(primary, band string, twt bool) []Step {
 	wl := func(args ...string) Step {
 		return optStep("radio profile "+args[0], append([]string{"wl", "-i", primary}, args...)...)
 	}
@@ -302,7 +314,7 @@ func radioProfile(primary, band string) []Step {
 	if band == "ng" {
 		st = append(st, wl("vht_features", "0x7"))
 	}
-	return append(st, wl("twt", "0"), wl("tpc_report_ie", "0"), wl("pwr_const_ie", "0"),
+	return append(st, twtStep(primary, twt), wl("tpc_report_ie", "0"), wl("pwr_const_ie", "0"),
 		wl("bssload", "0"), wl("sgi_tx", "-1"))
 }
 
@@ -312,6 +324,7 @@ type radioPlan struct {
 	Notes     []string
 	Foreign   []string
 	Reconcile bool // hostapd restarted, BSSes cycled
+	TWTSet    bool // TWT written inside one of the plan's radio down/ups (twt.go)
 }
 
 // macDrift returns the steps that put a vif's driver MAC filter to mode/list
@@ -409,6 +422,10 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	}
 	txStep := wl("set tx power", "txpwr_degrade", itoa(degrade))
 	txChange := degrade != lr.Degrade
+	// TWT: written only inside a radio down/up made for something else
+	// (twt.go); an unreadable state is left alone there.
+	twtWant := !a.o.NoTWT
+	twtPending := lr.TWT >= 0 && lr.TWT != b2i(twtWant)
 
 	// hostapd conf, ACL files and driver state for the used vifs.
 	maxSta := rl.Radio.MaxClients
@@ -504,8 +521,13 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 			case used:
 				d := drvOf[v]
 				if lv.DWDS != d.DWDS {
-					// Refused by the driver unless the radio is down.
-					st = append(st, radioDownSteps(p, []vifDriver{d})...)
+					// Refused by the driver unless the radio is down. A TWT
+					// state that differs rides along (twt.go).
+					var extra []Step
+					if twtPending && !rp.TWTSet {
+						extra, rp.TWTSet = []Step{twtStep(p, twtWant)}, true
+					}
+					st = append(st, radioDownSteps(p, []vifDriver{d}, extra...)...)
 					foreign(fmt.Sprintf("%s: dwds %d on a client vif, set to %d", v, lv.DWDS, d.DWDS))
 				}
 				ms, f := macDrift(v, lv.MAC, d.Macmode, d.Maclist, false)
@@ -582,8 +604,9 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		st = append(st, wl("radio down", "down"))
 		st = append(st, phy...)
 		st = append(st, txStep)
-		st = append(st, radioProfile(p, rl.Band)...)
+		st = append(st, radioProfile(p, rl.Band, twtWant)...)
 		st = append(st, wl("radio up", "up"))
+		rp.TWTSet = true
 	} else {
 		if txChange {
 			st = append(st, txStep)
@@ -657,6 +680,9 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	var extra []Step
 	if lv, ok := ls.Vifs[ph]; ok && isBackhaul(ph) && lv.DWDS != 0 {
 		extra = append(extra, onVif(ph, optStep("backhaul "+ph+" dwds off (audit D8)", "wl", "-i", ph, "dwds", "0")))
+	}
+	if twtPending && !rp.TWTSet {
+		extra, rp.TWTSet = append(extra, twtStep(p, twtWant)), true
 	}
 	st = append(st, radioDownSteps(p, ds, extra...)...)
 	// Then what TP-Link's wifi script does per enabled vap (F3), with the
