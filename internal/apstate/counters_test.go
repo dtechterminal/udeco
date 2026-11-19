@@ -365,3 +365,67 @@ func TestStationRetryFields(t *testing.T) {
 	mc.Begin(100)
 	check("counted", reading(100, vapSpec{band: "na", iface: "wl13", ssid: "IoT", stas: []Station{st}}).FieldsWith(nil, CfgInfo{}, nil, mc))
 }
+
+// TestNoDataRadio: a radio whose driver gives no busy time and no TX
+// retries (jio-mtk) reports no cu_* and no retry keys, not 0%; the
+// controller showed the Garage AP at 0% interference and 0% retries
+// beside Decos at 15-36% (2026-11-19). A radio with data keeps them.
+func TestNoDataRadio(t *testing.T) {
+	st := Station{MAC: "aa:bb:cc:00:00:0a", Connected: 30, TxPackets: 900, TxRetries: 100}
+	mk := func(up int64, active int64) *Snapshot {
+		s := reading(up,
+			vapSpec{band: "ng", iface: "wl02", ssid: "Home", stas: []Station{st}},
+			vapSpec{band: "na", iface: "wl12", ssid: "Home", stas: []Station{st}})
+		s.Radios[0].NoSurvey, s.Radios[0].NoTxCounters = true, true
+		s.Radios[1].Survey = Survey{Active: active, Busy: active / 4, Rx: active / 10, Tx: active / 20}
+		return s
+	}
+	for _, mc := range []*Counters{nil, NewCounters()} {
+		prev, cur := mk(100, 10_000), mk(110, 20_000)
+		if mc != nil {
+			mc.Begin(prev.Uptime)
+			prev.FieldsWith(nil, CfgInfo{}, nil, mc)
+			mc.Begin(cur.Uptime)
+		}
+		f := cur.FieldsWith(prev, CfgInfo{}, nil, mc)
+		radios, rstats := f["radio_table"].([]map[string]any), f["radio_table_stats"].([]map[string]any)
+		cuKeys := []string{"cu_total", "cu_self_rx", "cu_self_tx", "cu_interf"}
+		for _, k := range cuKeys {
+			if _, ok := rstats[0][k]; ok {
+				t.Errorf("no-survey radio_table_stats has %s", k)
+			}
+			if _, ok := radios[0]["athstats"].(map[string]any)[k]; ok {
+				t.Errorf("no-survey athstats has %s", k)
+			}
+			if _, ok := rstats[1][k]; !ok {
+				t.Errorf("surveyed radio_table_stats lacks %s", k)
+			}
+		}
+		if _, ok := radios[0]["cu_interf"]; ok {
+			t.Error("no-survey radio_table row has cu_interf")
+		}
+		if rstats[1]["cu_total"] != 25 || rstats[1]["cu_interf"] != 10 {
+			t.Errorf("surveyed radio: cu_total %v cu_interf %v, want 25 and 10", rstats[1]["cu_total"], rstats[1]["cu_interf"])
+		}
+		retryKeys := []string{"tx_retries", "tx_combined_retries", "wifi_tx_attempts", "wifi_tx_dropped"}
+		ng, na := vapRow(t, f, "wl02"), vapRow(t, f, "wl12")
+		ngSta, naSta := ng["sta_table"].([]map[string]any)[0], na["sta_table"].([]map[string]any)[0]
+		for _, k := range retryKeys {
+			if _, ok := ng[k]; ok {
+				t.Errorf("no-counter vap row has %s", k)
+			}
+			if _, ok := ngSta[k]; ok {
+				t.Errorf("no-counter sta row has %s", k)
+			}
+			if _, ok := na[k]; !ok {
+				t.Errorf("counted vap row lacks %s", k)
+			}
+			if _, ok := naSta[k]; !ok {
+				t.Errorf("counted sta row lacks %s", k)
+			}
+		}
+		if ngSta["tx_packets"] == nil || ngSta["rx_bytes"] == nil {
+			t.Error("no-counter sta row lost its byte/packet counters")
+		}
+	}
+}

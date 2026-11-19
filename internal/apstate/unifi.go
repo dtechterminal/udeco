@@ -231,16 +231,23 @@ func (s *Snapshot) FieldsWith(prev *Snapshot, info CfgInfo, caps map[string]Radi
 		// noise): the airtime graph stacks self tx + self rx + interference
 		cuInterf := max(0, cuTotal-cuRx-cuTx)
 		avail := min(100, 100+cuRx+cuTx-cuTotal) // airtime others leave (satisfaction.go)
-		radios[len(radios)-1]["cu_interf"] = cuInterf
-		radios[len(radios)-1]["athstats"] = map[string]any{
-			"name": name, "cu_total": cuTotal, "cu_self_rx": cuRx, "cu_self_tx": cuTx, "cu_interf": cuInterf,
-			"ast_txto": 0, "ast_cst": 0, "ast_be_xmit": 0,
-		}
-		rstats = append(rstats, map[string]any{
+		ath := map[string]any{"name": name, "ast_txto": 0, "ast_cst": 0, "ast_be_xmit": 0}
+		rs := map[string]any{
 			"name": name, "radio": r.Band, "channel": r.Channel, "tx_power": r.TxPower,
-			"num_sta": 0, "user-num_sta": 0, "guest-num_sta": 0,
-			"cu_total": cuTotal, "cu_self_rx": cuRx, "cu_self_tx": cuTx, "cu_interf": cuInterf, "noise": r.Noise,
-		})
+			"num_sta": 0, "user-num_sta": 0, "guest-num_sta": 0, "noise": r.Noise,
+		}
+		if !r.NoSurvey {
+			// a radio without busy time leaves the cu_* keys out: a 0% the
+			// controller shows as an idle, interference-free channel would
+			// be invented (the Garage AP read 0% beside a 31% Deco)
+			cu := map[string]any{"cu_total": cuTotal, "cu_self_rx": cuRx, "cu_self_tx": cuTx, "cu_interf": cuInterf}
+			for k, v := range cu {
+				ath[k], rs[k] = v, v
+			}
+			radios[len(radios)-1]["cu_interf"] = cuInterf
+		}
+		radios[len(radios)-1]["athstats"] = ath
+		rstats = append(rstats, rs)
 
 		radioSta, radioSat := 0, 0
 		for _, v := range r.VAPs {
@@ -283,7 +290,11 @@ func (s *Snapshot) FieldsWith(prev *Snapshot, info CfgInfo, caps map[string]Radi
 					"state": 15, "state_ht": st.HT, "state_pwrmgt": false,
 					"is_guest": guest,
 				}
-				staRetryFields(row, sc["tx_packets"], sc["tx_retries"], sc["tx_failed"], sc["tx_success"])
+				if r.NoTxCounters {
+					delete(row, "tx_retries")
+				} else {
+					staRetryFields(row, sc["tx_packets"], sc["tx_retries"], sc["tx_failed"], sc["tx_success"])
+				}
 				if guest {
 					// portal state; WPA authorization stays in the AP
 					row["authorized"] = info.Authorized[strings.ToLower(st.MAC)]
@@ -327,9 +338,11 @@ func (s *Snapshot) FieldsWith(prev *Snapshot, info CfgInfo, caps map[string]Radi
 				"rx_dropped": nd["rx_dropped"], "tx_dropped": nd["tx_dropped"],
 				"ccq": 1000,
 				"bw":  r.Width, "extchannel": 0,
-				"tx_retries": vc.Retries, "tx_combined_retries": vc.Retries,
-				"wifi_tx_attempts": vc.TxPkts + vc.Retries, "wifi_tx_dropped": vc.Failed,
-				"tx_total": vc.TxPkts, "tx_success": vc.Success,
+			}
+			if !r.NoTxCounters {
+				vap["tx_retries"], vap["tx_combined_retries"] = vc.Retries, vc.Retries
+				vap["wifi_tx_attempts"], vap["wifi_tx_dropped"] = vc.TxPkts+vc.Retries, vc.Failed
+				vap["tx_total"], vap["tx_success"] = vc.TxPkts, vc.Success
 			}
 			if n := len(v.Stations); n > 0 {
 				vap["avg_client_signal"] = sig / n
@@ -344,7 +357,6 @@ func (s *Snapshot) FieldsWith(prev *Snapshot, info CfgInfo, caps map[string]Radi
 			vaps = append(vaps, vap)
 		}
 		nsta += radioSta
-		rs := rstats[len(rstats)-1]
 		rs["num_sta"], rs["user-num_sta"] = radioSta, radioSta
 		if radioSta > 0 {
 			radios[len(radios)-1]["athstats"].(map[string]any)["satisfaction"] = satClamp(radioSat / radioSta)
