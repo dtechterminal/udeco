@@ -29,7 +29,12 @@ package main
 //     asked again for roamHold. Still (or again) on the same BSS
 //     roamJudge after the request and within roamReturn: it ignored the
 //     request or the move did not hold, and the wait doubles each time up
-//     to roamHoldMax; away for roamReturn: the backoff ends.
+//     to roamHoldMax; away for roamReturn: the backoff ends;
+//   - the worker hands each request's outcome back to the next reading. A
+//     request bcmwifi refused was never sent: a client without BSS
+//     transition is held roamNoBTMHold and logged once; no usable
+//     candidate left (bcmwifi's own-BSS guard) is the no-candidate case.
+//     Neither is judged, nor keeps band steering off the client.
 //
 // At most roamPerRead requests per reading, weakest first; takeover mode
 // only (hostapd is ours), not while memory is short.
@@ -40,6 +45,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
@@ -60,6 +66,7 @@ const (
 	roamCandAge      = 15 * time.Minute // scan sightings older than this are no candidates
 	roamNoCandLog    = time.Hour        // "no candidate" logged once per client this often
 	roamForget       = time.Hour        // a client's record goes when unseen this long (and not held)
+	roamNoBTMHold    = 24 * time.Hour   // no request to a client without BSS transition support within this
 )
 
 // roamer is bcmwifi's Roaming Assistant primitive.
@@ -79,11 +86,22 @@ type roamClient struct {
 	fails  int       // requests in a row it ignored or came back from
 	hold   time.Time // no request before this
 	noCand time.Time // "no candidate" last logged
+	noBTM  bool      // a request was refused: it does not advertise BSS transition (logged)
 }
 
-// roamState belongs to the inform loop.
+// roamState belongs to the inform loop, but for done.
 type roamState struct {
 	c map[string]*roamClient // client MAC -> record
+
+	mu   sync.Mutex
+	done []roamDone // the worker's outcomes, for the next reading
+}
+
+// roamDone is one request's outcome.
+type roamDone struct {
+	c   roamCand
+	at  time.Time // the reading that made it
+	err error
 }
 
 // roamPolicy is the live Wi-Fi's Roaming Assistant thresholds by
@@ -146,6 +164,7 @@ func (a *agent) roamReading(s *apstate.Snapshot, now time.Time) {
 	if st.c == nil {
 		st.c = map[string]*roamClient{}
 	}
+	a.roamOutcomes()
 	where := map[string]string{} // client MAC -> the BSS it is on now
 	for _, r := range s.Radios {
 		for _, v := range r.VAPs {
@@ -224,13 +243,9 @@ func (a *agent) roamReading(s *apstate.Snapshot, now time.Time) {
 			break
 		}
 		rc := st.c[c.mac]
-		rc.asked, rc.vif, rc.left, rc.judged = now, c.vif, false, false
+		// held until the outcome says otherwise (and if the job is dropped)
 		rc.hold = now.Add(roamHold)
 		rc.since, rc.n = time.Time{}, 0
-		if a.steer.last != nil {
-			// no band steering back onto the band it is leaving for a while
-			a.steer.last[c.mac] = now
-		}
 		var to []bcmwifi.Neighbor
 		for _, h := range c.to {
 			to = append(to, h.n)
@@ -238,18 +253,53 @@ func (a *agent) roamReading(s *apstate.Snapshot, now time.Time) {
 		req := bcmwifi.RoamRequest{Vif: c.vif, MAC: c.mac, Candidates: to, DisassocTBTT: roamDisassocTBTT}
 		a.submit("roam "+c.mac, func(ctx context.Context) {
 			err := rr.RoamAssist(ctx, req)
-			switch {
-			case errors.Is(err, bcmwifi.ErrNoBTM):
-				a.logf("roaming assistant: %s at %d dBm on %s does not support BSS transition: left alone", c.mac, c.signal, c.vif)
-			case errors.Is(err, bcmwifi.ErrNoCandidate):
-				a.logf("roaming assistant: %s at %d dBm on %s: no usable candidate: left alone", c.mac, c.signal, c.vif)
-			case err != nil:
-				a.logf("roaming assistant %s: %v", c.mac, err)
-			default:
-				a.logf("roaming assistant: asked %s (%d dBm < %d dBm on %s %s for %s) to move to %s",
-					c.mac, c.signal, c.thresh, c.band, c.vif, c.weak.Round(time.Second), heardList(c.to))
-			}
+			st.mu.Lock()
+			st.done = append(st.done, roamDone{c, now, err})
+			st.mu.Unlock()
 		})
+	}
+}
+
+// roamOutcomes applies the outcomes of the requests the worker has run
+// since the last reading (loop goroutine).
+func (a *agent) roamOutcomes() {
+	st := &a.roam
+	st.mu.Lock()
+	done := st.done
+	st.done = nil
+	st.mu.Unlock()
+	for _, d := range done {
+		c := d.c
+		rc := st.c[c.mac]
+		if rc == nil {
+			rc = &roamClient{seen: d.at}
+			st.c[c.mac] = rc
+		}
+		switch {
+		case d.err == nil:
+			rc.asked, rc.vif, rc.left, rc.judged, rc.noBTM = d.at, c.vif, false, false, false
+			if a.steer.last != nil {
+				// no band steering back onto the band it is leaving for a while
+				a.steer.last[c.mac] = d.at
+			}
+			a.logf("roaming assistant: asked %s (%d dBm < %d dBm on %s %s for %s) to move to %s",
+				c.mac, c.signal, c.thresh, c.band, c.vif, c.weak.Round(time.Second), heardList(c.to))
+		case errors.Is(d.err, bcmwifi.ErrNoBTM):
+			rc.hold = d.at.Add(roamNoBTMHold)
+			if !rc.noBTM {
+				rc.noBTM = true
+				a.logf("roaming assistant: %s at %d dBm on %s does not support BSS transition: left alone", c.mac, c.signal, c.vif)
+			}
+		case errors.Is(d.err, bcmwifi.ErrNoCandidate):
+			rc.hold = time.Time{}
+			if rc.noCand.IsZero() || d.at.Sub(rc.noCand) >= roamNoCandLog {
+				rc.noCand = d.at
+				a.logf("roaming assistant: %s at %d dBm on %s: no usable candidate: left alone", c.mac, c.signal, c.vif)
+			}
+		default:
+			// not sent: tried again after roamHold, not judged
+			a.logf("roaming assistant %s: %v", c.mac, d.err)
+		}
 	}
 }
 

@@ -57,6 +57,11 @@
     2 h (`roamHoldMax`). A client that stays away for 30 min ends the backoff.
   - **Limits.** At most 2 requests are sent per reading, weakest client first. A client that is asked
     also gets band steering's rate limit, so band steering does not move it back at once.
+  - **Refusals are not requests.** The Wi-Fi worker hands each request's outcome back to the next
+    reading. If `RoamAssist` refuses a client that does not advertise BSS transition (`ErrNoBTM`), the
+    client is held for 24 h (`roamNoBTMHold`) and this is logged once. If no usable candidate is left
+    (`ErrNoCandidate`), it is handled like the no-candidate case above. Neither refusal counts as an
+    ignored request for the backoff, and neither gives the client band steering's rate limit.
 - `internal/bcmwifi/roaming.go` `RoamAssist`: drops every candidate that is one of the BSSes the
   agent serves (any band, any first octet), as a second guard. If the BSSID of any served BSS cannot
   be read, it sends nothing, because that BSS could be one of the candidates.

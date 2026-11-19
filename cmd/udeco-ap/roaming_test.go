@@ -15,8 +15,12 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 )
 
-// roamWifi is fakeWifi with bcmwifi's Roaming Assistant primitive.
-type roamWifi struct{ *fakeWifi }
+// roamWifi is fakeWifi with bcmwifi's Roaming Assistant primitive; err is
+// what it returns (a refusal: the request is recorded all the same).
+type roamWifi struct {
+	*fakeWifi
+	err error
+}
 
 func (w roamWifi) RoamAssist(ctx context.Context, r bcmwifi.RoamRequest) error {
 	var to []string
@@ -24,7 +28,7 @@ func (w roamWifi) RoamAssist(ctx context.Context, r bcmwifi.RoamRequest) error {
 		to = append(to, fmt.Sprintf("%s/%s/%d", n.BSSID, n.Band, n.Channel))
 	}
 	w.rec.add(fmt.Sprintf("roam:%s@%s->%s t=%d", r.MAC, r.Vif, strings.Join(to, ","), r.DisassocTBTT))
-	return nil
+	return w.err
 }
 
 // roamAssistCfg: WLAN "net" on both bands with 802.11v, and the Roaming
@@ -42,7 +46,7 @@ func roamAssistCfg(extra ...string) string {
 // station's 5 GHz signal comes from *signal.
 func roamHarness(t *testing.T, mu *sync.Mutex, signal *int) *harness {
 	h := newHarness(t, func(c *Config, o *options) { c.Takeover, c.Apply = true, true })
-	rw := roamWifi{h.wifi}
+	rw := roamWifi{fakeWifi: h.wifi}
 	h.a.o.newWifi = func(bcmwifi.Options) wifiApplier { h.built++; return rw }
 	h.col.snap = func() *apstate.Snapshot {
 		mu.Lock()
@@ -162,7 +166,7 @@ const roamPhone = "d2:f7:e5:58:6f:89"
 
 func newRoamUnit(t *testing.T) *roamUnit {
 	h := newHarness(t, func(c *Config, o *options) { c.Takeover, c.Apply = true, true })
-	h.a.wifi = roamWifi{h.wifi}
+	h.a.wifi = roamWifi{fakeWifi: h.wifi}
 	h.a.policy.Store(&wifiPolicy{steer: map[string]string{}, roam: map[string]int{"net|na": -75}})
 	return &roamUnit{t: t, h: h, now: time.Date(2026, 11, 19, 23, 0, 0, 0, time.UTC)}
 }
@@ -346,4 +350,57 @@ func TestRoamStaleReading(t *testing.T) {
 	if c := roamCalls(h); len(c) != 0 {
 		t.Fatalf("asked on stale readings: %v", c)
 	}
+}
+
+// A request bcmwifi refuses is no request: a client that does not
+// advertise BSS transition is held long and logged once (never asked every
+// roamHold), and a request left without a usable candidate is the "no
+// candidate" case. Neither counts as ignored, nor keeps band steering off
+// the client.
+func TestRoamRefused(t *testing.T) {
+	sib := apstate.BSS{BSSID: "02:00:00:00:77:01", SSID: "net", Channel: 149, Signal: -60}
+	run := func(t *testing.T, refuse error, d time.Duration) (*roamUnit, int) {
+		u := newRoamUnit(t)
+		u.h.a.wifi = roamWifi{fakeWifi: u.h.wifi, err: refuse}
+		u.h.a.steer.last = map[string]time.Time{}
+		n := 0
+		for e := time.Duration(0); e < d; e += 10 * time.Second {
+			u.heard(0, sib)
+			n += len(u.read(10*time.Second, "wl12", -80))
+		}
+		return u, n
+	}
+	t.Run("no BSS transition", func(t *testing.T) {
+		u, n := run(t, bcmwifi.ErrNoBTM, 4*time.Hour)
+		if n != 1 {
+			t.Errorf("%d requests in 4 h, want 1", n)
+		}
+		logs := u.h.logs.all()
+		if c := strings.Count(logs, "does not support BSS transition"); c != 1 {
+			t.Errorf("logged %d times:\n%s", c, logs)
+		}
+		if strings.Contains(logs, "after the request") || strings.Contains(logs, "asked "+roamPhone) {
+			t.Errorf("counted as a request:\n%s", logs)
+		}
+		if _, ok := u.h.a.steer.last[roamPhone]; ok {
+			t.Errorf("band steering held off a client that was never asked")
+		}
+	})
+	t.Run("no usable candidate", func(t *testing.T) {
+		u, n := run(t, bcmwifi.ErrNoCandidate, 30*time.Minute)
+		if n < 2 {
+			t.Errorf("%d requests in 30 min: the client is held as if asked", n)
+		}
+		c := u.h.a.roam.c[roamPhone]
+		logs := u.h.logs.all()
+		if c == nil || c.fails != 0 || !c.asked.IsZero() || strings.Contains(logs, "after the request") {
+			t.Errorf("counted as ignored: %+v\n%s", c, logs)
+		}
+		if k := strings.Count(logs, "no usable candidate"); k != 1 {
+			t.Errorf("logged %d times:\n%s", k, logs)
+		}
+		if _, ok := u.h.a.steer.last[roamPhone]; ok {
+			t.Errorf("band steering held off a client that was never asked")
+		}
+	})
 }
