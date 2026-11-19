@@ -480,8 +480,9 @@ func (m *Manager) rollback(ctx context.Context, p int) error {
 
 // Restore puts every LAN port the controller may change back on the
 // untagged LAN without tagged VLANs (the agent hands the unit back, or the
-// controller is unreachable) and checks each got there. Locked ports and
-// the uplink are not touched.
+// controller is unreachable) and checks each got there, then has the VLAN
+// bridges no port or SSID uses any more removed (with the uplink's VLAN
+// devices in them). Locked ports and the uplink are not touched.
 func (m *Manager) Restore(ctx context.Context) Report {
 	r := newReport()
 	if m.o.DryRun {
@@ -507,6 +508,9 @@ func (m *Manager) Restore(ctx context.Context) Report {
 		r.Ports[p] = PortWant{}.String()
 	}
 	m.o.B.SetPortVLANs(m.usedVLANs())
+	if err := m.o.B.PruneVLANs(ctx); err != nil {
+		r.note("removing VLAN bridges no port or SSID uses: %v", err)
+	}
 	return r
 }
 

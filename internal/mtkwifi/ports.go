@@ -149,14 +149,22 @@ func (a *Applier) PortVLANDevs(parent string) map[int]string {
 }
 
 // PruneVLANs removes the VLAN bridges neither the live SSIDs nor the ports
-// use. It does nothing until this process has applied (or found live) the
-// controller's Wi-Fi: without that it cannot tell an SSID's bridge from an
-// unused one.
+// use. With the vendor's Wi-Fi up (never taken over, or handed back:
+// restoreBaseline) no SSID uses one, so only the ports' are kept. With the
+// agent's profiles installed it does nothing until this process has
+// applied (or found live) the controller's Wi-Fi: without that it cannot
+// tell an SSID's bridge from an unused one.
 func (a *Applier) PruneVLANs(ctx context.Context) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.live == nil || a.o.DryRun {
+	if a.o.DryRun {
 		return nil
+	}
+	if a.live == nil {
+		if a.Owned() {
+			return nil
+		}
+		return a.cleanVLANs(ctx, nil)
 	}
 	return a.cleanVLANs(ctx, a.live)
 }

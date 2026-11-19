@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
 )
 
@@ -240,5 +241,56 @@ func TestCleanVLANsRescuesPorts(t *testing.T) {
 	a.SetPortVLANs(map[int]bool{7: true})
 	if err := a.PruneVLANs(ctx); err != nil || !f.exists("br-v7") || f.bridge("eth0.2.1") != "br-v7" {
 		t.Errorf("used port bridge removed: %v", err)
+	}
+}
+
+// TestHandBackRemovesPortVLANs: an apply whose rollback cannot bring
+// last-good up hands Wi-Fi back to the vendor (restoreBaseline); the
+// agent then puts the ports back on the LAN (dropToObserve: portsRestore).
+// Nothing the agent made stays: no br-vN, no eth0.4.N, no port VLAN
+// device. Port 1 (locked) keeps its bridge.
+func TestHandBackRemovesPortVLANs(t *testing.T) {
+	f := newPortsDev(t)
+	a := newApplier(f)
+	ctx := context.Background()
+	p, _ := a.Plan(ctx, home())
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	m := portsManager(a)
+	w := jioports.Want{VLAN: true, Ports: map[int]jioports.PortWant{2: {Native: 2}, 3: {Tagged: []int{5, 3}}}}
+	if r := m.Apply(ctx, w); len(r.Failed) != 0 {
+		t.Fatalf("ports %+v", r.Failed)
+	}
+	for _, dev := range []string{"br-v2", "br-v3", "br-v5", "eth0.4.2", "eth0.4.3", "eth0.4.5", "eth0.3.5"} {
+		if !f.exists(dev) {
+			t.Fatalf("%s missing before the hand-back", dev)
+		}
+	}
+	// a new Desired whose 5 GHz radio does not come up, nor does last-good's
+	m.Prepare(w)
+	f.fail["ifconfig rai0 up"] = true
+	d := home()
+	d.Radios["na"] = bcmwifi.Radio{Enabled: true, Channel: 149, Width: 40}
+	p, _ = a.Plan(ctx, d)
+	if err := a.Apply(ctx, p); err == nil {
+		t.Fatal("apply succeeded")
+	}
+	if a.Owned() {
+		t.Fatal("still owned: the test wants a hand-back to the vendor")
+	}
+	delete(f.fail, "ifconfig rai0 up")
+	if r := m.Restore(ctx); len(r.Failed) != 0 {
+		t.Fatalf("restore %+v", r.Failed)
+	}
+	for _, dev := range []string{"eth0.1.1", "eth0.2.1", "eth0.3.1", "eth0.4.1"} {
+		if f.bridge(dev) != "bdg2" {
+			t.Errorf("%s in %q, want bdg2", dev, f.bridge(dev))
+		}
+	}
+	for _, dev := range []string{"br-v2", "br-v3", "br-v5", "eth0.4.2", "eth0.4.3", "eth0.4.5", "eth0.3.3", "eth0.3.5", "eth0.2.2"} {
+		if f.exists(dev) {
+			t.Errorf("%s left behind after the hand-back", dev)
+		}
 	}
 }
