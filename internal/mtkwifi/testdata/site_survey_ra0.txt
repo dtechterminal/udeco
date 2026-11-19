@@ -1,0 +1,20 @@
+ra0       get_site_survey:
+Total=16  
+No  Ch  SSID                             BSSID               Security               RSSI     Siganl(%)W-Mode  ExtCH  NT SSID_Len WPS DPID BcnRept   MWDSCap
+0   1   Neighbour00                      02:00:5e:01:ba:75   OPEN/NONE              -67      57       11b/g/n ABOVE  In 11        NO      NO     NO 
+1   1   Neighbour01                      02:00:5e:02:64:e9   WPAPSKWPA2PSK/TKIPAES  -89      2        11b/g/n ABOVE  In 11       YES      NO     NO 
+2   1   Neighbour02                      02:00:5e:03:90:6e   WPA2PSK/AES            -75      37       11b/g/n NONE   In 11        NO      NO     NO 
+3   1   Neighbour03                      02:00:5e:04:53:79   WPAPSKWPA2PSK/TKIPAES  -90      0        11b/g/n NONE   In 11       YES      NO     NO 
+4   1   Neighbour04                      02:00:5e:05:53:79   WPAPSKWPA2PSK/TKIPAES  -90      0        11b/g/n NONE   In 11        NO      NO     NO 
+5   1   Example Network                  ba:a7:b9:3e:17:04   WPA2PSK/TKIPAES        -70      50       11b/g/n NONE   In 15        NO      NO     NO 
+6   1   Neighbour05                      02:00:5e:06:64:ec   WPA2PSK/AES            -84      15       11b/g/n ABOVE  In 11        NO      NO     NO 
+7   3   ORCHID                           54:af:97:74:f4:37   WPA2PSK/AES            -65      63       11b/g/n NONE   In 6         NO      NO     NO 
+8   6   Example Network                  aa:a7:b9:3e:15:f8   WPA2PSK/TKIPAES        -82      20       11b/g/n NONE   In 15        NO      NO     NO 
+9   6   Neighbour06                      02:00:5e:07:63:50   WPAPSKWPA2PSK/TKIPAES  -78      29       11b/g/n NONE   In 11       YES      NO     NO 
+10  6   Neighbour06                      02:00:5e:08:63:50   WPAPSKWPA2PSK/TKIPAES  -79      26       11b/g/n NONE   In 11        NO      NO     NO 
+11  6   Neighbour07                      02:00:5e:09:64:2b   WPA2PSK/AES            -84      15       11b/g/n NONE   In 11       YES      NO     NO 
+12  10  Neighbour08                      02:00:5e:0a:de:0e   WPAPSKWPA2PSK/TKIPAES  -95      0        11b/g/n BELOW  In 11       YES      NO     NO 
+13  11  Neighbour09                      02:00:5e:0b:01:58   WPA2PSK/AES            -85      13       11b/g/n NONE   In 11       YES      NO     NO 
+14  11  Nbr_Quote'$                      02:00:5e:0c:c7:29   WPAPSKWPA2PSK/TKIPAES  -60      76       11b/g/n NONE   In 11       YES      NO     NO 
+15  11  Example Network                  aa:a7:b9:3e:16:90   WPA2PSK/TKIPAES        -57      83       11b/g/n NONE   In 15        NO      NO     NO 
+

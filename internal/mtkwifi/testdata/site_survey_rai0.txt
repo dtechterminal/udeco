@@ -1,0 +1,20 @@
+rai0      get_site_survey:
+Total=16  
+No  Ch  SSID                             BSSID               Security               RSSI     Siganl(%)W-Mode  ExtCH  NT SSID_Len WPS DPID BcnRept   MDId FToverDS RsrReqCap
+0   36  Example Network                  ae:a7:b9:3e:15:f9   WPA2PSKWPA3PSK/AES     -98      0         -9811a/n/ac ABOVE  In 15        NO      NO     bb75 FALSE    FALSE    
+1   36  ORCHID_5                         54:af:97:74:f4:39   WPA2PSK/AES            -70      50        -7011a/n/ac NONE   In 8         NO      NO    
+2   44  Neighbour00                      02:00:5e:01:9f:be   WPAPSKWPA2PSK/TKIPAES  -100     0         -10011a/n/ac ABOVE  In 11       YES      NO    
+3   44  Neighbour00                      02:00:5e:02:9f:be   WPAPSKWPA2PSK/TKIPAES  -100     0         -10011a/n/ac ABOVE  In 11        NO      NO    
+4   44  Neighbour01                      02:00:5e:03:63:52   WPAPSKWPA2PSK/TKIPAES  -98      0         -9811a/n/ac ABOVE  In 11       YES      NO    
+5   44  Neighbour01                      02:00:5e:04:63:52   WPAPSKWPA2PSK/TKIPAES  -99      0         -9911a/n/ac ABOVE  In 11        NO      NO    
+6   48                                   02:00:5e:05:db:2d   WPA2PSK/AES            -88      5         -8811a/n/ac BELOW  In 0         NO      NO    
+7   48  Neighbour02                      02:00:5e:06:db:2d   WPAPSKWPA2PSK/TKIPAES  -89      2         -8911a/n/ac BELOW  In 11        NO      NO    
+8   149 Example Network                  be:a7:b9:3e:17:05   WPA2PSKWPA3PSK/AES     -89      2         -8911a/n/ac ABOVE  In 15        NO      NO     bb75 FALSE    FALSE    
+9   149 olive#                           be:a7:b9:3e:17:06   WPA2PSKWPA3PSK/AES     -89      2         -8911a/n/ac ABOVE  In 6         NO      NO     20bd FALSE    FALSE    
+10  149 Neighbour03                      02:00:5e:07:73:b5   WPA2PSK/AES            -99      0         -9911a/n/ac ABOVE  In 11        NO      NO    
+11  149                                  02:00:5e:08:73:b5   WPA2PSK/AES            -99      0         -9911a/n/ac ABOVE  In 0        YES      NO    
+12  149 Example Network                  ae:a7:b9:3e:16:91   WPA2PSKWPA3PSK/AES     -75      37        -7511a/n/ac ABOVE  In 15        NO      NO     bb75 FALSE    FALSE    
+13  153 Nbr_Quote'$                      02:00:5e:09:c7:2a   WPAPSKWPA2PSK/TKIPAES  -82      20        -8211a/n/ac BELOW  In 11       YES      NO    
+14  153                                  02:00:5e:0a:c7:2a   WPA2PSK/AES            -82      20        -8211a/n/ac BELOW  In 0        YES      NO    
+15  157 Neighbour05                      02:00:5e:0b:90:6f   WPA2PSK/AES            -99      0         -9911a/n/ac ABOVE  In 11        NO      NO    
+
