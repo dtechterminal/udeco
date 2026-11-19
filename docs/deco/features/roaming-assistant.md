@@ -58,7 +58,8 @@
   - **Limits.** At most 2 requests are sent per reading, weakest client first. A client that is asked
     also gets band steering's rate limit, so band steering does not move it back at once.
 - `internal/bcmwifi/roaming.go` `RoamAssist`: drops every candidate that is one of the BSSes the
-  agent serves (any band, any first octet), as a second guard.
+  agent serves (any band, any first octet), as a second guard. If the BSSID of any served BSS cannot
+  be read, it sends nothing, because that BSS could be one of the candidates.
   It then checks the station's `wl sta_info` "wnm" capability word (bit 0x1 BSS-Transition, as the
   X20 driver prints it; fixtures in internal/wl/testdata) and refuses (`ErrNoBTM`) a station without
   it. The request it sends is

@@ -123,6 +123,18 @@ func TestRoamAssist(t *testing.T) {
 	if f.called("bss_tm_req") {
 		t.Errorf("a refused request reached hostapd: %v", f.mutating())
 	}
+
+	// A served BSS whose BSSID cannot be read might be the candidate:
+	// no request at all rather than one that may name this AP.
+	f.write(CtrlDir+"/wl17", "") // its socket, no netdev, no BSSID on record
+	f.reset()
+	if err := a.RoamAssist(ctx, RoamRequest{Vif: "wl12", MAC: staBTMOK, Candidates: []Neighbor{
+		{BSSID: "02:00:00:00:77:02", Band: "na", Channel: 149}}, DisassocTBTT: 100}); err == nil {
+		t.Errorf("sent with a served BSS's BSSID unknown")
+	}
+	if f.called("bss_tm_req") {
+		t.Errorf("a request reached hostapd with a served BSS's BSSID unknown: %v", f.mutating())
+	}
 }
 
 func TestStaBTM(t *testing.T) {
