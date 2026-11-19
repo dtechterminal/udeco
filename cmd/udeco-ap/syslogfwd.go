@@ -11,6 +11,10 @@ package main
 // syslog key, tagged with its hash_id). Nothing on the unit changes (logd's
 // own remote target is left alone), so it runs in observe and takeover mode
 // alike. docs/deco/features/pathmon.md (with path monitoring).
+//
+// Platform jio-mtk has no logread: its BusyBox syslogd writes only the file
+// /var/log/messages, which the agent follows instead, merging in its own
+// log lines (logfollow.go).
 
 import (
 	"bufio"
@@ -56,10 +60,9 @@ func (t syslogTarget) String() string {
 
 // syslogState is the forwarder (loop goroutine fields).
 type syslogState struct {
-	key      string // the system_cfg (adopted/cfgversion/N) last read
-	cur      syslogTarget
-	stop     context.CancelFunc
-	jioNoted bool // the platform-has-no-logread note was logged
+	key  string // the system_cfg (adopted/cfgversion/N) last read
+	cur  syslogTarget
+	stop context.CancelFunc
 }
 
 // syslogFollow starts, changes or stops the forwarding when the saved
@@ -77,13 +80,7 @@ func (a *agent) syslogFollow(ctx context.Context) {
 	}
 	sl.key = key
 	var want syslogTarget
-	if a.x.S.Adopted && a.cfg.jio() && !sl.jioNoted {
-		// the JCOW414's syslogd keeps no shared buffer (-n -m 0): logread
-		// cannot follow it, so nothing is forwarded
-		sl.jioNoted = true
-		a.logf("remote syslog: not forwarded on platform %s (its syslogd has no buffer logread can follow)", a.cfg.Platform)
-	}
-	if a.x.S.Adopted && !a.cfg.jio() {
+	if a.x.S.Adopted {
 		b, _ := os.ReadFile(a.sysCfgPath)
 		in, _ := translate.IntentFromCfg(string(b))
 		if s := in.Syslog; s != nil {
@@ -115,10 +112,20 @@ func (a *agent) syslogFollow(ctx context.Context) {
 	go func() { defer a.bg.Done(); a.forwardSyslog(fctx, want) }()
 }
 
-// logFollow streams the unit's log (logread -f; one line per message).
+// logFollow streams the unit's log (logread -f; one line per message). On
+// platform jio-mtk it follows syslogd's file instead (logfollow.go), with
+// the agent's own lines merged in unless they already go to syslog.
 func (a *agent) logFollow(ctx context.Context) (io.ReadCloser, error) {
 	if a.o.logFollow != nil {
 		return a.o.logFollow(ctx)
+	}
+	if a.cfg.jio() {
+		var own <-chan string
+		if a.cfg.Log != "syslog" {
+			own = a.selfLog.attach()
+		}
+		rc := followFile(ctx, a.dev(jioLogPath), a.t.logPoll, own)
+		return &tapStream{ReadCloser: rc, done: func() { a.selfLog.detach(own) }}, nil
 	}
 	// -l 1: only the newest buffered line, so a restart does not resend the
 	// whole ring buffer
@@ -151,6 +158,18 @@ func (c *cmdStream) Close() error {
 		c.err = c.cmd.Wait()
 	})
 	return c.err
+}
+
+// tapStream detaches the agent's own lines from the log tap on Close.
+type tapStream struct {
+	io.ReadCloser
+	once sync.Once
+	done func()
+}
+
+func (t *tapStream) Close() error {
+	t.once.Do(t.done)
+	return t.ReadCloser.Close()
 }
 
 // syslogRetry: the wait before logread or the socket is tried again.
@@ -224,32 +243,45 @@ func (a *agent) forwardSyslogOnce(ctx context.Context, t syslogTarget) error {
 }
 
 // uafSyslog turns a logread line ("Thu Nov 19 03:13:11 2026 daemon.err
-// prog[1]: msg") into a UniFi AP style syslog line ("<27>Nov 19 03:13:11
-// host U6-Lite...: prog[1]: msg") and its severity (0-7). ok is false for
-// an empty line. A line logread did not format is sent as user.info with
-// the current time.
+// prog[1]: msg") or a BusyBox syslogd file line ("Nov 19 03:13:11 RIL
+// daemon.err prog[1]: msg", platform jio-mtk) into a UniFi AP style syslog
+// line ("<27>Nov 19 03:13:11 host U6-Lite...: prog[1]: msg") and its
+// severity (0-7). ok is false for an empty line. A line in neither format
+// is sent as user.info with the current time.
 func uafSyslog(line, host, tag string) (string, int, bool) {
 	line = strings.TrimRight(line, "\r\n")
 	if strings.TrimSpace(line) == "" {
 		return "", 0, false
 	}
 	f := strings.Fields(line)
-	if len(f) >= 7 {
-		if fac, lvl, ok := strings.Cut(f[5], "."); ok {
+	// logread: weekday month day time year fac.lvl; the file: month day
+	// time host fac.lvl
+	for _, l := range []struct{ n, month, pri int }{{6, 1, 5}, {5, 0, 4}} {
+		if len(f) <= l.n {
+			continue
+		}
+		if _, ok := syslogMonths[f[l.month]]; !ok {
+			continue
+		}
+		if fac, lvl, ok := strings.Cut(f[l.pri], "."); ok {
 			fv, fok := syslogFacilities[fac]
 			lv, lok := syslogSeverities[lvl]
 			if fok && lok {
 				rest := line
-				for i := 0; i < 6; i++ { // drop the six leading fields, keep the message's own spacing
+				for i := 0; i < l.n; i++ { // drop the leading fields, keep the message's own spacing
 					rest = strings.TrimLeft(rest, " ")
 					rest = rest[strings.IndexByte(rest, ' ')+1:]
 				}
-				return fmt.Sprintf("<%d>%s %2s %s %s %s %s", fv*8+lv, f[1], f[2], f[3], host, tag, strings.TrimLeft(rest, " ")), lv, true
+				return fmt.Sprintf("<%d>%s %2s %s %s %s %s", fv*8+lv, f[l.month], f[l.month+1], f[l.month+2], host, tag,
+					strings.TrimLeft(rest, " ")), lv, true
 			}
 		}
 	}
 	return fmt.Sprintf("<14>%s %s %s %s", time.Now().Format(time.Stamp), host, tag, line), 6, true
 }
+
+var syslogMonths = map[string]bool{"Jan": true, "Feb": true, "Mar": true, "Apr": true, "May": true, "Jun": true,
+	"Jul": true, "Aug": true, "Sep": true, "Oct": true, "Nov": true, "Dec": true}
 
 var syslogFacilities = map[string]int{"kern": 0, "user": 1, "mail": 2, "daemon": 3, "auth": 4, "syslog": 5,
 	"lpr": 6, "news": 7, "uucp": 8, "cron": 9, "authpriv": 10, "ftp": 11, "local0": 16, "local1": 17,

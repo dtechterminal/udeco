@@ -149,6 +149,10 @@ type timing struct {
 	selfCheck     time.Duration // R10 self-check summary (5 min)
 	informTO      time.Duration // one inform POST, connect to last byte (10 s)
 	portsWatch    time.Duration // the LAN port monitor's pass (5 s; ports.go)
+	clockFirst    time.Duration // first clock check after the start (30 s; clock.go)
+	clockEvery    time.Duration // clock re-check (1 h)
+	clockRetry    time.Duration // clock re-check after no time source answered (1 min)
+	logPoll       time.Duration // remote syslog on jio-mtk: log file poll (1 s; logfollow.go)
 }
 
 func (t *timing) fill() {
@@ -176,6 +180,10 @@ func (t *timing) fill() {
 	def(&t.selfCheck, 5*time.Minute)
 	def(&t.informTO, 10*time.Second)
 	def(&t.portsWatch, 5*time.Second)
+	def(&t.clockFirst, clockFirst)
+	def(&t.clockEvery, clockEvery)
+	def(&t.clockRetry, clockRetry)
+	def(&t.logPoll, logPoll)
 }
 
 // options are the agent's environment; tests replace the edges.
@@ -204,6 +212,10 @@ type options struct {
 	snmpListen func(context.Context) (net.PacketConn, error)
 	// ftOpen opens the FT-SAE peer announcement sockets; nil = AF_PACKET (ftsae.go)
 	ftOpen ftpeer.Opener
+	// sntp asks an NTP server for the clock offset; nil = sntpOffset (clock.go)
+	sntp func(ctx context.Context, server string, now func() time.Time) (time.Duration, error)
+	// setClock steps the system clock; nil = settimeofday (clock.go)
+	setClock func(time.Time) error
 }
 
 type agent struct {
@@ -287,6 +299,11 @@ type agent struct {
 	rateSeen map[string]bool
 	// rateNoted: the not-supported note for rate-update was logged
 	rateNoted bool
+	// selfLog hands the agent's own log lines to remote syslog (platform
+	// jio-mtk, logfollow.go)
+	selfLog logTap
+	// ctlClock is the clock offset the last inform reply showed (clock.go)
+	ctlClock atomic.Pointer[clockSample]
 }
 
 func newAgent(cfg *Config, o options) (*agent, error) {
@@ -338,7 +355,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 	}
 	a := &agent{cfg: cfg, o: o, t: o.t, scans: newScanner(), wake: make(chan struct{}, 1),
 		jobs: make(chan job, 32), adopt: make(chan device.AdoptRequest, 4), acks: make(chan string, 8)}
-	a.events = &eventLog{path: a.dev(filepath.Join(o.base, eventsFile)), root: o.root, clock: o.now, logf: o.logf}
+	a.events = &eventLog{path: a.dev(filepath.Join(o.base, eventsFile)), root: o.root, clock: o.now, logf: a.logf}
 	a.topo = newTopology()
 	// ports an earlier run took out of br-lan (loop guard; ramfs record)
 	a.topo.removed = loadLoopGuard(a.loopFilePath())
@@ -364,7 +381,10 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 // dev maps a device path onto the filesystem root.
 func (a *agent) dev(p string) string { return filepath.Join(a.o.root, p) }
 
-func (a *agent) logf(f string, args ...any) { a.o.logf(f, args...) }
+func (a *agent) logf(f string, args ...any) {
+	a.o.logf(f, args...)
+	a.selfLog.send(time.Now(), f, args...) // remote syslog on platform jio-mtk (logfollow.go)
+}
 
 func (a *agent) mode() string {
 	if a.takeover.Load() {
@@ -420,6 +440,7 @@ func (a *agent) run(parent context.Context) error {
 	a.startLLDP(ctx, s)
 	a.startPathmon(ctx)
 	a.startFTPeers(ctx)
+	a.startClock(ctx)
 	if a.takeover.Load() {
 		a.bg.Add(1)
 		go func() { defer a.bg.Done(); a.workerLoop(ctx) }()
@@ -948,7 +969,9 @@ func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 		a.logf("encode: %v", err)
 		return device.Outcome{}, false
 	}
+	sent := time.Now()
 	status, body, err := a.o.post(ctx, x.S.InformURL, pkt)
+	answered := time.Now()
 	if err != nil {
 		if ctx.Err() == nil {
 			a.logf("POST: %v", err)
@@ -983,6 +1006,7 @@ func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 		a.logf("reply did not decode: %v", err)
 		return device.Outcome{}, false
 	}
+	a.noteControllerTime(plain, sent, answered) // clock.go
 	o, err := x.Handle(plain, time.Now())
 	if err != nil {
 		a.logf("%v", err)
