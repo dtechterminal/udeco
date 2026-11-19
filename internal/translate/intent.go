@@ -836,8 +836,9 @@ var bandFields = map[string]bool{"security": true, "pmf": true, "ft": true, "fts
 
 // mergeVAPs merges one WLAN's per-band VAPs. Band-wide settings are taken
 // from the first VAP. When the bands differ in security or roaming settings,
-// each band's own values are kept in PerBand (a backend serves every band
-// exactly as the controller sent it); any other difference is noted.
+// each band's own values are kept in PerBand (a backend that can serves every
+// band exactly as the controller sent it; one that cannot, bcmwifi, notes
+// it); any other difference is noted.
 func mergeVAPs(vaps []WLANIntent, nb *noteList) WLANIntent {
 	x := vaps[0]
 	x.Bands, x.Enabled = nil, false

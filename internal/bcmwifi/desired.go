@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -77,7 +78,9 @@ type SSID struct {
 	ProxyARP           bool
 	MulticastToUnicast bool
 	// PerBand: the controller's own values for one band when its bands
-	// differ (translate.WLANIntent.PerBand); ForBand applies them.
+	// differ (translate.WLANIntent.PerBand); ForBand applies them (mtkwifi).
+	// bcmwifi itself serves every band with the SSID-wide fields and notes
+	// the bands that differ (perBandNotes).
 	PerBand map[string]BandSettings
 	DTIM    map[string]int // band -> period
 	// MinRateKbps is the lowest data rate per band (band -> kbps). It is
@@ -553,7 +556,7 @@ func radioNotes(band string, r Radio) []string {
 // normalizeSSID validates s and fills defaults. It returns ok=false (with a
 // note) when the SSID cannot be served safely. Notes never contain secrets.
 func normalizeSSID(s SSID) (SSID, []string, bool) {
-	var notes []string
+	notes := perBandNotes(s)
 	skip := func(why string) (SSID, []string, bool) {
 		return s, append(notes, fmt.Sprintf("ssid %s: %s, skipped", s.ID, why)), false
 	}
@@ -865,4 +868,45 @@ func (s SSID) ForBand(band string) SSID {
 	s.UAPSD, s.ProxyARP, s.MulticastToUnicast = b.UAPSD, b.ProxyARP, b.MulticastToUnicast
 	s.Hidden, s.Isolation, s.GroupRekey = b.Hidden, b.Isolation, b.GroupRekey
 	return s
+}
+
+// bandSettings is s's SSID-wide security and roaming settings (the ones
+// bcmwifi serves on every band).
+func (s SSID) bandSettings() BandSettings {
+	return BandSettings{Security: s.Security, PMF: s.PMF, FT: s.FT, FTSAE: s.FTSAE, FTOverDS: s.FTOverDS,
+		MobilityDomain: s.MobilityDomain, BSSTransition: s.BSSTransition, RRM: s.RRM, UAPSD: s.UAPSD,
+		ProxyARP: s.ProxyARP, MulticastToUnicast: s.MulticastToUnicast, Hidden: s.Hidden,
+		Isolation: s.Isolation, GroupRekey: s.GroupRekey}
+}
+
+// perBandNotes notes each band whose own settings (SSID.PerBand) differ from
+// the SSID-wide ones. bcmwifi does not apply PerBand: it serves every band
+// with the SSID-wide settings (translate takes them from the first band),
+// as it did before PerBand existed, and this keeps the "not carried" note
+// translate gave for such a WLAN until then. Field names only, never values.
+func perBandNotes(s SSID) []string {
+	if len(s.PerBand) == 0 {
+		return nil
+	}
+	bands := make([]string, 0, len(s.PerBand))
+	for b := range s.PerBand {
+		bands = append(bands, b)
+	}
+	sort.Strings(bands)
+	want := reflect.ValueOf(s.bandSettings())
+	var notes []string
+	for _, b := range bands {
+		got := reflect.ValueOf(s.PerBand[b])
+		var diff []string
+		for i := 0; i < want.NumField(); i++ {
+			if !reflect.DeepEqual(want.Field(i).Interface(), got.Field(i).Interface()) {
+				diff = append(diff, strings.ToLower(want.Type().Field(i).Name))
+			}
+		}
+		if len(diff) > 0 {
+			notes = append(notes, fmt.Sprintf("ssid %s: %s differ on %s: bcmwifi serves every band with the SSID-wide settings",
+				s.ID, strings.Join(diff, ", "), b))
+		}
+	}
+	return notes
 }
