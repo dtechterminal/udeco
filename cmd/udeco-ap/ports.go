@@ -60,6 +60,10 @@ func (a *agent) portsSetup() bool {
 	if !a.portsOn() || !a.takeover.Load() || a.wifi == nil {
 		return false
 	}
+	if a.modelHeld != "" {
+		a.logf("ports: port VLANs are not applied: UniFi holds this unit as %s, not %s (adoptmodel.go: Forget, adopt again, restart the agent)", a.modelHeld, a.cfg.Model)
+		return false
+	}
 	b, ok := a.wifi.(jioports.Bridger)
 	if !ok {
 		a.logf("ports: the Wi-Fi backend cannot bridge ports: port VLANs are not applied")

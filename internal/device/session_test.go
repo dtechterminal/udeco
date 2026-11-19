@@ -295,3 +295,34 @@ func TestCapabilityWordsSerialised(t *testing.T) {
 		}
 	}
 }
+
+// The state keeps the model it was adopted as (the controller never takes
+// a new model from an adopted device): every adoption path records the
+// reported model, a re-key keeps it, setdefault clears it.
+func TestAdoptedModel(t *testing.T) {
+	x := newSession(t)
+	x.Dev.Model = "UHDIW"
+	handle(t, x, `{"_type":"setparam","mgmt_cfg":"authkey=`+newKey+`\n"}`)
+	if x.S.Model != "UHDIW" {
+		t.Fatalf("setparam adoption: model %q", x.S.Model)
+	}
+	x.Dev.Model = "U7LT" // a config change on an adopted unit
+	handle(t, x, `{"_type":"cmd","cmd":"set-adopt","key":"ffffffffffffffffffffffffffffffff"}`)
+	x.ApplyAdopt(AdoptRequest{Key: newKey})
+	if x.S.Model != "UHDIW" {
+		t.Fatalf("re-key changed the adopted model: %q", x.S.Model)
+	}
+	handle(t, x, `{"_type":"setdefault"}`)
+	if x.S.Model != "" {
+		t.Fatalf("setdefault kept model %q", x.S.Model)
+	}
+	handle(t, x, `{"_type":"cmd","cmd":"set-adopt","key":"`+newKey+`"}`)
+	if x.S.Model != "U7LT" {
+		t.Fatalf("set-adopt adoption: model %q", x.S.Model)
+	}
+	handle(t, x, `{"_type":"cmd","cmd":"setdefault"}`)
+	x.ApplyAdopt(AdoptRequest{Key: newKey})
+	if x.S.Model != "U7LT" || !x.S.Adopted {
+		t.Fatalf("ssh adoption: %+v", x.S)
+	}
+}

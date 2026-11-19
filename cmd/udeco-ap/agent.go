@@ -243,6 +243,9 @@ type agent struct {
 	ctrSaved   time.Time
 	ctrErr     string
 	collectErr string
+	// modelHeld: the model the controller holds for this unit when it is
+	// not the config's (set at setup; adoptmodel.go)
+	modelHeld  string
 	infoKey    string
 	info       apstate.CfgInfo
 	infoPortal bool              // the saved system_cfg turns the guest portal on (redirector)
@@ -524,7 +527,12 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 			a.logf("uplink port: not found from the gateway's FDB entry (bcmwifi picks the only br-lan port with carrier)")
 		}
 	}
-	portVLAN := a.portsSetup() // LAN ports (jio-mtk as UHDIW: ports.go)
+	st, found, err := device.Load(a.statePath)
+	if err != nil {
+		return fmt.Errorf("state %s: %w", a.statePath, err)
+	}
+	stChanged := a.checkAdoptedModel(&st) // the model UniFi holds (adoptmodel.go)
+	portVLAN := a.portsSetup()            // LAN ports (jio-mtk as UHDIW: ports.go)
 	_, canSteer := a.wifi.(steerer)
 	_, canRoam := a.wifi.(roamer)
 	ft, canFTSAE := a.wifi.(ftSAEServer)
@@ -563,10 +571,6 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	if err != nil || len(mac) != 6 {
 		return fmt.Errorf("br-lan MAC %q: %v", s.MAC, err)
 	}
-	st, found, err := device.Load(a.statePath)
-	if err != nil {
-		return fmt.Errorf("state %s: %w", a.statePath, err)
-	}
 	if !found {
 		st = device.NewState(a.cfg.InformURL)
 		st.Version = p.Version
@@ -588,6 +592,12 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	}
 	a.renameRadios()
 	a.logRadioNames()
+	if stChanged {
+		if err := a.x.S.Save(a.statePath); err != nil {
+			return err
+		}
+	}
+	a.logModelHeld()
 	if a.x.S.HashID == "" {
 		if a.x.S.HashID, err = device.NewHashID(); err != nil {
 			return err
@@ -730,6 +740,7 @@ func (a *agent) loop(ctx context.Context) {
 		if next.Reset {
 			a.logf("setdefault: removed from the controller; informing as a new device, the unit's Wi-Fi is left as it is")
 			a.radioNamesAfterReset()
+			a.modelAfterReset()
 		}
 		// adoption state changed (a reply adopted or reset the unit): the
 		// SSH credential check follows it (R12)

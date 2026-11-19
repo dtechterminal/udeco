@@ -289,7 +289,7 @@ func (x *Session) ApplyAdopt(r AdoptRequest) Outcome {
 	}
 	if r.Key != "" {
 		x.S.Key = r.Key
-		x.S.Adopted = true
+		x.setAdopted()
 		o.Events = append(o.Events, "ADOPTED via SSH set-adopt: new authkey stored, inform_url="+x.S.InformURL)
 	} else {
 		o.Events = append(o.Events, "set-inform: inform_url="+x.S.InformURL)

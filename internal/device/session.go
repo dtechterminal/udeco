@@ -51,6 +51,12 @@ type State struct {
 	// so the naming may only change when the controller forgets the device
 	// (cmd/udeco-ap radionames.go).
 	RadioNames string `json:"radio_names,omitempty"`
+	// Model: the model code this state was adopted as ("" = not adopted, or
+	// a state written before the field). The controller fixes a device's
+	// model when it first sees it and never takes a new one from an
+	// adopted device's informs, so reporting another model needs a Forget
+	// and a new adoption (cmd/udeco-ap adoptmodel.go).
+	Model string `json:"model,omitempty"`
 	// ClientRates: per-client speed limits from the controller's
 	// rate-update cmd (client MAC -> limits), kept until a rate-update
 	// clears them.
@@ -450,7 +456,7 @@ func (x *Session) setparam(r Reply, now time.Time, o *Outcome) {
 	if authkey != "" && authkey != inform.DefaultKeyHex {
 		if x.S.Key == inform.DefaultKeyHex {
 			x.S.Key = authkey
-			x.S.Adopted = true
+			x.setAdopted()
 			o.Changed = true
 			ev += " ADOPTED: new authkey stored"
 		} else if authkey != x.S.Key {
@@ -549,10 +555,21 @@ func (x *Session) upgrade(version, url string, now time.Time, o *Outcome) {
 	o.Immediate = true
 }
 
+// setAdopted marks the state adopted, as the model reported now when it
+// was not adopted before (a new key on an adopted state keeps its model,
+// as the controller's record does).
+func (x *Session) setAdopted() {
+	if !x.S.Adopted {
+		x.S.Model = x.Dev.Model
+	}
+	x.S.Adopted = true
+}
+
 func (x *Session) setdefault(o *Outcome) {
 	x.S.Key = inform.DefaultKeyHex
 	x.S.GCM = false
 	x.S.Adopted = false
+	x.S.Model = ""
 	x.S.CfgVersion = "0"
 	x.S.PendingCfgVersion = ""
 	x.S.MgmtCfg = ""
@@ -567,7 +584,7 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 	case "set-adopt", "adopt":
 		if r.Key != "" {
 			x.S.Key = r.Key
-			x.S.Adopted = true
+			x.setAdopted()
 		}
 		uri := ""
 		if r.URI != "" {
