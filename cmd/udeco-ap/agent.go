@@ -368,7 +368,8 @@ func (a *agent) mode() string {
 }
 
 // run is the agent until ctx ends (SIGTERM): informs stop, the Wi-Fi
-// worker finishes the job it is in, and the unit's Wi-Fi is left as it is.
+// worker finishes the job it is in, and the unit's Wi-Fi is left as it is
+// (tc limits and the flow cache state included: flowcache.go).
 //
 // Order: phase 1 (takeover only: the inbound fence, nothing else), the
 // boot gate (R1/R2: no inform, no Enforce, no apply until TP-Link's boot
@@ -394,6 +395,7 @@ func (a *agent) run(parent context.Context) error {
 	}
 	if !a.takeover.Load() {
 		a.observeLoopGuardRestore(ctx)
+		a.observeFlowCacheRestore(ctx)
 	}
 	s, err := a.firstReading(ctx)
 	if err != nil {

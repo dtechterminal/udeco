@@ -493,6 +493,8 @@ func (a *agent) dropToObserve(ctx context.Context, why string) {
 	if err := a.sys.Restore(ctx); err != nil {
 		a.logf("decosys: restore: %v (reboot the unit for a clean stock state)", err)
 	}
+	// the hand-back turned the flow cache on; this retries a failure
+	a.restoreFlowCache(ctx, a.wifi)
 	// Restore put the loop guard's ports back (and removed the record):
 	// the loop goroutine forgets them at its next reading
 	a.loopReload.Store(true)
