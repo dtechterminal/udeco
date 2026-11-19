@@ -25,6 +25,9 @@ package main
 //
 // Observe mode runs neither (actions.go logs them only) and does not claim
 // RF_SCAN. Nothing is stored on flash: the tables live in the runners.
+//
+// A collector without a spectrum runner (jio-mtk) runs neither: with
+// site_survey both run its neighbour survey instead (sitesurvey.go).
 
 import (
 	"context"
@@ -85,6 +88,10 @@ func (a *agent) quickScan(ctx context.Context, band string, bw int) {
 		a.logf("[quick-scan] %s: skipped, %s", what, why)
 		return
 	}
+	if ok, on := a.spectrumBySurvey(); ok {
+		a.surveyForSpectrum(ctx, "quick-scan", []string{band}, on)
+		return
+	}
 	if busy, ok := a.scans.begin(what, true, false); !ok {
 		a.logf("[quick-scan] skipped: already in progress (%s)", busy)
 		return
@@ -110,6 +117,10 @@ func (a *agent) spectrumScan(ctx context.Context) {
 	}
 	if why := a.scanBlock(); why != "" {
 		a.logf("%s: skipped, %s", what, why)
+		return
+	}
+	if ok, on := a.spectrumBySurvey(); ok {
+		a.surveyForSpectrum(ctx, what, []string{"na", "ng"}, on) // 5 GHz first, as below
 		return
 	}
 	if busy, ok := a.scans.begin(what, false, true); !ok {

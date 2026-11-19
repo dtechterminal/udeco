@@ -98,6 +98,18 @@ type Config struct {
 	// (60-3600 s; 0 = 300). The port monitor: ports.go.
 	PortsConfirmS int `json:"ports_confirm_s,omitempty"`
 	PortsLossS    int `json:"ports_loss_s,omitempty"`
+	// SiteSurvey (platform jio-mtk) lets the controller's scan commands
+	// run the MediaTek driver's site survey (`iwpriv <radio> set
+	// SiteSurvey=1`, mtkwifi.CollectorOptions.FreshScan), which takes the
+	// radio off its channel for a few seconds: `cmd scan` surveys both
+	// bands, and `cmd spectrum-scan` and `cmd quick-scan`, which have no
+	// spectrum runner on that unit, survey their band(s) and report
+	// scan_table only (sitesurvey.go). RF_SCAN is claimed with it. Never
+	// periodic, never during a radio restart or its settle time. Off by
+	// default: the agent then claims no RF_SCAN and only the driver's
+	// cached survey feeds the neighbour list. Needs takeover (observe mode
+	// runs no scans); ignored, with a log line, on the Deco (wl scans).
+	SiteSurvey bool `json:"site_survey,omitempty"`
 }
 
 func (c *Config) portsConfirm() time.Duration {
@@ -217,6 +229,9 @@ func (c *Config) validate() error {
 	}
 	if c.Hotspot2 && !c.Takeover {
 		return errors.New("config: hotspot2 needs takeover (observe mode serves no Wi-Fi of its own)")
+	}
+	if c.SiteSurvey && !c.Takeover {
+		return errors.New("config: site_survey needs takeover (observe mode runs no scans and claims no RF scan)")
 	}
 	for _, m := range c.MgmtSources {
 		if net.ParseIP(m) != nil {

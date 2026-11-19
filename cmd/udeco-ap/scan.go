@@ -44,6 +44,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -183,21 +184,44 @@ func (sc *scanner) addBSS(band string, res apstate.ScanResult) {
 	sc.mu.Unlock()
 }
 
-// neighbourScan is `cmd scan`: bands one after the other in the background,
-// scan_table only; done runs when it finishes. A band starts only while
+// neighbourJob is a neighbour scan to run: what is the command it answers
+// ("scan", or "quick-scan" / "spectrum-scan" on a collector without a
+// spectrum runner, sitesurvey.go); quick holds quickscan_scanning true while
+// it runs (a quick-scan answered by the survey: the inform without it ends
+// the controller's quick-scan, which then sends the next band); note is
+// logged once it has started.
+type neighbourJob struct {
+	what  string
+	bands []string
+	quick bool
+	note  string
+}
+
+// label names the job in the logs and as the running scan ("scan ng na",
+// "quick-scan na").
+func (j neighbourJob) label() string { return j.what + " " + strings.Join(j.bands, " ") }
+
+// neighbourScan runs j: its bands one after the other in the background,
+// scan_table only, never spectrum_scanning, quickscan_scanning only with
+// j.quick; done runs when it finishes (after the scan is marked ended, so
+// the inform done sends reports the end). A band starts only while
 // blocked returns "" (agent.scanBlock). It returns false (and never calls
 // done) when a scan is already running.
-func (sc *scanner) neighbourScan(ctx context.Context, col collector, bands []string, perBand time.Duration,
+func (sc *scanner) neighbourScan(ctx context.Context, col collector, j neighbourJob, perBand time.Duration,
 	logf func(string, ...any), blocked func() string, done func()) (busy string, ok bool) {
-	if busy, ok := sc.begin("scan", false, false); !ok {
+	if busy, ok := sc.begin(j.label(), j.quick, false); !ok {
 		return busy, false
 	}
+	if j.note != "" {
+		logf("%s", j.note)
+	}
+	what, bands := j.what, j.bands
 	go func() {
 		defer done()
 		defer sc.end()
 		for _, band := range bands {
 			if why := blocked(); why != "" {
-				logf("scan %s: not started, %s", band, why)
+				logf("%s %s: not started, %s", what, band, why)
 				return
 			}
 			bctx, cancel := context.WithTimeout(ctx, perBand)
@@ -205,13 +229,13 @@ func (sc *scanner) neighbourScan(ctx context.Context, col collector, bands []str
 			res, err := col.Scan(bctx, band)
 			cancel()
 			if err != nil {
-				logf("scan %s: %v", band, err)
+				logf("%s %s: %v", what, band, err)
 				continue
 			}
 			// neighbours only: a legacy ScanResult.Spectrum is never
 			// reported (spectrum_table comes from the spectrum runner)
 			sc.addBSS(band, apstate.ScanResult{Band: res.Band, Time: res.Time, BSS: res.BSS})
-			logf("scan %s: %d networks in %s", band, len(res.BSS), time.Since(t0).Round(100*time.Millisecond))
+			logf("%s %s: %d networks in %s", what, band, len(res.BSS), time.Since(t0).Round(100*time.Millisecond))
 		}
 	}()
 	return "", true

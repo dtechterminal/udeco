@@ -28,8 +28,9 @@ import (
 //     not reported; a changed table is reported as seen now, an unchanged
 //     one with that first sighting (its age grows, the controller lists rows
 //     younger than 30 s only), and nothing once that is surveyKeep old.
-//   - Scan (the controller's `cmd scan` only) starts a fresh survey when
-//     FreshScan is set, else it is unsupported.
+//   - Scan (a controller command only: `cmd scan`, and spectrum-scan and
+//     quick-scan, which have no spectrum runner here: SpectrumBySurvey)
+//     starts a fresh survey when FreshScan is set, else it is unsupported.
 
 // surveyKeep: how long an unchanged cached survey is still reported.
 const surveyKeep = 10 * time.Minute
@@ -42,7 +43,12 @@ type surveySeen struct {
 }
 
 // scanPoll: how often a fresh survey's table is read; scanSettle: how long
-// it must stay the same to count as finished.
+// it must stay the same to count as finished. Not measured on the unit: a
+// driver that clears its table when the survey starts and refills it
+// channel by channel could hold a partial table for scanSettle on quiet
+// passive (DFS) channels, so Scan would end, and release the restart gate,
+// before the radio is back on its channel. Log get_site_survey every
+// 250 ms through one 5 GHz survey before site_survey goes on (README).
 const (
 	scanPoll   = 500 * time.Millisecond
 	scanSettle = 2 * time.Second
@@ -216,6 +222,12 @@ func (c *Collector) mibGap(main string) {
 		m.gap = true
 	}
 }
+
+// SpectrumBySurvey: this driver has no spectrum runner (Spectrum is
+// ErrUnsupported), so the agent answers the controller's spectrum commands
+// (spectrum-scan, quick-scan) with Scan of their band(s) when this is true
+// (FreshScan), and with nothing when it is false.
+func (c *Collector) SpectrumBySurvey() bool { return c.o.FreshScan }
 
 // ErrRadioDown: Scan of a radio whose interfaces are down (off, or no SSID
 // served on it); the driver is not asked.
