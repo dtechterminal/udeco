@@ -369,3 +369,25 @@ func TestFlowCacheDryRunNoDrift(t *testing.T) {
 		t.Errorf("dry run: off=%v owned=%v, %d drift lines", f.fcOff, a.fcOff, n)
 	}
 }
+
+// TestParseFCStatus pins the parser to the real `fc status` output of the
+// X20: the state is the "Flow Learning Enabled/Disabled :" line, not the
+// first line, and not "OVS Flow Learning <...>".
+func TestParseFCStatus(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		out    string
+		on, ok bool
+	}{
+		{"enabled", fcStatusOut("Enabled"), true, true},
+		{"disabled", fcStatusOut("Disabled"), false, true},
+		{"blog line", "Broadcom Packet Flow Cache learning via BLOG disabled.\n", false, true},
+		{"ovs only", "\tOVS Flow Learning <Disabled> \n\tMCast Learning <Disabled>\n", false, false},
+		{"empty", "", false, false},
+	} {
+		on, ok := parseFCStatus(c.out)
+		if on != c.on || ok != c.ok {
+			t.Errorf("%s: got on=%v ok=%v, want on=%v ok=%v", c.name, on, ok, c.on, c.ok)
+		}
+	}
+}

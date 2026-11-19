@@ -117,8 +117,12 @@ got **4.9 Mbit/s down / 8.2 Mbit/s up**, and the htb classes counted only
 during the transfer let ~14 packets through before the flow was accelerated
 again. With `fc disable` the same limits held, **473 kbit/s down / 698 kbit/s
 up**, and the classes counted the traffic; `fc enable` restored acceleration.
-`fc status` prints "Broadcom Packet Flow Cache learning via BLOG disabled."
-(or "... enabled.") as its first line.
+`fc enable`/`fc disable` print "Broadcom Packet Flow Cache learning via BLOG
+enabled." (or "... disabled."). `fc status` prints a tab-indented table on
+stdout whose last line carries the state: `Flow Learning Enabled : Max<16383>,
+Active<93>, ...` or `Flow Learning Disabled : ...` ("OVS Flow Learning" and
+"MCast Learning" are other switches). The first draft parsed the BLOG line out
+of `fc status` and would have done nothing on a unit; caught before deploy.
 
 There is no narrower way: `wl` has no per-station limit, ebtables has no
 `skiplog` target, there is no bridge netfilter (`/proc/sys/net/bridge` is
@@ -131,8 +135,8 @@ runs at the end of every shaping sync (Apply, Tick, `SetClientRates`,
 `SyncRateLimits`) with what that sync wants shaped:
 
 - **A limit is built** (a per-client entry or a SSID-wide limit, for a
-  station associated now): the flow cache must be off. It reads the first line
-  of `fc status`; if it is learning, `fc disable` then `fc flush` (whole cache,
+  station associated now): the flow cache must be off. It reads the
+  `Flow Learning Enabled/Disabled` line of `fc status`; if it is learning, `fc disable` then `fc flush` (whole cache,
   so flows learnt before take the slow path too), and logs once
   `flow cache off: N per-client / M SSID limits need the slow path`. N counts
   stations limited by their own entry, M the limited SSIDs with a station on
@@ -163,7 +167,7 @@ runs at the end of every shaping sync (Apply, Tick, `SetClientRates`,
   decides again (and turns it on if no limit remains). Safe either way: a
   reboot turns the cache back on (`fc disable` is not saved) and clears the
   record with `/tmp`.
-- **No fc** (`fc status` fails or its first line is not the flow-cache line):
+- **No fc** (`fc status` fails or has no `Flow Learning` line):
   nothing is done, logged once; the trees are still built. jio-mtk never runs
   bcmwifi.
 - Dry-run: `fc status` is read, the flip only logged; the agent takes no

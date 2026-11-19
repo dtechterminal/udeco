@@ -187,8 +187,8 @@ func ifnameOK(s string) bool {
 // while the cache is off, and the next start's first sync decides again.
 // A reboot brings the cache back on (it is not saved anywhere).
 //
-// Nothing is done when `fc status` fails or its first line is not the
-// flow-cache line (no fc on the unit; jio-mtk has no bcmwifi at all).
+// Nothing is done when `fc status` fails or has no flow-learning line (no
+// fc on the unit; jio-mtk has no bcmwifi at all).
 
 // FlowCacheOffFile, in RunDir, records for this boot that the agent turned
 // the flow cache off (the agent looks for it at an observe-mode start).
@@ -205,30 +205,51 @@ type shapeNeed struct {
 
 func (n shapeNeed) any() bool { return len(n.perClient)+len(n.ssid) > 0 }
 
-// fcStatus reads whether the flow cache is learning from the first line of
-// `fc status` ("Broadcom Packet Flow Cache learning via BLOG enabled." or
-// "... disabled."). ok is false when there is no such line (no fc).
+// fcStatus reads whether the flow cache is learning from `fc status`. On the
+// X20 (.205, 2026-11-19) status prints a tab-indented table on stdout whose
+// last line is "Flow Learning Enabled : Max<16383>, Active<93>, ..." or
+// "Flow Learning Disabled : ..."; "OVS Flow Learning <Disabled>" and
+// "MCast Learning <...>" are other switches. The "Broadcom Packet Flow Cache
+// learning via BLOG enabled." line is what `fc enable`/`fc disable` print,
+// not status; it is accepted too in case another build prints it there.
+// ok is false when no such line is found (no fc).
 func (a *Applier) fcStatus(ctx context.Context) (on, ok bool) {
 	out, err := a.o.Run.Run(ctx, "fc", "status")
-	line := strings.TrimSpace(firstLine(strings.TrimLeft(string(out), "\r\n\t ")))
-	l := strings.ToLower(line)
-	if strings.Contains(l, "flow cache") {
-		switch {
-		case strings.HasSuffix(l, "disabled."), strings.HasSuffix(l, "disabled"):
+	if err == nil {
+		if on, ok := parseFCStatus(string(out)); ok {
 			a.fcNote = ""
-			return false, true
-		case strings.HasSuffix(l, "enabled."), strings.HasSuffix(l, "enabled"):
-			a.fcNote = ""
-			return true, true
+			return on, true
 		}
 	}
-	why := fmt.Sprintf("unrecognised first line %q", line)
+	why := fmt.Sprintf("no flow learning line in %q", firstLine(strings.TrimLeft(string(out), "\r\n\t ")))
 	if err != nil {
 		why = err.Error()
 	}
 	if why != a.fcNote {
 		a.fcNote = why
 		a.o.Logf("bcmwifi: flow cache: fc status: %s (no flow cache control: left as it is)", why)
+	}
+	return false, false
+}
+
+// parseFCStatus finds the flow-learning state in `fc status` output.
+func parseFCStatus(out string) (on, ok bool) {
+	for _, raw := range strings.Split(out, "\n") {
+		l := strings.TrimSpace(raw)
+		switch {
+		case strings.HasPrefix(l, "Flow Learning Disabled"):
+			return false, true
+		case strings.HasPrefix(l, "Flow Learning Enabled"):
+			return true, true
+		}
+		if ll := strings.ToLower(l); strings.Contains(ll, "flow cache learning") {
+			switch {
+			case strings.HasSuffix(ll, "disabled."), strings.HasSuffix(ll, "disabled"):
+				return false, true
+			case strings.HasSuffix(ll, "enabled."), strings.HasSuffix(ll, "enabled"):
+				return true, true
+			}
+		}
 	}
 	return false, false
 }

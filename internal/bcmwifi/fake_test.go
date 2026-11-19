@@ -407,20 +407,33 @@ func (f *fakeDev) Run(ctx context.Context, name string, args ...string) ([]byte,
 	return nil, fmt.Errorf("fake: unknown command %q", name)
 }
 
+// fcStatusOut is `fc status` stdout as captured on .205 (2026-11-19), with
+// the learning state filled in; "OVS Flow Learning" and "MCast Learning"
+// are other switches the parser must not read.
+func fcStatusOut(learning string) string {
+	return "\tFlow Timer Interval = 10000 millisecs\n" +
+		"\tAcceleration Mode: <L3>\n" +
+		"\tMCast Learning <Disabled>\n" +
+		"\tHW Acceleration <Enabled> \n" +
+		"\tOVS Flow Learning <Disabled> \n" +
+		"\tFlow Learning " + learning + " : Max<16383>, Active<93>, Cummulative [ 172798 - 172705 ]\n"
+}
+
 // fc is the Broadcom flow cache tool as seen on .205 (2026-11-19): status
-// prints the learning state first, enable/disable flip it.
+// prints the table above, enable/disable flip it and print the BLOG line.
 func (f *fakeDev) fc(args []string) ([]byte, error) {
 	if f.noFC {
 		return nil, errors.New(`exec: "fc": executable file not found in $PATH`)
 	}
 	switch args[0] {
 	case "status":
-		st := map[bool]string{false: "enabled", true: "disabled"}[f.fcOff]
-		return []byte("Broadcom Packet Flow Cache learning via BLOG " + st + ".\nFlow Learning Enabled\nAcceleration Mode: <L3>\n"), nil
+		return []byte(fcStatusOut(map[bool]string{false: "Enabled", true: "Disabled"}[f.fcOff])), nil
 	case "enable":
 		f.fcOff = false
+		return []byte("Broadcom Packet Flow Cache learning via BLOG enabled.\n"), nil
 	case "disable":
 		f.fcOff = true
+		return []byte("Broadcom Packet Flow Cache learning via BLOG disabled.\n"), nil
 	}
 	return nil, nil
 }
