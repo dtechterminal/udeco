@@ -41,6 +41,7 @@ type Options struct {
 	// VerifyTimeout bounds the wait for the BSSes after an apply (20 s).
 	VerifyTimeout time.Duration
 	sleep         func(context.Context, time.Duration) error
+	writeLED      func(path, s string) error // one LED table row (tests record them)
 }
 
 // Applier implements the agent's Wi-Fi applier on the MediaTek driver.
@@ -58,6 +59,10 @@ type Applier struct {
 	// portVLANs: the VLAN bridges the LAN ports use (internal/jioports,
 	// SetPortVLANs); cleanVLANs keeps them
 	portVLANs map[int]bool
+	// status LED (led.go), under its own lock so it never waits for an apply
+	ledMu    sync.Mutex
+	ledOn    bool // led_enabled; the controller's last word
+	locating bool
 }
 
 const (
@@ -95,7 +100,10 @@ func New(o Options) *Applier {
 			}
 		}
 	}
-	return &Applier{o: o, uplink: o.Uplink}
+	if o.writeLED == nil {
+		o.writeLED = writeProc
+	}
+	return &Applier{o: o, uplink: o.Uplink, ledOn: true}
 }
 
 func (a *Applier) dev(p string) string { return filepath.Join(a.o.Root, p) }
@@ -916,8 +924,6 @@ func keptOut(prev, next ifaceACL) []string {
 	}
 	return out
 }
-
-func (a *Applier) LED(context.Context, string) error { return nil }
 
 func (a *Applier) ForgetFailed() {
 	a.mu.Lock()
