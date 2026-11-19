@@ -3,6 +3,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -417,4 +419,64 @@ func TestStaEventsAttachNoSpurious(t *testing.T) {
 			t.Fatalf("queue %v, want y's leave, x's association, a's leave, once each", e.queue)
 		}
 	})
+}
+
+// scriptCol is fakeCol whose readings follow a script by call number.
+type scriptCol struct {
+	*fakeCol
+	mu sync.Mutex
+	n  int
+	fn func(n int) (*apstate.Snapshot, error)
+}
+
+func (c *scriptCol) Collect(ctx context.Context) (*apstate.Snapshot, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.n++
+	return c.fn(c.n)
+}
+
+func (c *scriptCol) calls() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.n
+}
+
+// A reading that fails reports the last one again; it is no new look at
+// the stations. Its socket events wait for the next real reading, and the
+// stale vap_table neither counts toward reconciling nor reports a station
+// a second time.
+func TestStaEventsStaleReading(t *testing.T) {
+	const x = "aa:bb:cc:00:02:0b"
+	mon := &fakeStaMon{}
+	h := newHarness(t, func(c *Config, o *options) { c.Takeover, c.Apply = true, true; o.staMon = mon })
+	// 1 the first reading, 2 seeds, 3 covers wl12; x joins while 4 is
+	// taken (the reading shows it, its CONNECTED comes after the reading
+	// started); 5-9 fail; 10 on read again
+	col := &scriptCol{fakeCol: h.col, fn: func(n int) (*apstate.Snapshot, error) {
+		s := testSnapshot()
+		switch {
+		case n >= 5 && n <= 9:
+			return nil, errors.New("wl: timeout")
+		case n == 4:
+			mon.mu.Lock()
+			mon.evs = []hapdmon.Event{{Vif: "wl12", MAC: x, Kind: hapdmon.Connected, At: time.Now()}}
+			mon.mu.Unlock()
+			fallthrough
+		case n > 4:
+			s.Radios[1].VAPs[0].Stations = append(s.Radios[1].VAPs[0].Stations, apstate.Station{MAC: x, Signal: -61})
+		}
+		return s, nil
+	}}
+	h.a.o.col = col
+	h.start()
+	eventually(t, "readings", func() bool { return col.calls() >= 10+staSettle+1 })
+	h.stop()
+	var got []string
+	for _, ev := range h.a.sta.queue {
+		got = append(got, ev["event_type"].(string)+" "+ev["mac"].(string))
+	}
+	if len(got) != 1 || got[0] != "association "+x {
+		t.Fatalf("events %v, want x's association once", got)
+	}
 }

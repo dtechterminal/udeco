@@ -298,6 +298,9 @@ type agent struct {
 	// running; staevents.go); readAt: when the reading in use started
 	hapd   staSource
 	readAt time.Time
+	// stale: the reading in use is the last one again (it failed): no new
+	// look at the clients (station events, Roaming Assistant)
+	stale  bool
 	mcast  *mcastInspect // multicast inspection (mcinspect.go); loop goroutine only
 	mdns   *mdnsState    // mDNS service bridge (mdnsbr.go); loop goroutine only
 	wake   chan struct{}
@@ -877,7 +880,7 @@ func (a *agent) loop(ctx context.Context) {
 func (a *agent) fields(ctx context.Context) map[string]any {
 	readAt := time.Now()
 	s, err := a.collect(ctx)
-	if err == nil {
+	if a.stale = err != nil; !a.stale {
 		a.readAt = readAt
 	}
 	if err != nil {
@@ -951,7 +954,10 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 	if a.x.S.Adopted {
 		a.sta.attach(f)
 	}
-	a.sta.observe(f, a.staFeed(&c, f))
+	if !a.stale {
+		// the socket events wait in the monitor for a real reading
+		a.sta.observe(f, a.staFeed(&c, f))
+	}
 	a.rateJoins(f)
 	a.mcastMerge(ctx, f, &c, info, time.Now())
 	a.mdnsReconcile(ctx, &c, info)

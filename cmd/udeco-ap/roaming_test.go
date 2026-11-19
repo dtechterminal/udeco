@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -306,5 +307,43 @@ func TestRoamSustainAndBackoff(t *testing.T) {
 	// none ever more often than roamHold
 	if d, ok := asked(roamHold-time.Minute, "wl12"); ok {
 		t.Fatalf("asked again after %s", d)
+	}
+}
+
+// A reading that fails reports the last one again: it is no new look at
+// the client, so it does not count toward the readings below the
+// threshold (nor judge a request).
+func TestRoamStaleReading(t *testing.T) {
+	var mu sync.Mutex
+	signal := -60
+	h := roamHarness(t, &mu, &signal)
+	h.a.t.roamSustain = time.Millisecond
+	weak, used := false, false
+	col := &scriptCol{fakeCol: h.col, fn: func(int) (*apstate.Snapshot, error) {
+		mu.Lock()
+		w := weak
+		mu.Unlock()
+		if w {
+			// one weak reading, then the unit cannot be read
+			if used {
+				return nil, errors.New("wl: timeout")
+			}
+			used = true
+		}
+		return h.col.snap(), nil
+	}}
+	h.a.o.col = col
+	h.ctl.queue(adoptReply, provisionReply(roamAssistCfg("wireless.1.btm_disassoc.status=enabled", "wireless.1.btm_disassoc.threshold=-75")))
+	h.start()
+	eventually(t, "provisioned", func() bool { return cfgversionOf(h.ctl.last()) == "00000000000000c1" })
+	mu.Lock()
+	signal, weak = -80, true
+	mu.Unlock()
+	n := col.calls()
+	eventually(t, "readings", func() bool { return col.calls() >= n+3*roamBelow })
+	time.Sleep(20 * time.Millisecond) // the worker
+	h.stop()
+	if c := roamCalls(h); len(c) != 0 {
+		t.Fatalf("asked on stale readings: %v", c)
 	}
 }
