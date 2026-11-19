@@ -585,6 +585,15 @@ func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 			UAPSD: wl.UAPSD, ProxyARP: wl.ProxyARP, MulticastToUnicast: wl.MulticastToUnicast,
 			DTIM: wl.DTIM, MinRateKbps: wl.MinRateKbps, Schedule: wl.Schedule}
 		s.MinRateOpts = minRateOpts(wl.MinRateOpts)
+		for band, b := range wl.PerBand {
+			if s.PerBand == nil {
+				s.PerBand = map[string]bcmwifi.BandSettings{}
+			}
+			s.PerBand[band] = bcmwifi.BandSettings{Security: b.Security, PMF: b.PMF, FT: b.FT, FTSAE: b.FTSAE,
+				FTOverDS: b.FTOverDS, MobilityDomain: b.MobilityDomain, BSSTransition: b.BSSTransition, RRM: b.RRM,
+				UAPSD: b.UAPSD, ProxyARP: b.ProxyARP, MulticastToUnicast: b.MulticastToUnicast, Hidden: b.Hidden,
+				Isolation: b.Isolation, GroupRekey: b.GroupRekey}
+		}
 		for _, b := range wl.Bands {
 			if b == "ng" || b == "na" {
 				s.Bands = append(s.Bands, b)

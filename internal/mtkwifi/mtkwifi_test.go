@@ -519,6 +519,34 @@ func TestLockToAP(t *testing.T) {
 	}
 }
 
+// TestPlansPerBand: the controller's own per-band values are served
+// exactly: WPA2/WPA3 with PMF on 5 GHz, WPA2 on 2.4 GHz, and PMF on a WPA2
+// SSID only where the driver has it.
+func TestPlansPerBand(t *testing.T) {
+	d := home()
+	d.SSIDs[0].Security = "wpa2"
+	d.SSIDs[0].PerBand = map[string]bcmwifi.BandSettings{
+		"ng": {Security: "wpa2", PMF: "optional"},
+		"na": {Security: "wpa2wpa3", PMF: "optional", RRM: true},
+	}
+	ps, notes := plans(d, JCOW414, true)
+	if b := ps["na"].BSS[0]; b.Auth != "WPA2PSKWPA3PSK" || b.PMF != 1 {
+		t.Errorf("na Example Network %+v", b)
+	}
+	if b := ps["ng"].BSS[0]; b.Auth != "WPA2PSK" || b.PMF != 0 {
+		t.Errorf("ng Example Network %+v", b)
+	}
+	if !strings.Contains(strings.Join(notes, "\n"), `ng: SSID "Example Network": PMF optional is not supported`) {
+		t.Errorf("notes %q", notes)
+	}
+	// WPA2 with PMF required on 5 GHz
+	d.SSIDs[0].PerBand["na"] = bcmwifi.BandSettings{Security: "wpa2", PMF: "required"}
+	ps, _ = plans(d, JCOW414, true)
+	if b := ps["na"].BSS[0]; b.Auth != "WPA2PSK" || b.PMF != 2 {
+		t.Errorf("na PMF required %+v", b)
+	}
+}
+
 func TestWantACLsAllow(t *testing.T) {
 	d := home()
 	d.SSIDs[0].MACFilter = &bcmwifi.MACFilter{Policy: "allow", MACs: []string{"aa:aa:aa:aa:aa:aa", "bb:bb:bb:bb:bb:bb"}}

@@ -76,7 +76,10 @@ type SSID struct {
 	UAPSD              bool
 	ProxyARP           bool
 	MulticastToUnicast bool
-	DTIM               map[string]int // band -> period
+	// PerBand: the controller's own values for one band when its bands
+	// differ (translate.WLANIntent.PerBand); ForBand applies them.
+	PerBand map[string]BandSettings
+	DTIM    map[string]int // band -> period
 	// MinRateKbps is the lowest data rate per band (band -> kbps). It is
 	// applied as the BSS rateset (wl rateset, beacons at the lowest basic
 	// rate) only with Options.MinRates; otherwise it is noted.
@@ -830,4 +833,36 @@ func joinSecrets(pub *Desired, sec secretSet) {
 			}
 		}
 	}
+}
+
+// BandSettings is one band's own security and roaming settings of an SSID
+// (SSID.PerBand).
+type BandSettings struct {
+	Security           string
+	PMF                string
+	FT, FTSAE          bool
+	FTOverDS           bool
+	MobilityDomain     string
+	BSSTransition, RRM bool
+	UAPSD, ProxyARP    bool
+	MulticastToUnicast bool
+	Hidden, Isolation  bool
+	GroupRekey         int
+}
+
+// ForBand is s as the controller sent it for band ("ng"/"na", or
+// "2g"/"5g"): the band's own settings from PerBand when it has them.
+func (s SSID) ForBand(band string) SSID {
+	b, ok := s.PerBand[band]
+	if !ok {
+		alias := map[string]string{"ng": "2g", "na": "5g", "2g": "ng", "5g": "na"}[band]
+		if b, ok = s.PerBand[alias]; !ok {
+			return s
+		}
+	}
+	s.Security, s.PMF, s.FT, s.FTSAE, s.FTOverDS = b.Security, b.PMF, b.FT, b.FTSAE, b.FTOverDS
+	s.MobilityDomain, s.BSSTransition, s.RRM = b.MobilityDomain, b.BSSTransition, b.RRM
+	s.UAPSD, s.ProxyARP, s.MulticastToUnicast = b.UAPSD, b.ProxyARP, b.MulticastToUnicast
+	s.Hidden, s.Isolation, s.GroupRekey = b.Hidden, b.Isolation, b.GroupRekey
+	return s
 }
