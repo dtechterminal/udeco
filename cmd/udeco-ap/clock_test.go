@@ -217,3 +217,28 @@ func TestClockCheckFloor(t *testing.T) {
 		t.Errorf("stepped to 2000: %v", rec.steps)
 	}
 }
+
+// A real SNTP failure names the socket's ephemeral local port ("read udp
+// 192.168.0.51:40312->192.168.0.1:123: ... connection refused" against the
+// UCG, which serves no NTP), a new one every check: the failure must still
+// be logged once, not every clockRetry for as long as no source answers.
+func TestClockCheckRealSNTPFailureLoggedOnce(t *testing.T) {
+	c, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := c.LocalAddr().String()
+	c.Close() // nothing listens there now
+	rec := &clockRec{}
+	a := clockAgent(t, true, sntpVia(closed), rec)
+	a.topo.gwIP.Store("127.0.0.1")
+	cs := &clockState{}
+	for i := 0; i < 3; i++ {
+		if a.clockCheck(context.Background(), cs) {
+			t.Fatal("check against a closed port succeeded")
+		}
+	}
+	if n := strings.Count(strings.Join(rec.logs, "\n"), "clock: no time source"); n != 1 {
+		t.Errorf("failure logged %d times, want once: %q", n, rec.logs)
+	}
+}

@@ -223,7 +223,7 @@ func (a *agent) clockCheck(ctx context.Context, cs *clockState) bool {
 		}
 	}
 	if src == "" {
-		if e := err.Error(); e != cs.lastErr {
+		if e := clockErrKey(err); e != cs.lastErr {
 			cs.lastErr = e
 			cs.inSync = false
 			a.logf("clock: no time source (SNTP to the gateway: %s; no recent server_time_in_utc in an inform reply); retrying every %s", e, a.t.clockRetry)
@@ -256,6 +256,16 @@ func (a *agent) clockCheck(ctx context.Context, cs *clockState) bool {
 	cs.inSync = false
 	a.event(fmt.Sprintf("clock: stepped %+.3f s to %s (was %s)", off.Seconds(), src, now.UTC().Format(time.RFC3339)))
 	return true
+}
+
+// clockErrKey is what makes a failure new for clockState: a socket error
+// without its addresses, which name a new ephemeral local port every check.
+func clockErrKey(err error) string {
+	var oe *net.OpError
+	if errors.As(err, &oe) && oe.Err != nil {
+		return oe.Op + " " + oe.Net + ": " + oe.Err.Error()
+	}
+	return err.Error()
 }
 
 // startClock runs clockLoop on platform jio-mtk.
