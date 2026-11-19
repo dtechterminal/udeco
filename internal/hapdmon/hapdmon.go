@@ -282,10 +282,22 @@ func (m *Monitor) watch(ctx context.Context, name string, w *watch) {
 	}
 	defer os.Remove(local)
 	defer c.Close()
-	// ctx ending wakes a blocked read; the loop then detaches
-	stop := context.AfterFunc(ctx, func() { _ = c.SetReadDeadline(time.Now()) })
+	// Every read deadline goes through rd: once ctx has ended it is now,
+	// whoever sets it, so ctx ending wakes a blocked read (the loop then
+	// detaches) and no later deadline (a request's, the keepalive's)
+	// undoes that wake-up.
+	var dl sync.Mutex
+	rd := func(t time.Time) {
+		dl.Lock()
+		defer dl.Unlock()
+		if ctx.Err() != nil {
+			t = time.Now()
+		}
+		_ = c.SetReadDeadline(t)
+	}
+	stop := context.AfterFunc(ctx, func() { rd(time.Now()) })
 	defer stop()
-	if err := request(c, "ATTACH", "OK"); err != nil {
+	if err := request(c, rd, "ATTACH", "OK"); err != nil {
 		if ctx.Err() == nil {
 			m.note(name, "ATTACH: "+err.Error())
 		}
@@ -298,9 +310,7 @@ func (m *Monitor) watch(ctx context.Context, name string, w *watch) {
 	buf := make([]byte, 4096)
 	pinged := false
 	for {
-		if ctx.Err() == nil {
-			_ = c.SetReadDeadline(time.Now().Add(m.o.Ping))
-		}
+		rd(time.Now().Add(m.o.Ping))
 		n, err := c.Read(buf)
 		if ctx.Err() != nil {
 			_ = c.SetWriteDeadline(time.Now().Add(200 * time.Millisecond))
@@ -340,10 +350,11 @@ func (m *Monitor) watch(ctx context.Context, name string, w *watch) {
 }
 
 // request sends cmd and waits for a reply starting with want, skipping
-// unsolicited events.
-func request(c *net.UnixConn, cmd, want string) error {
-	_ = c.SetDeadline(time.Now().Add(replyTimeout))
-	defer c.SetDeadline(time.Time{})
+// unsolicited events; rd sets the read deadline (watch).
+func request(c *net.UnixConn, rd func(time.Time), cmd, want string) error {
+	dl := time.Now().Add(replyTimeout)
+	_ = c.SetWriteDeadline(dl)
+	rd(dl)
 	if _, err := c.Write([]byte(cmd)); err != nil {
 		return errors.New("send failed: " + errText(err))
 	}

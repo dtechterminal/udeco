@@ -4,6 +4,7 @@ package hapdmon
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -240,5 +241,64 @@ func TestParse(t *testing.T) {
 		if ok != (want.Kind != 0) || got.MAC != want.MAC || got.Kind != want.Kind {
 			t.Errorf("parse(%q) = %+v %v, want %+v", in, got, ok, want)
 		}
+	}
+}
+
+// Stopping while ATTACH is answered on a BSS that then stays silent (no
+// event, and no PING due for long) still ends Run promptly: the wake-up
+// of a blocked read is never undone by the reply's deadline handling.
+func TestMonitorStopDuringAttach(t *testing.T) {
+	ctrl, local := shortDir(t), shortDir(t)
+	p := filepath.Join(ctrl, "wl12")
+	c, err := net.ListenUnixgram("unixgram", &net.UnixAddr{Name: p, Net: "unixgram"})
+	if err != nil {
+		t.Skip(err)
+	}
+	defer c.Close()
+	var mu sync.Mutex
+	var cancel context.CancelFunc
+	var spin int
+	go func() {
+		buf := make([]byte, 512)
+		for {
+			n, from, err := c.ReadFromUnix(buf)
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			if err != nil {
+				continue // ECONNRESET (macOS): an OK sent to a monitor already gone
+			}
+			if from == nil || string(buf[:n]) != "ATTACH" {
+				continue // silent: no PONG, no DETACH reply
+			}
+			mu.Lock()
+			cf, d := cancel, spin
+			spin++
+			mu.Unlock()
+			// the agent stops around the moment the reply arrives
+			if d%3 == 0 {
+				cf()
+			}
+			c.WriteToUnix([]byte("OK\n"), from)
+			time.Sleep(time.Duration(d%7) * 10 * time.Microsecond)
+			if d%3 != 0 {
+				cf()
+			}
+		}
+	}()
+	for i := 0; i < 1000; i++ {
+		ctx, cf := context.WithCancel(context.Background())
+		mu.Lock()
+		cancel = cf
+		mu.Unlock()
+		m := New(Options{Dir: ctrl, LocalDir: local, Scan: time.Hour, Ping: time.Hour})
+		done := make(chan struct{})
+		go func() { defer close(done); m.Run(ctx) }()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("run %d: Run did not return after its context ended", i)
+		}
+		cf()
 	}
 }
