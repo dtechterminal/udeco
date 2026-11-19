@@ -68,7 +68,8 @@ Status key:
 | Feature | Deco | Notes |
 |---|---|---|
 | 802.11k, 802.11v | Verified | |
-| 802.11r (FT-PSK, FT-SAE) | Built | Live on every SSID. The units exchange FT key holders over signed announcements on the LAN. A client doing a fast transition has not been observed yet. |
+| 802.11r (FT-PSK) | Built | Live on every SSID. The units exchange FT key holders over signed announcements on the LAN. A client doing a fast transition has not been observed yet. |
+| 802.11r for WPA3 (FT-SAE) | Off | Advertising FT-SAE stopped WPA3 phones (iPhone, Apple Watch, Pixel, Samsung) from joining at all; only WPA2-only IoT stayed connected. With `"ft_sae": false` in the agent config they rejoined within a minute (verified 2026-11-19). |
 | Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | |
 | Band steering, minimum RSSI, max clients | Built | Band steering uses 802.11v nudges. |
 | Minimum data rates | Not yet | Off. `wl rateset` needs the whole radio down; the step will be moved inside a radio down/up. |
