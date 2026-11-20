@@ -329,6 +329,28 @@ func TestStringConsts(t *testing.T) {
 	}
 }
 
+func TestIntConsts(t *testing.T) {
+	want := map[string]int64{"OpA": 0x4001, "OpB": 0x43b0, "Bit": 1 << 24, "Low": 0x20, "Mask": 1<<24 | 0x20 | 4,
+		"Clear": 1<<24 | 4, "Sum": 9, "Lone": 161}
+	if got := IntConsts(t, "internal/repotest/testdata/consts.go.txt"); !reflect.DeepEqual(got, want) {
+		t.Errorf("IntConsts = %v, want %v", got, want)
+	}
+}
+
+func TestFlatAndMustHave(t *testing.T) {
+	if got := Flat("a  b\n\t  c\n"); got != "a b c" {
+		t.Errorf("Flat = %q", got)
+	}
+	// the package comment of repotest.go runs over several lines
+	MustHave(t, "internal/repotest/repotest.go", "a document that states a value. Such a file cannot import the code")
+	if msg := reported(func(tb testing.TB) { MustHave(tb, "go.mod", "module ") }); msg != "" {
+		t.Errorf("MustHave failed for a phrase go.mod has: %s", msg)
+	}
+	if msg := reported(func(tb testing.TB) { MustHave(tb, "go.mod", "module ", "no such phrase in go.mod") }); msg == "" {
+		t.Error("MustHave did not fail for a phrase the file does not have")
+	}
+}
+
 func TestFlagDefaults(t *testing.T) {
 	want := map[string]string{
 		"url":          "defaultURL",

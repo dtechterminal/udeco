@@ -5,6 +5,7 @@ package repotest
 import (
 	"bytes"
 	"go/ast"
+	"go/constant"
 	"go/parser"
 	"go/printer"
 	"go/token"
@@ -53,6 +54,79 @@ func StringConsts(t testing.TB, rel string) map[string]string {
 					out[n.Name] = v
 				}
 			}
+		}
+	}
+	return out
+}
+
+// IntConsts are the integer constants the Go file at rel declares at
+// package level, with or without a type, whose value is written with
+// integer literals, the operators << >> | & &^ ^ + - * and the file's own
+// such constants: name -> value (`0x4001`, `1 << 24`, `A | B`). A constant
+// with any other value (a string, a duration, another package's constant,
+// iota) is not listed, nor is one whose value does not fit an int64.
+func IntConsts(t testing.TB, rel string) map[string]int64 {
+	t.Helper()
+	_, f := parseGo(t, rel)
+	exprs := map[string]ast.Expr{}
+	for _, d := range f.Decls {
+		g, ok := d.(*ast.GenDecl)
+		if !ok || g.Tok != token.CONST {
+			continue
+		}
+		for _, s := range g.Specs {
+			vs := s.(*ast.ValueSpec)
+			for i, n := range vs.Names {
+				if i < len(vs.Values) {
+					exprs[n.Name] = vs.Values[i]
+				}
+			}
+		}
+	}
+	vals := map[string]constant.Value{}
+	var eval func(e ast.Expr) constant.Value
+	eval = func(e ast.Expr) constant.Value {
+		switch e := e.(type) {
+		case *ast.BasicLit:
+			if e.Kind == token.INT {
+				return constant.MakeFromLiteral(e.Value, token.INT, 0)
+			}
+		case *ast.ParenExpr:
+			return eval(e.X)
+		case *ast.Ident:
+			return vals[e.Name]
+		case *ast.BinaryExpr:
+			x, y := eval(e.X), eval(e.Y)
+			if x == nil || y == nil {
+				return nil
+			}
+			switch e.Op {
+			case token.SHL, token.SHR:
+				if n, ok := constant.Uint64Val(y); ok && n < 63 {
+					return constant.Shift(x, e.Op, uint(n))
+				}
+			case token.OR, token.AND, token.AND_NOT, token.XOR, token.ADD, token.SUB, token.MUL:
+				return constant.BinaryOp(x, e.Op, y)
+			}
+		}
+		return nil
+	}
+	// a constant may name one declared after it: go round until nothing new
+	for changed := true; changed; {
+		changed = false
+		for name, e := range exprs {
+			if vals[name] != nil {
+				continue
+			}
+			if v := eval(e); v != nil {
+				vals[name], changed = v, true
+			}
+		}
+	}
+	out := map[string]int64{}
+	for name, v := range vals {
+		if n, ok := constant.Int64Val(v); ok {
+			out[name] = n
 		}
 	}
 	return out

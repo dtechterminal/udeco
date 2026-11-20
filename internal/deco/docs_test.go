@@ -4,13 +4,75 @@ package deco
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
 )
+
+// The protocol document's opcode table (section 8) has a row for every
+// opcode constant of schemas.go, so an opcode added to the code is added
+// to the table. A row names its opcodes in its first cell: one, several
+// ("0x401a / 0x401b") or a range ("0x4402-0x4407").
+func TestDocsOpcodeTable(t *testing.T) {
+	const doc, src = "docs/deco/deco-tmp-protocol.md", "internal/deco/schemas.go"
+	text := repotest.Read(t, doc)
+	_, sec, ok := strings.Cut(text, "\n## 8. Opcodes the wrapper needs\n")
+	if !ok {
+		t.Fatalf("%s has no section 8", doc)
+	}
+	sec, _, _ = strings.Cut(sec, "\n### ")
+	rows := map[int64]bool{}
+	hex := regexp.MustCompile(`0x[0-9a-f]{4}`)
+	span := regexp.MustCompile(`^(0x[0-9a-f]{4})-(0x[0-9a-f]{4})$`)
+	num := func(s string) int64 {
+		n, err := strconv.ParseInt(s, 0, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	for _, l := range strings.Split(sec, "\n") {
+		cells := strings.Split(l, "|")
+		if len(cells) < 3 || !strings.HasPrefix(strings.TrimSpace(cells[1]), "0x") {
+			continue
+		}
+		cell := strings.TrimSpace(cells[1])
+		if m := span.FindStringSubmatch(cell); m != nil {
+			for o := num(m[1]); o <= num(m[2]); o++ {
+				rows[o] = true
+			}
+			continue
+		}
+		for _, h := range hex.FindAllString(cell, -1) {
+			rows[num(h)] = true
+		}
+	}
+	consts := repotest.IntConsts(t, src)
+	// the constants as read from the source are the compiled ones
+	for name, v := range map[string]uint16{"OpNegotiation": OpNegotiation, "OpGetMLO": OpGetMLO, "OpAccountModify": OpAccountModify, "OpSetClientAccess": OpSetClientAccess} {
+		if consts[name] != int64(v) {
+			t.Fatalf("%s reads %s as %#x, it is %#x", src, name, consts[name], v)
+		}
+	}
+	n := 0
+	for name, v := range consts {
+		if !strings.HasPrefix(name, "Op") {
+			continue
+		}
+		n++
+		if !rows[v] {
+			t.Errorf("%s section 8 has no row for %s (0x%04x)", doc, name, v)
+		}
+	}
+	if n < 30 {
+		t.Errorf("%s: found %d Op constants, the table is not checked", src, n)
+	}
+}
 
 // The documents of the off-device daemon tell the reader how long it waits
 // and how often it reads. They keep their prose; each sentence below is

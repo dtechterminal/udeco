@@ -714,6 +714,7 @@ func (e *e2e) checkFlow() map[string]any {
 			t.Errorf("%s %v, want %v", k, m[k], want[k])
 		}
 	}
+	docsCapabilityWords(t, e.cfg.Takeover, m) // and the design document quotes the same words
 	// The session.go fix: once adopted, sys_stats and radio_table_stats are
 	// the unit's (proc_meminfo.txt MemTotal 252152 kB; chanspecs 2l and
 	// 44/80; clients from sta_info all), not the canned U7PG2 constants

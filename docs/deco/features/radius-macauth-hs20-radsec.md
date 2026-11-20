@@ -1,6 +1,11 @@
 # RADIUS MAC authentication, Hotspot 2.0 and RadSec on the Deco agent
 
-Status (2026-11-19): none of the three is claimed. This page records what
+Status (2026-11-19): none of the three was claimed when this page was
+written. Two have been built since, as their sections below say: RadSec is
+claimed in takeover (`models.FW2CapRadSec`, [radsec](radsec.md)) and
+Hotspot 2.0 in takeover with the `hotspot2` key (`models.FWCapHotspot2`,
+[hotspot2](hotspot2.md)). RADIUS MAC authentication is still not claimed
+(`models.WifiCapRadiusMACAuth`). This page records what
 the controller sends and why the TP-Link hostapd on the X20 cannot do each
 one as asked. Evidence comes from the read-only `strings` of `/sbin/hostapd`
 v2.9 on .205, `wl` getters, `wl.ko` strings and the hostapd syslog.

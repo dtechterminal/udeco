@@ -55,6 +55,22 @@ func MustContain(t testing.TB, rel, phrase string) {
 	}
 }
 
+// Flat is text with every run of blanks and line breaks as one space, so a
+// phrase is found across a document's line breaks and list indentation.
+func Flat(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+// MustHave fails the test for each of phrases the file at rel does not
+// have, line breaks and runs of blanks aside (Flat of both).
+func MustHave(t testing.TB, rel string, phrases ...string) {
+	t.Helper()
+	text := Flat(Read(t, rel))
+	for _, p := range phrases {
+		if !strings.Contains(text, Flat(p)) {
+			t.Errorf("%s does not have %q", rel, p)
+		}
+	}
+}
+
 // ShellVar is the value the shell script text gives name in its first
 // top-level assignment: a line that starts in column 0 with assignments
 // (NAME=value, several to a line allowed). The value comes without its

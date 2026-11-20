@@ -69,7 +69,13 @@ Notes:
 
 ## Unverified on hardware
 
-- None of these writes has been run on an X20 yet. The settings come from
+This list is the note's state when it was written (2026-11-20). The current
+status is in the rows of the [README](../../../README.md) that link here
+("Radio driver defaults", "Intelligent DHCP", "BSS Load element", "802.11k,
+802.11v"); where the two differ, the rows are right.
+
+- When this was written, none of these writes had been run on an X20. The
+  README's rows have what was read on the units since. The settings come from
   the Bedroom Deco's read-back (2026-11-20): bssload 0, txbf_imp 1,
   vht_features 0x7 on wl0, interference 361, both power-save iovars 0.
 - Whether `vht_features` and the power-save iovars really need the radio

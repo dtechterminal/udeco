@@ -47,6 +47,11 @@ const (
 	TMPForwardHost = "127.0.0.1"
 	TMPForwardPort = 20002
 
+	// DefaultSSHPort is the dropbear port TMP rides on the X20s: what
+	// their TDP reply gives as tmp_port[0] (LIVE), and what Connect dials
+	// when its config names no port.
+	DefaultSSHPort = 20001
+
 	// JSch 0.1.54 default ident (com/jcraft/jsch/Session.java:88; JSch.java:13).
 	JSchClientVersion = "SSH-2.0-JSCH-0.1.54"
 	// TDP banner_type==1 devices: setClientVersion("TPS"+"-2.0-JSCH-"+VERSION) replaces

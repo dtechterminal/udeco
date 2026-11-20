@@ -4,7 +4,7 @@ How unifi-openwrt works, for contributors. Everything here was worked out agains
 UniFi Network 10.6 and UAP firmware 6.8.2; other versions may differ.
 
 - [Protocol: inform, adoption, keys](#protocol-inform-adoption-keys)
-- [Config translation: system_cfg to UCI](#config-translation-systemcfg-to-uci)
+- [Config translation: system_cfg to UCI](#config-translation-system_cfg-to-uci)
 - [Stats in the inform](#stats-in-the-inform)
 - [UniFi AP "satisfaction" / WiFi Experience score: how it is computed](#unifi-ap-satisfaction--wifi-experience-score-how-it-is-computed)
 - [Models and capability profiles](#models-and-capability-profiles)
@@ -247,8 +247,8 @@ right before the first adoption).
 ## Stats in the inform
 
 What the daemon reads on the AP and where the controller expects it. Code:
-`internal/openwrt/collect.go` (reading), `internal/openwrt/unifi.go` (inform
-fields), `internal/openwrt/satisfaction.go`.
+`internal/openwrt/collect.go` (reading), `internal/apstate/unifi.go` (inform
+fields), `internal/apstate/satisfaction.go`.
 
 ### Reading the AP
 
@@ -353,7 +353,8 @@ lldpd 1.0.22 and a UniFi switch: the controller stores the AP's
   free - buffers - cache) / total). Without `system-stats` the CPU and memory
   graphs stay empty.
 - `satisfaction` at the top level, per VAP and in `athstats.satisfaction`:
-  see `docs/satisfaction-formula.md` for how UAP firmware computes it.
+  see [the satisfaction section below](#unifi-ap-satisfaction--wifi-experience-score-how-it-is-computed)
+  for how UAP firmware computes it.
 - `hash_id` (encrypted syslog), `guest_token` and `guest_kicks` (portal).
 
 ### Live updates
@@ -446,7 +447,7 @@ Two searches found no Ubiquiti page or community write-up with the formula. The 
 
 ### (b) What this means for unifi-openwrt
 
-- A signal-based estimate does not match: signal is not an input in 6.8.2, and the reported value never goes below 60. `internal/openwrt/satisfaction.go` implements the PHY-rate and retry sub-scores, the 5-cycle smoothing and the clamp.
+- A signal-based estimate does not match: signal is not an input in 6.8.2, and the reported value never goes below 60. `internal/apstate/satisfaction.go` implements the PHY-rate and retry sub-scores, the 5-cycle smoothing and the clamp.
 - A faithful version on OpenWrt: compute the PHY-rate, retry and (optionally) TCP-latency sub-scores as above, take the minimum, average each sub-score over the last 5 cycles, report `satisfaction = clamp(min, 60, 100)`, and send `satisfaction_real` / `satisfaction_now` unclamped. Set `anomalies` bits for sub-scores <= 79.
 - Whether the retry and drop sub-scores apply on a real U7PG2 is open (chip-type gate, see (d)); leaving them at 100 is the safe reading for the other chip types.
 
@@ -594,7 +595,7 @@ An AP adopted with UCI `mesh_uplink '1'` joins the site's UniFi mesh as a
 wireless uplink when it has no cable, like a UniFi AP that loses its wire.
 Tested: an OpenWrt AP meshing to a UniFi console's AP, shown as "Meshing to"
 the parent in the UniFi. Code: `internal/openwrt/mesh.go`,
-`internal/openwrt/unifi.go` (`uplinkVAP`).
+`internal/apstate/unifi.go` (`uplinkVAP`).
 
 ### What the controller sends
 
@@ -746,7 +747,7 @@ time as timeout, and redirects to `url`. A forged cookie gets 403.
 
 ## RF scan and 802.11k neighbour list
 
-Code: `internal/openwrt/scan.go`, `internal/openwrt/rrm.go`, `cmd/m2/scan.go`.
+Code: `internal/openwrt/scan.go`, `internal/openwrt/rrm.go`, `cmd/uow/scan.go`.
 
 ### What the controller reads
 

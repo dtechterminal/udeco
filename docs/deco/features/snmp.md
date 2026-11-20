@@ -136,6 +136,9 @@ SNMP over TCP, IPv6, AES-192/256, traps and informs.
 
 ## Integration (for the owner of models/agent.go and agent_test.go)
 
+Done since this list was written (2026-11-19), as "Capability bit" above
+says. The list is kept as the record of what was asked.
+
 - `cmd/udeco-ap/agent.go` already has the hooks; they are additive:
   - `options.snmpListen`;
   - the `agent.snmp` field;

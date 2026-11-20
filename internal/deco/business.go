@@ -689,7 +689,7 @@ func negotiateTolerated(err error) bool {
 // Config describes how to reach one Deco. Build it from a TDP DecoInfo.
 type Config struct {
 	Host          string
-	Port          int    // TDP tmp_port[0]; 20001 on the X20s (LIVE)
+	Port          int    // TDP tmp_port[0]; DefaultSSHPort (20001) on the X20s (LIVE)
 	SSHUser       string // DecoInfo.SSHUsername(CloudUserName)
 	CloudUserName string // exact stored TP-Link ID string (md5 must equal TDP owner)
 	CloudPassword Secret // never printed: Secret formats as [redacted]
@@ -755,7 +755,7 @@ type Client struct {
 // q1.f0()/l0(), q1.java:387-397,717-737; token alloc precedes it via o.N()).
 func Connect(ctx context.Context, cfg Config) (*Client, error) {
 	if cfg.Port == 0 {
-		cfg.Port = 20001
+		cfg.Port = DefaultSSHPort
 	}
 	if cfg.Heartbeat == 0 {
 		cfg.Heartbeat = DefaultHeartbeat

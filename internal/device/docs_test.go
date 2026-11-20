@@ -108,3 +108,13 @@ func TestDocsTimingAndPorts(t *testing.T) {
 		t.Errorf("portal ports %v, %d", PortalHostPorts(), PortalPort)
 	}
 }
+
+// docs/internals.md gives the size of the ledger of unhandled items and
+// how often repeat counts reach its file (unhandled.go).
+func TestDocsLedgerLimits(t *testing.T) {
+	if ledgerEvery != time.Hour {
+		t.Fatalf("ledgerEvery is %s: docs/internals.md says repeat counts are written once an hour; reword it and this test", ledgerEvery)
+	}
+	repotest.MustHave(t, "docs/internals.md", fmt.Sprintf(
+		"at most %d entries, a new one written at once and logged (`unhandled ... (first time)`), repeat counts once an hour.", ledgerMax))
+}

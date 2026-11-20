@@ -47,7 +47,7 @@
 cmd/udeco/main.go          config, Mesh, runners, signal handling
 cmd/udeco/runner.go        per-AP port of uow's loop (main.go:290-477)
 cmd/udeco/print.go         -print: one read-only poll dumped as JSON (no UniFi traffic)
-internal/deco/             spec/go/{tmp,business,schemas,discovery}.go
+internal/deco/             tmp.go, business.go, schemas.go, discovery.go: the protocol (P§9), ported from the spec's Go reference
 internal/deco/mesh.go      session owner, poller, MeshState cache, apply queue, block reconcile
 internal/deco/collect.go   Unit + clients -> openwrt.Snapshot (normMAC, connKey, Skeleton)
 internal/deco/wlan.go      UniFi WLANs -> partial 0x4008 bodies, backup/verify/rollback

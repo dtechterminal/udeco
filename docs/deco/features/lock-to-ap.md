@@ -1,7 +1,10 @@
 # Lock to Access Point (wifi_caps 0x1000000)
 
-Status: implemented in takeover mode (2026-11-19). The bit is not claimed yet:
-the integration step adds it as a takeover-only feature (see "Capability bit").
+Status: implemented in takeover mode (2026-11-19). This note's status is as of
+that date; the current one is the "Lock client to AP" row of the
+[README](../../../README.md). The bit is claimed in takeover only
+(`models.WifiCapLockAP`, one of `models.DecoAgentTakeoverWifiCaps`; see
+"Capability bit").
 
 ## What the controller does (Network 11.1.50, decompiled)
 

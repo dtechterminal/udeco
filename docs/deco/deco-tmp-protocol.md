@@ -14,7 +14,7 @@
 
 - **Citation paths** are relative to `scratchpad/deco-jadx/out/sources/` unless they say otherwise.
 - **Dex annotations:** `dexcheck/sn6.txt` and `sn7.txt` are `@SerializedName` values extracted with `dexdump -a` from `base.apk` `classes6.dex` and `classes7.dex`. jadx drops these from enum constants.
-- **Go reference:** `scratchpad/spec/go/`. It passes `go vet` and `go test -race` against an in-process emulator. It has never talked to a real Deco.
+- **Go code:** `internal/deco`. This spec was written beside a Go reference (`scratchpad/spec/go/`), which passed `go vet` and `go test -race` against an in-process emulator and had never talked to a real Deco. `internal/deco` was ported from it and is the only copy now (`docs/deco/reference-go/README.md` says where the old one is in the history); what it has read from a real Deco since is in its own comments.
 
 **Labels used throughout.**
 
@@ -164,7 +164,7 @@ Casing matters for both md5 and sha1. **Pre-check offline:** `md5hex(candidate) 
 - MACs: hmac-sha2-256/512;
 - auth: publickey, password.
 
-**Host keys.** The app accepts any key: `StrictHostKeyChecking=ask` with `promptYesNo()` returning true (`JSch.java:86`; `com/tplink/ssh2/m0.java:42-45`). The wrapper pins the LIVE fingerprints instead (`go/tmp.go` `PinnedHostKey`).
+**Host keys.** The app accepts any key: `StrictHostKeyChecking=ask` with `promptYesNo()` returning true (`JSch.java:86`; `com/tplink/ssh2/m0.java:42-45`). The wrapper pins the LIVE fingerprints instead (`internal/deco/tmp.go` `PinnedHostKey`).
 
 **Auth retries.**
 
@@ -471,7 +471,7 @@ JSON  {"error_code":0,"result":{"band2_4":{...},"band5_1":{...}}}
 
 ## 8. Opcodes the wrapper needs
 
-**Source of truth.** Opcodes are from `mesh/global/p.java` (name map: `:1294-1296` token verify/free and `TMP_APPV2_OP_COMP_NEGOTIATE`, `:1303-1304` `TMP_APPV2_OP_WIRELESS_SET/GET`). Schemas are from the bean classes. Go types are in `go/schemas.go`.
+**Source of truth.** Opcodes are from `mesh/global/p.java` (name map: `:1294-1296` token verify/free and `TMP_APPV2_OP_COMP_NEGOTIATE`, `:1303-1304` `TMP_APPV2_OP_WIRELESS_SET/GET`). Schemas are from the bean classes. Go types and the opcode constants are in `internal/deco/schemas.go`; a test holds this table to the constants (every `Op...` constant has a row).
 
 - "params null" means the request body is just `{"config_version":…}`.
 - `opcodes_annot.txt` is incomplete (it lacks the LED opcodes). Grep `p.java` directly.
@@ -486,6 +486,7 @@ JSON  {"error_code":0,"result":{"band2_4":{...},"band5_1":{...}}}
 | 0x4040 | f66120u0:1077 | Get | null | IotClientListResult | smart/client/repository/v.java:1577 |
 | 0x4009 | f66023m:786 | Get | null | WirelessInfoBean | MeshWirelessRepository.java:1617 |
 | 0x4008 | f66011l:750 | Set | partial WirelessInfoBean | Boolean, default TRUE | MeshWirelessRepository.java:680 |
+| 0x43b0 / 0x43b1 | f66067p7:918 / f66079q7:954 | Get / Set | MLO: `WirelessMloInfo` in `internal/deco/schemas.go` | | not recorded; nothing in this repository sends them |
 | 0x4016 | f66179z:1254 | Set | `{device_list:[{device_id}]}` | `{reboot_time:int}` | e0.java:626 (body built at e0.java:149-156) |
 | 0x4017 | A:10 | Set | ClientBlockParams (block-list add) | default null | l0.java:1334 |
 | 0x4018 | B:22 | Get | null | ClientBlockListResult | l0.java:1607 |
@@ -500,6 +501,7 @@ JSON  {"error_code":0,"result":{"band2_4":{...},"band5_1":{...}}}
 | 0x42f0 / 0x42f1 / 0x42f2 | x4/y4/z4 | Get/Set/Get | WirelessBandwidthSwitchBean | `{countdown}` / `{status}` | wireless/repository/g.java:493,409,502 |
 | 0x4390 / 0x4391 | N6/O6 | Get/Set | `{enable}` | | wireless/repository/s.java:29,46 |
 | 0x4098 | K9:140 | Get | null | QsWifiStatusResult (quick setup only) | quicksetup/repository/c.java:65 |
+| 0x4038 | f65961h0:600 | not recorded | `AccountModifyParams` `{cloud_account:{email,password}}` (`TMP_APPV2_OP_ACCOUNT_MODIFY`: re-binds the cloud account and rewrites `/etc/shadow`) | | not recorded; nothing in this repository sends it |
 
 ### 8.1 NegotiationResult (`bo/negotiation/result/NegotiationResult.java:22-61`)
 
@@ -659,16 +661,18 @@ No opcode was found for any of these (INFERRED from grep of `p.java` usage):
 
 ---
 
-## 9. Go reference (`scratchpad/spec/go`, package `deco`)
+## 9. Go code (`internal/deco`, package `deco`)
+
+The protocol layers of this spec, by file. The package also holds what the daemon builds on them (`mesh.go`, `live.go`, `collect.go`, `wlan.go`; see `design.md`).
 
 | file | contents |
 |---|---|
-| `discovery.go` | `EncodeTDP`/`DecodeTDP`/`DiscoverDeco`, `DecoInfo.OwnerMatches`, `SSHUsername`, `SSHPort`, `UsesTLS`, `TPSBanner` |
-| `tmp.go` | `DecoSSHConfig`, `DialTMP`, `PinnedHostKey`; TMP v1 `EncodeDataFrame`, `ReadFrame`, and `FrameConn` (serial demux, idle-edge heartbeat, BYE handling) |
-| `business.go` | V2 `Transact` (mirrors `a.java`, including R3), `Session` (token state machine, retry), `EncodeRequest`/`DecodeResult`, `NegotiationParams` (role `owner`/`user`), and `Client` (`Connect`, `Call`/`Get`/`Set`, lazy redial, `Close`) |
-| `schemas.go` | all beans in §8, lenient scalar types, `BuildHostSet`/`BuildGuestSet` |
-| `emulator_test.go` | in-process device emulator covering both ack styles, multi-chunk replies and requests, the empty-response CRC rule (R3), empty-token handling, heartbeat echo, negotiate tolerance, and the TDP/username vectors |
+| `internal/deco/discovery.go` | `EncodeTDP`/`DecodeTDP`/`DiscoverDeco`, `DecoInfo.OwnerMatches`, `SSHUsername`, `SSHPort`, `UsesTLS`, `TPSBanner` |
+| `internal/deco/tmp.go` | `DecoSSHConfig`, `DialTMP`, `PinnedHostKey`; TMP v1 `EncodeDataFrame`, `ReadFrame`, and `FrameConn` (serial demux, idle-edge heartbeat, BYE handling) |
+| `internal/deco/business.go` | V2 `Transact` (mirrors `a.java`, including R3), `Session` (token state machine, retry), `EncodeRequest`/`DecodeResult`, `NegotiationParams` (role `owner`/`user`), and `Client` (`Connect`, `Call`/`Get`/`Set`, lazy redial, `Close`) |
+| `internal/deco/schemas.go` | the opcodes and all beans in §8, lenient scalar types, `BuildHostSet`/`BuildGuestSet` |
+| `internal/deco/emulator_test.go` | in-process device emulator covering both ack styles, multi-chunk replies and requests, the empty-response CRC rule (R3), empty-token handling, heartbeat echo, negotiate tolerance, and the TDP/username vectors |
 
-**Verified:** `go vet ./...` is clean and `go test -race -count=1 ./...` passes 6 of 6 tests.
+**Verified:** the emulator tests run with the repository's `go vet ./...` and `go test ./...`.
 
-**Not verified:** behaviour against a real Deco.
+**Not verified by these tests:** behaviour against a real Deco (`open-questions.md`).
