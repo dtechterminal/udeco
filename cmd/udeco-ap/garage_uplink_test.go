@@ -83,3 +83,13 @@ func TestUplinkLossConfig(t *testing.T) {
 		}
 	}
 }
+
+func TestBSSPinningConfig(t *testing.T) {
+	base := `{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","platform":"jio-mtk","model":"U7LT","takeover":true`
+	if c, err := parseConfig([]byte(base + `,"bss_pinning":true}`)); err != nil || !c.BSSPinning {
+		t.Errorf("jio: %v", err)
+	}
+	if _, err := parseConfig([]byte(`{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","takeover":true,"bss_pinning":true}`)); err == nil {
+		t.Error("Deco accepted bss_pinning")
+	}
+}

@@ -75,7 +75,7 @@ func isolatedPlans(want map[string]RadioPlan, keep string) map[string]RadioPlan 
 	out := map[string]RadioPlan{}
 	for band, rp := range want {
 		c := rp
-		c.BSS = nil
+		c.BSS, c.Slots = nil, nil // the kept SSID in slot 0
 		for _, b := range rp.BSS {
 			if b.ID == id {
 				c.BSS = append(c.BSS, b)

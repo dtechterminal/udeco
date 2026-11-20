@@ -43,6 +43,9 @@ type Options struct {
 	// KeepSSID is the SSID kept up while the uplink is down
 	// (uplinkloss.go); "" = the first LAN SSID
 	KeepSSID string
+	// PinSlots keeps each WLAN on its profile slot (netdev, BSSID) while
+	// others come and go (slots.go); off = the controller's order
+	PinSlots bool
 	// VerifyTimeout bounds the wait for the BSSes after an apply (20 s).
 	VerifyTimeout time.Duration
 	// Settle: how long after a radio restart the collector's driver reads
@@ -94,6 +97,8 @@ type Applier struct {
 	// (a.live is its isolated form meanwhile)
 	uplinkDown bool
 	want       map[string]RadioPlan
+	// pins: WLAN id -> profile slot per band (slots.go)
+	pins map[string]map[string]int
 }
 
 const (
@@ -200,6 +205,7 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	full, notes := plans(d, a.o.Layout, a.o.WPA3)
+	full, _ = a.pinned(full)
 	want := a.effective(full)
 	p := bcmwifi.Plan{Desired: d, Notes: notes}
 	cur := a.live
@@ -346,6 +352,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	full, _ := plans(p.Desired, a.o.Layout, a.o.WPA3)
+	full, pins := a.pinned(full)
 	want := a.effective(full)
 	h := plansHash(full)
 	if h == a.failed {
@@ -377,6 +384,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 		return err
 	}
 	a.live, a.want = want, full
+	a.savePins(pins)
 	a.saveLastGood(full)
 	a.flushLive(ctx)
 	return nil
@@ -433,13 +441,19 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 	if err := writeFile(a.dev(rd.Dat), profile(base, rd, rp), 0o600); err != nil {
 		return err
 	}
-	for i := range rp.BSS {
-		if err := a.run(ctx, "ifconfig", rd.Ifaces[i], "up"); err != nil {
+	// slot 0 first: the radio's first BSS netdev up reads the profile
+	order := make([]int, len(rp.BSS))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(x, y int) bool { return rp.slot(order[x]) < rp.slot(order[y]) })
+	for _, i := range order {
+		if err := a.run(ctx, "ifconfig", a.ifaceOf(rd, rp, i), "up"); err != nil {
 			return err
 		}
 	}
 	for i, b := range rp.BSS {
-		if err := a.bridgeTo(ctx, rd.Ifaces[i], b.VLAN); err != nil {
+		if err := a.bridgeTo(ctx, a.ifaceOf(rd, rp, i), b.VLAN); err != nil {
 			return err
 		}
 	}
@@ -457,7 +471,7 @@ func (a *Applier) applyLive(ctx context.Context, rd RadioDef, c, rp RadioPlan) e
 		if i < len(c.BSS) && c.BSS[i].Hidden == b.Hidden && c.BSS[i].Isolate == b.Isolate && c.BSS[i].MaxSta == b.MaxSta {
 			continue
 		}
-		ifc := rd.Ifaces[i]
+		ifc := a.ifaceOf(rd, rp, i)
 		for _, kv := range []string{"HideSSID=" + b01(b.Hidden), "NoForwarding=" + b01(b.Isolate), "MaxStaNum=" + strconv.Itoa(b.MaxSta)} {
 			if err := a.run(ctx, "iwpriv", ifc, "set", kv); err != nil {
 				return err
@@ -651,8 +665,10 @@ func (a *Applier) check(ctx context.Context, want map[string]RadioPlan, ssids bo
 // checkRadio is check for one radio.
 func (a *Applier) checkRadio(ctx context.Context, rd RadioDef, rp RadioPlan, ssids bool) error {
 	var bad []string
-	for i, ifc := range rd.Ifaces {
-		if i >= len(rp.BSS) {
+	served := bssOf(rd, rp)
+	for _, ifc := range rd.Ifaces {
+		i, ok := served[ifc]
+		if !ok {
 			if a.isUp(ifc) {
 				bad = append(bad, ifc+" is up but serves nothing")
 			}
@@ -701,6 +717,7 @@ func (a *Applier) Verify(ctx context.Context, d bcmwifi.Desired) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	want, _ := plans(d, a.o.Layout, a.o.WPA3)
+	want, _ = a.pinned(want)
 	return a.check(ctx, a.effective(want), !a.settling())
 }
 
@@ -858,8 +875,10 @@ func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 	ssids := !a.settling()
 	for _, rd := range a.o.Layout {
 		rp := a.live[rd.Band]
-		for i, ifc := range rd.Ifaces {
-			if i >= len(rp.BSS) {
+		served := bssOf(rd, rp)
+		for _, ifc := range rd.Ifaces {
+			i, ok := served[ifc]
+			if !ok {
 				if a.isUp(ifc) {
 					r.Foreign = append(r.Foreign, ifc+" is up but serves nothing")
 					r.NeedsApply = true
@@ -973,8 +992,9 @@ func wantACLs(d bcmwifi.Desired, want map[string]RadioPlan, layout []RadioDef, b
 	}
 	out := map[string]ifaceACL{}
 	for _, rd := range layout {
-		for i, b := range want[rd.Band].BSS {
-			if i >= len(rd.Ifaces) {
+		rp := want[rd.Band]
+		for i, b := range rp.BSS {
+			if rp.slot(i) >= len(rd.Ifaces) {
 				break
 			}
 			deny := map[string]bool{}
@@ -1007,7 +1027,7 @@ func wantACLs(d bcmwifi.Desired, want map[string]RadioPlan, layout []RadioDef, b
 				}
 			}
 			sort.Strings(acl.MACs)
-			out[rd.Ifaces[i]] = acl
+			out[rd.Ifaces[rp.slot(i)]] = acl
 		}
 	}
 	return out

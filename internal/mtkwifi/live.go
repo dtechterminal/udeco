@@ -76,7 +76,18 @@ func (a *Applier) flushLive(ctx context.Context) {
 }
 
 // ifaceOf is the netdev serving rp.BSS[i] on rd.
-func (a *Applier) ifaceOf(rd RadioDef, rp RadioPlan, i int) string { return rd.Ifaces[i] }
+func (a *Applier) ifaceOf(rd RadioDef, rp RadioPlan, i int) string { return rd.Ifaces[rp.slot(i)] }
+
+// bssOf maps rd's netdevs to the index of the BSS of rp each serves.
+func bssOf(rd RadioDef, rp RadioPlan) map[string]int {
+	m := map[string]int{}
+	for i := range rp.BSS {
+		if s := rp.slot(i); s < len(rd.Ifaces) {
+			m[rd.Ifaces[s]] = i
+		}
+	}
+	return m
+}
 
 // clearLive sets the per-BSS live settings back to the drivers' defaults
 // on every up BSS of the radios the agent set them on (the hand-back:

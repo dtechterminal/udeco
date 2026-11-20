@@ -98,6 +98,9 @@ type BSS struct {
 	// Guest: a guest SSID, isolated by the agent's ebtables chains
 	// (guest.go)
 	Guest bool `json:",omitempty"`
+	// Sched: the WLAN has a schedule (it comes and goes): never pinned
+	// to slot 0 while an always-on WLAN can be (slots.go)
+	Sched bool `json:",omitempty"`
 }
 
 // RadioPlan is what one radio serves. The zero value of each per-radio
@@ -127,6 +130,18 @@ type RadioPlan struct {
 	// TxMode is the controller's power mode (auto, high, medium, low,
 	// custom), reported back with the power (collector.go radioTx)
 	TxMode string `json:",omitempty"`
+	// Slots is each BSS's profile slot (its netdev Ifaces[slot]), parallel
+	// to BSS; nil = positional (BSS[i] in slot i). Set by BSS pinning
+	// (slots.go).
+	Slots []int `json:",omitempty"`
+}
+
+// slot is the profile slot of rp.BSS[i].
+func (rp RadioPlan) slot(i int) int {
+	if i < len(rp.Slots) {
+		return rp.Slots[i]
+	}
+	return i
 }
 
 // structural is everything that may need the radio restarted: the BSS
@@ -239,7 +254,8 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			}
 			s = s.ForBand(rd.Band) // the controller's own values for this radio
 			b := BSS{ID: s.ID, SSID: s.SSID, Hidden: s.Hidden, Isolate: s.Isolation, MaxSta: maxSta, VLAN: s.VLAN,
-				RRM: s.RRM, BTM: s.BSSTransition, UAPSD: s.UAPSD && rd.UAPSD, M2U: s.MulticastToUnicast}
+				RRM: s.RRM, BTM: s.BSSTransition, UAPSD: s.UAPSD && rd.UAPSD, M2U: s.MulticastToUnicast,
+				Sched: len(s.Schedule) > 0}
 			switch s.Security {
 			case "open", "":
 				b.Auth, b.Encr = "OPEN", "NONE"
@@ -466,6 +482,21 @@ func listKey(base []byte, key string, n int, vals []string, def string) string {
 	return strings.Join(parts, ";")
 }
 
+// slotKey is listKey with each value in its BSS's slot (rp.Slots): the
+// slots not served keep the vendor's values.
+func slotKey(base []byte, key string, n int, rp RadioPlan, vals []string, def string) string {
+	if rp.Slots == nil {
+		return listKey(base, key, n, vals, def)
+	}
+	parts := strings.Split(listKey(base, key, n, nil, def), ";")
+	for i, v := range vals {
+		if s := rp.slot(i); s < n {
+			parts[s] = v
+		}
+	}
+	return strings.Join(parts, ";")
+}
+
 // profile is base rewritten for rp.
 func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 	n := len(rd.Ifaces)
@@ -494,27 +525,27 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 	kv["TxPower"] = strconv.Itoa(rp.TxPct)
 	var auth, encr, hide, nofw, maxsta, mfpc, mfpr []string
 	for i, b := range rp.BSS {
-		kv[fmt.Sprintf("SSID%d", i+1)] = b.SSID
+		kv[fmt.Sprintf("SSID%d", rp.slot(i)+1)] = b.SSID
 		if b.PSK != "" {
-			kv[fmt.Sprintf("WPAPSK%d", i+1)] = b.PSK
+			kv[fmt.Sprintf("WPAPSK%d", rp.slot(i)+1)] = b.PSK
 		}
 		auth, encr = append(auth, b.Auth), append(encr, b.Encr)
 		hide, nofw = append(hide, b01(b.Hidden)), append(nofw, b01(b.Isolate))
 		maxsta = append(maxsta, strconv.Itoa(b.MaxSta))
 		mfpc, mfpr = append(mfpc, b01(b.PMF >= 1)), append(mfpr, b01(b.PMF == 2))
 	}
-	kv["AuthMode"] = listKey(base, "AuthMode", n, auth, "WPA2PSK")
-	kv["EncrypType"] = listKey(base, "EncrypType", n, encr, "AES")
-	kv["HideSSID"] = listKey(base, "HideSSID", n, hide, "0")
-	kv["NoForwarding"] = listKey(base, "NoForwarding", n, nofw, "0")
-	kv[rd.MaxStaKey] = listKey(base, rd.MaxStaKey, n, maxsta, strconv.Itoa(maxStaDefault))
+	kv["AuthMode"] = slotKey(base, "AuthMode", n, rp, auth, "WPA2PSK")
+	kv["EncrypType"] = slotKey(base, "EncrypType", n, rp, encr, "AES")
+	kv["HideSSID"] = slotKey(base, "HideSSID", n, rp, hide, "0")
+	kv["NoForwarding"] = slotKey(base, "NoForwarding", n, rp, nofw, "0")
+	kv[rd.MaxStaKey] = slotKey(base, rd.MaxStaKey, n, rp, maxsta, strconv.Itoa(maxStaDefault))
 	if rd.SAE {
 		// per-BSS lists; the slots not served keep PMF off
-		kv["PMFMFPC"] = listKey(nil, "PMFMFPC", n, mfpc, "0")
-		kv["PMFMFPR"] = listKey(nil, "PMFMFPR", n, mfpr, "0")
+		kv["PMFMFPC"] = slotKey(nil, "PMFMFPC", n, rp, mfpc, "0")
+		kv["PMFMFPR"] = slotKey(nil, "PMFMFPR", n, rp, mfpr, "0")
 		kv["PMFSHA256"] = listKey(nil, "PMFSHA256", n, nil, "0")
 	}
-	kv["IEEE8021X"] = listKey(base, "IEEE8021X", n, []string{"0", "0", "0", "0"}[:len(rp.BSS)], "0")
+	kv["IEEE8021X"] = slotKey(base, "IEEE8021X", n, rp, []string{"0", "0", "0", "0"}[:len(rp.BSS)], "0")
 	profileFeatures(kv, base, rd, rp)
 	return setKeys(base, kv)
 }

@@ -134,6 +134,13 @@ type Config struct {
 	// on the LAN (no VLAN, not a guest SSID). Not served: nothing is taken
 	// down.
 	UplinkLossSSID string `json:"uplink_loss_ssid,omitempty"`
+	// BSSPinning (platform jio-mtk) keeps each WLAN on its own driver
+	// profile slot (netdev and BSSID) while other WLANs come and go
+	// (schedules, disabled WLANs), as a U6 has one VAP per WLAN; slot 0
+	// always carries a WLAN, one without a schedule when there is one.
+	// Off by default until the single-BSS down/up test passed on the unit
+	// (mtkwifi slots.go, docs/deco/features/garage-parity.md).
+	BSSPinning bool `json:"bss_pinning,omitempty"`
 }
 
 // uplinkLoss: the SSIDs are isolated on uplink loss (platform jio-mtk)
@@ -231,8 +238,8 @@ func (c *Config) validate() error {
 	default:
 		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
 	}
-	if (c.UplinkLoss != nil || c.UplinkLossSSID != "") && !c.jio() {
-		return errors.New("config: uplink_loss and uplink_loss_ssid are for platform " + PlatformJio + " only")
+	if (c.UplinkLoss != nil || c.UplinkLossSSID != "" || c.BSSPinning) && !c.jio() {
+		return errors.New("config: uplink_loss, uplink_loss_ssid and bss_pinning are for platform " + PlatformJio + " only")
 	}
 	if (len(c.PortsUnlocked) > 0 || c.PortsConfirmS != 0 || c.PortsLossS != 0) && !c.jio() {
 		return errors.New("config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform " + PlatformJio + " only")

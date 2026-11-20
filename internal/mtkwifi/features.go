@@ -263,11 +263,11 @@ func profileFeatures(kv map[string]string, base []byte, rd RadioDef, rp RadioPla
 		rrm, wnm, apsd = append(rrm, b01(b.RRM)), append(wnm, b01(b.BTM)), append(apsd, b01(b.UAPSD))
 	}
 	// per BSS in both drivers ("bDot11kRRMEnable[%d]", "bDot11vWNMEnable[%d]")
-	kv["RRMEnable"] = listKey(base, "RRMEnable", n, rrm, "0")
-	kv["WNMEnable"] = listKey(base, "WNMEnable", n, wnm, "0")
+	kv["RRMEnable"] = slotKey(base, "RRMEnable", n, rp, rrm, "0")
+	kv["WNMEnable"] = slotKey(base, "WNMEnable", n, rp, wnm, "0")
 	if rd.UAPSD {
 		// per BSS on the MT7663 ("APSDCapable[%d]=%d"); the MT7603 has none
-		kv["APSDCapable"] = listKey(base, "APSDCapable", n, apsd, "0")
+		kv["APSDCapable"] = slotKey(base, "APSDCapable", n, rp, apsd, "0")
 	}
 	if rp.DTIM > 0 {
 		kv["DtimPeriod"] = strconv.Itoa(rp.DTIM)
@@ -281,7 +281,7 @@ func profileFeatures(kv map[string]string, base []byte, rd RadioDef, rp RadioPla
 		for _, b := range rp.BSS {
 			m2u = append(m2u, b01(b.M2U))
 		}
-		kv["IgmpSnEnable"] = listKey(base, "IgmpSnEnable", n, m2u, "1")
+		kv["IgmpSnEnable"] = slotKey(base, "IgmpSnEnable", n, rp, m2u, "1")
 	case rp.IgmpSn:
 		// the vendor's form: one value on the MT7603
 		if cur, _ := getKey(base, "IgmpSnEnable"); strings.Contains(cur, ";") {
@@ -328,8 +328,8 @@ func u6Defaults(kv map[string]string, base []byte, rd RadioDef, rp RadioPlan) {
 			method, interval = append(method, "DISABLE"), append(interval, "0")
 		}
 	}
-	kv["RekeyMethod"] = listKey(base, "RekeyMethod", n, method, "TIME")
-	kv["RekeyInterval"] = listKey(base, "RekeyInterval", n, interval, "3600")
+	kv["RekeyMethod"] = slotKey(base, "RekeyMethod", n, rp, method, "TIME")
+	kv["RekeyInterval"] = slotKey(base, "RekeyInterval", n, rp, interval, "3600")
 	switch rd.Band {
 	case "ng":
 		// 20/40 coexistence off (U6 disablecoext 1, cwmenable 0)
