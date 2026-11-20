@@ -188,6 +188,10 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 	gst, gforeign := a.guestSteps(l.Guest, l.guestVifs(), a.readGuest(ctx))
 	p.Steps = append(p.Steps, gst...)
 	p.Foreign = append(p.Foreign, gforeign...)
+	// The bridge group address filter on every served vif (bga.go).
+	bst, bforeign := a.bgaSteps(l.bgaVifs(), a.readBGA(ctx))
+	p.Steps = append(p.Steps, bst...)
+	p.Foreign = append(p.Foreign, bforeign...)
 	for _, rl := range l.Radios {
 		rp, err := a.planRadio(ctx, rl, ls, blocked, d.Country, caps)
 		if err != nil {

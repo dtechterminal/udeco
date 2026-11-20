@@ -22,12 +22,20 @@ func guestDesired(portal bool) Desired {
 	return d
 }
 
+// ebRules lists a chain's rules; in FORWARD, the BGA filter's jump
+// (bga.go, on every served vif whatever the guest policy) is left out.
 func ebRules(f *fakeDev, chain string) []string {
 	c := f.eb.chains[chain]
 	if c == nil {
 		return nil
 	}
-	return c.rules
+	var out []string
+	for _, r := range c.rules {
+		if r != "-j "+chainBGA {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 func TestGuestIsolation(t *testing.T) {

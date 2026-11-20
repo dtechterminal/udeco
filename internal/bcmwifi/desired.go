@@ -108,6 +108,10 @@ type SSID struct {
 	// per radio in this driver: off only when every SSID on the radio
 	// says so (parity.go radioBSSLoad).
 	NoBSSLoad bool `json:",omitempty"`
+	// NoBGAFilter: the controller turned the WLAN's bridge group address
+	// filter off (wireless.N.bga_filter=disabled): its vifs are left out
+	// of UDECO-BGA (bga.go).
+	NoBGAFilter bool `json:",omitempty"`
 }
 
 // MACFilter is a per-SSID station filter.

@@ -288,6 +288,8 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		s.Optional = true
 		st = append(st, s)
 	}
+	bst, _ := a.bgaSteps(nil, a.readBGA(ctx)) // the BGA filter too (bga.go)
+	st = append(st, bst...)
 	st = append(st, a.shapingTeardownSteps()...)
 	backhaul := func(v string, have [][2]string) {
 		for _, d := range backhaulDefaults {

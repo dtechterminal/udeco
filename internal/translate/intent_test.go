@@ -921,3 +921,31 @@ func TestIntentSameBandTwice(t *testing.T) {
 		}
 	}
 }
+
+// qbssload and bga_filter are carried: absent or enabled is the default
+// (BSS Load advertised, BPDUs filtered), disabled turns them off.
+func TestIntentQBSSLoadBGA(t *testing.T) {
+	for _, c := range []struct {
+		lines           []string
+		nobss, nofilter bool
+	}{
+		{nil, false, false},
+		{[]string{"wireless.1.qbssload=disabled"}, true, false},
+		{[]string{"wireless.1.bga_filter=disabled"}, false, true},
+		{[]string{"wireless.1.bga_filter=enabled", "wireless.1.qbssload=enabled"}, false, false},
+	} {
+		in, notes := IntentFromCfg(wlan(append([]string{"aaa.1.wpa=2", "aaa.1.wpa.key.1.mgmt=WPA-PSK", "aaa.1.wpa.psk=good-pass-1"}, c.lines...)...))
+		if len(in.WLANs) != 1 {
+			t.Fatalf("%v: %v %q", c.lines, in.WLANs, notes)
+		}
+		w := in.WLANs[0]
+		if w.NoBSSLoad != c.nobss || w.NoBGAFilter != c.nofilter {
+			t.Errorf("%v: nobssload %t nobga %t", c.lines, w.NoBSSLoad, w.NoBGAFilter)
+		}
+		for _, n := range notes {
+			if strings.Contains(n, "qbssload") || strings.Contains(n, "bga_filter") {
+				t.Errorf("%v: note %q", c.lines, n)
+			}
+		}
+	}
+}
