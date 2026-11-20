@@ -5,6 +5,7 @@ package bcmwifi
 import (
 	"context"
 	"fmt"
+	"math/bits"
 	"net"
 	"os"
 	"regexp"
@@ -298,7 +299,7 @@ func TestFTSAEMobilityDomainOverDS(t *testing.T) {
 	}
 	u := l.radio("na").Used[0]
 	d := driverFor(u, "be:a7:b9:3e:17:05", 128, nil, false)
-	if d.MDID != 0xa1b2 || d.OverDS != 1 {
+	if d.MDID != 0xb2a1 || d.OverDS != 1 {
 		t.Errorf("driver %+v", d)
 	}
 	var argv []string
@@ -306,7 +307,7 @@ func TestFTSAEMobilityDomainOverDS(t *testing.T) {
 		argv = append(argv, strings.Join(st.Argv, " "))
 	}
 	all := strings.Join(argv, "\n")
-	if !strings.Contains(all, "fbt_mdid 41394") || !strings.Contains(all, "fbtoverds 1") {
+	if !strings.Contains(all, "fbt_mdid 45729") || !strings.Contains(all, "fbtoverds 1") {
 		t.Errorf("driver steps:\n%s", all)
 	}
 
@@ -385,8 +386,9 @@ func TestFTSAEApplyKeepsKeySecret(t *testing.T) {
 		t.Errorf("each band lists its own band's peer: %v", peerOf)
 	}
 	for _, band := range []string{"ng", "na"} {
-		if !f.called("fbt_mdid " + fmt.Sprint(bandMobilityDomain(s.SSID, band))) {
-			t.Errorf("driver fbt_mdid for %s not the band's", band)
+		// the driver gets the byte-swapped MDID (it beacons little-endian)
+		if !f.called("fbt_mdid " + fmt.Sprint(bits.ReverseBytes16(bandMobilityDomain(s.SSID, band)))) {
+			t.Errorf("driver fbt_mdid for %s not the band's (byte-swapped)", band)
 		}
 	}
 	if !f.called("fbt 1") {
