@@ -19,7 +19,13 @@ import (
 // The daemon writes a net-snmp config (root-only: the community and password
 // are secrets) and procd runs snmpd on it (init script instance "snmp").
 
-const SNMPConf = "/etc/unifi-openwrt/snmpd.conf"
+// SNMPConf is the net-snmp config SyncSNMP writes. The init script runs
+// snmpd on it, as the procd instance snmpInstance, while the file is there.
+const (
+	SNMPConf     = ConfDir + "/snmpd.conf"
+	snmpInstance = "snmp"
+	snmpdBin     = "/usr/sbin/snmpd" // the snmpd package's daemon
+)
 
 var snmpSafe = regexp.MustCompile(`^[\x21-\x7e]{1,64}$`) // printable, no spaces or quotes trouble below
 
@@ -70,24 +76,26 @@ func SNMPConfig(cfg map[string]string) (string, error) {
 	return b.String(), nil
 }
 
-// SyncSNMP installs or removes the snmpd config; the init script runs snmpd
-// while the file exists (a reload starts or stops it).
-func (cl *Client) SyncSNMP(conf string) (changed bool, err error) {
-	script := `set -e
+// snmpSyncScript installs the config (stdin); an empty one removes it.
+const snmpSyncScript = `set -e
 umask 077
 f=` + SNMPConf + `
 cat > "$f.new"
 if [ ! -s "$f.new" ]; then
 	rm -f "$f.new"
 	[ -e "$f" ] || { echo same; exit 0; }
-	rm -f "$f"; /etc/init.d/unifi-openwrt reload; echo changed; exit 0
+	rm -f "$f"; ` + initScript + ` reload; echo changed; exit 0
 fi
 if cmp -s "$f.new" "$f"; then rm -f "$f.new"; echo same; exit 0; fi
 mv "$f.new" "$f"
-[ -x /usr/sbin/snmpd ] || { echo nosnmpd; exit 0; }
-/etc/init.d/unifi-openwrt reload
+[ -x ` + snmpdBin + ` ] || { echo nosnmpd; exit 0; }
+` + initScript + ` reload
 echo changed`
-	out, err := cl.RunStdin("sh -c "+shQuote(script), []byte(conf))
+
+// SyncSNMP installs or removes the snmpd config; the init script runs snmpd
+// while the file exists (a reload starts or stops it).
+func (cl *Client) SyncSNMP(conf string) (changed bool, err error) {
+	out, err := cl.RunStdin("sh -c "+shQuote(snmpSyncScript), []byte(conf))
 	if err != nil {
 		return false, fmt.Errorf("snmp: %v (%s)", err, strings.TrimSpace(string(out)))
 	}

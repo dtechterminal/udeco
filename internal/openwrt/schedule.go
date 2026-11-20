@@ -11,6 +11,14 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
+// The WLAN schedule on the AP: the cron script SyncSchedules installs, the
+// table it reads and the mark of its line in root's crontab.
+const (
+	scheduleSh       = ConfDir + "/schedule.sh"
+	scheduleConfFile = ConfDir + "/schedule.conf"
+	scheduleCronMark = "# unifi-openwrt schedule"
+)
+
 // scheduleScript runs every minute from cron on the AP: for each scheduled
 // wifi-iface it works out whether it should be up now (local time, the
 // timezone the controller set) and flips `disabled` + `wifi reload` when
@@ -18,7 +26,7 @@ import (
 // A window's end is inclusive, as in a UAP's within_schedule (now <= end;
 // all day is 0000-2359): see translate.Schedule.
 const scheduleScript = `#!/bin/sh
-C=/etc/unifi-openwrt/schedule.conf
+C=` + scheduleConfFile + `
 [ -s "$C" ] || exit 0
 d=$(date +%a | tr A-Z a-z); t=$(date +%H%M)
 changed=0
@@ -72,6 +80,27 @@ func scheduleConf(ss []translate.Schedule) (string, error) {
 	return strings.Join(lines, "\n") + "\n", nil
 }
 
+// scheduleSyncScript installs the cron script, writes conf (scheduleConf's
+// text; empty = no schedule) as its table and keeps the crontab line only
+// while there is a table.
+func scheduleSyncScript(conf string) string {
+	return `set -e
+mkdir -p ` + ConfDir + `
+cat > ` + scheduleSh + `.new <<'SCRIPT'
+` + scheduleScript + `SCRIPT
+chmod 755 ` + scheduleSh + `.new
+mv ` + scheduleSh + `.new ` + scheduleSh + `
+printf '%s' ` + shQuote(conf) + ` > ` + scheduleConfFile + `
+touch /etc/crontabs/root
+old=$(cat /etc/crontabs/root)
+grep -v '` + scheduleCronMark + `' /etc/crontabs/root > /etc/crontabs/root.uow || true
+[ -s ` + scheduleConfFile + ` ] && echo '* * * * * ` + scheduleSh + ` ` + scheduleCronMark + `' >> /etc/crontabs/root.uow
+mv /etc/crontabs/root.uow /etc/crontabs/root
+[ "$old" = "$(cat /etc/crontabs/root)" ] && pgrep crond >/dev/null || /etc/init.d/cron restart
+` + scheduleSh + `
+echo ok`
+}
+
 // SyncSchedules installs (or removes) the WLAN schedules and the cron job,
 // then runs the script once.
 func (cl *Client) SyncSchedules(ss []translate.Schedule) error {
@@ -79,21 +108,7 @@ func (cl *Client) SyncSchedules(ss []translate.Schedule) error {
 	if err != nil {
 		return err
 	}
-	script := fmt.Sprintf(`set -e
-mkdir -p /etc/unifi-openwrt
-cat > /etc/unifi-openwrt/schedule.sh.new <<'SCRIPT'
-%sSCRIPT
-chmod 755 /etc/unifi-openwrt/schedule.sh.new
-mv /etc/unifi-openwrt/schedule.sh.new /etc/unifi-openwrt/schedule.sh
-printf '%%s' %s > /etc/unifi-openwrt/schedule.conf
-touch /etc/crontabs/root
-old=$(cat /etc/crontabs/root)
-grep -v '# unifi-openwrt schedule' /etc/crontabs/root > /etc/crontabs/root.uow || true
-[ -s /etc/unifi-openwrt/schedule.conf ] && echo '* * * * * /etc/unifi-openwrt/schedule.sh # unifi-openwrt schedule' >> /etc/crontabs/root.uow
-mv /etc/crontabs/root.uow /etc/crontabs/root
-[ "$old" = "$(cat /etc/crontabs/root)" ] && pgrep crond >/dev/null || /etc/init.d/cron restart
-/etc/unifi-openwrt/schedule.sh
-echo ok`, scheduleScript, shQuote(conf))
+	script := scheduleSyncScript(conf)
 	out, err := cl.Run(script)
 	if err != nil {
 		return fmt.Errorf("schedules: %v (%s)", err, strings.TrimSpace(string(out)))

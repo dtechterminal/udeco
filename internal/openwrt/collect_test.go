@@ -3,11 +3,41 @@
 package openwrt
 
 import (
+	"flag"
+	"io"
 	"os"
 	"strings"
 	"testing"
 	"time"
 )
+
+// TargetFlags is the four flags of the SSH tools: what they are called,
+// what they default to and which field of the Target each fills.
+func TestTargetFlags(t *testing.T) {
+	fs := flag.NewFlagSet("t", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	tg := TargetFlags(fs)
+	if err := fs.Parse(nil); err != nil {
+		t.Fatal(err)
+	}
+	if want := (Target{Addr: "192.168.1.2:22", User: "root", KeyFile: "ap_ed25519", KnownHosts: "ap_known_hosts"}); *tg != want {
+		t.Errorf("defaults %+v, want %+v", *tg, want)
+	}
+	if want := (Target{Addr: DefaultAddr, User: DefaultUser, KeyFile: DefaultKeyFile, KnownHosts: DefaultKnownHosts}); *tg != want {
+		t.Errorf("defaults %+v are not the Default* constants %+v", *tg, want)
+	}
+	if err := fs.Parse([]string{"-addr", "10.0.0.2:2022", "-user", "admin", "-key", "k", "-known-hosts", "kh"}); err != nil {
+		t.Fatal(err)
+	}
+	if want := (Target{Addr: "10.0.0.2:2022", User: "admin", KeyFile: "k", KnownHosts: "kh"}); *tg != want {
+		t.Errorf("parsed %+v, want %+v", *tg, want)
+	}
+	n := 0
+	fs.VisitAll(func(*flag.Flag) { n++ })
+	if n != 4 {
+		t.Errorf("%d flags registered, want 4", n)
+	}
+}
 
 func TestParseOnHub(t *testing.T) {
 	b, err := os.ReadFile("testdata/onhub-collect.txt")

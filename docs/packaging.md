@@ -95,8 +95,8 @@ kept, and the package's version is saved next to it as `.apk-new`.
 ### OpenWrt SDK or feed
 
 `packaging/openwrt/unifi-openwrt/Makefile` is a standard OpenWrt package Makefile
-(`golang-package.mk` from the packages feed; needs golang 1.26, which the
-openwrt-25.12 packages feed has). It builds `cmd/uow` for the SDK's target, with the
+(`golang-package.mk` from the packages feed; needs the Go version in `go.mod`, which
+the openwrt-25.12 packages feed has). It builds `cmd/uow` for the SDK's target, with the
 right `GOARM`/`GOMIPS` for every arch, and makes a signed package when the SDK or
 buildroot has signing keys. In the SDK:
 

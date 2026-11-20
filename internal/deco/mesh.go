@@ -43,6 +43,17 @@ const (
 	// enrichment (names, client_type, last placement): live it took 62 s and
 	// returned only stored settings, and while it runs nothing else is polled.
 	MinClientsEvery = 10 * time.Minute
+	// DefaultPoll is how often the device list, client speeds (0x4014) and
+	// IoT clients (0x4040) are read when the config does not say
+	// (MeshConfig.Poll; "poll" in cmd/udeco's config).
+	DefaultPoll = 15 * time.Second
+	// The other reads' intervals when MeshConfig leaves them zero:
+	// Wi-Fi info (0x4009), port status (0x4327) and the block list (0x4018).
+	defaultWirelessEvery = 60 * time.Second
+	defaultPortsEvery    = 5 * time.Minute
+	defaultBlocksEvery   = 60 * time.Second
+	// defaultCommandTimeout is how long a queued command waits for a session.
+	defaultCommandTimeout = 5 * time.Minute
 )
 
 // pollComponent gates a poll on a NEGOTIATE component, as the app does:
@@ -104,19 +115,19 @@ type MeshConfig struct {
 	// Apply gates every write. False (the default) logs the plan only.
 	Apply bool
 
-	Poll           time.Duration // device list, client speeds (0x4014), IoT clients (0x4040); default 15s
+	Poll           time.Duration // device list, client speeds (0x4014), IoT clients (0x4040); default DefaultPoll
 	ClientsEvery   time.Duration // 0x4012 enrichment; default and floor MinClientsEvery; < 0 turns it off
-	WirelessEvery  time.Duration // 0x4009; default 60s, and after every Set
-	PortsEvery     time.Duration // 0x4327; default 5m
-	BlocksEvery    time.Duration // 0x4018; default 60s
+	WirelessEvery  time.Duration // 0x4009; default defaultWirelessEvery, and after every Set
+	PortsEvery     time.Duration // 0x4327; default defaultPortsEvery
+	BlocksEvery    time.Duration // 0x4018; default defaultBlocksEvery
 	RedialMin      time.Duration // login backoff start; never below RedialFloor
 	RedialMax      time.Duration // login backoff cap; default RedialCeiling
-	Heartbeat      time.Duration // TMP heartbeat; default 3s
-	RequestTimeout time.Duration // per request; default 45s (0x4012: at least 75s, AppRequestTimeout)
+	Heartbeat      time.Duration // TMP heartbeat; default DefaultHeartbeat
+	RequestTimeout time.Duration // per request; default DefaultRequestTimeout (0x4012: at least its AppRequestTimeout)
 	// OpTimeouts overrides the request budget of single opcodes.
 	OpTimeouts      map[uint16]time.Duration
-	CommandTimeout  time.Duration // queued command lifetime; default 5m
-	WLANMinInterval time.Duration // minimum gap between Wi-Fi Sets; default 5m
+	CommandTimeout  time.Duration // queued command lifetime; default defaultCommandTimeout
+	WLANMinInterval time.Duration // minimum gap between Wi-Fi Sets; default the constant WLANMinInterval
 
 	// MaxLogins > 0 caps the SSH logins of this Mesh's lifetime (-print: 1).
 	// Once reached, a lost session stays down.
@@ -398,18 +409,18 @@ func NewMesh(cfg MeshConfig) (*Mesh, error) {
 			*d = v
 		}
 	}
-	def(&cfg.Poll, 15*time.Second)
+	def(&cfg.Poll, DefaultPoll)
 	if cfg.ClientsEvery >= 0 && cfg.ClientsEvery < MinClientsEvery {
 		cfg.ClientsEvery = MinClientsEvery
 	}
-	def(&cfg.WirelessEvery, 60*time.Second)
-	def(&cfg.PortsEvery, 5*time.Minute)
-	def(&cfg.BlocksEvery, 60*time.Second)
+	def(&cfg.WirelessEvery, defaultWirelessEvery)
+	def(&cfg.PortsEvery, defaultPortsEvery)
+	def(&cfg.BlocksEvery, defaultBlocksEvery)
 	def(&cfg.RedialMax, RedialCeiling)
 	def(&cfg.Heartbeat, DefaultHeartbeat)
-	def(&cfg.RequestTimeout, 45*time.Second)
-	def(&cfg.CommandTimeout, 5*time.Minute)
-	def(&cfg.WLANMinInterval, 5*time.Minute)
+	def(&cfg.RequestTimeout, DefaultRequestTimeout)
+	def(&cfg.CommandTimeout, defaultCommandTimeout)
+	def(&cfg.WLANMinInterval, WLANMinInterval)
 	if cfg.RedialMin < RedialFloor {
 		cfg.RedialMin = RedialFloor
 	}

@@ -31,8 +31,9 @@ const (
 	noiseFloor     = rf.NoiseFloorDBm // dBm; rssi = signal - noise, so never 0 (unifi.go:222)
 	defaultSignal  = -60              // dBm when neither strength nor level is known
 	defaultMaxGap  = 60 * time.Second
-	defaultMaxAge  = 45 * time.Second // 3 polls at the default 15 s
-	counterExpiry  = time.Hour        // forget a client's byte counters after this long unseen
+	maxAgePolls    = 3 // a list older than this many polls is no longer current (MaxAge)
+	defaultMaxAge  = maxAgePolls * DefaultPoll
+	counterExpiry  = time.Hour // forget a client's byte counters after this long unseen
 	defaultPortMbs = 1000
 )
 
@@ -64,8 +65,17 @@ type CollectOptions struct {
 	// MaxAge is how old device_list and the presence lists (0x4014, 0x4040,
 	// 0x4012) may be and still be reported as current (see Fresh,
 	// LiveClients); past it the unit reports no clients rather than a frozen
-	// list. Default 45 s; about 3x the poll.
+	// list. Default MaxAge(DefaultPoll), 45 s.
 	MaxAge time.Duration
+}
+
+// MaxAge is how old a list may be and still count as current for a Mesh
+// polling every poll: three polls. poll <= 0 is DefaultPoll.
+func MaxAge(poll time.Duration) time.Duration {
+	if poll <= 0 {
+		poll = DefaultPoll
+	}
+	return maxAgePolls * poll
 }
 
 var defaultRadios = map[string]RadioSpec{

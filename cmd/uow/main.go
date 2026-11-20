@@ -46,15 +46,27 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/unifiapi"
 )
 
+// Flag defaults the OpenWrt package writes as well: its shipped UCI config
+// (packaging/files/etc/config/unifi-openwrt), the init script's fallbacks
+// (packaging/files/etc/init.d/unifi-openwrt) and packaging/install.sh.
+// Those run on the AP and cannot read this file; TestPackagedDefaults holds
+// them to these constants.
+const (
+	defaultInformURL = "http://192.168.1.1:8080/inform"
+	defaultHostname  = "OpenWrt"
+	defaultModel     = models.DefaultModel
+	defaultSSHListen = ":2222" // the package's ssh_port, with the colon
+)
+
 func main() {
-	informURL := flag.String("url", "http://192.168.1.1:8080/inform", "controller inform URL (IP literal host)")
+	informURL := flag.String("url", defaultInformURL, "controller inform URL (IP literal host)")
 	console := flag.String("console", "192.168.1.1", "console host for read-only health checks")
 	macStr := flag.String("mac", "02:6f:77:72:74:01", "device MAC: made-up (02:...) without -ap; with -ap it must equal the AP's br-lan MAC")
 	apAddr := flag.String("ap", "", "real OpenWrt AP to report (ssh host:port); empty = made-up device")
-	apUser := flag.String("ap-user", "root", "ssh user on the AP")
-	apKey := flag.String("ap-key", "ap_ed25519", "ssh key for the AP")
-	apKH := flag.String("ap-known-hosts", "ap_known_hosts", "known_hosts with the AP's key")
-	hostname := flag.String("hostname", "OpenWrt", "hostname reported to the controller")
+	apUser := flag.String("ap-user", openwrt.DefaultUser, "ssh user on the AP")
+	apKey := flag.String("ap-key", openwrt.DefaultKeyFile, "ssh key for the AP")
+	apKH := flag.String("ap-known-hosts", openwrt.DefaultKnownHosts, "known_hosts with the AP's key")
+	hostname := flag.String("hostname", defaultHostname, "hostname reported to the controller")
 	wifiCaps := flag.Int("wifi-caps", 0, "UNIFI_WIFI_CAP bitmap to claim (131072 = WPA3); only what the AP can do")
 	uplinkName := flag.String("uplink-port", "", "port that is always the uplink (e.g. wan); empty = the port the gateway is behind")
 	flag.BoolVar(&meshUplink, "mesh-uplink", false, "join the site's mesh as a wireless uplink when no cable has link (AP-side watcher)")
@@ -62,7 +74,7 @@ func main() {
 	flag.StringVar(&portalListen, "portal-listen", "", fmt.Sprintf("guest portal redirect endpoint (UniFi APs: :%d); empty = off", device.PortalPort))
 	flag.StringVar(&ledIdle, "led-idle", "", "idle LED effect instead of steady blue: \"rainbow\" (RGB LED rings, daemon on the AP); empty = blue like the UniFi model")
 	informEvery := flag.Duration("inform-every", 0, "inform at least this often (0 = the controller's interval, 10 s); 2s makes the panel's live bars move")
-	modelCode := flag.String("model", models.DefaultModel, "UniFi model to be adopted as (see -models / -suggest)")
+	modelCode := flag.String("model", defaultModel, "UniFi model to be adopted as (see -models / -suggest)")
 	listModels := flag.Bool("models", false, "list the UniFi AP models and exit")
 	suggest := flag.Bool("suggest", false, "suggest the closest UniFi model for the AP (-ap) and exit")
 	profileCaps := flag.Bool("profile-caps", false, "report the real U7PG2's capability words (wifi/fw/radio caps); the translator clamps what the AP can't do")
@@ -71,7 +83,7 @@ func main() {
 	flag.BoolVar(&locateBeepOn, "locate-beep", true, "beep on Locate (APs with a speaker)")
 	stateDir := flag.String("state", "uow-state", "state directory (created mode 700)")
 	healthEvery := flag.Duration("health-every", time.Minute, "health check period")
-	sshListen := flag.String("ssh-listen", ":2222", "fake device SSH (adoption only); empty = off")
+	sshListen := flag.String("ssh-listen", defaultSSHListen, "fake device SSH (adoption only); empty = off")
 	maxErrors := flag.Int("max-errors", 0, "stop after this many bad answers in a row (0 = never: keep trying, up to a minute apart)")
 	flag.Parse()
 	if h, _, err := net.SplitHostPort(*apAddr); err == nil {

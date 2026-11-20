@@ -8,13 +8,22 @@ import (
 	"strings"
 )
 
+// MeshScript is where SyncMesh installs the mesh-uplink watcher. The init
+// script runs it as the procd instance meshInstance when the file is there
+// at service start; meshConf is what the watcher reads.
+const (
+	MeshScript   = ConfDir + "/mesh.sh"
+	meshConf     = ConfDir + "/mesh.conf"
+	meshInstance = "mesh"
+)
+
 // meshScript is the AP-side mesh-uplink watcher (procd instance "mesh"). It
 // keeps a 4-address (WDS) client to the site's mesh SSID up only while no
 // wired bridge port has link: 20 s without cable -> join; cable back -> the
 // wireless uplink goes down within a second, then is removed. So the AP is
 // never uplinked by cable and Wi-Fi at once (no loop).
 const meshScript = `#!/bin/sh
-C=/etc/unifi-openwrt/mesh.conf
+C=` + meshConf + `
 STA=unifi_mesh
 wired() {
 	for p in $(ubus call network.device status | jsonfilter -e '@["br-lan"]["bridge-members"][*]'); do
@@ -68,6 +77,28 @@ while :; do
 done
 `
 
+// meshOffScript takes the mesh uplink away: no config (the watcher then
+// keeps the wireless uplink down) and no uplink interface.
+const meshOffScript = `rm -f ` + meshConf + `; [ "$(uci -q get wireless.unifi_mesh)" = wifi-iface ] && { uci delete wireless.unifi_mesh; uci commit wireless; wifi reload; }; true`
+
+// meshSyncScript installs the config (stdin) and the watcher.
+const meshSyncScript = `set -e
+mkdir -p ` + ConfDir + `
+umask 077
+cat > ` + meshConf + `.new
+mv ` + meshConf + `.new ` + meshConf + `
+# new file + rename: the running watcher keeps reading its own (old) inode
+cat > ` + MeshScript + `.new <<'SCRIPT'
+` + meshScript + `SCRIPT
+chmod 755 ` + MeshScript + `.new
+cmp -s ` + MeshScript + `.new ` + MeshScript + ` && rm -f ` + MeshScript + `.new || mv ` + MeshScript + `.new ` + MeshScript + `
+# procd starts the "mesh" instance only if mesh.sh exists at service start:
+# on the first sync, reload so it starts (unchanged instances keep running)
+if [ "$(ubus call service list '{"name":"` + Service + `"}' | jsonfilter -e '@[*].instances.` + meshInstance + `.running')" != true ]; then
+	` + initScript + ` reload
+fi
+echo ok`
+
 var meshSafe = regexp.MustCompile(`^[A-Za-z0-9._@+=:,/~!#%^*()\[\]{}-]{1,63}$`)
 
 // MeshAccept turns the controller's Mesh Parent choice (mesh.serial1/2: the
@@ -92,7 +123,7 @@ func MeshAccept(serials ...string) []string {
 // Mesh Parent BSSID masks (MeshAccept); empty = any parent.
 func (cl *Client) SyncMesh(enabled bool, ssid, psk, radio string, accept []string) error {
 	if !enabled {
-		_, err := cl.Run(`rm -f /etc/unifi-openwrt/mesh.conf; [ "$(uci -q get wireless.unifi_mesh)" = wifi-iface ] && { uci delete wireless.unifi_mesh; uci commit wireless; wifi reload; }; true`)
+		_, err := cl.Run(meshOffScript)
 		return err
 	}
 	for _, v := range []string{ssid, psk} {
@@ -104,23 +135,7 @@ func (cl *Client) SyncMesh(enabled bool, ssid, psk, radio string, accept []strin
 		return fmt.Errorf("bad radio %q", radio)
 	}
 	conf := fmt.Sprintf("MESH_SSID='%s'\nMESH_PSK='%s'\nMESH_RADIO='%s'\nMESH_ACCEPT='%s'\n", ssid, psk, radio, strings.Join(accept, " "))
-	script := `set -e
-mkdir -p /etc/unifi-openwrt
-umask 077
-cat > /etc/unifi-openwrt/mesh.conf.new
-mv /etc/unifi-openwrt/mesh.conf.new /etc/unifi-openwrt/mesh.conf
-# new file + rename: the running watcher keeps reading its own (old) inode
-cat > /etc/unifi-openwrt/mesh.sh.new <<'SCRIPT'
-` + meshScript + `SCRIPT
-chmod 755 /etc/unifi-openwrt/mesh.sh.new
-cmp -s /etc/unifi-openwrt/mesh.sh.new /etc/unifi-openwrt/mesh.sh && rm -f /etc/unifi-openwrt/mesh.sh.new || mv /etc/unifi-openwrt/mesh.sh.new /etc/unifi-openwrt/mesh.sh
-# procd starts the "mesh" instance only if mesh.sh exists at service start:
-# on the first sync, reload so it starts (unchanged instances keep running)
-if [ "$(ubus call service list '{"name":"unifi-openwrt"}' | jsonfilter -e '@[*].instances.mesh.running')" != true ]; then
-	/etc/init.d/unifi-openwrt reload
-fi
-echo ok`
-	out, err := cl.RunStdin("sh -c "+shQuote(script), []byte(conf))
+	out, err := cl.RunStdin("sh -c "+shQuote(meshSyncScript), []byte(conf))
 	if err != nil {
 		return fmt.Errorf("mesh: %v (%s)", err, strings.TrimSpace(string(out)))
 	}

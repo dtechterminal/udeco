@@ -12,6 +12,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"math/bits"
 	"net"
@@ -33,6 +34,27 @@ type Target struct {
 	User       string
 	KeyFile    string // private key (the daemon's own)
 	KnownHosts string // known_hosts file with the AP's host key
+}
+
+// What the tools that reach an AP over SSH take when nothing is given
+// (cmd/owctl, cmd/owplan, cmd/owprobe; cmd/uow's -ap-user, -ap-key and
+// -ap-known-hosts).
+const (
+	DefaultAddr       = "192.168.1.2:22"
+	DefaultUser       = "root"
+	DefaultKeyFile    = "ap_ed25519"
+	DefaultKnownHosts = "ap_known_hosts"
+)
+
+// TargetFlags registers -addr, -user, -key and -known-hosts on fs and
+// returns the Target they fill when fs is parsed.
+func TargetFlags(fs *flag.FlagSet) *Target {
+	t := &Target{}
+	fs.StringVar(&t.Addr, "addr", DefaultAddr, "AP ssh address")
+	fs.StringVar(&t.User, "user", DefaultUser, "ssh user")
+	fs.StringVar(&t.KeyFile, "key", DefaultKeyFile, "ssh private key for the AP")
+	fs.StringVar(&t.KnownHosts, "known-hosts", DefaultKnownHosts, "known_hosts file with the AP's host key")
+	return t
 }
 
 type Client struct {

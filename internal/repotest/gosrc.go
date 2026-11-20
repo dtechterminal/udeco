@@ -58,6 +58,55 @@ func StringConsts(t testing.TB, rel string) map[string]string {
 	return out
 }
 
+// FlagDefaults are the command-line flags the Go file at rel registers
+// with the flag package's calls, on the package or on a FlagSet, and the
+// default each is given, as written: name -> `":2222"`, `false`,
+// `time.Minute`, `defaultModel`. A call counts when it has the shape of
+// flag.String(name, default, usage) or flag.StringVar(&v, name, default,
+// usage) for one of the flag package's value kinds and names the flag
+// with a string literal.
+func FlagDefaults(t testing.TB, rel string) map[string]string {
+	t.Helper()
+	fset, f := parseGo(t, rel)
+	out := map[string]string{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		kind, isVar := strings.CutSuffix(sel.Sel.Name, "Var")
+		switch kind {
+		case "Bool", "Duration", "Float64", "Int", "Int64", "String", "Uint", "Uint64":
+		default:
+			return true
+		}
+		at := 0 // the name's place among the arguments
+		if isVar {
+			at = 1
+		}
+		if len(call.Args) != at+3 {
+			return true
+		}
+		lit, ok := call.Args[at].(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		name, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			return true
+		}
+		var b bytes.Buffer
+		printer.Fprint(&b, fset, call.Args[at+1])
+		out[name] = b.String()
+		return true
+	})
+	return out
+}
+
 // Switch is one expression switch of a function.
 type Switch struct {
 	Tag   string     // what it switches on, as written ("verb", "r.Cmd"); "" for a switch without a tag

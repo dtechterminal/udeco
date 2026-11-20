@@ -329,6 +329,19 @@ func TestStringConsts(t *testing.T) {
 	}
 }
 
+func TestFlagDefaults(t *testing.T) {
+	want := map[string]string{
+		"url":          "defaultURL",
+		"apply":        "false",
+		"health-every": "time.Minute",
+		"ssh-listen":   `":2222"`,
+		"n":            "2 * base",
+	}
+	if got := FlagDefaults(t, goSample); !reflect.DeepEqual(got, want) {
+		t.Errorf("FlagDefaults = %q, want %q", got, want)
+	}
+}
+
 func TestSwitches(t *testing.T) {
 	want := []Switch{
 		{Tag: "verb", Cases: [][]string{{"dev.Unblock", "dev.GuestAuth"}}},

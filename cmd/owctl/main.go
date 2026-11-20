@@ -14,16 +14,13 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", "192.168.1.2:22", "AP ssh address")
-	user := flag.String("user", "root", "ssh user")
-	key := flag.String("key", "ap_ed25519", "ssh private key for the AP")
-	kh := flag.String("known-hosts", "ap_known_hosts", "known_hosts file with the AP's host key")
+	target := openwrt.TargetFlags(flag.CommandLine)
 	flag.Parse()
 	a := flag.Args()
 	if len(a) == 0 {
 		log.Fatal("usage: owctl bans | kick <mac> | ban <mac>... | unblock <mac>... | beep | led on|off|locate")
 	}
-	cl := openwrt.NewClient(openwrt.Target{Addr: *addr, User: *user, KeyFile: *key, KnownHosts: *kh})
+	cl := openwrt.NewClient(*target)
 	defer cl.Close()
 	var err error
 	switch {

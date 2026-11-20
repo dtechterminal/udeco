@@ -3,8 +3,10 @@
 package main
 
 import (
+	"path"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -130,11 +132,20 @@ func TestConfigWords(t *testing.T) {
 		onRemoveStop+"`) or show it as pending again (`"+onRemovePending+"`). |")
 }
 
-// deploy/unraid.sh looks into udeco.json for a key by its name (no
-// credentials file is needed when the config names a password file): each
-// name it greps for is a JSON key of Config.
-func TestUnraidScriptConfigKeys(t *testing.T) {
-	keys := regexp.MustCompile(`grep -q '\\"([a-z0-9_]+)\\"' '\$APPDATA/udeco\.json'`).FindAllStringSubmatch(repotest.Read(t, "deploy/unraid.sh"), -1)
+// deploy/unraid.sh refuses to go on when it sees no credentials: neither
+// the env file udeco reads by default nor a config that names a file of
+// its own. That is loadSecrets' lookup, written again for the host, so
+// each key it greps udeco.json for is a JSON key of Config, both keys
+// that name a credentials file are among them (a config with one of them
+// is taken by the daemon and must not be refused by the script), and the
+// env file and the variables its message asks for are the daemon's.
+func TestUnraidScriptCredentials(t *testing.T) {
+	script := repotest.Read(t, "deploy/unraid.sh")
+	cfgName := path.Base(defaultConfigPath)
+	var keys []string
+	for _, m := range regexp.MustCompile(`! grep -q '\\"([a-z0-9_]+)\\"' '\$APPDATA/`+regexp.QuoteMeta(cfgName)+`'`).FindAllStringSubmatch(script, -1) {
+		keys = append(keys, m[1])
+	}
 	if len(keys) == 0 {
 		t.Fatal("deploy/unraid.sh no longer greps udeco.json for a key this way")
 	}
@@ -146,8 +157,35 @@ func TestUnraidScriptConfigKeys(t *testing.T) {
 		}
 	}
 	for _, k := range keys {
-		if !tags[k[1]] {
-			t.Errorf("deploy/unraid.sh greps udeco.json for %q, which is not a key of Config", k[1])
+		if !tags[k] {
+			t.Errorf("deploy/unraid.sh greps udeco.json for %q, which is not a key of Config", k)
 		}
+	}
+	want := []string{jsonKey(t, "PasswordFile"), jsonKey(t, "CredentialsFile")}
+	sort.Strings(keys)
+	sort.Strings(want)
+	if strings.Join(keys, " ") != strings.Join(want, " ") {
+		t.Errorf("deploy/unraid.sh takes a config with one of %q as having credentials; the keys of Config that name a credentials file are %q", keys, want)
+	}
+	// one condition: no env file and none of the keys
+	if want := "if [ ! -f '$APPDATA/" + credentialsFileName + "' ] && ! grep -q "; !strings.Contains(script, want) {
+		t.Errorf("deploy/unraid.sh does not start its credentials check with %s", want)
+	}
+
+	// the env file by the daemon's name for it, wherever the script names one
+	envFiles := regexp.MustCompile(`[A-Za-z0-9_.-]+\.env\b`).FindAllString(script, -1)
+	if len(envFiles) < 3 { // the check, its message, the chmod
+		t.Errorf("deploy/unraid.sh names an env file %d times, want the check, its message and the chmod", len(envFiles))
+	}
+	for _, f := range envFiles {
+		if f != credentialsFileName {
+			t.Errorf("deploy/unraid.sh names the env file %s, the daemon reads %s", f, credentialsFileName)
+		}
+	}
+	// and the variables it tells the user to put there
+	vars := regexp.MustCompile(`\b[A-Z_]*TPLINK[A-Z_]*\b`).FindAllString(script, -1)
+	sort.Strings(vars)
+	if want := []string{envTPLinkEmail, envTPLinkPassword}; strings.Join(vars, " ") != strings.Join(want, " ") {
+		t.Errorf("deploy/unraid.sh asks for %q in the env file, the daemon reads %q", vars, want)
 	}
 }
