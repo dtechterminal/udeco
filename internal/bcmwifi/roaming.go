@@ -23,10 +23,13 @@ import (
 //
 //	bss_tm_req <sta> disassoc_imminent=1 disassoc_timer=<TBTT> pref=1 abridged=1 neighbor=<bssid>,<info>,<opclass>,<chan>,<phy> ...
 //
-// Two guards keep it from becoming a bare kick: a station whose driver
+// Three guards keep it from becoming a bare kick: a station whose driver
 // record (`wl sta_info`, "wnm" capability line) does not list
-// BSS-Transition is never sent one (ErrNoBTM), and a request needs at
-// least one candidate (ErrNoCandidate). Checked against the binary on .205:
+// BSS-Transition is never sent one (ErrNoBTM), this AP's own BSSes (any
+// band, any first octet: the X20's BSSIDs are variants of one address)
+// are never a candidate (no request while one of their BSSIDs cannot be
+// read), and a request needs at least one candidate left
+// (ErrNoCandidate). Checked against the binary on .205:
 // hostapd 2.9 has bss_tm_req with disassoc_timer=, disassoc_imminent=1,
 // pref=, abridged= and neighbor= (strings), and set_disassoc_timer.
 
@@ -88,11 +91,28 @@ func (a *Applier) RoamAssist(ctx context.Context, r RoamRequest) error {
 	if err != nil {
 		return fmt.Errorf("bcmwifi: roam: %w", err)
 	}
+	// never one of this AP's own BSSes, on any band: a client asked to
+	// move to the same unit's other band is only dropped by the timer and
+	// comes straight back (live 2026-11-19). A served BSS whose BSSID
+	// cannot be read could be any candidate: no request then.
+	mine := map[string]bool{}
+	for _, v := range append([]string{r.Vif}, ours...) {
+		b := own
+		if v != r.Vif {
+			if b, err = a.bssid(ctx, v); err != nil {
+				return fmt.Errorf("bcmwifi: roam: this AP's BSSes: %w", err)
+			}
+		}
+		if b = normMAC(b); b == "" {
+			return fmt.Errorf("bcmwifi: roam: this AP's BSSes: no BSSID for %s", v)
+		}
+		mine[b[2:]] = true
+	}
 	var nbs []string
-	seen := map[string]bool{own: true}
+	seen := map[string]bool{}
 	for _, c := range r.Candidates {
 		b, band := normMAC(c.BSSID), normBand(c.Band)
-		if b == "" || band == "" || c.Channel <= 0 || c.Channel > 196 || seen[b] {
+		if b == "" || band == "" || c.Channel <= 0 || c.Channel > 196 || seen[b] || mine[b[2:]] {
 			continue
 		}
 		seen[b] = true

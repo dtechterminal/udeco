@@ -6,15 +6,38 @@ package main
 // roaming-assistant.md). The controller turns it on per WLAN and band
 // (system_cfg wireless.N.btm_disassoc.status=enabled, .threshold=<dBm>;
 // translate.WLANIntent.RoamAssist -> bcmwifi.SSID.RoamAssist), and a UAP
-// does it in its driver (btm_disassoc / btm_dis_thld). Here the inform loop
-// watches each reading: a station on such a BSS whose signal stays below the
-// threshold for roamBelow readings in a row gets one 802.11v BSS Transition
-// Management request with Disassociation Imminent and a disassociation
-// timer (bcmwifi.RoamAssist), naming as candidates the same SSID's other
-// BSSes on this AP (the other band) and the BSSes with that SSID the
-// unit's scans heard (the site's other APs). A station that does not
-// advertise BSS transition, or one with no candidate to go to, is left
-// alone. Rate-limited per station; takeover mode only (hostapd is ours).
+// does it in its driver (btm_disassoc / btm_dis_thld: an 802.11v BSS
+// Transition Management request with Disassociation Imminent to a client
+// below the threshold). Here the inform loop watches each reading:
+//
+//   - a client on such a BSS qualifies once its signal has stayed below the
+//     threshold for roamBelow readings in a row and at least
+//     timing.roamSustain (one weak reading is noise, not a client at the
+//     edge);
+//   - the candidates are BSSes of the same SSID on OTHER APs that this
+//     unit's scans heard within roamCandAge at the threshold plus
+//     roamCandMargin or better (an AP this unit hears well is near enough
+//     that a client at this unit's edge may well hear it better). Never one
+//     of this unit's own BSSes, on any band: asking a client at -76 dBm on
+//     the 5 GHz BSS to move to the same unit's 2.4 GHz BSS (live,
+//     2026-11-19) only had the disassociation timer drop it, and it came
+//     straight back to the 5 GHz BSS every few minutes;
+//   - no candidate: no request, and the client is never disassociated;
+//     logged once per client per roamNoCandLog;
+//   - a candidate: one request (bcmwifi.RoamAssist, which also refuses a
+//     client that does not advertise BSS transition). The client is not
+//     asked again for roamHold. Still (or again) on the same BSS
+//     roamJudge after the request and within roamReturn: it ignored the
+//     request or the move did not hold, and the wait doubles each time up
+//     to roamHoldMax; away for roamReturn: the backoff ends;
+//   - the worker hands each request's outcome back to the next reading. A
+//     request bcmwifi refused was never sent: a client without BSS
+//     transition is held roamNoBTMHold and logged once; no usable
+//     candidate left (bcmwifi's own-BSS guard) is the no-candidate case.
+//     Neither is judged, nor keeps band steering off the client.
+//
+// At most roamPerRead requests per reading, weakest first; takeover mode
+// only (hostapd is ours), not while memory is short.
 
 import (
 	"context"
@@ -22,6 +45,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
@@ -29,11 +53,20 @@ import (
 )
 
 const (
-	roamBelow        = 2               // readings in a row below the threshold before a request
-	roamEvery        = 5 * time.Minute // at most one request per station this often
-	roamPerRead      = 2               // requests per reading at most
-	roamDisassocTBTT = 100             // disassociation timer: 100 beacon intervals, about 10 s
-	roamScanCands    = 4               // candidates taken from the scans at most
+	roamBelow        = 3                // readings in a row below the threshold, at least
+	roamSustain      = time.Minute      // and below it for this long (timing.roamSustain)
+	roamHold         = 10 * time.Minute // no second request to a client within this
+	roamHoldMax      = 2 * time.Hour    // the longest wait after requests that did not help
+	roamJudge        = time.Minute      // on the same BSS this long after a request: it did not move (timer ~10 s)
+	roamReturn       = 30 * time.Minute // back on the same BSS within this: the move did not hold
+	roamPerRead      = 2                // requests per reading at most
+	roamDisassocTBTT = 100              // disassociation timer: 100 beacon intervals, about 10 s
+	roamScanCands    = 4                // candidates taken from the scans at most
+	roamCandMargin   = 10               // dB above the threshold a candidate must be heard at, at least
+	roamCandAge      = 15 * time.Minute // scan sightings older than this are no candidates
+	roamNoCandLog    = time.Hour        // "no candidate" logged once per client this often
+	roamForget       = time.Hour        // a client's record goes when unseen this long (and not held)
+	roamNoBTMHold    = 24 * time.Hour   // no request to a client without BSS transition support within this
 )
 
 // roamer is bcmwifi's Roaming Assistant primitive.
@@ -41,10 +74,34 @@ type roamer interface {
 	RoamAssist(ctx context.Context, r bcmwifi.RoamRequest) error
 }
 
-// roamState belongs to the inform loop.
+// roamClient is one client's Roaming Assistant record.
+type roamClient struct {
+	since  time.Time // first reading of the current run below its threshold (zero: none)
+	n      int       // readings in a row below its threshold
+	seen   time.Time // last reading with it on this unit
+	asked  time.Time // last request (zero: none)
+	vif    string    // the BSS it was asked to leave
+	left   bool      // a reading after the request did not have it on vif
+	judged bool      // the last request's outcome is counted
+	fails  int       // requests in a row it ignored or came back from
+	hold   time.Time // no request before this
+	noCand time.Time // "no candidate" last logged
+	noBTM  bool      // a request was refused: it does not advertise BSS transition (logged)
+}
+
+// roamState belongs to the inform loop, but for done.
 type roamState struct {
-	below map[string]int       // station MAC -> readings in a row below its threshold
-	last  map[string]time.Time // station MAC -> last request (or decision to leave it alone)
+	c map[string]*roamClient // client MAC -> record
+
+	mu   sync.Mutex
+	done []roamDone // the worker's outcomes, for the next reading
+}
+
+// roamDone is one request's outcome.
+type roamDone struct {
+	c   roamCand
+	at  time.Time // the reading that made it
+	err error
 }
 
 // roamPolicy is the live Wi-Fi's Roaming Assistant thresholds by
@@ -68,44 +125,74 @@ type roamCand struct {
 	vif, mac       string
 	signal, thresh int
 	band           string
-	to             []bcmwifi.Neighbor
+	weak           time.Duration // below the threshold this long
+	to             []roamHeard
+}
+
+// ownBSS reports whether a BSSID is this unit's: one of the reading's
+// radio or BSS addresses, or one of them with another first octet (the
+// X20 derives its BSSIDs as locally administered variants, e.g.
+// aa:a7:b9:3e:15:f8 and ba:a7:b9:3e:15:f8).
+type ownBSS map[string]bool
+
+func ownBSSes(s *apstate.Snapshot) ownBSS {
+	own := ownBSS{}
+	add := func(b string) {
+		if b = strings.ToLower(b); len(b) == 17 {
+			own[b], own["*"+b[2:]] = true, true
+		}
+	}
+	add(s.MAC)
+	for _, r := range s.Radios {
+		add(r.BSSID)
+		for _, v := range r.VAPs {
+			add(v.BSSID)
+		}
+	}
+	return own
+}
+
+func (o ownBSS) has(b string) bool {
+	b = strings.ToLower(b)
+	return o[b] || len(b) == 17 && o["*"+b[2:]]
 }
 
 // roamReading looks at one reading and asks the worker to send Roaming
-// Assistant requests to the stations that qualify (loop goroutine).
+// Assistant requests to the clients that qualify (loop goroutine).
 func (a *agent) roamReading(s *apstate.Snapshot, now time.Time) {
 	st := &a.roam
-	if st.below == nil {
-		st.below, st.last = map[string]int{}, map[string]time.Time{}
+	if st.c == nil {
+		st.c = map[string]*roamClient{}
 	}
-	for m, t := range st.last {
-		if now.Sub(t) > roamEvery {
-			delete(st.last, m)
+	a.roamOutcomes()
+	where := map[string]string{} // client MAC -> the BSS it is on now
+	for _, r := range s.Radios {
+		for _, v := range r.VAPs {
+			for _, c := range v.Stations {
+				where[strings.ToLower(c.MAC)] = v.Iface
+			}
+		}
+	}
+	for m, c := range st.c {
+		vif, here := where[m]
+		if here {
+			c.seen = now
+		}
+		a.roamJudge(m, c, vif, here, now)
+		if !here && now.Sub(c.seen) > roamForget && !now.Before(c.hold) {
+			delete(st.c, m)
 		}
 	}
 	pol := a.policy.Load()
 	rr, ok := a.wifi.(roamer)
 	if !a.takeover.Load() || a.shed.Load() || pol == nil || len(pol.roam) == 0 || !ok {
-		clear(st.below)
+		for _, c := range st.c {
+			c.since, c.n = time.Time{}, 0
+		}
 		return
 	}
-	own := map[string]bool{}
-	ess := map[string][]bcmwifi.Neighbor{} // SSID -> this AP's BSSes of it
-	for _, r := range s.Radios {
-		if r.BSSID != "" {
-			own[strings.ToLower(r.BSSID)] = true
-		}
-		for _, v := range r.VAPs {
-			if v.BSSID == "" {
-				continue
-			}
-			own[strings.ToLower(v.BSSID)] = true
-			if v.SSID != "" && r.Channel > 0 {
-				ess[v.SSID] = append(ess[v.SSID], bcmwifi.Neighbor{BSSID: v.BSSID, Band: vapBand(r, v), Channel: r.Channel})
-			}
-		}
-	}
-	seen := map[string]bool{}
+	own := ownBSSes(s)
+	weak := map[string]bool{}
 	var cs []roamCand
 	for _, r := range s.Radios {
 		for _, v := range r.VAPs {
@@ -114,33 +201,40 @@ func (a *agent) roamReading(s *apstate.Snapshot, now time.Time) {
 			if !on || v.Iface == "" {
 				continue
 			}
-			for _, c := range v.Stations {
-				if c.Signal == 0 {
-					continue // no reading
+			for _, sta := range v.Stations {
+				m := strings.ToLower(sta.MAC)
+				if sta.Signal == 0 || sta.Signal >= th {
+					continue // no reading, or strong enough: the run ends below
 				}
-				seen[c.MAC] = true
-				if c.Signal >= th {
-					delete(st.below, c.MAC)
+				weak[m] = true
+				c := st.c[m]
+				if c == nil {
+					c = &roamClient{seen: now}
+					st.c[m] = c
+				}
+				if c.since.IsZero() {
+					c.since = now
+				}
+				c.n++
+				if c.n < roamBelow || now.Sub(c.since) < a.t.roamSustain || now.Before(c.hold) {
 					continue
 				}
-				st.below[c.MAC]++
-				if _, recent := st.last[c.MAC]; recent || st.below[c.MAC] < roamBelow {
-					continue
-				}
-				var to []bcmwifi.Neighbor
-				for _, o := range ess[v.SSID] {
-					if !strings.EqualFold(o.BSSID, v.BSSID) {
-						to = append(to, o)
+				to := a.scans.sameESS(v.SSID, own, th+roamCandMargin, now, roamScanCands)
+				if len(to) == 0 {
+					if c.noCand.IsZero() || now.Sub(c.noCand) >= roamNoCandLog {
+						c.noCand = now
+						a.logf("roaming assistant: %s at %d dBm (threshold %d) on %s: no other AP with %q heard at %d dBm or better: left alone",
+							m, sta.Signal, th, v.Iface, v.SSID, th+roamCandMargin)
 					}
+					continue
 				}
-				to = append(to, a.scans.sameESS(v.SSID, own, roamScanCands)...)
-				cs = append(cs, roamCand{v.Iface, c.MAC, c.Signal, th, band, to})
+				cs = append(cs, roamCand{v.Iface, m, sta.Signal, th, band, now.Sub(c.since), to})
 			}
 		}
 	}
-	for m := range st.below {
-		if !seen[m] {
-			delete(st.below, m) // gone, or no reading: start over
+	for m, c := range st.c {
+		if !weak[m] {
+			c.since, c.n = time.Time{}, 0 // strong again, gone, or no reading: start over
 		}
 	}
 	sort.Slice(cs, func(i, j int) bool { return cs[i].signal < cs[j].signal }) // weakest first
@@ -148,49 +242,125 @@ func (a *agent) roamReading(s *apstate.Snapshot, now time.Time) {
 		if i == roamPerRead {
 			break
 		}
-		st.last[c.mac] = now
-		delete(st.below, c.mac)
-		if a.steer.last != nil {
-			// no band steering back onto the band it is leaving for a while
-			a.steer.last[c.mac] = now
+		rc := st.c[c.mac]
+		// held until the outcome says otherwise (and if the job is dropped)
+		rc.hold = now.Add(roamHold)
+		rc.since, rc.n = time.Time{}, 0
+		var to []bcmwifi.Neighbor
+		for _, h := range c.to {
+			to = append(to, h.n)
 		}
-		if len(c.to) == 0 {
-			a.logf("roaming assistant: %s at %d dBm (threshold %d) on %s: no other BSS of its SSID known, left alone", c.mac, c.signal, c.thresh, c.vif)
-			continue
-		}
-		req := bcmwifi.RoamRequest{Vif: c.vif, MAC: c.mac, Candidates: c.to, DisassocTBTT: roamDisassocTBTT}
+		req := bcmwifi.RoamRequest{Vif: c.vif, MAC: c.mac, Candidates: to, DisassocTBTT: roamDisassocTBTT}
 		a.submit("roam "+c.mac, func(ctx context.Context) {
 			err := rr.RoamAssist(ctx, req)
-			switch {
-			case errors.Is(err, bcmwifi.ErrNoBTM):
-				a.logf("roaming assistant: %s at %d dBm on %s does not support BSS transition: left alone", c.mac, c.signal, c.vif)
-			case err != nil:
-				a.logf("roaming assistant %s: %v", c.mac, err)
-			default:
-				a.logf("roaming assistant: asked %s (%d dBm < %d dBm on %s) to move to %s", c.mac, c.signal, c.thresh, c.band, neighborList(c.to))
-			}
+			st.mu.Lock()
+			st.done = append(st.done, roamDone{c, now, err})
+			st.mu.Unlock()
 		})
 	}
 }
 
-// sameESS returns up to max BSSes with this SSID that the scans heard and
-// that are not this AP's own, strongest first.
-func (sc *scanner) sameESS(ssid string, own map[string]bool, max int) []bcmwifi.Neighbor {
+// roamOutcomes applies the outcomes of the requests the worker has run
+// since the last reading (loop goroutine).
+func (a *agent) roamOutcomes() {
+	st := &a.roam
+	st.mu.Lock()
+	done := st.done
+	st.done = nil
+	st.mu.Unlock()
+	for _, d := range done {
+		c := d.c
+		rc := st.c[c.mac]
+		if rc == nil {
+			rc = &roamClient{seen: d.at}
+			st.c[c.mac] = rc
+		}
+		switch {
+		case d.err == nil:
+			rc.asked, rc.vif, rc.left, rc.judged, rc.noBTM = d.at, c.vif, false, false, false
+			if a.steer.last != nil {
+				// no band steering back onto the band it is leaving for a while
+				a.steer.last[c.mac] = d.at
+			}
+			a.logf("roaming assistant: asked %s (%d dBm < %d dBm on %s %s for %s) to move to %s",
+				c.mac, c.signal, c.thresh, c.band, c.vif, c.weak.Round(time.Second), heardList(c.to))
+		case errors.Is(d.err, bcmwifi.ErrNoBTM):
+			rc.hold = d.at.Add(roamNoBTMHold)
+			if !rc.noBTM {
+				rc.noBTM = true
+				a.logf("roaming assistant: %s at %d dBm on %s does not support BSS transition: left alone", c.mac, c.signal, c.vif)
+			}
+		case errors.Is(d.err, bcmwifi.ErrNoCandidate):
+			rc.hold = time.Time{}
+			if rc.noCand.IsZero() || d.at.Sub(rc.noCand) >= roamNoCandLog {
+				rc.noCand = d.at
+				a.logf("roaming assistant: %s at %d dBm on %s: no usable candidate: left alone", c.mac, c.signal, c.vif)
+			}
+		default:
+			// not sent: tried again after roamHold, not judged
+			a.logf("roaming assistant %s: %v", c.mac, d.err)
+		}
+	}
+}
+
+// roamJudge counts the outcome of a client's last request: on the same BSS
+// roamJudge after it (it ignored the request, or came back) doubles the
+// wait for the next one; away for roamReturn ends the backoff.
+func (a *agent) roamJudge(mac string, c *roamClient, vif string, here bool, now time.Time) {
+	if c.asked.IsZero() || c.judged {
+		return
+	}
+	since := now.Sub(c.asked)
+	if !here || vif != c.vif {
+		c.left = true
+		if since >= roamReturn {
+			c.judged, c.fails = true, 0
+		}
+		return
+	}
+	if since < roamJudge {
+		return
+	}
+	c.judged = true
+	if since >= roamReturn {
+		c.fails = 0 // back on it, but long after: the move held
+		return
+	}
+	c.fails++
+	c.hold = c.asked.Add(min(roamHold<<min(c.fails, 8), roamHoldMax))
+	what := "stayed on"
+	if c.left {
+		what = "came back to"
+	}
+	a.logf("roaming assistant: %s %s %s after the request: next one not before %s", mac, what, vif, c.hold.Format(time.TimeOnly))
+}
+
+// roamHeard is a candidate and how loud this unit heard it.
+type roamHeard struct {
+	n      bcmwifi.Neighbor
+	signal int
+}
+
+// sameESS returns up to max BSSes with this SSID, not this unit's own, that
+// the scans heard at minSignal dBm or better within roamCandAge,
+// strongest first.
+func (sc *scanner) sameESS(ssid string, own ownBSS, minSignal int, now time.Time, max int) []roamHeard {
 	if sc == nil || ssid == "" {
 		return nil
 	}
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	type heard struct {
-		n      bcmwifi.Neighbor
-		signal int
-	}
-	var hs []heard
+	var hs []roamHeard
 	got := map[string]bool{}
 	for band, res := range sc.results {
 		for _, b := range res.BSS {
 			m := strings.ToLower(b.BSSID)
-			if b.SSID != ssid || own[m] || got[m] || b.Channel <= 0 {
+			seen := b.Seen
+			if seen.IsZero() {
+				seen = res.Time
+			}
+			if b.SSID != ssid || own.has(m) || got[m] || b.Channel <= 0 || b.Signal == 0 || b.Signal < minSignal ||
+				now.Sub(seen) > roamCandAge {
 				continue
 			}
 			got[m] = true
@@ -198,7 +368,7 @@ func (sc *scanner) sameESS(ssid string, own map[string]bool, max int) []bcmwifi.
 			if bb == "" {
 				bb = band
 			}
-			hs = append(hs, heard{bcmwifi.Neighbor{BSSID: b.BSSID, Band: bb, Channel: b.Channel}, b.Signal})
+			hs = append(hs, roamHeard{bcmwifi.Neighbor{BSSID: b.BSSID, Band: bb, Channel: b.Channel}, b.Signal})
 		}
 	}
 	sort.Slice(hs, func(i, j int) bool {
@@ -207,20 +377,16 @@ func (sc *scanner) sameESS(ssid string, own map[string]bool, max int) []bcmwifi.
 		}
 		return hs[i].n.BSSID < hs[j].n.BSSID
 	})
-	var out []bcmwifi.Neighbor
-	for i, h := range hs {
-		if i == max {
-			break
-		}
-		out = append(out, h.n)
+	if len(hs) > max {
+		hs = hs[:max]
 	}
-	return out
+	return hs
 }
 
-func neighborList(ns []bcmwifi.Neighbor) string {
+func heardList(hs []roamHeard) string {
 	var p []string
-	for _, n := range ns {
-		p = append(p, fmt.Sprintf("%s (%s ch %d)", n.BSSID, n.Band, n.Channel))
+	for _, h := range hs {
+		p = append(p, fmt.Sprintf("%s (%s ch %d, heard at %d dBm)", h.n.BSSID, h.n.Band, h.n.Channel, h.signal))
 	}
 	return strings.Join(p, ", ")
 }

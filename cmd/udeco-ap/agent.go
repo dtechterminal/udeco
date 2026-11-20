@@ -155,6 +155,7 @@ type timing struct {
 	clockRetry    time.Duration // clock re-check after no time source answered (1 min)
 	logPoll       time.Duration // remote syslog on jio-mtk: log file poll (1 s; logfollow.go)
 	portsRetry    time.Duration // the longest inform wait while a port change waits for confirmation (15 s)
+	roamSustain   time.Duration // a client below the Roaming Assistant threshold this long, at least (roaming.go)
 }
 
 func (t *timing) fill() {
@@ -187,6 +188,7 @@ func (t *timing) fill() {
 	def(&t.clockRetry, clockRetry)
 	def(&t.logPoll, logPoll)
 	def(&t.portsRetry, 15*time.Second)
+	def(&t.roamSustain, roamSustain)
 }
 
 // options are the agent's environment; tests replace the edges.
@@ -219,6 +221,9 @@ type options struct {
 	sntp func(ctx context.Context, server string, now func() time.Time) (time.Duration, error)
 	// setClock steps the system clock; nil = settimeofday (clock.go)
 	setClock func(time.Time) error
+	// staMon follows hostapd's station events; nil = hapdmon on
+	// bcmwifi.CtrlDir (staevents.go)
+	staMon staSource
 }
 
 type agent struct {
@@ -287,8 +292,15 @@ type agent struct {
 	scanHold atomic.Value
 	wifiBusy atomic.Bool
 
-	scans  *scanner
-	sta    staEvents     // station events for the controller (staevents.go); loop goroutine
+	scans *scanner
+	sta   staEvents // station events for the controller (staevents.go); loop goroutine
+	// hapd follows the hostapd control sockets' station events (nil: not
+	// running; staevents.go); readAt: when the reading in use started
+	hapd   staSource
+	readAt time.Time
+	// stale: the reading in use is the last one again (it failed): no new
+	// look at the clients (station events, Roaming Assistant)
+	stale  bool
 	mcast  *mcastInspect // multicast inspection (mcinspect.go); loop goroutine only
 	mdns   *mdnsState    // mDNS service bridge (mdnsbr.go); loop goroutine only
 	wake   chan struct{}
@@ -462,6 +474,7 @@ func (a *agent) run(parent context.Context) error {
 			go func() { defer a.bg.Done(); a.portsWatchLoop(ctx) }() // ports.go
 		}
 		a.startHomeListen(ctx)
+		a.startStaMonitor(ctx) // staevents.go
 		a.startupJobs()
 	} else if a.x.S.Adopted {
 		a.provisionIfNew("startup")
@@ -865,7 +878,11 @@ func (a *agent) loop(ctx context.Context) {
 // fields reads the unit and returns the inform fields (the last reading
 // when this one fails).
 func (a *agent) fields(ctx context.Context) map[string]any {
+	readAt := time.Now()
 	s, err := a.collect(ctx)
+	if a.stale = err != nil; !a.stale {
+		a.readAt = readAt
+	}
 	if err != nil {
 		if err.Error() != a.collectErr {
 			a.logf("reading the unit: %v (reporting the last reading)", err)
@@ -939,7 +956,10 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 	if a.x.S.Adopted {
 		a.sta.attach(f)
 	}
-	a.sta.observe(f)
+	if !a.stale {
+		// the socket events wait in the monitor for a real reading
+		a.sta.observe(f, a.staFeed(&c, f))
+	}
 	a.rateJoins(f)
 	a.mcastMerge(ctx, f, &c, info, time.Now())
 	a.mdnsReconcile(ctx, &c, info)

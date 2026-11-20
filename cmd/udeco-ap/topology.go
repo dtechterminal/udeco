@@ -231,7 +231,9 @@ func (a *agent) observeReading(s *apstate.Snapshot, f map[string]any) {
 		a.portFields(f, s)
 	}
 	a.steerReading(s, now)
-	a.roamReading(s, now)
+	if !a.stale {
+		a.roamReading(s, now)
+	}
 }
 
 // loopGuard is R9 (loop goroutine; the changes run on the worker).
