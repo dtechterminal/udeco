@@ -75,8 +75,10 @@
 - Encrypted DNS cannot be read and no timing is guessed from it. DNS over TLS shows only as
   the station's SYN to port 853 and the server's SYN-ACK: an attempt that would be a soft
   failure only for the missing DNS answer (it has an address and a frame), sent no plaintext
-  query and had a DoT server accept its connection is dropped unjudged, no event at all, as
-  the controller counts both a soft failure and a success without `dns_responses` as a failure.
+  query and had a DoT server accept its connection is set aside unjudged, no event, as the
+  controller counts both a soft failure and a success without `dns_responses` as a failure.
+  It stays open for the fixup window: a plaintext DNS answer inside it (Private DNS falling
+  back) sends a success, and a leave with no answer sends nothing.
   A roam's soft failure (a success to the controller) and any other gap are still sent; a
   plaintext query left unanswered is still a `dns_timeout`. DNS over HTTPS (TCP or QUIC 443) is
   indistinguishable from other HTTPS: a DoH-only client still reads as a soft failure
