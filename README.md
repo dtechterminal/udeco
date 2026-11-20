@@ -40,6 +40,7 @@ Status key:
 | Locate, LED on/off | Verified | LED on is steady green, also right after a reboot. Off goes dark. Locate blinks green until Unlocate. UniFi's LED colour can't be carried. |
 | Topology (LLDP) | Verified | UniFi shows the parent switch port. |
 | Device SSH keys and site logins | Verified | Site SSH keys pushed from UniFi let the site user log in; root login stays key-only. |
+| Login lock (root logins) | Built | While Device SSH Authentication is off and the controller answers, new connections to the unit's root login (Deco :22, Garage :23 and :22) are dropped; open sessions stay. 10 min without a controller reply, Device SSH on, observe mode or the agent's stop opens it again. `"login_lock": false` turns it off. Not yet run on a unit ([login-lock](docs/deco/features/login-lock.md)). |
 | Encrypted remote syslog | Verified | The controller's AES-GCM syslog format. |
 | Firmware upgrade | Not possible | By design: upgrade offers are answered and ignored. Ubiquiti firmware is never flashed. |
 | SNMP, mDNS bridge | Built | Off by default (`mdns_bridge` config key for the bridge). |
@@ -191,7 +192,10 @@ You need root SSH on each unit; how to get it is out of scope here.
    no 80 MHz. The agent now runs India as IN/288, so the override is no
    longer recommended. On by default:
    `uplink_ssid_down` (SSIDs down while the uplink has no carrier, as a U6;
-   `false` keeps them up), `sta_snoop` (connection-timing events),
+   `false` keeps them up), `login_lock` (with takeover and apply: root
+   logins closed while UniFi's Device SSH is off and the controller
+   answers; `login_lock_failopen_s`, 600, opens them after that much
+   silence), `sta_snoop` (connection-timing events),
    `assoc_garp` (gratuitous ARP for a client once authorized), and `twt`
    (802.11ax Target Wake Time on both radios, as a real U6 Pro runs it;
    `"twt": false` keeps TP-Link's off). The driver takes it only while the
@@ -212,7 +216,9 @@ You need root SSH on each unit; how to get it is out of scope here.
    The script builds the armv7 binary, checks the unit (read-only), installs
    the gzipped agent to `/tp_data/udeco` with an md5 check and starts it. It
    prints a one-line rollback command at the end. Do satellites first, then
-   the master.
+   the master. While the login lock holds, :22 does not answer: turn on
+   Device SSH in UniFi, wait about a minute, deploy, then turn it off again
+   ([login-lock](docs/deco/features/login-lock.md)).
 
 3. **Supervise.** One line at the end of the unit's `/data/persist_shell.sh`,
    which cron runs every minute:
@@ -268,6 +274,7 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   | Proxy ARP | agent responder + ebtables drops on both radios (MT7663 driver flag `hs_flag=3` only with `proxy_arp_driver`) | controller, `proxy_arp` (on), `proxy_arp_driver` (off) |
   | DFS | 52-64, CAC, radar followed and reported | `dfs` (off) |
   | Station GARP | on association when the address is known | always |
+  | Login lock | new telnet (:23) and SSH (:22) connections dropped while Device SSH is off and the controller answers; open after 10 min of silence | `login_lock` (on), `login_lock_failopen_s` |
 
   Profile changes are batched into one restart per radio; live driver
   settings wait for a restart's settle time; the hand-back restores the

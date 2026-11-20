@@ -23,6 +23,8 @@ Rules the items share:
 
 New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
 `uplink_loss`, `uplink_loss_ssid`, `bss_pinning`, `proxy_arp`, `proxy_arp_driver`, `dfs`.
+The login lock's keys (`login_lock`, `login_lock_failopen_s`, section 16)
+apply to both platforms.
 
 ## 1. Minimum RSSI
 
@@ -302,3 +304,21 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   come from the readings, so the GARP follows within one reading.
 - **Unverified:** on-air capture of the GARP; the upstream switch's MAC
   move.
+
+## 16. Login lock (`login_lock`, on with takeover and apply)
+
+- **U6:** with the site's Device SSH Authentication off, the AP's SSH
+  server listens on the loopback only.
+- **Garage:** the agent drops new connections to telnetd (:23) and to :22,
+  IPv4 and IPv6, while Device SSH is off and the controller answers
+  (`UDECO-LOCK`, first in `INPUT`, ahead of Jio's own :23 accept;
+  `/pfrm2.0/bin/iptables` without `-w`; `internal/jiosys/loginlock.go`).
+  Established sessions and the loopback are let through. It opens after
+  10 min without a controller reply, on Device SSH on, at the agent's
+  stop and at the hand-back. `deploy/jio-start.sh` removes the lock
+  before each start of the agent, and `deploy/jio-ap.sh` says what to do
+  when telnet does not answer. The details:
+  [login-lock](login-lock.md).
+- **Unverified:** `-m conntrack` and `ip6tables` on this kernel; an open
+  telnet session surviving the lock. A failed rule leaves the unit open,
+  and the log says why.

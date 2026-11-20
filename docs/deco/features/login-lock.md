@@ -1,0 +1,210 @@
+# Login lock: root logins closed while the controller is healthy (2026-11-20)
+
+## Why
+
+The units' own root logins are reachable from the whole LAN: the Deco
+master's dropbear on tcp :22 takes passwords, and the Garage's telnetd on
+:23 sends the root password in clear text. A UniFi AP closes its SSH to
+the LAN when the site's **Device SSH Authentication** is off. The login
+lock does the same while UniFi manages the unit, and opens again when the
+controller goes away, so the owner can always get in.
+
+## When it is locked
+
+LOCKED exactly when all of these hold. Anything else is OPEN.
+
+| Condition | Source |
+| --- | --- |
+| Takeover with `"apply": true`, and `"login_lock"` is not `false` | config, the agent's mode (a hand-back to TP-Link means observe mode) |
+| The unit is adopted | the session state |
+| The saved `system_cfg` has an `sshd` section and Device SSH is off in it | `translate.SSHD(...).LANLogins()` is false: `sshd.status=disabled`, or only `lo` listeners, or no password and no key |
+| The controller's last reply that decoded with the device key is under `login_lock_failopen_s` old (600 s) | `informOnce`: replies are AES-GCM sealed with the per-device key, and an unencrypted reply is refused, so only the real controller can produce one |
+
+OPEN when there is no `sshd` section, Device SSH is on, the unit is not
+adopted, the agent observes (configured, forced or after a hand-back),
+no reply has decoded since the agent started, or the controller has been
+silent for the whole window (fail-open).
+
+The decision is in `cmd/udeco-ap/loginlock.go` (`lockDecision`). The 10th
+minute of silence opens it: 9 min 59 s after the last reply is still
+locked, 10 min is open.
+
+## What is dropped
+
+Chain `UDECO-LOCK`, in IPv4 (`iptables`) and IPv6 (`ip6tables`), jumped
+first from `INPUT` while locked. It drops new TCP connections to the root
+login ports from every source except the loopback:
+
+```
+-A INPUT -j UDECO-LOCK                      (inserted at position 1)
+-A UDECO-LOCK -i lo -j RETURN
+-A UDECO-LOCK -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
+-A UDECO-LOCK -p tcp -m tcp --dport 22 -j DROP     (Deco)
+-A UDECO-LOCK -p tcp -m tcp --dport 23 -j DROP     (Garage)
+-A UDECO-LOCK -p tcp -m tcp --dport 22 -j DROP     (Garage)
+```
+
+- **Established sessions are kept.** A session open before the lock
+  carries on: its packets RETURN before the DROP.
+- **RETURN, not ACCEPT.** A RETURNed packet goes on through the rest of
+  `INPUT`, so the lock adds drops and nothing else. On the Deco, the
+  inbound fence `UDECO-IN` (sitting right behind the lock) still drops
+  TP-Link's management ports for established sessions as before. Its
+  rules are not changed: :22 from the LAN, :2222 from the console, and
+  the TP-Link ports stay as `docs/deco/agent-design.md` R5 has them.
+- **The Deco** (`internal/decosys/loginlock.go`) runs
+  `/usr/sbin/iptables -w ...` under the decosys lock. `UDECO-IN` leaves
+  `UDECO-LOCK` ahead of it, so the two jumps never move each other.
+- **The Garage** (`internal/jiosys/loginlock.go`) runs
+  `/pfrm2.0/bin/iptables` and `ip6tables` without `-w` (not known to be
+  supported there). The jump goes ahead of Jio's own
+  `--dport 23 -m ifgroup --src-group 0x1/0x1 -j ACCEPT`.
+- **Idempotent.** A lock in place costs two reads per family
+  (`-S UDECO-LOCK`, `-S INPUT`). A chain whose rules differ is flushed and
+  refilled. A jump that is missing, not first, or duplicated is inserted
+  at 1 before the stale copies are deleted, so the lock is never unhooked.
+  A lock that had to be put back is logged.
+- **Unlock** removes every `-j UDECO-LOCK` from `INPUT`, then runs
+  `-F UDECO-LOCK` and `-X UDECO-LOCK`.
+
+## Who acts
+
+- **The loop**, after every inform: it acts only when the decision
+  changed. A switch from UniFi takes effect at the inform that brings the
+  new `system_cfg`. The fail-open lands within one inform interval of the
+  window, and the failed informs back off to at most 1 min.
+- **The tick** (every 60 s in takeover) re-asserts a lock in place:
+  rules can be lost.
+- **The agent's stop** (SIGTERM; `run` after the worker has finished and
+  the LED is released) removes it, with its own 10 s context.
+- **The hand-back to TP-Link** (`dropToObserve`) removes it before
+  `Restore`. Both `decosys.Restore` and `jiosys.Restore` remove it too.
+- **The first look** after the start removes any leftover, in case the
+  launcher could not.
+
+Each transition is one event in `events.log`, with the reason:
+
+```
+LOGIN LOCKED: Device SSH off and controller answering
+LOGIN OPEN: Device SSH on
+LOGIN OPEN: controller silent 10m
+LOGIN OPEN: not adopted
+LOGIN OPEN: observe mode
+LOGIN OPEN: agent stop
+LOGIN OPEN: hand-back
+LOGIN OPEN: lock failed: <error>
+```
+
+Nothing secret is logged: the reasons, iptables errors and ports only.
+
+## Fail-open
+
+- **Install.** The chain is built in full, loopback and established
+  RETURNs first, before its jump goes in. Any error in either family
+  takes the lock out of both families again and is logged once ("the
+  unit stays open"). The next tick tries again.
+- **No iptables on the unit:** no lock. If only `ip6tables` is missing,
+  the IPv4 lock is installed alone.
+- **A removal that fails** is retried at every look of the loop until it
+  works.
+- **A failed re-assert of a lock in place** counts as open:
+  `LOGIN OPEN: lock failed`.
+
+## Crash safety (launchers)
+
+The agent only removes the lock on its way out when it gets SIGTERM.
+Before every (re)start of the agent, both launchers remove the lock
+themselves (busybox sh, errors ignored):
+
+- **The Deco**: the launcher `/tp_data/udeco/start.sh` is written by
+  `deploy/deco-ap.sh` (the `LAUNCH` template). It removes the lock only
+  when it is about to start the agent, never while one runs.
+- **The Garage**: `deploy/jio-start.sh`, the supervisor loop's `unlock`
+  before each `udeco-ap` start. `UDECO_IPT` overrides the default
+  `/pfrm2.0/bin`.
+
+```sh
+for T in iptables ip6tables; do
+	for i in 1 2 3; do $T -w -D INPUT -j UDECO-LOCK 2>/dev/null || break; done
+	$T -w -F UDECO-LOCK 2>/dev/null
+	$T -w -X UDECO-LOCK 2>/dev/null
+done
+```
+
+On the Garage the same lines run without `-w`, with
+`/pfrm2.0/bin/iptables` and `ip6tables`.
+
+A reboot clears iptables on both platforms (nothing persists), and the
+agent always starts OPEN: it locks only after a reply has decoded.
+
+`deploy/jio-ap.sh` replaces only the agent, not
+`/flash2/udeco/start.sh`. Until the Garage's `start.sh` is replaced by
+hand with the new `deploy/jio-start.sh`, a SIGKILLed agent's lock stays
+until the next reboot. To replace it: copy the new file to
+`/flash2/udeco/start.sh.new`, then `mv` it over `start.sh`. The running
+loop keeps the old inode, and the new loop takes over at the next reboot.
+
+## Config
+
+| Key | Default | |
+| --- | --- | --- |
+| `login_lock` | on for takeover with apply, both platforms | `false` never locks. `true` without takeover and apply is a config error. |
+| `login_lock_failopen_s` | 600 | How long the controller may be silent before the lock opens (60-3600). It needs the lock on. |
+
+## Deploying while locked
+
+`deploy/deco-ap.sh` (ssh to :22) and `deploy/jio-ap.sh` (telnet to :23)
+print this when the port refuses or times out:
+
+```
+login lock: turn on Device SSH in UniFi (Settings > System > Advanced > Device SSH Authentication), wait ~1 min, retry
+```
+
+1. In UniFi, turn on Settings > System > Advanced > Device SSH
+   Authentication.
+2. Wait for the next config push to reach the unit (within about a
+   minute; `LOGIN OPEN: Device SSH on` in `events.log`).
+3. Deploy.
+4. Turn Device SSH Authentication off again. The unit locks at the inform
+   that brings the change (`LOGIN LOCKED: ...`).
+
+Neither script ever changes the controller's setting itself. A session
+already open when the lock comes back stays open.
+
+Device SSH on also turns on the site users' SSH logins on the agent's
+port 2222 (`cmd/udeco-ap/sitessh.go`), as on a UniFi AP.
+
+## Residual risks
+
+- **Blocked controller traffic.** An attacker who can block the
+  controller's traffic to the unit for the whole window (10 min) makes the
+  lock fail open. They still need the root credential: the Deco's
+  dropbear password, or the Garage's telnet password, which crosses the
+  LAN in clear text whenever someone logs in.
+- **A dead agent and a dead launcher.** If the agent is SIGKILLed (or
+  crashes) and its launcher is dead too, the lock stays until the next
+  reboot. The Deco's cron hook runs the launcher every minute, and the
+  Garage's gateway guard restarts the supervisor loop. With both gone,
+  the way back in is a power cycle (UniFi's Restart needs a running
+  agent).
+- **Other ports.** Only :22 (and the Garage's :23) are locked. The agent's
+  own :2222 is fenced to the console and the site users already
+  (`UDECO-IN`, Deco). TP-Link's :20001 is dropped by `UDECO-IN`.
+
+## Unverified on hardware
+
+Built and tested against fake runners only. Not yet seen on a unit:
+
+- the rules on the units' kernels: `-m conntrack` on the Garage (its
+  `INPUT` has an ESTABLISHED rule, but which match it uses is not known; a
+  failed append leaves the Garage open and logs why), and `ip6tables`
+  with conntrack on both platforms;
+- that `-S UDECO-LOCK` lists the rules in the form compared against (a
+  mismatch would refill the chain every tick: the log shows "had to be put
+  back");
+- an open dropbear or telnet session surviving the lock;
+- the Deco launcher's and the Garage loop's removal on the real busybox;
+- `/pfrm2.0/bin/iptables` without `-w` while nothing else holds the
+  xtables lock;
+- the timing of Device SSH on reaching the unit (expected within one
+  inform).
