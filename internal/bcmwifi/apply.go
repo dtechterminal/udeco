@@ -431,7 +431,9 @@ func (a *Applier) waitHostapd(ctx context.Context, s Step) error {
 	}
 }
 
-// writeFileAtomic writes data to full via a temp file and rename.
+// writeFileAtomic writes data to full via a temp file and rename. It is
+// not atomicfile.Write: the temporary name is random, the directory is
+// made and the mode is set on the open file.
 func writeFileAtomic(full string, data []byte, mode os.FileMode) error {
 	dir := filepath.Dir(full)
 	if err := os.MkdirAll(dir, 0o700); err != nil {

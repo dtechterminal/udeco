@@ -72,7 +72,9 @@ func ParseMDNS(b []byte) *MDNS {
 }
 
 // readName reads a (possibly compressed) domain name at off and returns it
-// in lower case without the trailing dot, and the offset after it.
+// in lower case without the trailing dot, and the offset after it. It is
+// not internal/mdnsbr's readName: that one refuses a forward pointer and a
+// name over 255 octets, which this one takes.
 func readName(b []byte, off int) (string, int, bool) {
 	var labels []string
 	end, jumps := -1, 0

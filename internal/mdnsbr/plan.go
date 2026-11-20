@@ -151,7 +151,7 @@ func BuildPlan(c Config, env Env) (Plan, []string) {
 			switch {
 			case c.APMode:
 				note("VLAN %d has no bridge here and AP mode takes no wired mDNS: nothing to bridge from it", v)
-			case env.Uplink == "" || !ifRE.MatchString(env.Uplink):
+			case env.Uplink == "" || !devRE.MatchString(env.Uplink):
 				note("VLAN %d has no bridge here and the uplink is not known: not bridged", v)
 			default:
 				addPort(Port{Name: env.Uplink, VID: v, VLAN: v})
@@ -160,7 +160,7 @@ func BuildPlan(c Config, env Env) (Plan, []string) {
 		}
 		for _, x := range ports {
 			switch {
-			case !ifRE.MatchString(x), env.Guest[x]:
+			case !devRE.MatchString(x), env.Guest[x]:
 				continue
 			case env.Vifs[x]:
 				addPort(Port{Name: x, VLAN: v, Vif: true})

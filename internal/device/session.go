@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 	"github.com/antoniocosta/unifi-openwrt/internal/inform"
 )
 
@@ -99,11 +100,7 @@ func (s State) Save(path string) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return atomicfile.Write(path, path+".tmp", b, 0o600)
 }
 
 // The files of a session's state directory (Session.StateDir), for the

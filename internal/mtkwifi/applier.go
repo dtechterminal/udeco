@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
@@ -551,12 +552,9 @@ func (a *Applier) applyLive(ctx context.Context, rd RadioDef, c, rp RadioPlan) e
 	return a.writeProfile(rd, rp)
 }
 
+// writeFile replaces p through "<p>.udeco" beside it.
 func writeFile(p string, b []byte, mode os.FileMode) error {
-	tmp := p + ".udeco"
-	if err := os.WriteFile(tmp, b, mode); err != nil {
-		return err
-	}
-	return os.Rename(tmp, p)
+	return atomicfile.Write(p, p+".udeco", b, mode)
 }
 
 // ------------------------------------------------------------- bridging
@@ -580,13 +578,7 @@ func (a *Applier) exists(dev string) bool {
 	return err == nil
 }
 
-func (a *Applier) bridgeOf(dev string) string {
-	l, err := os.Readlink(a.dev("/sys/class/net/" + dev + "/brport/bridge"))
-	if err != nil {
-		return ""
-	}
-	return filepath.Base(l)
-}
+func (a *Applier) bridgeOf(dev string) string { return bcmwifi.BridgeOf(a.o.Root, dev) }
 
 // bridgeTo puts ifc into the LAN bridge (vid 0) or the VLAN's bridge.
 func (a *Applier) bridgeTo(ctx context.Context, ifc string, vid int) error {

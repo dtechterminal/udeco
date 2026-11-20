@@ -7,6 +7,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 )
 
 // Stable vif slots. An SSID keeps the vif it is on when the SSID set of its
@@ -106,13 +108,9 @@ func (a *Applier) saveSlots(l *layout) {
 		return
 	}
 	p := a.fsPath(a.slotsPath())
-	tmp := p + ".tmp"
 	err := os.MkdirAll(filepath.Dir(p), 0o700)
 	if err == nil {
-		err = os.WriteFile(tmp, b, 0o600)
-	}
-	if err == nil {
-		err = os.Rename(tmp, p)
+		err = atomicfile.Write(p, p+".tmp", b, 0o600)
 	}
 	if err != nil {
 		a.o.Logf("bcmwifi: recording vif slots: %v (an SSID that is off may get another vif when it returns)", err)

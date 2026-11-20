@@ -322,7 +322,8 @@ func (m *Manager) writeFile(p string, lines []string, perm os.FileMode) error {
 }
 
 // writeRaw atomically replaces a device file: it writes a temporary file in
-// stateDir (the same ramfs as the rest of /etc) and renames it into place.
+// stateDir (the same ramfs as the rest of /etc) and renames it into place
+// (not atomicfile.Write, whose temporary file is beside the target).
 func (m *Manager) writeRaw(p string, data []byte, perm os.FileMode) error {
 	tmp, err := m.writeTemp(data, perm)
 	if err != nil {

@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 )
 
 // Unhandled is one thing the controller sent that was not acted on.
@@ -150,10 +152,7 @@ func (l *Ledger) write(now time.Time) {
 	if err != nil {
 		return
 	}
-	tmp := l.path + ".tmp"
-	if os.WriteFile(tmp, append(b, '\n'), 0o600) == nil {
-		os.Rename(tmp, l.path)
-	}
+	atomicfile.Write(l.path, l.path+".tmp", append(b, '\n'), 0o600) // best effort
 }
 
 // secretName: field and key names whose values are never recorded. Broad on

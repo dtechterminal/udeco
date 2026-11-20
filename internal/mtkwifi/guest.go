@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
 // Guest WLANs. The JCOW414 has ebtables with the filter table and the ip,
@@ -234,11 +234,10 @@ func (a *Applier) UnauthorizeGuest(ctx context.Context, mac string) error {
 }
 
 func (a *Applier) setGuestAuth(ctx context.Context, mac string, on bool) error {
-	hw, err := net.ParseMAC(strings.TrimSpace(mac))
-	if err != nil || len(hw) != 6 {
+	m, err := wl.NormMAC(strings.TrimSpace(mac))
+	if err != nil {
 		return fmt.Errorf("mtkwifi: guest authorisation: bad MAC %q", mac)
 	}
-	m := hw.String()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	list := a.loadGuestAuth()

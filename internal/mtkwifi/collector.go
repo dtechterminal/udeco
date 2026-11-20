@@ -482,11 +482,12 @@ func readTxModes(root, runDir string) map[string]string {
 	return m
 }
 
-var statNames = []string{"rx_bytes", "tx_bytes", "rx_packets", "tx_packets", "rx_errors", "tx_errors", "rx_dropped", "tx_dropped"}
-
+// netStats reads the interface counters a vap_table row carries
+// (apstate.VAPNetdevFields, as internal/wl's netStats; the numbers are
+// read signed here and unsigned there, so only the names are shared).
 func (c *Collector) netStats(dev string) map[string]int64 {
 	m := map[string]int64{}
-	for _, k := range statNames {
+	for _, k := range apstate.VAPNetdevFields {
 		v, _ := strconv.ParseInt(c.read("/sys/class/net/"+dev+"/statistics/"+k), 10, 64)
 		m[k] = v
 	}

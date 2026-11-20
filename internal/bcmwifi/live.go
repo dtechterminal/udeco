@@ -218,8 +218,15 @@ func (a *Applier) exists(p string) bool {
 func (a *Applier) netdevExists(name string) bool { return a.exists("/sys/class/net/" + name) }
 
 // bridgeOf returns the bridge port's bridge, or "".
-func (a *Applier) bridgeOf(port string) string {
-	t, err := os.Readlink(a.fsPath("/sys/class/net/" + port + "/brport/bridge"))
+func (a *Applier) bridgeOf(port string) string { return BridgeOf(a.o.Root, port) }
+
+// BridgeOf returns the bridge that port is a member of on the unit whose
+// filesystem is at root (the name /sys/class/net/<port>/brport/bridge
+// points to), or "" when it is in none. It is the one reader of that
+// link: this package's applier, internal/mtkwifi's and cmd/udeco-ap's
+// gratuitous ARP use it.
+func BridgeOf(root, port string) string {
+	t, err := os.Readlink(filepath.Join(root, filepath.FromSlash("/sys/class/net/"+port+"/brport/bridge")))
 	if err != nil {
 		return ""
 	}

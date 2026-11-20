@@ -126,7 +126,7 @@ func FuzzParseScanResults(f *testing.F) {
 			if b.BSSID == "" || b.BSSID != strings.ToLower(b.BSSID) {
 				t.Fatalf("BSSID %q", b.BSSID)
 			}
-			if _, err := netParseMAC(b.BSSID); err != nil {
+			if _, err := NormMAC(b.BSSID); err != nil {
 				t.Fatalf("BSSID %q: %v", b.BSSID, err)
 			}
 			if !validSecurityLabel(b.Security) {
@@ -161,8 +161,8 @@ func FuzzParseCCAAndUs(f *testing.F) {
 			t.Fatalf("own airtime %v", own)
 		}
 		parseChanimUs(b)
-		for _, m := range parseAssoclist(b) {
-			if _, err := netParseMAC(m); err != nil || m != strings.ToLower(m) {
+		for _, m := range ParseAssoclist(text) {
+			if _, err := NormMAC(m); err != nil || m != strings.ToLower(m) {
 				t.Fatalf("assoclist MAC %q", m)
 			}
 		}

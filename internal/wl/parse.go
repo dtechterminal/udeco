@@ -483,7 +483,7 @@ func staHeader(t string) (string, bool) {
 		return "", false
 	}
 	mac := strings.TrimSuffix(strings.TrimSpace(rest), ":")
-	hw, err := netParseMAC(mac)
+	hw, err := NormMAC(mac)
 	if err != nil {
 		return "", false
 	}

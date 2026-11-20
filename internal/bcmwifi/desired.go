@@ -14,6 +14,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
 // Desired is the complete Wi-Fi state the agent wants. It mirrors
@@ -717,13 +718,11 @@ func validRadius(r *Radius) error {
 	return nil
 }
 
-// normMAC returns mac as lower-case aa:bb:cc:dd:ee:ff, or "" if invalid.
+// normMAC returns mac as lower-case aa:bb:cc:dd:ee:ff, or "" if invalid
+// (wl.NormMAC, after trimming).
 func normMAC(mac string) string {
-	hw, err := net.ParseMAC(strings.TrimSpace(mac))
-	if err != nil || len(hw) != 6 {
-		return ""
-	}
-	return hw.String()
+	m, _ := wl.NormMAC(strings.TrimSpace(mac))
+	return m
 }
 
 // normMACs normalizes, de-duplicates and sorts macs; bad counts the

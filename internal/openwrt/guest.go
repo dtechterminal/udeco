@@ -6,16 +6,18 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
-var ifnameOK = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,15}$`)
+// ifnameOK is this package's one check of an interface name before it goes
+// into a script or a rule set: apstate.IfNameChars.
+func ifnameOK(s string) bool { return apstate.IfNameChars(s) }
 
 // guestRuleset renders the nftables bridge table for guest interfaces:
 // EAPOL, ARP, DHCP and DNS (to the LAN's DNS servers only) pass; IPv6 and
@@ -24,7 +26,7 @@ var ifnameOK = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,15}$`)
 // the captive portal.
 func guestRuleset(ifnames []string, g translate.Guest, dns []string, brMAC string) (string, error) {
 	for _, i := range ifnames {
-		if !ifnameOK.MatchString(i) {
+		if !ifnameOK(i) {
 			return "", fmt.Errorf("bad interface name %q", i)
 		}
 	}

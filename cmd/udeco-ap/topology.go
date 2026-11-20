@@ -42,6 +42,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
 	"github.com/antoniocosta/unifi-openwrt/internal/lldp"
@@ -427,13 +428,9 @@ func (a *agent) recordLoopGuard(port, why string, in bool) {
 	for _, p := range sortedKeys(m) {
 		lines = append(lines, p+" "+m[p])
 	}
-	tmp := path + ".tmp"
 	err := os.MkdirAll(filepath.Dir(path), 0o700)
 	if err == nil {
-		err = os.WriteFile(tmp, []byte(strings.Join(lines, "\n")+"\n"), 0o600)
-	}
-	if err == nil {
-		err = os.Rename(tmp, path)
+		err = atomicfile.Write(path, path+".tmp", []byte(strings.Join(lines, "\n")+"\n"), 0o600)
 	}
 	if err != nil {
 		a.logf("loop guard: recording %s: %v (a restarted agent would not know %s is out of br-lan)", path, err, port)

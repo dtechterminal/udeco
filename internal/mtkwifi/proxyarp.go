@@ -12,6 +12,8 @@ import (
 	"sync"
 
 	"slices"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
 )
 
 // Proxy ARP (the controller's per-WLAN proxy_arp; agent config proxy_arp,
@@ -283,7 +285,9 @@ type arpPkt struct {
 	spa, tpa net.IP
 }
 
-// parseARP reads an untagged Ethernet IPv4 ARP frame.
+// parseARP reads an untagged Ethernet IPv4 ARP frame of any operation, the
+// addresses as bytes (the responder's own reader: stasnoop.Parse reads
+// requests and replies only, into the text of a connection event).
 func parseARP(b []byte) (arpPkt, bool) {
 	if len(b) < 42 || binary.BigEndian.Uint16(b[12:]) != 0x0806 || binary.BigEndian.Uint16(b[14:]) != 1 ||
 		binary.BigEndian.Uint16(b[16:]) != 0x0800 || b[18] != 6 || b[19] != 4 {
@@ -295,34 +299,18 @@ func parseARP(b []byte) (arpPkt, bool) {
 		tha: net.HardwareAddr(slices.Clone(b[32:38])), tpa: net.IP(slices.Clone(b[38:42]))}, true
 }
 
-func arpFrame(dst, sha net.HardwareAddr, op uint16, spa net.IP, tha net.HardwareAddr, tpa net.IP) []byte {
-	b := make([]byte, 60) // the Ethernet minimum, padded
-	copy(b[0:], dst)
-	copy(b[6:], sha)
-	binary.BigEndian.PutUint16(b[12:], 0x0806)
-	binary.BigEndian.PutUint16(b[14:], 1)
-	binary.BigEndian.PutUint16(b[16:], 0x0800)
-	b[18], b[19] = 6, 4
-	binary.BigEndian.PutUint16(b[20:], op)
-	copy(b[22:], sha)
-	copy(b[28:], spa.To4())
-	copy(b[32:], tha)
-	copy(b[38:], tpa.To4())
-	return b
-}
-
-// arpReply is sha's reply (spa is at sha) to tha's request from tpa.
+// arpReply is sha's reply (spa is at sha) to tha's request from tpa. The
+// frame is stasnoop.ARPFrame's, as the Deco agent's.
 func arpReply(sha net.HardwareAddr, spa net.IP, tha net.HardwareAddr, tpa net.IP) []byte {
 	if tpa == nil {
 		tpa = net.IPv4zero
 	}
-	return arpFrame(tha, sha, 2, spa, tha, tpa)
+	return stasnoop.ARPFrame(tha, sha, 2, spa, tha, tpa)
 }
 
-// garp is a gratuitous ARP request: ip is at mac.
-func garp(mac net.HardwareAddr, ip net.IP) []byte {
-	return arpFrame(bcastMAC, mac, 1, ip, make(net.HardwareAddr, 6), ip)
-}
+// garp is a gratuitous ARP request: ip is at mac (stasnoop.GARPFrame; not
+// stasnoop.GARP, which refuses a group address that AnnounceStation takes).
+func garp(mac net.HardwareAddr, ip net.IP) []byte { return stasnoop.GARPFrame(mac, ip) }
 
 // parseDHCPAck reads an untagged IPv4 UDP 67->68 BOOTREPLY DHCPACK: the
 // client's hardware address and its address.

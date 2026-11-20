@@ -19,6 +19,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 )
 
 // DefaultAddr is the UDP address the agent answers on (IPv4 only): what
@@ -140,12 +142,7 @@ func NextEngineBoots(path string) (int64, error) {
 	if n < 1<<31-1 {
 		n++
 	}
-	tmp := path + ".new"
-	if err := os.WriteFile(tmp, []byte(strconv.FormatInt(n, 10)+"\n"), 0o600); err != nil {
-		return 0, err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp)
+	if err := atomicfile.Write(path, path+".new", []byte(strconv.FormatInt(n, 10)+"\n"), 0o600); err != nil {
 		return 0, err
 	}
 	if n >= 1<<31-1 {

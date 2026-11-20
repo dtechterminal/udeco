@@ -112,6 +112,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
@@ -356,16 +357,11 @@ func (a *agent) saveSpectrum() {
 		return
 	}
 	p := a.spectrumPath()
-	tmp := p + ".tmp"
 	err = os.MkdirAll(filepath.Dir(p), 0o700)
 	if err == nil {
-		err = os.WriteFile(tmp, b, 0o600)
-	}
-	if err == nil {
-		err = os.Rename(tmp, p)
+		err = atomicfile.Write(p, p+".tmp", b, 0o600)
 	}
 	if err != nil {
-		os.Remove(tmp)
 		a.logf("spectrum: saving the tables to %s: %v (kept in memory; a restart would start without them)", p, err)
 		return
 	}

@@ -9,6 +9,8 @@ import (
 	"path"
 	"sort"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
 // Per-client rate limits with tc (docs/deco/device-capabilities.md; audit
@@ -92,17 +94,9 @@ func (a *Applier) saveTC(st map[string]*tcState) error {
 // ifbFor is the IFB device for a radio's uploads.
 func ifbFor(primary string) string { return "ifb" + primary[2:] }
 
-// parseAssoclist reads `wl assoclist` lines "assoclist AA:BB:CC:DD:EE:FF".
+// parseAssoclist reads `wl assoclist` (wl.ParseAssoclist), sorted.
 func parseAssoclist(out string) []string {
-	var macs []string
-	for _, line := range strings.Split(out, "\n") {
-		f := strings.Fields(line)
-		if len(f) >= 2 && f[0] == "assoclist" {
-			if m := normMAC(f[1]); m != "" {
-				macs = append(macs, m)
-			}
-		}
-	}
+	macs := wl.ParseAssoclist(out)
 	sort.Strings(macs)
 	return macs
 }

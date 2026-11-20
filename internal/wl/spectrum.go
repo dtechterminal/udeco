@@ -680,26 +680,29 @@ func (b *bandRun) skipCheck(ctx context.Context) error {
 			continue
 		}
 		out, err = b.c.wl(ctx, d, "assoclist")
-		if err == nil && len(parseAssoclist(out)) > 0 {
+		if err == nil && len(ParseAssoclist(string(out))) > 0 {
 			return fmt.Errorf("%w: backhaul vif %s has peers", ErrRadioSkipped, d)
 		}
 	}
 	return ctx.Err()
 }
 
-// parseAssoclist reads `wl assoclist` ("assoclist 8C:BF:EA:1D:BA:74" per
-// line) into lower-case MACs.
-func parseAssoclist(b []byte) []string {
-	var out []string
-	for line := range strings.Lines(string(b)) {
+// ParseAssoclist reads `wl assoclist` ("assoclist 8C:BF:EA:1D:BA:74" per
+// line) into lower-case MACs, in the driver's order. It is the one reader
+// of that text: internal/bcmwifi's shaping calls it and sorts the result.
+// A line is "assoclist", a MAC and whatever follows (the driver prints
+// nothing after the MAC; TestParseAssoclistRules has the captures).
+func ParseAssoclist(out string) []string {
+	var macs []string
+	for line := range strings.Lines(out) {
 		f := strings.Fields(line)
-		if len(f) == 2 && f[0] == "assoclist" {
-			if mac, err := netParseMAC(f[1]); err == nil {
-				out = append(out, mac)
+		if len(f) >= 2 && f[0] == "assoclist" {
+			if mac, err := NormMAC(f[1]); err == nil {
+				macs = append(macs, mac)
 			}
 		}
 	}
-	return out
+	return macs
 }
 
 // gate is PENDING (§8.1).
@@ -1090,7 +1093,7 @@ func (b *bandRun) checkClients(ctx context.Context, off bool) error {
 			continue
 		}
 		judged[v] = true
-		for _, m := range parseAssoclist(out) {
+		for _, m := range ParseAssoclist(string(out)) {
 			present[m] = true
 		}
 	}
