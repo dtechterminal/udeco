@@ -18,7 +18,12 @@ import (
 type Desired struct {
 	Country string           // ISO 3166 alpha-2 ("US"); "" keeps the live country
 	Radios  map[string]Radio // "ng" (2.4 GHz, wl0) and "na" (5 GHz, wl1)
-	SSIDs   []SSID
+	// BandCountry overrides Country for one radio ("ng" -> "US"): the
+	// driver country, the channel table and hostapd's country_code of that
+	// radio alone. The X20 runs wl0 as US (24 dBm) beside wl1 in IN/288
+	// (DFS), verified on .232 2026-11-20.
+	BandCountry map[string]string `json:",omitempty"`
+	SSIDs       []SSID
 	// Guest is the isolation policy for guest SSIDs (SSID.Guest). A guest
 	// SSID is only served when Guest is set and has a valid gateway MAC and
 	// IP: without isolation it would be a plain LAN SSID (fail closed).

@@ -58,6 +58,13 @@ type Config struct {
 	// on .205 2026-11-19), so the site country India caps 5 GHz at 40 MHz.
 	// Empty uses the controller's country.
 	DriverCountry string `json:"driver_country,omitempty"`
+	// DriverCountryBands overrides the country of one radio ("ng" or
+	// "na"), over driver_country for that band. IN/288 caps the X20's
+	// 2.4 GHz at 14 dBm (US/0: 24) and 5 GHz 36-48 at 16.5 dBm (US/0:
+	// 23.5), but only it has the DFS channels, at 23.5-25 dBm: {"ng": "US"}
+	// gives full power on both bands with DFS on 5 GHz (read on .232
+	// 2026-11-20). Takeover only.
+	DriverCountryBands map[string]string `json:"driver_country_bands,omitempty"`
 	// FTSAE is the kill switch for FT-SAE (802.11r for WPA3 clients) on top
 	// of wpa3: absent or true serves it (bcmwifi.Options.FTSAE, the agents
 	// learning each other's key holders: ftsae.go) and claims radio_caps2
@@ -323,6 +330,12 @@ func (c *Config) validate() error {
 	if c.TWT != nil && !c.Takeover {
 		return errors.New("config: twt needs takeover (observe mode never changes the unit)")
 	}
+	if len(c.DriverCountryBands) > 0 && !c.Takeover {
+		return errors.New("config: driver_country_bands needs takeover (observe mode never changes the unit)")
+	}
+	if err := validDriverCountryBands(c.DriverCountryBands); err != nil {
+		return err
+	}
 	if c.RxDesense && !c.Takeover {
 		return errors.New("config: rx_desense needs takeover (observe mode never changes the unit)")
 	}
@@ -377,4 +390,18 @@ func (c *Config) twt() bool { return c.TWT == nil || *c.TWT }
 func (c *Config) controllerIP() string {
 	u, _ := url.Parse(c.InformURL)
 	return u.Hostname()
+}
+
+// validDriverCountryBands: keys "ng"/"na", values two-letter country codes.
+func validDriverCountryBands(m map[string]string) error {
+	for b, c := range m {
+		if b != "ng" && b != "na" {
+			return fmt.Errorf("config: driver_country_bands: band %q is not ng or na", b)
+		}
+		c = strings.TrimSpace(c)
+		if len(c) != 2 || strings.IndexFunc(c, func(r rune) bool { return (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') }) >= 0 {
+			return fmt.Errorf("config: driver_country_bands: %s country %q is not a two-letter code", b, c)
+		}
+	}
+	return nil
 }

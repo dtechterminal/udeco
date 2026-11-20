@@ -594,6 +594,8 @@ func (a *agent) logIntent(pv provision) (bcmwifi.Desired, translate.Intent) {
 	var cn []string
 	d, cn = withDriverCountry(d, a.cfg.DriverCountry)
 	dn = append(dn, cn...)
+	d, cn = withDriverCountryBands(d, a.cfg.DriverCountryBands)
+	dn = append(dn, cn...)
 	gw, _ := a.topo.gwIP.Load().(string)
 	gwMAC, _ := a.topo.gwMAC.Load().(string)
 	var gn []string
@@ -740,5 +742,27 @@ func withDriverCountry(d bcmwifi.Desired, override string) (bcmwifi.Desired, []s
 		notes = append(notes, fmt.Sprintf("5 GHz DFS channel %d under driver_country %s: refused unless that table has it; remove driver_country to serve it in %s", r.Channel, dc, d.Country))
 	}
 	d.Country = dc
+	return d, notes
+}
+
+// bandNames names the radios in notes.
+var bandNames = map[string]string{"ng": "2.4 GHz", "na": "5 GHz"}
+
+// withDriverCountryBands applies driver_country_bands: each listed radio
+// runs in its own country (bcmwifi.Desired.BandCountry); one that equals
+// the country already in force is no override.
+func withDriverCountryBands(d bcmwifi.Desired, bands map[string]string) (bcmwifi.Desired, []string) {
+	var notes []string
+	for _, b := range []string{"ng", "na"} {
+		cc := strings.ToUpper(strings.TrimSpace(bands[b]))
+		if cc == "" || strings.EqualFold(cc, d.Country) {
+			continue
+		}
+		if d.BandCountry == nil {
+			d.BandCountry = map[string]string{}
+		}
+		d.BandCountry[b] = cc
+		notes = append(notes, fmt.Sprintf("country %s: the %s radio runs as %s (driver_country_bands)", d.Country, bandNames[b], cc))
+	}
 	return d, notes
 }

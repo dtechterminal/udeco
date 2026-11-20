@@ -221,7 +221,11 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 	p.Steps = append(p.Steps, bst...)
 	p.Foreign = append(p.Foreign, bforeign...)
 	for _, rl := range l.Radios {
-		rp, err := a.planRadio(ctx, rl, ls, blocked, d.Country, caps)
+		want := d.Country
+		if c := d.BandCountry[rl.Band]; c != "" {
+			want = c
+		}
+		rp, err := a.planRadio(ctx, rl, ls, blocked, want, caps)
 		if err != nil {
 			return Plan{}, err
 		}

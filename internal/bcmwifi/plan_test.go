@@ -633,3 +633,36 @@ func TestSetBlockedMACAuthAllowListSkipsHostapdAccept(t *testing.T) {
 		t.Error("driver allow list not updated")
 	}
 }
+
+// A per-band country override sets that radio's driver country alone: the
+// X20 runs 2.4 GHz as US (24 dBm) beside 5 GHz in IN/288 (DFS, 23.5-25 dBm
+// on 100-144), verified on .232 2026-11-20.
+func TestBandCountry(t *testing.T) {
+	f := newFakeDev(t)
+	a := newTestApplier(f, false)
+	d := twoSSIDs()
+	d.Country = "CA"
+	d.BandCountry = map[string]string{"ng": "US"} // the fake's radios read US
+	d.Radios["na"] = Radio{Enabled: true, Channel: 149, Width: 40}
+	p, err := a.Plan(context.Background(), d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stepIndex(t, p, "wl -i wl1 country CA/2")
+	for _, s := range p.Steps {
+		if strings.HasPrefix(strings.Join(s.Argv, " "), "wl -i wl0 country") {
+			t.Errorf("2.4 GHz country changed under its US override: %v", s.Argv)
+		}
+	}
+	d.Country = "US"
+	d.BandCountry = map[string]string{"ng": "CA"}
+	if p, err = a.Plan(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	stepIndex(t, p, "wl -i wl0 country CA/2")
+	for _, s := range p.Steps {
+		if strings.HasPrefix(strings.Join(s.Argv, " "), "wl -i wl1 country") {
+			t.Errorf("5 GHz country changed with only a 2.4 GHz override: %v", s.Argv)
+		}
+	}
+}

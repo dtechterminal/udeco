@@ -29,3 +29,42 @@ func TestDriverCountryDFSNote(t *testing.T) {
 		t.Errorf("no override: %q %q", got.Country, notes)
 	}
 }
+
+// driver_country_bands overrides one radio's country (2.4 GHz as US for its
+// power, 5 GHz in the site country for DFS); a band override wins over
+// driver_country for that band.
+func TestDriverCountryBands(t *testing.T) {
+	d := bcmwifi.Desired{Country: "IN", Radios: map[string]bcmwifi.Radio{"na": {Enabled: true, Channel: 100, Width: 80}}}
+	got, notes := withDriverCountryBands(d, map[string]string{"ng": "us"})
+	if got.Country != "IN" || got.BandCountry["ng"] != "US" || got.BandCountry["na"] != "" {
+		t.Fatalf("got %q %v", got.Country, got.BandCountry)
+	}
+	if !strings.Contains(strings.Join(notes, "\n"), "2.4 GHz") {
+		t.Errorf("notes %q", notes)
+	}
+	if got, notes := withDriverCountryBands(d, nil); got.BandCountry != nil || len(notes) != 0 {
+		t.Errorf("no override: %v %q", got.BandCountry, notes)
+	}
+	// same as the site country: nothing to override
+	if got, _ := withDriverCountryBands(d, map[string]string{"na": "in"}); len(got.BandCountry) != 0 {
+		t.Errorf("same country kept as an override: %v", got.BandCountry)
+	}
+}
+
+func TestDriverCountryBandsConfig(t *testing.T) {
+	for _, tc := range []struct {
+		m  map[string]string
+		ok bool
+	}{
+		{map[string]string{"ng": "US"}, true},
+		{map[string]string{"na": "IN", "ng": "us"}, true},
+		{map[string]string{"6e": "US"}, false},
+		{map[string]string{"ng": "USA"}, false},
+		{map[string]string{"ng": ""}, false},
+	} {
+		err := validDriverCountryBands(tc.m)
+		if (err == nil) != tc.ok {
+			t.Errorf("%v: err %v", tc.m, err)
+		}
+	}
+}

@@ -108,3 +108,23 @@ to observe mode.
   the takeover apply to see which.
 - The `EVT_AP_RadarDetected` payload keys. They were chosen to match the
   quick-scan event, because the U6's own payload has not been captured.
+
+## Power per region and the per-band override (2026-11-20)
+
+Read with `wl -i <radio> txpwr_target_max` on the X20s:
+
+| Region | 2.4 GHz | 5 GHz 36-48 | 5 GHz 100-144 | 5 GHz 149+ |
+| --- | --- | --- | --- | --- |
+| IN/288 | 14 dBm | 16.5 dBm | 23.5-25 dBm | 18.5 dBm |
+| US/0 | 24 dBm | 23.5 dBm | none (no DFS) | n/a here |
+
+IN/288 at 14 dBm on 2.4 GHz cut a Tapo camera on Bedroom from 72 Mbps with
+1-3 % retries to 1-5.5 Mbps with 40-64 % retries the hour the parity build
+landed. At 16.5 dBm on channels 36/40, a Galaxy S20 FE never received its
+DHCP replies. Each radio keeps its own country in the driver: on Bedroom,
+`wl -i wl0 down; wl -i wl0 country US; wl -i wl0 up` gave 2.4 GHz 24 dBm
+while 5 GHz stayed IN/288 on 100/80 with its In-Service Monitoring
+untouched, and the camera went back to 72 Mbps at once.
+`"driver_country_bands": {"ng": "US"}` makes this the agent's plan
+(bcmwifi `Desired.BandCountry`): full power on both bands, with DFS on 5 GHz.
+Keep 5 GHz on 100-144 under IN/288: 36-48 is the low-power block there.
