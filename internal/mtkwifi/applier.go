@@ -71,6 +71,9 @@ type Options struct {
 	// settle time of radio restarts runs on it, never on the wall clock
 	mono     func() time.Duration
 	writeLED func(path, s string) error // one LED table row (tests record them)
+	// wall is the wall clock the downlink watchdog stamps its probes with
+	// (the learner stamps replies with time.Now)
+	wall func() time.Time
 }
 
 // Applier implements the agent's Wi-Fi applier on the MediaTek driver.
@@ -191,6 +194,9 @@ func New(o Options) *Applier {
 	}
 	if o.sendFrame == nil {
 		o.sendFrame = sendFrame
+	}
+	if o.wall == nil {
+		o.wall = time.Now
 	}
 	a := &Applier{o: o, uplink: o.Uplink, ledOn: true}
 	if o.ProxyARP && !o.DryRun {

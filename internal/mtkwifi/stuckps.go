@@ -20,11 +20,12 @@ import (
 // to it does, until it gives up and re-associates by itself ~300 s later.
 // The driver's TxPackets is no witness (it kept growing through the
 // stall), so the agent tests delivery end to end: every stuckProbeEvery
-// each station of an untagged BSS is sent a unicast ARP request for its
+// each station of an untagged 2.4 GHz BSS (the radio whose station counters
+// are read) is sent a unicast ARP request for its
 // own address from the unit's bridge (the unit's MAC and IPv4 there: a
 // station answers that, verified on the pump; from the BSS netdev itself,
-// or from 0.0.0.0, it got no answer), and its reply is seen on its BSS
-// (arpTable.heard). A probe unanswered by the next reading counts as a
+// or from 0.0.0.0, it got no answer), and its reply to that address is seen
+// on its BSS (arpTable.replies: the station's other ARP does not count). A probe unanswered by the next reading counts as a
 // miss and is sent again. A station that answered a probe in this
 // association, then misses stuckMisses in a row over at least stuckAfter
 // while the driver reads it dozing and (where the driver counts) still
@@ -47,8 +48,9 @@ type downProber interface {
 	// Stations sets each netdev's associated stations (lower-case MACs)
 	Stations(map[string][]string)
 	Neighbor(mac string) (net.IP, bool)
-	// Heard is when the station's own ARP was last seen (zero: never)
-	Heard(mac string) time.Time
+	// Replied is when the station last answered an ARP request from self
+	// at ip (zero: never)
+	Replied(mac string, self net.HardwareAddr, ip net.IP) time.Time
 	// Self is the unit's MAC and IPv4 address on bridge
 	Self(bridge string) (net.HardwareAddr, net.IP, bool)
 }
@@ -90,15 +92,17 @@ func (a *Applier) KickStuck(ctx context.Context, s *apstate.Snapshot) []string {
 		}
 		return nil
 	}
-	vifs := map[string]bool{} // the untagged BSSes
+	// the untagged BSSes that are up, of the radios whose station
+	// counters are read (the MT7603's: "still sending" needs RxPackets)
+	vifs := map[string]bool{}
 	for _, rd := range a.o.Layout {
 		rp := a.live[rd.Band]
-		if !rp.On {
+		if counts, _, _ := driverReads(rd); !rp.On || !counts {
 			continue
 		}
 		for i, b := range rp.BSS {
-			if b.VLAN == 0 {
-				vifs[a.ifaceOf(rd, rp, i)] = true
+			if v := a.ifaceOf(rd, rp, i); b.VLAN == 0 && a.isUp(v) {
+				vifs[v] = true
 			}
 		}
 	}
@@ -147,7 +151,7 @@ func (a *Applier) KickStuck(ctx context.Context, s *apstate.Snapshot) []string {
 				}
 				p.conn = st.Connected
 				if !p.probed.IsZero() && now.Sub(p.probed) >= stuckProbeWait {
-					if a.down.Heard(mac).After(p.probed) {
+					if haveSelf && a.down.Replied(mac, self, selfIP).After(p.probed) {
 						p.answered, p.misses = true, 0
 						p.next = now.Add(stuckProbeEvery)
 					} else if p.answered {
@@ -162,7 +166,7 @@ func (a *Applier) KickStuck(ctx context.Context, s *apstate.Snapshot) []string {
 					p.probed = time.Time{}
 				}
 				if p.answered && p.misses >= stuckMisses && now.Sub(p.first) >= stuckAfter &&
-					st.PowerSave && (st.RxPackets == 0 || st.RxPackets > p.rx0) && !now.Before(p.until) {
+					st.PowerSave && st.RxPackets > p.rx0 && !now.Before(p.until) {
 					if err := a.run(ctx, "iwpriv", v.Iface, "set", "DisConnectSta="+strings.ToUpper(mac)); err != nil {
 						a.o.Logf("mtkwifi: downlink watchdog: disconnecting %s from %s: %v", mac, v.Iface, err)
 					} else {
@@ -191,12 +195,13 @@ func (a *Applier) KickStuck(ctx context.Context, s *apstate.Snapshot) []string {
 				if err != nil {
 					continue
 				}
+				sentAt := a.o.wall() // a reply is only one after the probe left
 				if err := a.o.sendFrame(a.o.Bridge, arpFrame(hw, self, 1, selfIP, hw, ip)); err != nil {
 					a.o.Logf("mtkwifi: downlink watchdog: probe to %s: %v", mac, err)
 					p.next = now.Add(stuckProbeEvery)
 					continue
 				}
-				p.probed = now
+				p.probed = sentAt
 			}
 		}
 	}

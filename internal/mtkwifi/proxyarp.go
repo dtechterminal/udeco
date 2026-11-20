@@ -403,10 +403,11 @@ type arpTable struct {
 	sta   map[string]string // MAC -> the BSS netdev it is associated to
 	byIP  map[string]string // ip -> MAC
 	byMAC map[string]string // MAC -> ip
-	// heard: MAC -> when the station's own ARP (either op) was last seen
-	// on its BSS (the downlink watchdog's probe replies, stuckps.go)
-	heard map[string]time.Time
-	now   func() time.Time // time.Now when nil
+	// replies: MAC -> "<target MAC>/<target IP>" -> when the station's own
+	// ARP reply to that target was last seen on its BSS (the downlink
+	// watchdog's probe replies, stuckps.go)
+	replies map[string]map[string]time.Time
+	now     func() time.Time // time.Now when nil
 }
 
 func (t *arpTable) setStations(m map[string][]string) {
@@ -424,18 +425,20 @@ func (t *arpTable) setStations(m map[string][]string) {
 			delete(t.byIP, ip)
 		}
 	}
-	for mac := range t.heard {
+	for mac := range t.replies {
 		if _, ok := t.sta[mac]; !ok {
-			delete(t.heard, mac)
+			delete(t.replies, mac)
 		}
 	}
 }
 
-// lastHeard is when mac's own ARP was last seen (zero: never).
-func (t *arpTable) lastHeard(mac string) time.Time {
+func replyKey(tha net.HardwareAddr, tpa net.IP) string { return tha.String() + "/" + tpa.String() }
+
+// lastReply is when mac last answered tha at tpa (zero: never).
+func (t *arpTable) lastReply(mac string, tha net.HardwareAddr, tpa net.IP) time.Time {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return t.heard[mac]
+	return t.replies[mac][replyKey(tha, tpa.To4())]
 }
 
 func (t *arpTable) set(mac, ip string) {
@@ -460,14 +463,19 @@ func (t *arpTable) learnFrame(vif string, f []byte) {
 		m := a.sha.String()
 		if t.sta[m] == vif && bytes.Equal(a.src, a.sha) && !a.spa.Equal(net.IPv4zero) {
 			t.set(m, a.spa.String())
-			if t.heard == nil {
-				t.heard = map[string]time.Time{}
+			if a.op == 2 {
+				if t.replies == nil {
+					t.replies = map[string]map[string]time.Time{}
+				}
+				if t.replies[m] == nil {
+					t.replies[m] = map[string]time.Time{}
+				}
+				now := time.Now
+				if t.now != nil {
+					now = t.now
+				}
+				t.replies[m][replyKey(a.tha, a.tpa)] = now()
 			}
-			now := time.Now
-			if t.now != nil {
-				now = t.now
-			}
-			t.heard[m] = now()
 		}
 		return
 	}

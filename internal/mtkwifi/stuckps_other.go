@@ -15,8 +15,8 @@ type noProber struct{}
 
 func newDownProber(func(string, ...any)) downProber { return noProber{} }
 
-func (noProber) SetVifs([]string)                             {}
-func (noProber) Stations(map[string][]string)                 {}
-func (noProber) Neighbor(string) (net.IP, bool)               { return nil, false }
-func (noProber) Heard(string) time.Time                       { return time.Time{} }
-func (noProber) Self(string) (net.HardwareAddr, net.IP, bool) { return nil, nil, false }
+func (noProber) SetVifs([]string)                                   {}
+func (noProber) Stations(map[string][]string)                       {}
+func (noProber) Neighbor(string) (net.IP, bool)                     { return nil, false }
+func (noProber) Replied(string, net.HardwareAddr, net.IP) time.Time { return time.Time{} }
+func (noProber) Self(string) (net.HardwareAddr, net.IP, bool)       { return nil, nil, false }

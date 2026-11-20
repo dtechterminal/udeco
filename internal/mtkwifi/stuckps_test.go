@@ -26,7 +26,12 @@ type fakeProber struct {
 
 func (p *fakeProber) SetVifs(v []string)             { p.vifs = v }
 func (p *fakeProber) Stations(m map[string][]string) { p.stas = m }
-func (p *fakeProber) Heard(mac string) time.Time     { return p.heard[mac] }
+func (p *fakeProber) Replied(mac string, self net.HardwareAddr, ip net.IP) time.Time {
+	if self.String() != "b4:a7:c6:17:e3:f3" || !ip.Equal(net.IPv4(192, 168, 0, 51)) {
+		return time.Time{}
+	}
+	return p.heard[mac]
+}
 func (p *fakeProber) Neighbor(mac string) (net.IP, bool) {
 	ip, ok := p.ip[mac]
 	return ip, ok
@@ -60,6 +65,7 @@ type stuckRig struct {
 	p      *fakeProber
 	frames []stuckFrame
 	t0     time.Time
+	cur    time.Time // the reading's time (the probes' wall clock)
 }
 
 func newStuckRig(t *testing.T, d bcmwifi.Desired) *stuckRig {
@@ -74,6 +80,7 @@ func newStuckRig(t *testing.T, d bcmwifi.Desired) *stuckRig {
 	r := &stuckRig{t: t, f: f, a: a, now: now, t0: time.Unix(1_800_000_000, 0),
 		p: &fakeProber{ip: map[string]net.IP{pumpMAC: net.IPv4(192, 168, 0, 26)}, heard: map[string]time.Time{}, self: true}}
 	a.down = r.p
+	a.o.wall = func() time.Time { return r.cur.Add(100 * time.Millisecond) }
 	a.o.sendFrame = func(dev string, b []byte) error {
 		r.frames = append(r.frames, stuckFrame{dev, append([]byte(nil), b...)})
 		return nil
@@ -84,11 +91,16 @@ func newStuckRig(t *testing.T, d bcmwifi.Desired) *stuckRig {
 // at runs a reading s seconds after t0; answer: the station replies to the
 // probe in flight (heard 100 ms after it).
 func (r *stuckRig) at(s int, ps bool, rx int64, answer bool) []string {
-	at := r.t0.Add(time.Duration(s) * time.Second)
+	return r.atMs(s*1000, ps, rx, answer)
+}
+
+func (r *stuckRig) atMs(ms int, ps bool, rx int64, answer bool) []string {
+	at := r.t0.Add(time.Duration(ms) * time.Millisecond)
 	if answer && len(r.frames) > 0 {
-		r.p.heard[pumpMAC] = at.Add(-time.Second)
+		r.p.heard[pumpMAC] = at.Add(-500 * time.Millisecond)
 	}
-	return r.a.KickStuck(context.Background(), pumpSnap(at, "ra0", ps, rx, int64(100+s)))
+	r.cur = at
+	return r.a.KickStuck(context.Background(), pumpSnap(at, "ra0", ps, rx, int64(100+ms/1000)))
 }
 
 // TestKickStuckProbe: the probe is a unicast ARP request for the
@@ -151,12 +163,33 @@ func TestKickStuckKick(t *testing.T) {
 	if got := s - 5; got < 40+int(stuckAfter/time.Second) {
 		t.Errorf("kicked at %d s", got)
 	}
-	// re-associated (Connected restarts), proves itself, stalls again at once: back-off holds
-	for i := 0; i < 6; i++ {
-		at := r.t0.Add(time.Duration(s+5*i) * time.Second)
-		if k := r.a.KickStuck(context.Background(), pumpSnap(at, "ra0", true, int64(500+i), int64(1+5*i))); len(k) > 0 && i < 4 {
-			t.Fatalf("kicked again within the back-off: %v", k)
+	// it re-associates after each kick, proves itself, and stalls again
+	// at once: the back-off doubles (kickBackoff, then 2x, 4x), so the
+	// gaps between kicks grow past the detection time
+	kicks := []time.Time{r.t0.Add(time.Duration(s-5) * time.Second)}
+	conn, answer, sentBefore := int64(0), true, len(r.frames)
+	for at := kicks[0].Add(5 * time.Second); len(kicks) < 4 && at.Before(kicks[0].Add(time.Hour)); at = at.Add(5 * time.Second) {
+		conn += 5
+		if answer && len(r.frames) > sentBefore { // this association's first probe is out
+			r.p.heard[pumpMAC] = at.Add(-500 * time.Millisecond)
+			answer = false
 		}
+		r.cur = at
+		if k := r.a.KickStuck(context.Background(), pumpSnap(at, "ra0", true, conn*10, conn)); len(k) > 0 {
+			kicks = append(kicks, at)
+			conn, answer, sentBefore = 0, true, len(r.frames)
+		}
+	}
+	if len(kicks) < 4 {
+		t.Fatalf("kicks %v", kicks)
+	}
+	for i, want := range []time.Duration{kickBackoff, 2 * kickBackoff, 4 * kickBackoff} {
+		if g := kicks[i+1].Sub(kicks[i]); g < want {
+			t.Errorf("kick %d came %s after the last (back-off %s)", i+2, g, want)
+		}
+	}
+	if g := kicks[3].Sub(kicks[2]); g < 4*kickBackoff {
+		t.Errorf("back-off not doubling: %v", kicks)
 	}
 }
 
@@ -195,6 +228,44 @@ func TestKickStuckGuards(t *testing.T) {
 	}
 }
 
+// TestKickStuckAfter: misses counted 2 s apart still wait stuckAfter from
+// the first unanswered probe.
+func TestKickStuckAfter(t *testing.T) {
+	r := newStuckRig(t, home())
+	r.at(0, true, 10, false)
+	r.at(5, true, 11, true) // proven
+	var at int
+	for ms := 40_000; ms < 80_000 && at == 0; ms += 2100 {
+		if k := r.atMs(ms, true, int64(ms/100), false); len(k) > 0 {
+			at = ms
+		}
+	}
+	if at == 0 || at-40_000 < int(stuckAfter/time.Millisecond) {
+		t.Errorf("kicked at %d ms (first miss probed at 40000)", at)
+	}
+}
+
+// TestKickStuckNoCounts: without RxPackets ("still sending" unknown) there
+// is no kick; a 5 GHz station (no station counters there) is not watched.
+func TestKickStuckNoCounts(t *testing.T) {
+	r := newStuckRig(t, home())
+	r.at(0, true, 0, false)
+	r.at(5, true, 0, true)
+	for s := 40; s <= 120; s += 5 {
+		if k := r.at(s, true, 0, false); len(k) > 0 {
+			t.Fatalf("kicked without counters: %v", k)
+		}
+	}
+	r = newStuckRig(t, home())
+	r.cur = r.t0
+	r.a.KickStuck(context.Background(), &apstate.Snapshot{Time: r.t0, Radios: []apstate.Radio{{Band: "na", VAPs: []apstate.Radio{
+		{Iface: "rai0", Stations: []apstate.Station{{MAC: pumpMAC, PowerSave: true, RxPackets: 5, Connected: 9}}},
+	}}}})
+	if len(r.frames) > 0 || strings.Contains(strings.Join(r.p.vifs, ","), "rai") {
+		t.Errorf("5 GHz watched: vifs %v frames %d", r.p.vifs, len(r.frames))
+	}
+}
+
 // TestKickStuckVLAN: a BSS on a VLAN (no address of the unit there) is not
 // watched; without the bridge's address nothing is probed.
 func TestKickStuckVLAN(t *testing.T) {
@@ -228,20 +299,27 @@ NO                                                              MaxCap:HTMIX    
 	}
 }
 
-// learnFrame stamps a station's own ARP (its probe reply) as heard.
-func TestARPTableHeard(t *testing.T) {
+// learnFrame stamps a station's ARP reply by its target; its requests and
+// replies to others are not an answer to the unit.
+func TestARPTableReplies(t *testing.T) {
 	at := time.Unix(1_800_000_000, 0)
 	tb := arpTable{now: func() time.Time { return at }}
+	self, selfIP := mac("b4:a7:c6:17:e3:f3"), net.IPv4(192, 168, 0, 51)
 	tb.setStations(map[string][]string{"ra1": {pumpMAC}})
+	tb.learnFrame("ra1", testARP(1, "ff:ff:ff:ff:ff:ff", pumpMAC, "192.168.0.26", "00:00:00:00:00:00", "192.168.0.1"))
+	tb.learnFrame("ra1", testARP(2, "1e:6a:1b:c5:04:c2", pumpMAC, "192.168.0.26", "1e:6a:1b:c5:04:c2", "192.168.0.1"))
+	if h := tb.lastReply(pumpMAC, self, selfIP); !h.IsZero() {
+		t.Fatalf("a request or a reply to the gateway counted: %v", h)
+	}
 	tb.learnFrame("ra1", testARP(2, "b4:a7:c6:17:e3:f3", pumpMAC, "192.168.0.26", "b4:a7:c6:17:e3:f3", "192.168.0.51"))
-	if h := tb.lastHeard(pumpMAC); !h.Equal(at) {
-		t.Errorf("heard %v", h)
+	if h := tb.lastReply(pumpMAC, self, selfIP); !h.Equal(at) {
+		t.Errorf("reply %v", h)
 	}
 	if ip, ok := tb.neighbor(pumpMAC); !ok || ip.String() != "192.168.0.26" {
 		t.Errorf("neighbor %v %v", ip, ok)
 	}
 	tb.setStations(nil)
-	if h := tb.lastHeard(pumpMAC); !h.IsZero() {
-		t.Errorf("heard kept after leaving: %v", h)
+	if h := tb.lastReply(pumpMAC, self, selfIP); !h.IsZero() {
+		t.Errorf("kept after leaving: %v", h)
 	}
 }

@@ -79,7 +79,9 @@ func (l *learner) read(s *parpSock, name string) {
 
 func (l *learner) Stations(m map[string][]string)     { l.tbl.setStations(m) }
 func (l *learner) Neighbor(mac string) (net.IP, bool) { return l.tbl.neighbor(mac) }
-func (l *learner) Heard(mac string) time.Time         { return l.tbl.lastHeard(mac) }
+func (l *learner) Replied(mac string, self net.HardwareAddr, ip net.IP) time.Time {
+	return l.tbl.lastReply(mac, self, ip)
+}
 
 func (l *learner) Self(bridge string) (net.HardwareAddr, net.IP, bool) {
 	ifi, err := net.InterfaceByName(bridge)
