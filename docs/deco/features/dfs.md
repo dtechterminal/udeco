@@ -178,6 +178,11 @@ pinned to that AP at -25 to -30 dBm, measured with iperf3 against the UCG:
 | US/0 149/80 (shared with Bedroom) | HE-MCS 11, 40 MHz | 173 Mbps | 211 Mbps | 9,836 of 217,177 |
 | `#a` 100/80 (alone) | HE-MCS 11, 40 MHz | 215 Mbps | 211 Mbps | 1,858 of 41,773 |
 
+Internet speed test from the same KVM (Cloudflare, 4 streams each way, over
+its Wi-Fi only), 19:35-19:38 IST: US/0 149/80 150.6 down / 151.1 up, `#a`
+100/80 151.4 down / 156.1 up, 25 ms either way, with 785 AP retries in
+248,682 frames on 100. Both hit the 150 Mbps line, not the Wi-Fi.
+
 So the radio and driver do Wi-Fi 6 on DFS channels. Only the country data
 withholds it for every real country, and `#a` gets it by dropping radar
 detection, which is why it stays a test. TP-Link's data for this board carries Wi-Fi 6 only for US.
