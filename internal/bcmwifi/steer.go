@@ -5,6 +5,8 @@ package bcmwifi
 import (
 	"context"
 	"fmt"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // Band steering primitive. The X20 has no Broadcom steering daemon (no
@@ -21,27 +23,15 @@ import (
 // neighbor fields as decimal (upstream 2.9 does), and stations act on a
 // request from a BSS whose SSID has bss_transition on (SSID.BSSTransition).
 
-// neighborInfo returns the BSSID information, 20 MHz operating class and PHY
-// type of a candidate on band/channel, as the 802.11k list in internals.md
-// uses them (0x08af, +0x1000 VHT on 5 GHz; PHY 7 HT, 9 VHT).
+// neighborInfo returns the BSSID information, 20 MHz operating class
+// (rf.OpClass: 0 for a channel no class has) and PHY type of a candidate
+// on band/channel, as the 802.11k list in internals.md uses them (0x08af,
+// +0x1000 VHT on 5 GHz; PHY 7 HT, 9 VHT).
 func neighborInfo(band string, ch int) (info, opClass, phy int) {
-	if band == "ng" {
-		if ch == 14 {
-			return 0x08af, 82, 7
-		}
-		return 0x08af, 81, 7
+	if band == rf.Band2G {
+		return 0x08af, rf.OpClass(band, ch), 7
 	}
-	switch {
-	case ch >= 36 && ch <= 48:
-		opClass = 115
-	case ch >= 52 && ch <= 64:
-		opClass = 118
-	case ch >= 100 && ch <= 144:
-		opClass = 121
-	case ch >= 149:
-		opClass = 125
-	}
-	return 0x18af, opClass, 9
+	return 0x18af, rf.OpClass(band, ch), 9
 }
 
 // SteerToBand asks station mac, associated on vif, to move to targetBSSID,
@@ -91,6 +81,9 @@ func (a *Applier) SteerToBand(ctx context.Context, vif, mac, targetBSSID string)
 		return fmt.Errorf("bcmwifi: steer: %s: %w", prim, err)
 	}
 	info, opClass, phy := neighborInfo(band, cs.Ctrl)
+	if opClass == 0 {
+		return fmt.Errorf("bcmwifi: steer: %s: no operating class for %s channel %d", prim, band, cs.Ctrl)
+	}
 	nb := fmt.Sprintf("neighbor=%s,%d,%d,%d,%d", t, info, opClass, cs.Ctrl, phy)
 	if err := a.hostapdCLI(ctx, vif, "bss_tm_req", m, "pref=1", "abridged=1", nb); err != nil {
 		return fmt.Errorf("bcmwifi: steer %s to %s: %w", m, t, err)

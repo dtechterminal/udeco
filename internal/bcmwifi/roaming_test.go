@@ -76,9 +76,10 @@ func TestRoamAssist(t *testing.T) {
 	if err := a.RoamAssist(ctx, req); err != nil {
 		t.Fatal(err)
 	}
+	// channel 149: operating class 124 (rf.OpClass, Table E-4)
 	want := "hostapd_cli -p /var/run/udeco-hostapd -i wl12 bss_tm_req " + staBTMOK +
 		" disassoc_imminent=1 disassoc_timer=100 pref=1 abridged=1" +
-		" neighbor=02:00:00:00:77:02,6319,125,149,9"
+		" neighbor=02:00:00:00:77:02,6319,124,149,9"
 	if !f.called(want) {
 		t.Errorf("missing %q in %v", want, f.mutating())
 	}

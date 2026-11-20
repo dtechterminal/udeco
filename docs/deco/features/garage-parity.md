@@ -264,7 +264,8 @@ apply to both platforms.
     channel.
   - Radar is the driver's (CSA, a random new channel, 30 min NOP). The
     agent sees the radio on another channel than the one it set, reports
-    `EVT_AP_RadarDetected` (radio, channel, freq) to the controller and logs
+    `EVT_AP_RadarDetected` (radio, radio_name: the 5 GHz radio's
+    `radio_table` name, rai0 or wifi1; channel, freq) to the controller and logs
     `RADAR` in `events.log`, keeps the channel out for 31 min (all of 52-64
     at 80 MHz), writes the driver's channel into the profile meanwhile, and
     then goes back. A move the driver refused is no radar.

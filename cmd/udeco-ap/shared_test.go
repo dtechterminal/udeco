@@ -100,10 +100,19 @@ func TestWifiOwnedFiles(t *testing.T) {
 	}
 }
 
-// Both platforms' radar notifications are radarPayload's map.
+// Both platforms' radar notifications are radarPayload's map, whose
+// radio_name is the inform's radio_table name of the band's radio
+// (reportedRadioName), whichever naming the session reports.
 func TestRadarPayload(t *testing.T) {
-	want := map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": "na", "radio_name": "rai0", "channel": 100, "freq": 5500}
-	if got := radarPayload("na", 100, 5500, "rai0"); !reflect.DeepEqual(got, want) {
-		t.Errorf("radarPayload = %v, want %v", got, want)
+	for _, naming := range []string{radioNamesMediaTek, radioNamesQualcomm} {
+		a := &agent{x: radioSession(naming)}
+		a.renameRadios()
+		want := map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": "na", "radio_name": radioTableName(t, a, "na"), "channel": 100, "freq": 5500}
+		if got := a.radarPayload("na", 100, 5500); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: radarPayload = %v, want %v", naming, got, want)
+		}
+	}
+	if n := (&agent{x: radioSession(radioNamesMediaTek)}).reportedRadioName("6e"); n != "" {
+		t.Errorf("no 6 GHz radio named %q", n)
 	}
 }

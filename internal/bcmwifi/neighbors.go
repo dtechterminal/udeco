@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // 802.11k neighbor lists.
@@ -86,26 +88,7 @@ func entryFor(b nbrBSS, selfFT bool) nbrEntry {
 		info |= 0x4000
 		phy = 14 // HE
 	}
-	return nbrEntry{BSSID: strings.ToUpper(b.BSSID), Info: info, Reg: opClass(b.Channel), Channel: b.Channel, Phy: phy}
-}
-
-// opClass is the global operating class of a 20 MHz primary channel
-// (802.11-2020 Table E-4).
-func opClass(ch int) int {
-	switch {
-	case ch <= 13:
-		return 81
-	case ch <= 48:
-		return 115
-	case ch <= 64:
-		return 118
-	case ch <= 144:
-		return 121
-	case ch <= 161:
-		return 124
-	default:
-		return 125
-	}
+	return nbrEntry{BSSID: strings.ToUpper(b.BSSID), Info: info, Reg: rf.OpClass(rf.ChanBand(b.Channel), b.Channel), Channel: b.Channel, Phy: phy}
 }
 
 // nbrRadios returns the radios that serve an RRM SSID.
@@ -276,7 +259,11 @@ func (a *Applier) syncNeighbors(ctx context.Context, l *layout, now time.Time) (
 				if _, dup := want[b.BSSID]; dup || len(order) >= nbrMax {
 					return
 				}
-				want[b.BSSID] = entryFor(b, u.SSID.FT)
+				e := entryFor(b, u.SSID.FT)
+				if e.Reg == 0 {
+					return // a channel no operating class has
+				}
+				want[b.BSSID] = e
 				order = append(order, b.BSSID)
 			}
 			for _, o := range own {

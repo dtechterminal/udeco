@@ -19,13 +19,15 @@ fail at once, which means the WAN, not Wi-Fi):
   - a Deco AP (UniFi model UAL6 with a b0:a7:b9 MAC) that has been
     disconnected for 10+ min gets a UniFi restart, at most once per hour
 
-State, log and a JSON summary live in /data/wifi-inet-monitor. The summary
-is also published to MQTT (Home Assistant discovery) when the broker is up.
+State, log and a JSON summary live next to this script, in the directory
+30-wifi-inet-monitor.sh's unit runs it from (the one place that names it).
+The summary is also published to MQTT (Home Assistant discovery) when the
+broker is up.
 Read-only except the two fixes above. --dry-run reports without fixing.
 """
 import ipaddress, json, os, socket, struct, subprocess, sys, time, urllib.request
 
-BASE = "/data/wifi-inet-monitor"
+BASE = os.path.dirname(os.path.abspath(__file__))  # 30-wifi-inet-monitor.sh's ExecStart directory
 STATE = BASE + "/state.json"
 LOG = BASE + "/monitor.log"
 CONTROLLER = "http://127.0.0.1:8081"  # the Network application, from the gateway itself

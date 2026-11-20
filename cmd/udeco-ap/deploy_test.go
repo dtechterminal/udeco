@@ -143,14 +143,14 @@ func TestDeployPersistOnlyWithFlag(t *testing.T) {
 // TestUnitLayout holds the script's paths to those.
 func launcher(t *testing.T, root string) string {
 	t.Helper()
-	paths := scriptVars(t, decoDeploy, "DIR", "BIN", "GZ", "SUM", "START", "RAMDIR", "CFG")
-	under := map[string]string{}
+	paths := scriptVars(t, decoDeploy, "DIR", "BIN", "GZ", "SUM", "START", "RAMDIR", "CFG", "TAG")
+	under := map[string]string{"TAG": paths["TAG"]} // the syslog tag, not a path
 	for _, n := range []string{"DIR", "BIN", "GZ", "SUM", "START", "RAMDIR", "CFG"} {
 		under[n] = root + paths[n]
 	}
 	text, unknown := repotest.HeredocText(repotest.Heredoc(t, repotest.Read(t, decoDeploy), "LAUNCH"), under)
 	if len(unknown) != 0 {
-		t.Fatalf("the launcher uses %q, which are not paths of deploy/deco-ap.sh this test knows:\n%s", unknown, text)
+		t.Fatalf("the launcher uses %q, which are not variables of deploy/deco-ap.sh this test knows:\n%s", unknown, text)
 	}
 	return text + "\n"
 }

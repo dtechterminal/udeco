@@ -977,7 +977,7 @@ func findUsed(rl *radioLayout, vif string) (vifAssign, bool) {
 // aclSteps writes a vif's hostapd deny list (always, possibly empty) and its
 // accept list (allow-list SSIDs only; removed otherwise).
 func aclSteps(runDir string, d vifDriver) []Step {
-	st := []Step{writeStep("write deny list "+d.Vif, denyPath(runDir, d.Vif), 0o600, aclFile(d.DenyACL))}
+	st := []Step{writeStep("write deny list "+d.Vif, DenyPath(runDir, d.Vif), 0o600, aclFile(d.DenyACL))}
 	if d.Allow {
 		st = append(st, writeStep("write accept list "+d.Vif, acceptPath(runDir, d.Vif), 0o600, aclFile(d.AcceptACL)))
 	} else {

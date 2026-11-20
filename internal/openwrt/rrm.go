@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // 802.11k neighbour reports (docs/internals.md). A UAP lists its sibling APs
@@ -25,24 +27,6 @@ type Neighbor struct {
 	Band        string // ng / na
 }
 
-// opClass: the global operating class for a 20 MHz channel (IEEE 802.11
-// Annex E, table E-4).
-func opClass(freq, ch int) int {
-	switch {
-	case freq < 3000:
-		return 81
-	case ch >= 36 && ch <= 48:
-		return 115
-	case ch >= 52 && ch <= 64:
-		return 118
-	case ch >= 100 && ch <= 144:
-		return 121
-	case ch >= 149 && ch <= 177:
-		return 125
-	}
-	return 0
-}
-
 // NeighborElement: the Neighbor Report element body hostapd wants as hex:
 // BSSID, BSSID information (reachable, security, key scope, QoS/APSD/RRM,
 // HT, VHT for 5 GHz), operating class, channel, PHY type (HT 7, VHT 9).
@@ -52,7 +36,7 @@ func NeighborElement(n Neighbor) (string, error) {
 	if err != nil || len(b) != 6 {
 		return "", fmt.Errorf("bad bssid %q", n.BSSID)
 	}
-	oc := opClass(n.Freq, n.Channel)
+	oc := rf.OpClass(rf.ChanBand(n.Channel), n.Channel)
 	if oc == 0 || n.Channel <= 0 || n.Channel > 255 {
 		return "", fmt.Errorf("no operating class for %d MHz ch %d", n.Freq, n.Channel)
 	}

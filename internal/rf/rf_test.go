@@ -170,3 +170,32 @@ func TestNoiseFloor(t *testing.T) {
 		t.Errorf("NoiseFloorDBm = %d", NoiseFloorDBm)
 	}
 }
+
+// OpClass is 802.11-2020 Table E-4's 20 MHz classes, channel by channel:
+// every channel of a class, nothing between or around them.
+func TestOpClass(t *testing.T) {
+	want := map[string]map[int]int{Band2G: {14: 82}, Band5G: {}}
+	for ch := 1; ch <= 13; ch++ {
+		want[Band2G][ch] = 81
+	}
+	for _, c := range []struct{ class, first, last int }{
+		{115, 36, 48}, {118, 52, 64}, {121, 100, 144}, {124, 149, 161}, {125, 165, 177},
+	} {
+		for ch := c.first; ch <= c.last; ch += 4 {
+			want[Band5G][ch] = c.class
+		}
+	}
+	for _, band := range []string{Band2G, Band5G, Band6G, "", "5g"} {
+		for ch := -1; ch <= 200; ch++ {
+			if got := OpClass(band, ch); got != want[band][ch] {
+				t.Errorf("OpClass(%q, %d) = %d, want %d", band, ch, got, want[band][ch])
+			}
+		}
+	}
+	for ch := -1; ch <= 200; ch++ {
+		b := ChanBand(ch)
+		if OpClass(Band2G, ch) != 0 && b != Band2G || OpClass(Band5G, ch) != 0 && b != Band5G {
+			t.Errorf("ChanBand(%d) = %q, not the band of its operating class", ch, b)
+		}
+	}
+}

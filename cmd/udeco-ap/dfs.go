@@ -43,24 +43,35 @@ func (a *agent) radarOut() []bcmwifi.RadarEvent {
 
 // radarPayload is the EVT_AP_RadarDetected notification payload, of
 // either platform (bcmwifi's radar moves here, mtkwifi's in garage.go):
-// the radio's band and radio_table name, the channel the radar was on and
-// its MHz.
-func radarPayload(band string, channel, freqMHz int, radioName string) map[string]any {
-	return map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": band, "radio_name": radioName,
+// the radio's band and the name the inform's radio_table reports that
+// radio under (reportedRadioName), the channel the radar was on and its
+// MHz.
+func (a *agent) radarPayload(band string, channel, freqMHz int) map[string]any {
+	return map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": band, "radio_name": a.reportedRadioName(band),
 		"channel": channel, "freq": freqMHz}
+}
+
+// reportedRadioName is the name band's radio has in the session's radio
+// rows (inform.Device.Radios, as renameRadios named them: ra0/rai0, or
+// wifi0/wifi1 kept for an earlier adoption), "" for a band the unit has
+// no radio on. Loop goroutine.
+func (a *agent) reportedRadioName(band string) string {
+	if a.x == nil {
+		return ""
+	}
+	for _, r := range a.x.Dev.Radios {
+		if r.Radio == band {
+			return r.Name
+		}
+	}
+	return ""
 }
 
 // radarEvents puts the queued radar moves on the station-event queue
 // (loop goroutine).
 func (a *agent) radarEvents() {
 	for _, ev := range a.radarOut() {
-		name := ""
-		for _, r := range a.x.Dev.Radios {
-			if r.Radio == ev.Band {
-				name = r.Name
-			}
-		}
-		a.sta.push(radarPayload(ev.Band, ev.Channel, ev.FreqMHz, name))
+		a.sta.push(a.radarPayload(ev.Band, ev.Channel, ev.FreqMHz))
 	}
 }
 

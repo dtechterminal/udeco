@@ -120,7 +120,7 @@ func (a *Applier) RoamAssist(ctx context.Context, r RoamRequest) error {
 		seen[b] = true
 		info, opClass, phy := neighborInfo(band, c.Channel)
 		if opClass == 0 {
-			continue // a 5 GHz channel with no operating class here
+			continue // a channel no operating class has (rf.OpClass)
 		}
 		nbs = append(nbs, fmt.Sprintf("neighbor=%s,%d,%d,%d,%d", b, info, opClass, c.Channel, phy))
 		if len(nbs) == maxRoamCandidates {

@@ -103,7 +103,7 @@ func (a *Applier) planACLLive(primary string, conf []byte, drv []vifDriver, file
 			changed = true
 		}
 		l.prev[d.Vif] = p
-		l.paths[denyPath(run, d.Vif)] = true
+		l.paths[DenyPath(run, d.Vif)] = true
 		l.paths[acceptPath(run, d.Vif)] = true
 		l.paths[pskPath(run, d.Vif)] = true
 		if !sameSet(p.DenyACL, d.DenyACL) || !sameSet(p.AcceptACL, d.AcceptACL) {

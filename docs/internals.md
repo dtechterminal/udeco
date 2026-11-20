@@ -798,4 +798,7 @@ hour) and its own BSS of the same SSID on the other band, with
 `ubus call hostapd.<if> rrm_nr_set` (own entry from `rrm_nr_get_own` first),
 every 5 minutes and right after each Wi-Fi reload (hostapd forgets the list
 on restart). Element: BSSID, BSSID info `0x08af` (+`0x1000` VHT on 5 GHz),
-the 20 MHz operating class (81, 115, 118, 121, 125), channel, PHY type 7/9.
+the 20 MHz operating class (`rf.OpClass`, IEEE 802.11 Annex E: 2.4 GHz 1-13
+81, 14 82; 5 GHz 36-48 115, 52-64 118, 100-144 121, 149-161 124, 165-177
+125; the Deco's 802.11k lists and BTM requests use the same table), channel,
+PHY type 7/9.

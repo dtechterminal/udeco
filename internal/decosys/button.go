@@ -25,8 +25,8 @@ import (
 // SyslogTag is the tag of the agent's lines in the unit's syslog: its own
 // log (cmd/udeco-ap setupLog) and what the reset wrapper below logs with
 // logger. The Deco's launcher (the LAUNCH template in deploy/deco-ap.sh)
-// logs with logger too; cmd/udeco-ap's TestDeployLauncherTags holds its
-// tags.
+// logs with logger under it too (the script's TAG); cmd/udeco-ap's
+// TestDeployLauncherTags holds the script to it.
 const SyslogTag = "udeco-ap"
 
 const (

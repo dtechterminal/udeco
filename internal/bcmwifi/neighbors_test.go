@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // A peer AP as .205's 5 GHz scan printed .241 (2026-11-19), and a foreign
@@ -113,10 +115,23 @@ func TestNeighborListsFromScans(t *testing.T) {
 	}
 }
 
-func TestOpClass(t *testing.T) {
-	for ch, want := range map[int]int{1: 81, 11: 81, 36: 115, 48: 115, 52: 118, 100: 121, 149: 124, 161: 124, 165: 125} {
-		if got := opClass(ch); got != want {
-			t.Errorf("opClass(%d) = %d, want %d", ch, got, want)
+// Every neighbour report and BTM candidate list carries rf.OpClass's
+// operating class: the 802.11k list's entries (entryFor) and the 802.11v
+// requests' candidates (neighborInfo: SteerToBand, Roam), for every
+// channel of both bands.
+func TestOpClassIsRF(t *testing.T) {
+	for _, band := range []string{rf.Band2G, rf.Band5G} {
+		for ch := 1; ch <= 196; ch++ {
+			want := rf.OpClass(band, ch)
+			if _, got, _ := neighborInfo(band, ch); got != want {
+				t.Errorf("neighborInfo(%s, %d) class %d, want %d", band, ch, got, want)
+			}
+			if rf.ChanBand(ch) != band {
+				continue
+			}
+			if got := entryFor(nbrBSS{BSSID: "02:00:00:00:00:01", Channel: ch}, false).Reg; got != want {
+				t.Errorf("entryFor channel %d class %d, want %d", ch, got, want)
+			}
 		}
 	}
 }

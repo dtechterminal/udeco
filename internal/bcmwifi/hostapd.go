@@ -95,10 +95,12 @@ type hapdBSS struct {
 // radio is taken, removed when Wi-Fi is handed back.
 func ConfPath(runDir, primary string) string { return path.Join(runDir, "hapd-"+primary+".conf") }
 
+// DenyPath is a vif's hostapd deny list (the blocked stations) in RunDir.
+func DenyPath(runDir, vif string) string { return path.Join(runDir, vif+".deny") }
+
 // More hostapd file names in RunDir.
 func pidPath(runDir, primary string) string { return path.Join(runDir, "hapd-"+primary+".pid") }
 func drvPath(runDir, primary string) string { return path.Join(runDir, "drv-"+primary+".json") }
-func denyPath(runDir, vif string) string    { return path.Join(runDir, vif+".deny") }
 func acceptPath(runDir, vif string) string  { return path.Join(runDir, vif+".accept") }
 
 // mobilityDomain derives the 802.11r MDID from the SSID, so every unit
@@ -296,7 +298,7 @@ func renderBSS(w func(string, any), r hapdRadio, x hapdBSS) error {
 	}
 	// Always referenced (possibly empty) so a block-list change rewrites the
 	// file and updates hostapd live, without changing the conf.
-	w("deny_mac_file", denyPath(r.RunDir, x.Vif))
+	w("deny_mac_file", DenyPath(r.RunDir, x.Vif))
 	if err := writeHotspot2(w, s); err != nil { // Hotspot 2.0: hs20.go
 		return err
 	}

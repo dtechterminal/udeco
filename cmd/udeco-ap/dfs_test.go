@@ -3,33 +3,34 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/models"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // A radar move bcmwifi's Tick reports goes to the controller as a U6 Pro's
-// EVT_AP_RadarDetected notification, one per move.
+// EVT_AP_RadarDetected notification, one per move, naming the radio as
+// the inform's radio_table does (the Garage's: TestGarageRadar).
 func TestRadarEvent(t *testing.T) {
 	a := &agent{o: options{logf: t.Logf}}
+	a.x = radioSession(radioNamesMediaTek)
+	a.renameRadios()
 	a.radarIn([]bcmwifi.RadarEvent{{Band: "na", Radio: "wl1", Channel: 100, FreqMHz: 5500, From: "100/80", To: "36/80"}})
-	evs := a.radarOut()
-	if len(evs) != 1 || len(a.radarOut()) != 0 {
-		t.Fatalf("queue %+v", evs)
+	a.radarEvents()
+	if len(a.radarOut()) != 0 || len(a.sta.queue) != 1 {
+		t.Fatalf("queue %+v", a.sta.queue)
 	}
-	p := radarPayload(evs[0].Band, evs[0].Channel, evs[0].FreqMHz, "wifi1")
-	want := map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": "na", "radio_name": "wifi1", "channel": 100, "freq": 5500}
-	for k, v := range want {
-		if p[k] != v {
-			t.Errorf("%s = %v, want %v", k, p[k], v)
-		}
+	p := a.sta.queue[0]
+	want := map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": "na", "radio_name": radioTableName(t, a, "na"), "channel": 100, "freq": 5500}
+	if !reflect.DeepEqual(p, want) || p["radio_name"] != models.RadioNameMTK5G {
+		t.Errorf("payload %v, want %v", p, want)
 	}
-	var sta staEvents
-	sta.push(p)
 	f := map[string]any{}
-	sta.attach(f)
+	a.sta.attach(f)
 	if f["inform_as_notif"] != true || f["notif_reason"] != "event" {
 		t.Errorf("not a notification: %v", f)
 	}

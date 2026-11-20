@@ -284,7 +284,7 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		}
 	}
 	for _, v := range vifs {
-		for _, f := range []string{denyPath(a.o.RunDir, v), acceptPath(a.o.RunDir, v), pskPath(a.o.RunDir, v)} {
+		for _, f := range []string{DenyPath(a.o.RunDir, v), acceptPath(a.o.RunDir, v), pskPath(a.o.RunDir, v)} {
 			st = append(st, Step{Kind: StepRemove, Desc: "remove agent file", Path: f, Optional: true})
 		}
 	}

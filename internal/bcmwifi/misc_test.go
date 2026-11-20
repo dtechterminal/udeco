@@ -168,7 +168,7 @@ func TestSteerToBand(t *testing.T) {
 		band           string
 		ch             int
 		info, opc, phy int
-	}{{"ng", 6, 0x08af, 81, 7}, {"na", 36, 0x18af, 115, 9}, {"na", 100, 0x18af, 121, 9}, {"na", 149, 0x18af, 125, 9}} {
+	}{{"ng", 6, 0x08af, 81, 7}, {"na", 36, 0x18af, 115, 9}, {"na", 100, 0x18af, 121, 9}, {"na", 149, 0x18af, 124, 9}, {"na", 165, 0x18af, 125, 9}, {"ng", 14, 0x08af, 82, 7}} {
 		i, o, p := neighborInfo(c.band, c.ch)
 		if i != c.info || o != c.opc || p != c.phy {
 			t.Errorf("%s %d: %x %d %d", c.band, c.ch, i, o, p)

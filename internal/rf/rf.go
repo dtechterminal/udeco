@@ -2,7 +2,7 @@
 
 // Package rf holds the radio facts every backend shares: UniFi's band
 // names, channel and frequency arithmetic, the 5 GHz channel blocks, the
-// DFS range and the stand-in noise floor. It imports nothing from this
+// DFS range, the 20 MHz operating classes and the stand-in noise floor. It imports nothing from this
 // module, so any package may use it, and it is the one place these facts
 // are written down. A vendor's own limits (the channels a driver or a
 // country allows, a chip's 2.4 GHz 40 MHz sideband rule, the MediaTek
@@ -140,6 +140,52 @@ func Only20MHz(band string, ch int) bool { return band == Band5G && ch == 165 }
 // chooses from: the three that do not overlap. Each call returns a new
 // slice.
 func NonOverlap24() []int { return []int{1, 6, 11} }
+
+// opClasses20 are the IEEE 802.11 global operating classes of the 20 MHz
+// primary channels (802.11-2020 Annex E, Table E-4): each class's band,
+// first and last channel, all channels between them 5 MHz * step apart.
+// Where two classes list a channel (149-161 are in both 124 and 125), the
+// first row, the one made for them, wins.
+var opClasses20 = []struct {
+	band                     string
+	class, first, last, step int
+}{
+	{Band2G, 81, 1, 13, 1},
+	{Band2G, 82, 14, 14, 1},
+	{Band5G, 115, 36, 48, 4},
+	{Band5G, 118, 52, 64, 4},
+	{Band5G, 121, 100, 144, 4},
+	{Band5G, 124, 149, 161, 4},
+	{Band5G, 125, 165, 177, 4},
+}
+
+// OpClass is the global operating class of 20 MHz primary channel ch on
+// band, as an 802.11k neighbour report and an 802.11v BSS transition
+// request's candidate list carry it: 2.4 GHz 1-13 81, 14 82; 5 GHz 36-48
+// 115, 52-64 118, 100-144 121, 149-161 124, 165-177 125. 0 for any other
+// channel (none of these classes has it, or band is not ng or na).
+func OpClass(band string, ch int) int {
+	for _, c := range opClasses20 {
+		if c.band == band && ch >= c.first && ch <= c.last && (ch-c.first)%c.step == 0 {
+			return c.class
+		}
+	}
+	return 0
+}
+
+// ChanBand is the band a primary channel number lies in when no band is
+// known (a scanned BSS, a frequency's channel): 1-14 ng, 32-177 na, ""
+// for anything else. No unit here has a 6 GHz radio, whose channel
+// numbers would overlap these.
+func ChanBand(ch int) string {
+	switch {
+	case ch >= 1 && ch <= 14:
+		return Band2G
+	case ch >= 32 && ch <= 177:
+		return Band5G
+	}
+	return ""
+}
 
 // NoiseFloorDBm stands in for a noise floor no driver reading gives. The
 // controller's RSSI is signal minus noise, so a signal of NoiseFloorDBm or

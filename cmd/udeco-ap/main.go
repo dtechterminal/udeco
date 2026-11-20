@@ -92,7 +92,7 @@ func startGuard(cfg *Config, root, base, runDir string, now time.Time, logf func
 	up, err := readUptime(root)
 	if err != nil {
 		logf("udeco-ap: uptime: %v (crash-loop guard off for this start)", err)
-	} else if loop, err := recordStart(filepath.Join(root, runDir, "starts"), up); err != nil {
+	} else if loop, err := recordStart(filepath.Join(root, runDir, startsFile), up); err != nil {
 		logf("udeco-ap: start log: %v", err)
 	} else if loop {
 		why := fmt.Sprintf("crash loop: %d starts within %s", crashStarts, crashWindow)

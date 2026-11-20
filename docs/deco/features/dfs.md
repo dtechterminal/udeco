@@ -63,7 +63,8 @@ Out of Service", the agent:
 - logs the move;
 - queues a `RadarEvent`, which Tick reports once and the agent sends as an
   `EVT_AP_RadarDetected` notification (`event_string`, `radio`,
-  `radio_name`, `channel`, `freq`; `cmd/udeco-ap/dfs.go`);
+  `radio_name` (the radio's `radio_table` name), `channel`, `freq`;
+  `cmd/udeco-ap/dfs.go`, which the Garage's radar event shares);
 - notes the move in every plan.
 
 **dfs-reset.** The controller's cron job (`cron.N.job.M.cmd` containing

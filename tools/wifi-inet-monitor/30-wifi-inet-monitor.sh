@@ -1,6 +1,7 @@
 #!/bin/sh
-# Wi-Fi client internet monitor (/data/wifi-inet-monitor): recreate its
-# systemd timer after a firmware update wipes /etc/systemd/system.
+# Wi-Fi client internet monitor: recreate its systemd timer after a firmware
+# update wipes /etc/systemd/system. ExecStart names its directory, where the
+# script keeps its state, log and summary (it reads that from its own path).
 cat > /etc/systemd/system/wifi-inet-monitor.service <<"U"
 [Unit]
 Description=Wi-Fi client internet monitor (reconnects broken clients, restarts lost Decos)

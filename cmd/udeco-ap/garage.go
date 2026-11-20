@@ -48,7 +48,7 @@ func (a *agent) garageReading(ctx context.Context, s *apstate.Snapshot) {
 	if r, ok := a.wifi.(radarSource); ok {
 		for _, e := range r.TakeRadar() {
 			a.event(fmt.Sprintf("RADAR on 5 GHz channel %d: the radio moved to %d; back after the 30 min non-occupancy period", e.Channel, e.MovedTo))
-			a.sta.push(radarPayload("na", e.Channel, e.Freq, jioRadarRadioName))
+			a.sta.push(a.radarPayload("na", e.Channel, e.Freq))
 		}
 	}
 }
@@ -85,14 +85,6 @@ func (a *agent) garageWatchdogTick(ctx context.Context) {
 	}
 	a.kickStuck(ctx, s)
 }
-
-// jioRadarRadioName is the radio_name of the JCOW414's radar event. It is
-// the 5 GHz radio's name by position, whatever name the unit reports that
-// radio under (rai0 with MediaTek naming, radionames.go), where the Deco's
-// event (dfs.go radarEvents) carries the reported name. Sending the
-// reported name here too changes the event on the wire: that is the open
-// item tables-radar-event-payload, not done here.
-const jioRadarRadioName = "wifi1"
 
 // radarSource is the applier's DFS radar detections (mtkwifi dfs.go).
 type radarSource interface {

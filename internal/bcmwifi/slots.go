@@ -120,7 +120,7 @@ func (a *Applier) saveSlots(l *layout) {
 // vifFiles are the per-vif files the agent keeps in RunDir: the hostapd
 // deny and accept lists and the private-key file.
 func vifFiles(runDir, vif string) []string {
-	return []string{denyPath(runDir, vif), acceptPath(runDir, vif), pskPath(runDir, vif)}
+	return []string{DenyPath(runDir, vif), acceptPath(runDir, vif), pskPath(runDir, vif)}
 }
 
 // staleVifSteps removes the per-vif files of the radio's vifs that carry no

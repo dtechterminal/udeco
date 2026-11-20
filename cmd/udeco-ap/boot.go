@@ -37,6 +37,10 @@ import (
 // blocks a start (the old PID-file check could race: interference X11).
 const lockName = "agent.lock"
 
+// pidName is the PID file next to the lock, for scripts and the documented
+// kill command; the lock does not depend on it.
+const pidName = "udeco-ap.pid"
+
 type instanceLock struct {
 	f       *os.File
 	pidPath string
@@ -66,7 +70,7 @@ func acquireLock(runDir string) (*instanceLock, error) {
 	pid := []byte(strconv.Itoa(os.Getpid()) + "\n")
 	f.Truncate(0)
 	f.WriteAt(pid, 0)
-	l := &instanceLock{f: f, pidPath: filepath.Join(runDir, "udeco-ap.pid")}
+	l := &instanceLock{f: f, pidPath: filepath.Join(runDir, pidName)}
 	atomicfile.Write(l.pidPath, l.pidPath+".tmp", pid, 0o644) // for scripts: the lock does not depend on it
 	return l, nil
 }
@@ -139,6 +143,7 @@ func readUptime(root string) (float64, error) {
 const (
 	crashStarts = 5
 	crashWindow = 10 * time.Minute
+	startsFile  = "starts" // the start log, in the run directory
 )
 
 // recordStart appends uptime to the start log and reports whether this
@@ -180,6 +185,10 @@ func recordStart(path string, uptime float64) (bool, error) {
 //
 // (persist_shell.sh starts the agent again within a minute).
 const observeMarker = "force-observe"
+
+// bootIDFile, in the config's directory, is the kernel boot_id the agent
+// last ran under: a different one at start is a reboot (R13).
+const bootIDFile = "boot_id"
 
 func writeMarker(path, why string, now time.Time) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -474,7 +483,7 @@ func (a *agent) checkReboot() {
 	a.alive.mu.Lock()
 	a.alive.bootID = id
 	a.alive.mu.Unlock()
-	p := a.dev(filepath.Join(a.o.base, "boot_id"))
+	p := a.dev(filepath.Join(a.o.base, bootIDFile))
 	prev, err := os.ReadFile(p)
 	if err == nil && strings.TrimSpace(string(prev)) == id {
 		return

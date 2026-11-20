@@ -3,8 +3,11 @@
 package openwrt
 
 import (
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 func TestNeighborElement(t *testing.T) {
@@ -12,8 +15,8 @@ func TestNeighborElement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// bssid, info 0x000018af little-endian, class 125, channel 149, VHT
-	if want := "5a1122334404af1800007d9509"; el != want {
+	// bssid, info 0x000018af little-endian, class 124 (0x7c), channel 149, VHT
+	if want := "5a1122334404af1800007c9509"; el != want {
 		t.Errorf("got %s, want %s", el, want)
 	}
 	el, _ = NeighborElement(Neighbor{BSSID: "42:11:22:33:44:02", Freq: 2412, Channel: 1})
@@ -22,6 +25,25 @@ func TestNeighborElement(t *testing.T) {
 	}
 	if _, err := NeighborElement(Neighbor{BSSID: "x", Freq: 5745, Channel: 149}); err == nil {
 		t.Error("bad bssid accepted")
+	}
+	// every channel's element carries rf.OpClass's class, and a channel no
+	// class has is no element
+	for ch := 1; ch <= 196; ch++ {
+		band, freq := rf.ChanBand(ch), 0
+		if band != "" {
+			freq = rf.ChanFreq(band, ch)
+		}
+		el, err := NeighborElement(Neighbor{BSSID: "5a:11:22:33:44:04", Freq: freq, Channel: ch})
+		want := rf.OpClass(band, ch)
+		if want == 0 {
+			if err == nil {
+				t.Errorf("channel %d: element %s, want none", ch, el)
+			}
+			continue
+		}
+		if err != nil || len(el) != 26 || el[20:22] != fmt.Sprintf("%02x", want) {
+			t.Errorf("channel %d: element %s (%v), want class %d", ch, el, err, want)
+		}
 	}
 }
 

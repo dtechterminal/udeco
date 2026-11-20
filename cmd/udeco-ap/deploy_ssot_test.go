@@ -511,20 +511,36 @@ func TestLaunchersAgree(t *testing.T) {
 	}
 }
 
-// The launcher's two logger tags as they are today. The first is the
-// agent's own tag. The second, "udeco", is a known exception: the
-// "starting udeco-ap" line has always gone out under it, and a new tag
-// would change what a unit logs, so that is left to the owner.
+// The launcher logs under the agent's own syslog tag only: deploy/deco-ap.sh
+// holds it once (TAG, decosys.SyslogTag), every logger line of the
+// launcher uses it, and the deploy shows the agent's first lines by it. A
+// filter on the tag sees the launcher's "starting udeco-ap" line with the
+// agent's.
 func TestDeployLauncherTags(t *testing.T) {
-	var tags []string
-	for _, m := range regexp.MustCompile(`logger -t (\S+) `).FindAllStringSubmatch(launcher(t, ""), -1) {
-		tags = append(tags, m[1])
+	if tag := scriptVars(t, decoDeploy, "TAG")["TAG"]; tag != decosys.SyslogTag {
+		t.Errorf("deploy/deco-ap.sh TAG=%s, want decosys.SyslogTag %s", tag, decosys.SyslogTag)
 	}
-	if want := []string{decosys.SyslogTag, "udeco"}; !slices.Equal(tags, want) {
-		t.Errorf("the launcher logs with the tags %q, want %q", tags, want)
+	text := launcher(t, "")
+	tags := regexp.MustCompile(`logger -t (\S+) `).FindAllStringSubmatch(text, -1)
+	if len(tags) == 0 || len(tags) != strings.Count(text, "logger") {
+		t.Fatalf("the launcher has %d logger lines with a tag, %d mentions of logger:\n%s", len(tags), strings.Count(text, "logger"), text)
 	}
-	// the deploy shows the agent's first lines by that tag
-	if want := "logread 2>/dev/null | grep '" + decosys.SyslogTag + "' | tail"; !strings.Contains(repotest.Read(t, decoDeploy), want) {
+	for _, m := range tags {
+		if m[1] != decosys.SyslogTag {
+			t.Errorf("the launcher logs with the tag %q, want decosys.SyslogTag %q", m[1], decosys.SyslogTag)
+		}
+	}
+	if !strings.Contains(text, `logger -t `+decosys.SyslogTag+` "starting udeco-ap"`) {
+		t.Errorf("the launcher no longer logs its start under %s:\n%s", decosys.SyslogTag, text)
+	}
+	// every logger and logread filter of the script names the tag by $TAG
+	script := repotest.Read(t, decoDeploy)
+	for _, l := range strings.Split(script, "\n") {
+		if (strings.Contains(l, "logger -t ") || strings.Contains(l, "logread")) && !strings.Contains(l, "$TAG") {
+			t.Errorf("deploy/deco-ap.sh names a syslog tag other than by $TAG:\n%s", l)
+		}
+	}
+	if want := "logread 2>/dev/null | grep '$TAG' | tail"; !strings.Contains(script, want) {
 		t.Errorf("deploy/deco-ap.sh no longer has %q", want)
 	}
 }

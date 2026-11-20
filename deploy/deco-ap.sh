@@ -86,6 +86,7 @@ SUM=$DIR/udeco-ap.md5
 START=$DIR/start.sh
 RAMDIR=/tmp/udeco-bin
 CFG=$DIR/udeco-ap.json
+TAG=udeco-ap # the agent's syslog tag (decosys.SyslogTag): the launcher logs under it too
 PERSIST=/data/persist_shell.sh
 CRONTAB=/etc/crontabs/root
 MARK='# udeco-ap supervise (deploy/deco-ap.sh)'
@@ -448,7 +449,7 @@ if [ -f $GZ ]; then
 		T=\$B.\$\$
 		if ! gunzip -c $GZ >\$T || [ "\$(md5sum \$T | cut -d' ' -f1)" != "\$want" ]; then
 			rm -f \$T
-			logger -t udeco-ap "launcher: $GZ does not unpack to the deployed agent; not starting" 2>/dev/null
+			logger -t $TAG "launcher: $GZ does not unpack to the deployed agent; not starting" 2>/dev/null
 			exit 1
 		fi
 		chmod 755 \$T && mv \$T \$B
@@ -462,7 +463,7 @@ L=$RAMDIR/agent.log
 if [ -f \$L ] && [ \$(wc -c <\$L) -gt 2097152 ]; then
 	tail -c 262144 \$L >\$L.1; : >\$L
 fi
-logger -t udeco "starting udeco-ap" 2>/dev/null
+logger -t $TAG "starting udeco-ap" 2>/dev/null
 echo \$\$ >$RAMDIR/agent.pid
 exec \$B -config $CFG </dev/null >>\$L 2>&1
 LAUNCH
@@ -574,7 +575,7 @@ if pidof udeco-ap >/dev/null 2>&1; then
 else
 	echo "deco-ap: the agent is not running; its log:" >&2
 fi
-logread 2>/dev/null | grep 'udeco-ap' | tail -n 15
+logread 2>/dev/null | grep '$TAG' | tail -n 15
 EOF
 fi
 checklist

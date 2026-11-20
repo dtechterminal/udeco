@@ -11,7 +11,11 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/antoniocosta/unifi-openwrt/internal/models"
 	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 type netWifi struct {
@@ -108,30 +112,54 @@ type radarWifi struct {
 
 func (r *radarWifi) TakeRadar() []mtkwifi.RadarEvent { ev := r.ev; r.ev = nil; return ev }
 
+// radioSession is a session whose radio rows are named as setup names
+// them (renameRadios) for the naming given.
+func radioSession(naming string) *device.Session {
+	return &device.Session{S: device.State{RadioNames: naming}, Dev: inform.Device{Radios: []inform.Radio{
+		{Name: translate.PositionalRadioName(0), Radio: "ng"}, {Name: translate.PositionalRadioName(1), Radio: "na"}}}}
+}
+
+// radioTableName is the name the inform's radio_table reports band's
+// radio under.
+func radioTableName(t *testing.T, a *agent, band string) string {
+	t.Helper()
+	for _, r := range a.x.Dev.Radios {
+		if r.Radio == band {
+			return r.Name
+		}
+	}
+	t.Fatalf("no %s radio in %+v", band, a.x.Dev.Radios)
+	return ""
+}
+
 // TestGarageRadar: a radar detection the applier saw goes to the
-// controller as EVT_AP_RadarDetected (a custom alert, as a U6's).
+// controller as EVT_AP_RadarDetected (a custom alert, as a U6's), naming
+// the 5 GHz radio as the inform's radio_table does (rai0 with MediaTek
+// naming, wifi1 kept for an earlier adoption).
 func TestGarageRadar(t *testing.T) {
-	a := &agent{cfg: &Config{Platform: "jio-mtk", Takeover: true, DFS: true}}
-	a.takeover.Store(true)
-	a.wifi = &radarWifi{ev: []mtkwifi.RadarEvent{{Channel: 52, MovedTo: 149, Freq: 5260}}}
-	root := t.TempDir()
-	a.events = &eventLog{path: filepath.Join(root, "events.log"), root: root, clock: time.Now, logf: func(string, ...any) {}}
-	a.garageReading(context.Background(), &apstate.Snapshot{})
-	if len(a.sta.queue) != 1 {
-		t.Fatalf("queue %v", a.sta.queue)
-	}
-	e := a.sta.queue[0]
-	if e["event_string"] != "EVT_AP_RadarDetected" || e["radio"] != "na" || e["channel"] != 52 || e["freq"] != 5260 {
-		t.Errorf("event %v", e)
-	}
-	// The whole payload as it goes on the wire. radio_name is wifi1
-	// (jioRadarRadioName), not the name the 5 GHz radio is reported under
-	// with MediaTek naming (rai0): that is the open item
-	// tables-radar-event-payload, and this pins today's event until it is
-	// decided.
-	want := map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": "na", "radio_name": "wifi1", "channel": 52, "freq": 5260}
-	if !reflect.DeepEqual(e, want) {
-		t.Errorf("payload %v, want %v", e, want)
+	for _, tc := range []struct{ naming, name string }{
+		{radioNamesMediaTek, models.RadioNameMTK5G},
+		{radioNamesQualcomm, translate.PositionalRadioName(1)},
+	} {
+		a := &agent{cfg: &Config{Platform: "jio-mtk", Takeover: true, DFS: true}}
+		a.takeover.Store(true)
+		a.x = radioSession(tc.naming)
+		a.renameRadios()
+		a.wifi = &radarWifi{ev: []mtkwifi.RadarEvent{{Channel: 52, MovedTo: 149, Freq: 5260}}}
+		root := t.TempDir()
+		a.events = &eventLog{path: filepath.Join(root, "events.log"), root: root, clock: time.Now, logf: func(string, ...any) {}}
+		a.garageReading(context.Background(), &apstate.Snapshot{})
+		if len(a.sta.queue) != 1 {
+			t.Fatalf("%s: queue %v", tc.naming, a.sta.queue)
+		}
+		if n := radioTableName(t, a, "na"); n != tc.name {
+			t.Fatalf("%s: radio_table names the 5 GHz radio %s, want %s", tc.naming, n, tc.name)
+		}
+		// the whole payload as it goes on the wire
+		want := map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": "na", "radio_name": radioTableName(t, a, "na"), "channel": 52, "freq": 5260}
+		if e := a.sta.queue[0]; !reflect.DeepEqual(e, want) {
+			t.Errorf("%s: payload %v, want %v", tc.naming, e, want)
+		}
 	}
 }
 
