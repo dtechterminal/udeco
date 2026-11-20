@@ -166,4 +166,18 @@ weather-radar band. Do not run DFS channels under `#a`. The cause is in the tabl
 `wl chan_info 100` reads "RADAR Sensitive, Passive" under IN/288 but only "5G
 Band" under `#a` (52 and 120 likewise), and `wl spect 2` (strict 802.11h)
 does not change it, so the driver's CAC and monitoring never engage; the
-`dfs_preism`/`dfs_postism` overrides only act on radar-sensitive channels. TP-Link's data for this board carries Wi-Fi 6 only for US.
+`dfs_preism`/`dfs_postism` overrides only act on radar-sensitive channels.
+
+Hardware test under `#a` (Owner's Room, 2026-11-20 19:25-19:28 IST, done by
+hand with a 10-minute auto-revert, then put back to US 149/80): Wi-Fi 6 does
+run on a DFS channel. The GL KVM (AIC8800, one stream, links at 40 MHz only),
+pinned to that AP at -25 to -30 dBm, measured with iperf3 against the UCG:
+
+| Setup | Link | Down | Up | AP retries |
+| --- | --- | --- | --- | --- |
+| US/0 149/80 (shared with Bedroom) | HE-MCS 11, 40 MHz | 173 Mbps | 211 Mbps | 9,836 of 217,177 |
+| `#a` 100/80 (alone) | HE-MCS 11, 40 MHz | 215 Mbps | 211 Mbps | 1,858 of 41,773 |
+
+So the radio and driver do Wi-Fi 6 on DFS channels. Only the country data
+withholds it for every real country, and `#a` gets it by dropping radar
+detection, which is why it stays a test. TP-Link's data for this board carries Wi-Fi 6 only for US.
