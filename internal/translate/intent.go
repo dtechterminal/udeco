@@ -30,6 +30,9 @@ type Intent struct {
 	LED     *bool                  // ledbar.status; nil = not sent (mgmt_cfg led_enabled decides)
 	Syslog  *SyslogIntent          // remote syslog; nil = off
 	SSHD    *SSHDIntent            // the device SSH server switch (sshd.*); nil = not sent (sshd.go)
+	// DFSReset: the controller's nightly dfs-reset cron job (cron.go);
+	// nil = not sent.
+	DFSReset *DailyTime
 }
 
 // RadioIntent is one radio (radio.N plus its stamgr and bandsteering
@@ -179,6 +182,7 @@ func IntentFrom(cfg Cfg) (Intent, []string) {
 	in.LED = intentLED(cfg, &nb)
 	in.Syslog = intentSyslog(cfg, &nb)
 	in.SSHD = SSHD(cfg)
+	in.DFSReset = intentDFSReset(cfg, &nb)
 	classifyKeys(cfg, phyBand, skipped, &nb)
 	devnameNotes(cfg, &nb) // devname.go
 	sectionNotes(cfg, &nb)
@@ -1306,6 +1310,8 @@ func sectionNotes(cfg Cfg, nb *noteList) {
 			}
 		case "pathmon":
 			pathmonNotes(cfg, nb) // run by the agent (internal/pathmon)
+		case "cron":
+			// the dfs-reset job is run by the agent, the rest noted (cron.go)
 		case "snmp", "mdns_sd":
 			// run by the agent, which logs its own notes: the SNMP agent
 			// (internal/snmpagent, cmd/udeco-ap/snmp.go) and the mDNS

@@ -294,6 +294,10 @@ type agent struct {
 
 	scans *scanner
 	sta   staEvents // station events for the controller (staevents.go); loop goroutine
+	// radarQ: radar moves from the Wi-Fi worker for the controller
+	// (dfs.go)
+	radarMu sync.Mutex
+	radarQ  []bcmwifi.RadarEvent
 	// hapd follows the hostapd control sockets' station events (nil: not
 	// running; staevents.go); readAt: when the reading in use started
 	hapd   staSource
@@ -614,7 +618,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 		MinRate: own && a.cfg.MinRates, PPSK: deco, LockAP: own, RoamAssist: own && canRoam,
 		RadiusFilter: deco, MulticastInspect: deco, WPA3: own && a.cfg.WPA3, WPA3FT: own && a.cfg.WPA3 && canFTSAE,
 		RadSec: deco, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2,
-		PortVLAN: own && portVLAN})
+		PortVLAN: own && portVLAN, DFS: deco})
 	if !ok {
 		return fmt.Errorf("model %s has no agent capability words", a.cfg.Model)
 	}
@@ -942,8 +946,9 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 		a.x.FWCaps &^= models.DecoAgentTakeoverFWCaps
 		a.x.FW2Caps &^= models.DecoAgentTakeoverFW2Caps
 		a.x.FW3Caps &^= models.DecoAgentTakeoverFW3Caps
-		for b, rc := range a.radioCaps { // SAE (wpa3) is served by bcmwifi only
+		for b, rc := range a.radioCaps { // SAE (wpa3) and DFS are served by bcmwifi only
 			rc.RadioCaps2 &^= models.RadioCap2WPA3 | models.RadioCap2WPA3FT
+			rc.HasDFS, rc.HasFCCDFS = false, false
 			a.radioCaps[b] = rc
 		}
 	}
@@ -956,6 +961,7 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 	// a queued station event rides this inform; the changes this reading
 	// shows are queued for the next ones (staevents.go)
 	if a.x.S.Adopted {
+		a.radarEvents() // radar moves ride the station-event queue (dfs.go)
 		a.sta.attach(f)
 	}
 	if !a.stale {

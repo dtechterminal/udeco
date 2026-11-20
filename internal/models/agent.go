@@ -180,8 +180,9 @@ const (
 //     other bits have no known name), radio_caps2 WPA3 with f.WPA3 (plus
 //     WPA3 fast roaming with f.WPA3FT), else 0
 //     (RadioCap2WPA3: SAE per radio, without which the controller downgrades
-//     WPA2/WPA3 WLANs to WPA2); has_dfs/has_fccdfs false (the
-//     agent does not handle radar events; TP-Link's radar daemon is stopped).
+//     WPA2/WPA3 WLANs to WPA2); has_dfs/has_fccdfs on 5 GHz with f.DFS
+//     (bcmwifi serves DFS channels: 802.11h, CAC, radar moves and the
+//     controller's dfs-reset, internal/bcmwifi dfs.go), else false.
 //
 // heAX tells, per band, whether the hardware is 802.11ax (wl.Caps HE); a
 // non-ax radio gets the measured non-ax ieee_modes instead.
@@ -320,6 +321,10 @@ type DecoAgentFeatures struct {
 	// unit's LAN ports (internal/jioports; takeover on a JCOW414 reported
 	// as UHDIW): fw_caps QCA switch and OWRT switch.
 	PortVLAN bool
+	// DFS: bcmwifi serves the controller's DFS channels on 5 GHz
+	// (takeover on the Deco): has_dfs and has_fccdfs on the na radio, as
+	// a U6 Pro reports them.
+	DFS bool
 }
 
 // JCOW414Models are the models a JioFiber JCOW414 (MT7603 2x2 2.4 GHz,
@@ -377,6 +382,8 @@ func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (i
 		if hw := jcow414MaxTx[r.Band]; jcow && hw > 0 && rp.MaxTx > hw {
 			rp.MaxTx = hw
 		}
+		rp.HasDFS = f.DFS && r.Band == "na"
+		rp.HasFCCDFS = rp.HasDFS
 		wpa3 := f.WPA3 && !(jcow && r.Band == "ng")
 		set(wpa3, &rp.RadioCaps2, DecoAgentRadioCaps2)
 		set(wpa3 && f.WPA3FT, &rp.RadioCaps2, RadioCap2WPA3FT)

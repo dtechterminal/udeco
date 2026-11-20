@@ -83,6 +83,9 @@ type workerState struct {
 	lastSum   string               // last summary logged
 	evented   map[string]time.Time // foreign finding -> when it last went to the event ring
 	tickFails int                  // bcmwifi.Tick errors in a row (logged on change)
+
+	dfsReset   *translate.DailyTime // the controller's dfs-reset cron time (dfs.go); nil = none
+	dfsResetAt time.Time            // the last dfs-reset check
 }
 
 // rebuildWarning starts the decosys Report warning for a TP-Link Wi-Fi
@@ -165,7 +168,10 @@ func (a *agent) workerLoop(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
-			a.runJob(ctx, job{"schedules", a.scheduleTick})
+			a.runJob(ctx, job{"schedules", func(ctx context.Context) {
+				a.scheduleTick(ctx)
+				a.dfsResetTick(ctx) // the controller's nightly dfs-reset (dfs.go)
+			}})
 		}
 	}
 	a.logf("wifi worker: stopped (observe mode)")
@@ -310,6 +316,7 @@ func (a *agent) wifiTick(ctx context.Context) {
 	a.count("wifi-repair", r.Steps)
 	a.count("rate-limit", r.RateLimitChanges)
 	a.count("wifi-11k-neighbor", r.NeighborChanges)
+	a.radarIn(r.Radar) // EVT_AP_RadarDetected (dfs.go)
 	for _, p := range r.Problems {
 		a.logf("wifi: tick: %s", p)
 	}
@@ -347,6 +354,7 @@ func (a *agent) provision(ctx context.Context, pv provision) {
 	a.portsPrepare(pv)
 	defer a.portsApply(ctx, "system_cfg "+pv.hash)
 	w.users, w.usersSet = in.Users, true
+	w.dfsReset = in.DFSReset
 	a.syncUsers(w.users, true)
 	full = a.radsecProvision(ctx, full, in) // RADIUS over TLS through the local proxy (radsec.go)
 	// WLAN schedules: the SSIDs off now are applied disabled (schedule.go).
