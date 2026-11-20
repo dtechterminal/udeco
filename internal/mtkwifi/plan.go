@@ -549,7 +549,7 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 	}
 	kv["TxPower"] = strconv.Itoa(rp.TxPct)
 	if rd.Band == "na" && isDFS(rp.Channel) {
-		kv["CountryRegionABand"] = "0" // the only region with 52-64 (dfs.go)
+		kv[regionA] = dfsRegA // the only region with 52-64 (dfs.go)
 	}
 	var auth, encr, hide, nofw, maxsta, mfpc, mfpr []string
 	for i, b := range rp.BSS {

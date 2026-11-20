@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
@@ -18,7 +19,7 @@ func TestConfigDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Model != "UAL6" || c.SSHDPort != 2222 || c.Takeover || c.Apply || c.Egress || c.Log != "syslog" {
+	if c.Model != models.DecoAgentModel || c.SSHDPort != decosys.DefaultSSHDPort || c.Takeover || c.Apply || c.Egress || c.Log != logSyslog {
 		t.Errorf("defaults %+v", c)
 	}
 	if c.controllerIP() != "192.168.0.1" {

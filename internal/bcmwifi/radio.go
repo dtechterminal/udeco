@@ -205,6 +205,18 @@ func NormCountry(cc string) string {
 // 100/80 (Bedroom and Owner's Room, 2026-11-20).
 func NoRadarCountry(cc string) bool { return cc == "#a" }
 
+// ValidCountry reports whether cc, as a config gives it (spaces around it
+// do not count), is a driver country the agent sets: a two-letter code in
+// either case, or a '#' table it knows (NoRadarCountry; "#A" is another
+// table to wl, and not one of them).
+func ValidCountry(cc string) bool {
+	cc = strings.TrimSpace(cc)
+	if NoRadarCountry(cc) {
+		return true
+	}
+	return len(cc) == 2 && strings.IndexFunc(cc, func(r rune) bool { return (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') }) < 0
+}
+
 // weatherRadar: a 5 GHz chanspec that covers 5600-5650 MHz (channels
 // 120-128), the band weather radars use. Refused under a NoRadarCountry.
 func weatherRadar(cs chanspec) bool {

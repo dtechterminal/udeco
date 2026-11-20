@@ -48,7 +48,7 @@ func (a *agent) snmpListen(ctx context.Context) (net.PacketConn, error) {
 		return a.o.snmpListen(ctx)
 	}
 	var lc net.ListenConfig
-	return lc.ListenPacket(ctx, "udp4", "0.0.0.0:161")
+	return lc.ListenPacket(ctx, "udp4", snmpagent.DefaultAddr)
 }
 
 // snmpFollow starts, changes or stops the SNMP agent when the saved

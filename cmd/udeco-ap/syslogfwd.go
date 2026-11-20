@@ -122,7 +122,7 @@ func (a *agent) logFollow(ctx context.Context) (io.ReadCloser, error) {
 	}
 	if a.cfg.jio() {
 		var own <-chan string
-		if a.cfg.Log != "syslog" {
+		if a.cfg.Log != logSyslog {
 			own = a.selfLog.attach()
 		}
 		rc := followFile(ctx, a.dev(jioLogPath), a.t.logPoll, own)

@@ -222,7 +222,7 @@ type options struct {
 	garpSend     func(ifname string, frame []byte) error // nil = AF_PACKET (garp.go)
 	// logFollow streams the unit's log for remote syslog; nil = logread -f (syslogfwd.go)
 	logFollow func(context.Context) (io.ReadCloser, error)
-	// snmpListen opens the SNMP agent's socket; nil = UDP 0.0.0.0:161 (snmp.go)
+	// snmpListen opens the SNMP agent's socket; nil = UDP snmpagent.DefaultAddr (snmp.go)
 	snmpListen func(context.Context) (net.PacketConn, error)
 	// ftOpen opens the FT-SAE peer announcement sockets; nil = AF_PACKET (ftsae.go)
 	ftOpen ftpeer.Opener

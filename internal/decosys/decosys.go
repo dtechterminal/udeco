@@ -85,7 +85,7 @@ type Options struct {
 	// ConsoleIP is the only source allowed to reach SSHDPort (the agent's
 	// SSH-adopt listener). Empty leaves SSHDPort unfenced.
 	ConsoleIP string
-	// SSHDPort is the agent's SSH-adopt port; 0 means 2222.
+	// SSHDPort is the agent's SSH-adopt port; 0 means DefaultSSHDPort.
 	SSHDPort int
 	// LoopGuardFile is the agent's record (a device path, on ramfs) of the
 	// Ethernet ports its loop guard took out of LANDev, one "<port> <why>"

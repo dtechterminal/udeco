@@ -184,13 +184,18 @@ You need root SSH on each unit; how to get it is out of scope here.
    Unknown keys are an error, so a typo can't silently flip a safety switch.
    With `"takeover": false` the agent only reports to UniFi and changes
    nothing. With `"apply": false` it logs its plans without applying them.
+   `log` is `syslog` (the default) or `stderr`.
    Optional keys, all off by default: `wpa3`, `min_rates`, `mdns_bridge`,
    `hotspot2`, `mgmt_sources`, `uplink_gateway_down`, `rx_desense` (keep
-   TP-Link's glitch-based receiver desense, which a U6 Pro runs off) and
-   `driver_country`. `driver_country` runs the radios in another country's
-   table than the site's. It was needed while India ran as IN/0, which has
-   no 80 MHz. The agent now runs India as IN/288, so the override is no
-   longer recommended. On by default:
+   TP-Link's glitch-based receiver desense, which a U6 Pro runs off),
+   `driver_country` and `driver_country_bands`. `driver_country` runs the
+   radios in another country's table than the site's. It was needed while
+   India ran as IN/0, which has no 80 MHz. The agent now runs India as
+   IN/288, so the override is no longer recommended. `driver_country_bands`
+   sets the country of one radio (`ng` for 2.4 GHz, `na` for 5 GHz) over
+   it, as in the Country row above. On by default:
+   `ft_sae` (with `wpa3`: 802.11r for WPA3 clients; the example turns it
+   off, see the FT-SAE row above),
    `uplink_ssid_down` (SSIDs down while the uplink has no carrier, as a U6;
    `false` keeps them up), `login_lock` (with takeover and apply: root
    logins closed while UniFi's Device SSH is off and the controller

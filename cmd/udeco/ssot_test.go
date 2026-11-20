@@ -3,6 +3,9 @@
 package main
 
 import (
+	"reflect"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
@@ -88,4 +91,63 @@ func TestRunnerHandlesEveryAction(t *testing.T) {
 		t.Errorf("runner.action has cases that are not device.Act* constants: %q", other)
 	}
 	repotest.Cover(t, "runner.action", device.Actions(), handled, notHere)
+}
+
+// report_ip and on_remove take one of two words each. The default, the
+// check and the places that act on the value (runner.go) read the same
+// constants; the check's texts and the documents' table are as they were.
+func TestConfigWords(t *testing.T) {
+	cfg := func(extra string) []byte {
+		return []byte(`{"inform_url":"http://192.168.0.1:8080/inform","units":[{"ip":"192.168.0.241","mac":"b0:a7:b9:3e:16:94"}]` + extra + `}`)
+	}
+	c, err := parseConfig(cfg(""))
+	if err != nil || c.ReportIP != reportDaemon || c.OnRemove != onRemoveStop {
+		t.Fatalf("defaults: %v, report_ip %q, on_remove %q", err, c.ReportIP, c.OnRemove)
+	}
+	for extra, want := range map[string][2]string{
+		`,"report_ip":"daemon"`:  {reportDaemon, onRemoveStop},
+		`,"report_ip":"deco"`:    {reportDeco, onRemoveStop},
+		`,"on_remove":"stop"`:    {reportDaemon, onRemoveStop},
+		`,"on_remove":"pending"`: {reportDaemon, onRemovePending},
+	} {
+		c, err := parseConfig(cfg(extra))
+		if err != nil || c.ReportIP != want[0] || c.OnRemove != want[1] {
+			t.Errorf("%s: %v, report_ip %q, on_remove %q", extra, err, c.ReportIP, c.OnRemove)
+		}
+	}
+	for extra, want := range map[string]string{
+		`,"report_ip":"x"`:    `report_ip "x": want daemon or deco`,
+		`,"report_ip":"Deco"`: `report_ip "Deco": want daemon or deco`,
+		`,"on_remove":"x"`:    `on_remove "x": want stop or pending`,
+		`,"on_remove":"Stop"`: `on_remove "Stop": want stop or pending`,
+	} {
+		if _, err := parseConfig(cfg(extra)); err == nil || err.Error() != want {
+			t.Errorf("%s: %v, want %s", extra, err, want)
+		}
+	}
+	repotest.MustContain(t, "docs/deco/README.md", "| `report_ip` | `"+reportDaemon+"` | `"+reportDeco+"` reports the Deco's own IP after adoption")
+	repotest.MustContain(t, "docs/deco/README.md", "| `on_remove` | `"+onRemoveStop+"` | After the controller forgets a unit, either stop its runner (`"+
+		onRemoveStop+"`) or show it as pending again (`"+onRemovePending+"`). |")
+}
+
+// deploy/unraid.sh looks into udeco.json for a key by its name (no
+// credentials file is needed when the config names a password file): each
+// name it greps for is a JSON key of Config.
+func TestUnraidScriptConfigKeys(t *testing.T) {
+	keys := regexp.MustCompile(`grep -q '\\"([a-z0-9_]+)\\"' '\$APPDATA/udeco\.json'`).FindAllStringSubmatch(repotest.Read(t, "deploy/unraid.sh"), -1)
+	if len(keys) == 0 {
+		t.Fatal("deploy/unraid.sh no longer greps udeco.json for a key this way")
+	}
+	tags := map[string]bool{}
+	ty := reflect.TypeOf(Config{})
+	for i := 0; i < ty.NumField(); i++ {
+		if tag, _, _ := strings.Cut(ty.Field(i).Tag.Get("json"), ","); tag != "" {
+			tags[tag] = true
+		}
+	}
+	for _, k := range keys {
+		if !tags[k[1]] {
+			t.Errorf("deploy/unraid.sh greps udeco.json for %q, which is not a key of Config", k[1])
+		}
+	}
 }

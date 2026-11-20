@@ -266,13 +266,14 @@ func rebuilding(argv []string) bool {
 	return path.Base(argv[0]) == "repacd"
 }
 
-// binDirs is where firmware binaries live, searched in order.
-var binDirs = []string{"/usr/sbin", "/usr/bin", "/sbin", "/bin"}
+// BinDirs is where firmware binaries live, searched in order. The agent's
+// PATH is these, joined (cmd/udeco-ap agentPATH).
+var BinDirs = []string{"/usr/sbin", "/usr/bin", "/sbin", "/bin"}
 
 // bin returns the absolute device path of a firmware binary, so commands do
 // not depend on the agent's PATH, or the bare name when it is not found.
 func (m *Manager) bin(name string) string {
-	for _, d := range binDirs {
+	for _, d := range BinDirs {
 		if p := d + "/" + name; m.exists(p) {
 			return p
 		}

@@ -957,25 +957,3 @@ func TestE2ECapsClampChannel(t *testing.T) {
 		t.Errorf("DryRun takeover issued mutating commands: %q", m)
 	}
 }
-
-// deploy/deco-ap.sh writes the default config on a unit that has none: it
-// must pass the agent's strict parser (unknown keys are an error) and be
-// observe mode.
-func TestDeployDefaultConfig(t *testing.T) {
-	b := readFixture(t, "../../deploy", "deco-ap.sh")
-	m := regexp.MustCompile(`(?s)<<'JSON'\n(.*?)\nJSON\n`).FindSubmatch(b)
-	if m == nil {
-		t.Fatal("no default config in deploy/deco-ap.sh")
-	}
-	js := strings.NewReplacer("$inform_url", "http://192.168.0.1:8080/inform", "$console_ip", "192.168.0.1").Replace(string(m[1]))
-	if strings.Contains(js, "$") {
-		t.Fatalf("unexpanded variable in %s", js)
-	}
-	c, err := parseConfig([]byte(js))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.Takeover || c.Apply || c.Egress || c.Model != "UAL6" || c.SSHDPort != 2222 || c.Log != "syslog" {
-		t.Errorf("default config not observe mode: %+v", c)
-	}
-}

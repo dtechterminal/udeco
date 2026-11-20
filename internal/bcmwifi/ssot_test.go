@@ -224,3 +224,31 @@ func TestSecurityModesAreTranslates(t *testing.T) {
 		}
 	}
 }
+
+// ValidCountry is the rule for a driver country a config names
+// (cmd/udeco-ap's driver_country_bands). The answers are what the config's
+// own check gave while it wrote the rule itself: two ASCII letters in
+// either case, or a table NoRadarCountry knows, with spaces around either
+// ignored.
+func TestValidCountry(t *testing.T) {
+	for cc, want := range map[string]bool{
+		"US": true, "us": true, "In": true, " us ": true, "\tDE\n": true,
+		"#a": true, " #a ": true,
+		"#A": false, "#b": false, "#": false, "##": false, "a#": false,
+		"": false, " ": false, "U": false, "USA": false, "U1": false, "12": false, "U S": false, "U-": false,
+		"\u00e9":  false, // two bytes, one letter that is not ASCII
+		"\u00e9a": false,
+	} {
+		if got := ValidCountry(cc); got != want {
+			t.Errorf("ValidCountry(%q) = %v, want %v", cc, got, want)
+		}
+		// what passes is a code NormCountry hands to wl: the '#' table as
+		// it is, a two-letter code in upper case
+		if n := NormCountry(cc); want && !NoRadarCountry(n) && (len(n) != 2 || n != strings.ToUpper(n)) {
+			t.Errorf("NormCountry(%q) = %q", cc, n)
+		}
+	}
+	if !ValidCountry("#a") || !NoRadarCountry("#a") {
+		t.Error("the all-channels table is no longer a valid driver country")
+	}
+}

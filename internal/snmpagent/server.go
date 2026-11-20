@@ -21,6 +21,10 @@ import (
 	"time"
 )
 
+// DefaultAddr is the UDP address the agent answers on (IPv4 only): what
+// Options.Addr "" stands for, and the socket cmd/udeco-ap opens for Serve.
+const DefaultAddr = "0.0.0.0:161"
+
 // Limits.
 const (
 	// maxMsgSize is the largest message received or sent
@@ -46,7 +50,7 @@ const (
 
 // Options configure a Server.
 type Options struct {
-	Addr     string // UDP listen address; "" = 0.0.0.0:161 (IPv4 only)
+	Addr     string // UDP listen address; "" = DefaultAddr
 	Root     string // filesystem root for /proc and /sys; "" = "/"
 	EngineID []byte // snmpEngineID (EngineIDFromMAC); required for v3
 	Boots    int64  // snmpEngineBoots (NextEngineBoots); required for v3
@@ -91,7 +95,7 @@ type statsSnapshot struct {
 // New returns a Server; it answers nothing until SetConfig and Run.
 func New(o Options) *Server {
 	if o.Addr == "" {
-		o.Addr = "0.0.0.0:161"
+		o.Addr = DefaultAddr
 	}
 	if o.Logf == nil {
 		o.Logf = func(string, ...any) {}

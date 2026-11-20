@@ -23,7 +23,10 @@
 // editable), UniFi port 5 is the unit's port 4, the uplink.
 package jioports
 
-import "strconv"
+import (
+	"slices"
+	"strconv"
+)
 
 const (
 	// UplinkPhys is the unit's uplink port; it is never changed beyond
@@ -37,7 +40,9 @@ const (
 	NumPorts = 5
 )
 
-// LANPorts are the unit's ports whose VLANs the controller may set.
+// LANPorts are the unit's ports whose VLANs the controller may set, in
+// order and without a gap (the config's ports_unlocked message names them
+// as a range). Each shows in UniFi under its own number (Idx, Phys).
 var LANPorts = []int{1, 2, 3}
 
 // Idx is the UniFi port index of the unit's port phys (0 = none).
@@ -45,7 +50,7 @@ func Idx(phys int) int {
 	switch {
 	case phys == UplinkPhys:
 		return UplinkIdx
-	case phys >= 1 && phys <= 3:
+	case slices.Contains(LANPorts, phys):
 		return phys
 	}
 	return 0
@@ -56,7 +61,7 @@ func Phys(idx int) int {
 	switch {
 	case idx == UplinkIdx:
 		return UplinkPhys
-	case idx >= 1 && idx <= 3:
+	case slices.Contains(LANPorts, idx):
 		return idx
 	}
 	return 0

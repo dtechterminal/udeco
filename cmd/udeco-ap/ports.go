@@ -25,20 +25,20 @@ package main
 //     change got a valid reply from the controller. The change wakes the
 //     inform loop, and while one is pending a failing inform is retried
 //     every portsRetry (15 s) at most instead of backing off further. With
-//     no confirmation within ports_confirm_s (90 s) the ports of that
-//     change go back to the settings they had before, the setting is
-//     marked failed (jioports: not applied again until the controller sends
-//     another one for the port) and "EVENT: PORTS REVERTED" goes to the
-//     event ring;
-//   - controller loss: with no inform answered for ports_loss_s (300 s)
-//     every port the agent may change goes back on the plain LAN (the
-//     uplink and locked ports untouched) and port settings are held off
-//     until an inform is answered again; the controller's settings then
-//     apply again, each through the confirm window. A setting the loss
-//     watchdog takes off twice in a row is marked failed; "in a row" ends
-//     once informs have been answered for 2 x ports_loss_s after the
-//     resume (the setting kept the unit reachable: a later outage is
-//     another one);
+//     no confirmation within ports_confirm_s (its default and range:
+//     portsConfirmKey in config.go) the ports of that change go back to
+//     the settings they had before, the setting is marked failed
+//     (jioports: not applied again until the controller sends another one
+//     for the port) and "EVENT: PORTS REVERTED" goes to the event ring;
+//   - controller loss: with no inform answered for ports_loss_s
+//     (portsLossKey) every port the agent may change goes back on the
+//     plain LAN (the uplink and locked ports untouched) and port settings
+//     are held off until an inform is answered again; the controller's
+//     settings then apply again, each through the confirm window. A
+//     setting the loss watchdog takes off twice in a row is marked failed;
+//     "in a row" ends once informs have been answered for 2 x ports_loss_s
+//     after the resume (the setting kept the unit reachable: a later
+//     outage is another one);
 //   - startup: no port setting is applied before the first answered
 //     inform; the loss watchdog covers ports a previous run left off the LAN.
 //
@@ -93,11 +93,6 @@ type portPending struct {
 	live  string            // what the change made live: want, or the LAN when want failed
 	back  jioports.PortWant // the setting before (the revert's target)
 }
-
-const (
-	defaultPortsConfirm = 90 * time.Second
-	defaultPortsLoss    = 300 * time.Second
-)
 
 // portsOn reports whether the unit reports LAN ports (jio-mtk as the
 // UAP-IW-HD: Config.hasLANPorts).

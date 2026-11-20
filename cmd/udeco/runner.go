@@ -160,7 +160,7 @@ func (r *runner) extra() map[string]any {
 // reportIP is the daemon IP (the controller SSHes there to adopt and
 // re-provision), or with report_ip=deco and once adopted, the Deco's own.
 func (r *runner) reportIP(s *openwrt.Snapshot) string {
-	if r.d.cfg.ReportIP == "deco" && r.x.S.Adopted && s.IP != "" {
+	if r.d.cfg.ReportIP == reportDeco && r.x.S.Adopted && s.IP != "" {
 		return s.IP
 	}
 	return r.d.daemonIP
@@ -241,7 +241,7 @@ func (r *runner) loop(ctx context.Context) {
 			if r.x.S.CfgVersion != cfgBefore && !next.Reset {
 				r.planWLAN("cfgversion " + cfgBefore + " -> " + r.x.S.CfgVersion)
 			}
-			if next.Reset && r.d.cfg.OnRemove == "stop" {
+			if next.Reset && r.d.cfg.OnRemove == onRemoveStop {
 				r.logf("STOP: removed from the controller (setdefault); on_remove=stop, the Deco is untouched")
 				r.d.blocks.Drop(r.u.Name)
 				return

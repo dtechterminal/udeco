@@ -6,9 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/models"
 )
 
 func parse(s string) map[string]string {
@@ -124,6 +127,43 @@ func TestLayout(t *testing.T) {
 	}
 	if Phys(MissingIdx) != 0 || Untagged(2) != "eth0.2.1" || Parent(4) != "eth0.4" {
 		t.Errorf("layout")
+	}
+}
+
+// The layout against the model table and against itself: the uplink's
+// UniFi port is the UAP-IW-HD's rear uplink jack as internal/models has it
+// (the profile's switch bits and the reported uplink follow that one), and
+// LANPorts, which Idx, Phys and the agent's ports_unlocked check read, are
+// in order without a gap (the check's message names them as a range), each
+// under its own number in UniFi, the uplink and the missing port not among
+// them.
+func TestLayoutAndTheModel(t *testing.T) {
+	m, ok := models.Lookup(models.ModelUHDIW)
+	if !ok || m.RearUplinkPort() != UplinkIdx {
+		t.Errorf("UplinkIdx %d, models: %s rear uplink port %d (found %v)", UplinkIdx, models.ModelUHDIW, m.RearUplinkPort(), ok)
+	}
+	if len(LANPorts) == 0 {
+		t.Fatal("no LAN ports")
+	}
+	for i, p := range LANPorts {
+		if p != LANPorts[0]+i {
+			t.Errorf("LANPorts %v: not in order without a gap", LANPorts)
+		}
+		if Idx(p) != p || Phys(p) != p {
+			t.Errorf("LAN port %d: Idx %d, Phys %d", p, Idx(p), Phys(p))
+		}
+	}
+	if slices.Contains(LANPorts, UplinkPhys) || slices.Contains(LANPorts, MissingIdx) || slices.Contains(LANPorts, UplinkIdx) {
+		t.Errorf("LANPorts %v has the uplink (port %d, UniFi %d) or the missing UniFi port %d", LANPorts, UplinkPhys, UplinkIdx, MissingIdx)
+	}
+	// nothing else maps: every other number is no port
+	for n := -1; n <= NumPorts+2; n++ {
+		if !slices.Contains(LANPorts, n) && n != UplinkPhys && Idx(n) != 0 {
+			t.Errorf("Idx(%d) = %d", n, Idx(n))
+		}
+		if !slices.Contains(LANPorts, n) && n != UplinkIdx && Phys(n) != 0 {
+			t.Errorf("Phys(%d) = %d", n, Phys(n))
+		}
 	}
 }
 

@@ -84,8 +84,8 @@ type Config struct {
 	WifiCaps int    `json:"wifi_caps,omitempty"`
 
 	Apply         bool   `json:"apply"`
-	ReportIP      string `json:"report_ip,omitempty"` // daemon (default) | deco
-	OnRemove      string `json:"on_remove,omitempty"` // stop (default) | pending
+	ReportIP      string `json:"report_ip,omitempty"` // reportDaemon (default) | reportDeco
+	OnRemove      string `json:"on_remove,omitempty"` // onRemoveStop (default) | onRemovePending
 	KickEmulation bool   `json:"kick_emulation,omitempty"`
 	HideWired     bool   `json:"hide_wired,omitempty"`
 
@@ -101,6 +101,19 @@ type Config struct {
 const (
 	defaultModel    = models.DefaultModel // the measured UAP-AC-Pro
 	defaultSSHDPort = 22201
+)
+
+// The values of report_ip: the address a unit is reported with.
+const (
+	reportDaemon = "daemon" // the daemon's, always
+	reportDeco   = "deco"   // the Deco's own once adopted
+)
+
+// The values of on_remove: what a unit's runner does once the controller
+// forgets the unit.
+const (
+	onRemoveStop    = "stop"    // stops
+	onRemovePending = "pending" // goes on informing, as a unit to adopt
 )
 
 // loadConfig reads and validates path. It never reads secrets.
@@ -183,17 +196,17 @@ func (c *Config) validate() error {
 	}
 	switch c.ReportIP {
 	case "":
-		c.ReportIP = "daemon"
-	case "daemon", "deco":
+		c.ReportIP = reportDaemon
+	case reportDaemon, reportDeco:
 	default:
-		return fmt.Errorf("report_ip %q: want daemon or deco", c.ReportIP)
+		return fmt.Errorf("report_ip %q: want %s or %s", c.ReportIP, reportDaemon, reportDeco)
 	}
 	switch c.OnRemove {
 	case "":
-		c.OnRemove = "stop"
-	case "stop", "pending":
+		c.OnRemove = onRemoveStop
+	case onRemoveStop, onRemovePending:
 	default:
-		return fmt.Errorf("on_remove %q: want stop or pending", c.OnRemove)
+		return fmt.Errorf("on_remove %q: want %s or %s", c.OnRemove, onRemoveStop, onRemovePending)
 	}
 	if c.Poll == 0 {
 		c.Poll = Duration(15 * time.Second)
