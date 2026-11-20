@@ -354,3 +354,37 @@ func TestDFSChanspecAfterHostapd(t *testing.T) {
 		t.Errorf("chanspec written %d times for a non-DFS channel:\n%s", n, p2)
 	}
 }
+
+// A failed SSIDsDown leaves the hold as it was: Plan and Tick do not keep
+// the SSIDs down on a change that did not happen.
+func TestSSIDsDownFailureKeepsHold(t *testing.T) {
+	ctx := context.Background()
+	f := newFakeDev(t)
+	a := newTestApplier(f, false)
+	p, _ := a.Plan(ctx, twoSSIDs())
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	f.failOn = func(argv []string) bool {
+		return len(argv) == 5 && argv[2] == "wl12" && argv[3] == "bss" && argv[4] == "down"
+	}
+	if err := a.SSIDsDown(ctx, true); err == nil {
+		t.Fatal("no error")
+	}
+	if a.SSIDsHeld() {
+		t.Error("hold set although taking the SSIDs down failed")
+	}
+	f.failOn = nil
+	if err := a.SSIDsDown(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	f.failOn = func(argv []string) bool {
+		return len(argv) == 5 && argv[2] == "wl12" && argv[3] == "bss" && argv[4] == "up"
+	}
+	if err := a.SSIDsDown(ctx, false); err == nil {
+		t.Fatal("no error")
+	}
+	if !a.SSIDsHeld() {
+		t.Error("hold lifted although raising the SSIDs failed")
+	}
+}

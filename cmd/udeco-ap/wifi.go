@@ -122,12 +122,15 @@ func holdReason(rep decosys.Report, uptime float64) string {
 	return ""
 }
 
-// submit queues a Wi-Fi job. Jobs run one at a time, in order.
-func (a *agent) submit(what string, fn func(ctx context.Context)) {
+// submit queues a Wi-Fi job. Jobs run one at a time, in order. It reports
+// false when the queue was full and the job dropped.
+func (a *agent) submit(what string, fn func(ctx context.Context)) bool {
 	select {
 	case a.jobs <- job{what, fn}:
+		return true
 	default:
 		a.logf("wifi worker: queue full, dropped %s", what)
+		return false
 	}
 }
 

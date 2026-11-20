@@ -196,6 +196,11 @@ func (a *agent) observeReading(s *apstate.Snapshot, f map[string]any) {
 		up = fdbPort
 	case len(hearing) == 1:
 		up = hearing[0]
+	case len(carrier) == 1 && a.upl.held.Load() && t.uplink != "":
+		// the uplink-loss hold (uplink.go): the lost port flushed the
+		// gateway's FDB entry, and a lone port with carrier is a wired
+		// client, not proof of a path; only the gateway seen there (FDB,
+		// LLDP) moves the uplink while the hold stands
 	case len(carrier) == 1:
 		up = carrier[0]
 	}

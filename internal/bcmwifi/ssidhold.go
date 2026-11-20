@@ -30,6 +30,11 @@ func (a *Applier) SSIDsDown(ctx context.Context, down bool) error {
 	if d == nil || len(a.ourVifs()) == 0 {
 		return ErrNotOwned
 	}
+	// The hold changes only with the change itself: on a failure it stays
+	// as it was, so Plan and Tick do not keep the SSIDs down (or up) for a
+	// change the watcher will try again (Tick puts a half-done change
+	// back).
+	prev := a.ssidsDown
 	a.ssidsDown = down
 	var st []Step
 	for _, rl := range a.layout(*d).Radios {
@@ -49,6 +54,7 @@ func (a *Applier) SSIDsDown(ctx context.Context, down bool) error {
 		return nil
 	}
 	if err := a.executeAll(ctx, st); err != nil {
+		a.ssidsDown = prev
 		return fmt.Errorf("bcmwifi: SSIDs down=%t: %w", down, err)
 	}
 	return nil

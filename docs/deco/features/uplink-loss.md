@@ -23,7 +23,15 @@
   - Never during a Wi-Fi apply or rollback, nor while a takeover hold stands (a TP-Link Wi-Fi
     rebuild or upgrade in flight): the change waits, logged once, and runs when that ends.
   - Each change is logged and kept as an event (`EVENT: uplink eth1 lost (...): SSIDs down`,
-    `... back (...): SSIDs up`) in the event ring on flash. A failed change is retried after 10 s.
+    `... back (...): SSIDs up`) in the event ring on flash. A failed change is retried after 10 s;
+    a change whose job the full worker queue dropped counts as failed. A failed `SSIDsDown` leaves
+    bcmwifi's hold as it was, so the backend and the watcher never disagree about it.
+  - While the hold stands, the uplink stays the port that was lost unless the gateway is seen on
+    another port (its MAC in the bridge FDB, or LLDP). The lost port's carrier drop flushes the
+    gateway's FDB entry, and a lone other port with carrier (a wired PC or TV) is no path to the
+    network: without this rule topology would elect it, and the hold would lift on a dead AP.
+  - The LED is not changed: a U6 shows uplink down as pattern 11111110@160, but the Deco's TP-Link
+    LED states for it (`ubus call leds ...`) have not been read on a unit, so none is written.
   - Takeover with the Wi-Fi live only; a drop to observe mode forgets the hold.
 - `uplink_gateway_down` (default off; needs `uplink_ssid_down`): the agent's own ICMP echo to the
   gateway every 5 s (1 s timeout); unanswered for 60 s counts as a lost uplink with the carrier up,

@@ -69,7 +69,12 @@ type uplinkGuard struct {
 	waitLogged string    // why a change waits, logged once
 	noHold     bool      // "no hold on this backend" logged
 
-	failed atomic.Bool  // worker -> watcher: the last change failed
+	failed atomic.Bool // worker -> watcher: the last change failed
+	// held: the SSIDs are held down (watcher -> topology): while it
+	// stands, a reading without gateway evidence does not move the uplink
+	// to another port with carrier (a wired client), which would lift the
+	// hold on an AP that still has no path to the network.
+	held   atomic.Bool
 	gwFail atomic.Int64 // unix ns of the first unanswered gateway probe of the run (0: answered, or no gateway)
 }
 
@@ -147,10 +152,12 @@ func (a *agent) uplinkPass(now time.Time) {
 	g := &a.upl
 	if g.failed.Swap(false) {
 		g.down = !g.down // not done: the change is due again
+		g.held.Store(g.down)
 		g.retryAt = now.Add(uplinkRetry)
 	}
 	if !a.takeover.Load() || a.policy.Load() == nil {
 		g.down, g.lostAt, g.backAt, g.last = false, time.Time{}, time.Time{}, time.Time{}
+		g.held.Store(false)
 		return
 	}
 	dev, _ := a.topo.uplinkName.Load().(string)
@@ -221,12 +228,16 @@ func (a *agent) uplinkPass(now time.Time) {
 		}
 		return
 	}
-	g.down = want
-	a.event(why)
-	a.submit("uplink ssids", func(ctx context.Context) {
+	if !a.submit("uplink ssids", func(ctx context.Context) {
 		if err := h.SSIDsDown(ctx, want); err != nil {
 			a.logf("uplink: SSIDs down=%t: %v", want, err)
 			g.failed.Store(true)
 		}
-	})
+	}) {
+		g.retryAt = now.Add(uplinkRetry) // dropped: not done, due again
+		return
+	}
+	g.down = want
+	g.held.Store(want)
+	a.event(why)
 }
