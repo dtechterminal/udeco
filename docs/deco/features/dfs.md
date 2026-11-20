@@ -81,8 +81,13 @@ to observe mode.
   override meets a DFS channel.
 - **CAC on every 5 GHz restart.** Each radio down/up on a DFS channel runs
   the CAC again, during which Tick skips all repairs on both radios. 116/80
-  covers 120-128, the weather channels, so its CAC is expected to be about
-  10 minutes (INFERRED from the driver's ETSI rules, not timed on an X20).
+  covers 120-128, the weather channels, so its CAC is about 10 minutes
+  (timed on the Hallway X20 2026-11-20 under IN/288: PRE-ISM from 10:04:30
+  to In-Service Monitoring at 10:14:33). 100/80 and 132/80 took 60 s
+  (Bedroom, Owner's Room). `wl chan_info` flags 120-128 only "RADAR
+  Sensitive, Passive", like the rest of the band: the long CAC is not
+  visible there. The owner kept Hallway on 116/80 (25 dBm) knowing every
+  5 GHz restart there costs ~10 minutes of 5 GHz.
 
 ## Unverified on hardware
 
