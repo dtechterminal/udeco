@@ -219,31 +219,38 @@ You need root SSH on each unit; how to get it is out of scope here.
    ```
 
    The script builds the armv7 binary, checks the unit (read-only), installs
-   the gzipped agent to `/tp_data/udeco` with an md5 check and starts it. It
-   prints a one-line rollback command at the end. Do satellites first, then
-   the master. While the login lock holds, :22 does not answer: turn on
-   Device SSH in UniFi, wait about a minute, deploy, then turn it off again
-   ([login-lock](docs/deco/features/login-lock.md)).
+   the agent in `/tp_data/udeco` with an md5 check (the plain binary, or its
+   gzip when the binary is large), writes the launcher `start.sh` and starts
+   it. It prints a one-line rollback command at the end.
+   `deploy/deco-ap.sh --help` lists every step, check and size. Do satellites
+   first, then the master. While the login lock holds, :22 does not answer:
+   turn on Device SSH in UniFi, wait about a minute, deploy, then turn it off
+   again ([login-lock](docs/deco/features/login-lock.md)).
 
-3. **Supervise.** One line at the end of the unit's `/data/persist_shell.sh`,
-   which cron runs every minute:
+3. **Supervise.** One line in the unit's `/data/persist_shell.sh`, which
+   cron runs every minute, runs the launcher. The file is yours, so the
+   deploy only prints the exact line to add; it ends in a marker the script
+   finds it by at the next deploy. To have the script write it:
 
    ```sh
-   [ -f /tp_data/udeco/start.sh ] && sh /tp_data/udeco/start.sh
+   deploy/deco-ap.sh --edit-persist <unit-ip>
    ```
 
 4. **Adopt** the unit in UniFi. It appears as a U6-Lite.
 
-The agent logs to `/tmp/udeco-bin/agent.log` (RAM, capped at 2 MB);
-`/tp_data/udeco/events.log` keeps the important events across reboots.
+The launcher `/tp_data/udeco/start.sh` is written by `deploy/deco-ap.sh` on
+every deploy. It sends the agent's log to `/tmp/udeco-bin/agent.log` (RAM,
+capped at 2 MB); `/tp_data/udeco/events.log` keeps the important events
+across reboots.
 
 **Undo:** `rm /tp_data/udeco/start.sh` and reboot. The unit comes back as stock
-TP-Link. More in [packaging/deco](packaging/deco/README.md).
+TP-Link. The files on the unit are listed in
+[packaging/deco](packaging/deco/README.md).
 
-To build by hand:
+To build without a unit (the deploy's own build, so the same binary):
 
 ```sh
-GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o udeco-ap ./cmd/udeco-ap
+deploy/deco-ap.sh --build-only   # writes dist/udeco-ap-linux-armv7
 ```
 
 Run `go test ./... && go vet ./...` before deploying a change.
@@ -376,10 +383,10 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 | `internal/mtkwifi`, `internal/jiosys` | the JioFiber platform |
 | `internal/inform`, `internal/device`, `internal/translate` | UniFi inform protocol and the controller's settings |
 | `internal/ftpeer`, `internal/pathmon`, `internal/lldp`, `internal/snmpagent`, `internal/mdnsbr`, `internal/hs20`, `internal/radsec` | fast-roaming key exchange, uplink monitor, LLDP, SNMP, mDNS bridge, Hotspot 2.0, RadSec |
-| `internal/rf`, `internal/unit` | facts every package shares, each written once: band names, channel and frequency arithmetic, bridge names |
+| `internal/rf`, `internal/unit` | facts every package shares, each written once: band names, channel and frequency arithmetic, bridge names, the agent's directories on a unit |
 | `internal/repotest` | test helpers that hold the shell scripts and the docs to the Go code |
-| `deploy/` | `deco-ap.sh` (Deco deploy), `jio-start.sh` (JioFiber supervisor with the gateway guard) |
-| `packaging/deco` | persistent install on a Deco |
+| `deploy/` | `deco-ap.sh` (Deco deploy; it writes the unit's launcher), `jio-ap.sh` (JioFiber deploy), `jio-start.sh` (JioFiber supervisor with the gateway guard), `unraid.sh` (the off-device `udeco` on an Unraid host), `lib.sh` (what those scripts share), `udeco.example.json` (example config for `udeco`) |
+| `packaging/deco` | what a persistent install on a Deco consists of |
 | `tools/wifi-inet-monitor` | per-client internet monitor that runs on the gateway |
 | `docs/deco/` | [design](docs/deco/agent-design.md), [device capabilities](docs/deco/device-capabilities.md), [interference audit](docs/deco/interference-audit.md), [feature notes](docs/deco/features/) |
 

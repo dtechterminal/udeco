@@ -13,8 +13,12 @@
 #   deploy/unraid.sh stop       stop and remove the daemon container
 #
 # Environment: UNRAID_HOST (default root@192.168.0.4; "local" when run on the
-# host itself), APPDATA (default /mnt/osssd/appdata/unifi-deco).
+# host itself), APPDATA (default /mnt/osssd/appdata/unifi-deco), UDECO_SRC
+# (default /tmp/udeco-src; where the source is copied to on the host).
 set -euo pipefail
+
+# header_text (read here, before the cd below: $0 may be a relative path)
+. "$(dirname "$0")/lib.sh"
 
 HOST=${UNRAID_HOST:-root@192.168.0.4}
 APPDATA=${APPDATA:-/mnt/osssd/appdata/unifi-deco}
@@ -100,7 +104,7 @@ stop)
 	remote "docker rm -f '$NAME'"
 	;;
 *)
-	sed -n '4,15p' "$0" | sed 's/^# \{0,1\}//'
+	header_text "$0" 4
 	exit 2
 	;;
 esac

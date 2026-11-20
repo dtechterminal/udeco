@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // DefaultKeepDown is the owner's KILL_ONT_PATTERNS (customInit): the Jio
@@ -45,8 +46,10 @@ var DefaultKeepDown = []string{"omci", "ponmgr", "ont_dc", "ont_stb_bind", "dms"
 // these started (telnet sessions, the agent's commands) stays too. The
 // radios need no daemon: their firmware is in the drivers (no
 // /lib/firmware, no hotplug helper); the bridge, address and routes are
-// kernel state. syslogd stays because init respawns it (inittab).
-var DefaultKeepOnly = []string{"init", "telnetd", "getty", "syslogd", "udeco-ap", "/flash2/udeco/start.sh", "customInit"}
+// kernel state. syslogd stays because init respawns it (inittab). The
+// supervisor is kept by its whole path, as deploy/jio-start.sh starts
+// itself (sh $D/start.sh) under its default directory, unit.JioDir.
+var DefaultKeepOnly = []string{"init", "telnetd", "getty", "syslogd", "udeco-ap", unit.JioDir + "/" + unit.Launcher, "customInit"}
 
 // protected are never signalled, whatever the patterns say.
 var protected = []string{"telnetd", "getty", "init", "udeco-ap", "cfg.svc", "dnsmasq"}

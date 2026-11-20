@@ -21,10 +21,11 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
 	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // DefaultConfigPath is where persist_shell.sh starts the agent from.
-const DefaultConfigPath = "/tp_data/udeco/udeco-ap.json"
+const DefaultConfigPath = unit.DecoDir + "/" + unit.ConfigFile
 
 // Config is /tp_data/udeco/udeco-ap.json (agent-design.md §3.5). Unknown
 // keys are an error, so a typo never silently turns a safety switch off or on.

@@ -5,6 +5,7 @@ package main
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
 )
 
 // deploy/jio-start.sh's gateway guard, run without a device: guard.conf
@@ -52,7 +55,7 @@ sleep() {
 }
 `
 	os.WriteFile(filepath.Join(d, "guard.conf"), []byte(conf), 0o644)
-	cmd := exec.Command("sh", "../../deploy/jio-start.sh", "guard")
+	cmd := exec.Command("sh", filepath.Join(repotest.Root(t), filepath.FromSlash(jioStart)), "guard")
 	cmd.Env = append(os.Environ(), "UDECO_D="+d, "UDECO_R="+r, "UDECO_UPTIME="+up)
 	done := make(chan error, 1)
 	if err := cmd.Start(); err != nil {
@@ -164,5 +167,63 @@ func TestJioGuardConfirmsEachBuild(t *testing.T) {
 	}
 	if strings.Count(g.events, "confirmed good") != 2 {
 		t.Errorf("want both builds confirmed; events:\n%s", g.events)
+	}
+}
+
+// TestJioGuardWritesTheAgentsMarker: the guard's second reboot in a row
+// leaves a marker for the agent, which then comes back observing. The
+// guard writes the file in shell and the agent reads it in Go
+// (observeMarker, main.go startGuard): the name is typed on both sides, so
+// the file the guard leaves must be the one the agent finds.
+func TestJioGuardWritesTheAgentsMarker(t *testing.T) {
+	silent := "GW=203.0.113.1\nROLLBACK_AFTER=100000\nREBOOT_AFTER=30\nping() { return 1; }\nsync() { :; }\n"
+	// one reboot strike on record: this silence is the second
+	g := runGuard(t, map[string]string{"udeco-ap.gz": guardNewBuild, "udeco-ap.json": guardU7LT, "guard.strikes": "1\n"}, silent, 8)
+	marker := filepath.Join(g.d, observeMarker)
+	why := readMarker(marker)
+	if why == "" {
+		t.Fatalf("no marker %s after the second guard reboot; events:\n%s", marker, g.events)
+	}
+	if !strings.Contains(why, "guard: gateway 203.0.113.1 silent through 2 reboots") {
+		t.Errorf("marker says %q", why)
+	}
+	if !strings.Contains(g.events, observeMarker+" written (strike 2)") || !strings.Contains(g.events, "REBOOT: gateway") {
+		t.Errorf("events:\n%s", g.events)
+	}
+	// the agent started next observes because of it, whatever its config says
+	cfg := &Config{Takeover: true, Apply: true}
+	if got := startGuard(cfg, "/", g.d, t.TempDir(), time.Now(), t.Logf); !strings.Contains(got, "marker "+marker) || !strings.Contains(got, "silent through 2 reboots") {
+		t.Errorf("startGuard with the guard's marker: %q", got)
+	}
+
+	// a first strike alone writes none
+	g = runGuard(t, map[string]string{"udeco-ap.gz": guardNewBuild, "udeco-ap.json": guardU7LT}, silent, 4)
+	if why := readMarker(filepath.Join(g.d, observeMarker)); why != "" {
+		t.Errorf("a marker after the first guard reboot: %q", why)
+	}
+	if got := strings.TrimSpace(g.file(t, "guard.strikes")); got != "1" {
+		t.Errorf("guard.strikes %q after the first guard reboot", got)
+	}
+}
+
+// The Garage guard's thresholds are deploy/jio-start.sh's; the README
+// repeats three of them.
+func TestJioGuardThresholdsInReadme(t *testing.T) {
+	script := repotest.Read(t, jioStart)
+	val := func(name string) int {
+		n, err := strconv.Atoi(repotest.ShellFuncVar(t, script, "guard", name))
+		if err != nil {
+			t.Fatalf("%s in guard(): %v", name, err)
+		}
+		return n
+	}
+	rollback, reboot, healthy := val("ROLLBACK_AFTER"), val("REBOOT_AFTER"), val("HEALTHY_AFTER")
+	if healthy%60 != 0 {
+		t.Fatalf("HEALTHY_AFTER=%d is not whole minutes", healthy)
+	}
+	want := fmt.Sprintf("it rolls back to the previous build after %d s and reboots after %d s. A new build is confirmed after %d minutes healthy.",
+		rollback, reboot, healthy/60)
+	if !strings.Contains(flat(repotest.Read(t, "README.md")), want) {
+		t.Errorf("README.md does not have %q", want)
 	}
 }

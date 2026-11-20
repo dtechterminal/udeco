@@ -335,7 +335,8 @@ func TestDeployDefaultConfig(t *testing.T) {
 	if m == nil {
 		t.Fatal("no default config in deploy/deco-ap.sh")
 	}
-	informURL, consoleIP := repotest.ShellVar(t, script, "inform_url"), repotest.ShellVar(t, script, "console_ip")
+	defaults := scriptVars(t, decoDeploy, "inform_url", "console_ip")
+	informURL, consoleIP := defaults["inform_url"], defaults["console_ip"]
 	js := strings.NewReplacer("$inform_url", informURL, "$console_ip", consoleIP).Replace(m[1])
 	if strings.Contains(js, "$") {
 		t.Fatalf("unexpanded variable in %s", js)

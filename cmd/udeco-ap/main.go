@@ -36,6 +36,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 func main() {
@@ -59,7 +61,7 @@ func main() {
 }
 
 func run(cfg *Config, base string) error {
-	lock, err := acquireLock(defaultRunDir)
+	lock, err := acquireLock(unit.RunDir)
 	if errors.Is(err, errRunning) {
 		log.Printf("udeco-ap: %v; exiting", err)
 		os.Exit(1) // R6: a second start exits non-zero
@@ -70,8 +72,8 @@ func run(cfg *Config, base string) error {
 	defer lock.release()
 	log.Printf("udeco-ap: %s", applyLimits("/proc"))
 
-	o := options{root: "/", base: base, runDir: defaultRunDir, logf: log.Printf}
-	o.forceObserve = startGuard(cfg, "/", base, defaultRunDir, time.Now(), log.Printf)
+	o := options{root: "/", base: base, runDir: unit.RunDir, logf: log.Printf}
+	o.forceObserve = startGuard(cfg, "/", base, unit.RunDir, time.Now(), log.Printf)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

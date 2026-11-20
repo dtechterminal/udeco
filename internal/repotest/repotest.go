@@ -8,8 +8,10 @@
 package repotest
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -61,6 +63,14 @@ func MustContain(t testing.TB, rel, phrase string) {
 // written, for Expand. The test fails when text has no such assignment.
 func ShellVar(t testing.TB, text, name string) string {
 	t.Helper()
+	v, ok := shellVar(text, name)
+	if !ok {
+		t.Fatalf("repotest: no top-level %s= in the script", name)
+	}
+	return v
+}
+
+func shellVar(text, name string) (string, bool) {
 	for _, line := range strings.Split(text, "\n") {
 		if line == "" || line[0] == ' ' || line[0] == '\t' || line[0] == '#' {
 			continue
@@ -71,12 +81,188 @@ func ShellVar(t testing.TB, text, name string) string {
 				break // the command's own words: no more assignments
 			}
 			if n == name {
-				return paramDefault(unquote(v))
+				return paramDefault(unquote(v)), true
 			}
 		}
 	}
-	t.Fatalf("repotest: no top-level %s= in the script", name)
+	return "", false
+}
+
+// ShellFunc is the definition of the function name in the shell script
+// text, from its "name() {" line in column 0 to the "}" that closes it in
+// column 0 (the same line for a one-line function), with a newline at the
+// end: what sh needs to define it. The test fails when text has none.
+func ShellFunc(t testing.TB, text, name string) string {
+	t.Helper()
+	lines := strings.Split(text, "\n")
+	for i, l := range lines {
+		if !strings.HasPrefix(l, name+"() {") {
+			continue
+		}
+		if strings.HasSuffix(strings.TrimRight(l, " \t"), "}") {
+			return l + "\n"
+		}
+		for j := i + 1; j < len(lines); j++ {
+			if lines[j] == "}" {
+				return strings.Join(lines[i:j+1], "\n") + "\n"
+			}
+		}
+	}
+	t.Fatalf("repotest: no function %s() in the script", name)
 	return ""
+}
+
+// ShellFuncVar is ShellVar for a function's own statements: the value the
+// function fn of the script text gives name in its first assignment among
+// the lines indented by one tab (not those nested deeper).
+func ShellFuncVar(t testing.TB, text, fn, name string) string {
+	t.Helper()
+	var body []string
+	for _, l := range strings.Split(ShellFunc(t, text, fn), "\n") {
+		if strings.HasPrefix(l, "\t") {
+			body = append(body, l[1:])
+		}
+	}
+	v, ok := shellVar(strings.Join(body, "\n"), name)
+	if !ok {
+		t.Fatalf("repotest: %s() has no %s= among its own statements", fn, name)
+	}
+	return v
+}
+
+// Header is what a script's usage prints: its leading comment block from
+// line first (counted from 1) to the last line before one that is not a
+// comment, each line without its "# " and with a newline at the end.
+func Header(text string, first int) string {
+	var b strings.Builder
+	for i, l := range strings.Split(text, "\n") {
+		if i+1 < first {
+			continue
+		}
+		if !strings.HasPrefix(l, "#") {
+			break
+		}
+		l = strings.TrimPrefix(l, "#")
+		b.WriteString(strings.TrimPrefix(l, " "))
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// Heredoc is the body of the first here-document of the script text whose
+// delimiter is tag (<<tag or <<'tag'), without the line that ends it. The
+// body is as written: see HeredocText for what the shell makes of an
+// unquoted one. The test fails when text has none.
+func Heredoc(t testing.TB, text, tag string) string {
+	t.Helper()
+	lines := strings.Split(text, "\n")
+	for i, l := range lines {
+		if !opensHeredoc(l, "<<'"+tag+"'") && !opensHeredoc(l, "<<"+tag) {
+			continue
+		}
+		for j := i + 1; j < len(lines); j++ {
+			if lines[j] == tag {
+				return strings.Join(lines[i+1:j], "\n")
+			}
+		}
+	}
+	t.Fatalf("repotest: no here-document <<%s in the script", tag)
+	return ""
+}
+
+// opensHeredoc reports whether line has the redirection op as a whole
+// word's end: followed by nothing, a blank or the end of a command.
+func opensHeredoc(line, op string) bool {
+	for rest := line; ; {
+		i := strings.Index(rest, op)
+		if i < 0 {
+			return false
+		}
+		rest = rest[i+len(op):]
+		if rest == "" || strings.IndexByte(" \t;|&)", rest[0]) >= 0 {
+			return true
+		}
+	}
+}
+
+// HeredocText is what the shell makes of an unquoted here-document's body:
+// \$, \` and \\ are that character, and $NAME or ${NAME} is vars[NAME].
+// unknown lists the names referenced that vars does not have (left as
+// written), so a caller can refuse a body it cannot render in full. Any
+// other use of $ that is not escaped (a command substitution, a
+// ${NAME:-default}) is not rendered: it is left as written and reported
+// as the unknown name "$".
+func HeredocText(body string, vars map[string]string) (text string, unknown []string) {
+	var b strings.Builder
+	for i := 0; i < len(body); i++ {
+		c := body[i]
+		if c == '\\' && i+1 < len(body) && strings.IndexByte("$`\\", body[i+1]) >= 0 {
+			i++
+			b.WriteByte(body[i])
+			continue
+		}
+		if c != '$' {
+			b.WriteByte(c)
+			continue
+		}
+		j, braced := i+1, false
+		if j < len(body) && body[j] == '{' {
+			j, braced = j+1, true
+		}
+		k := j
+		for k < len(body) && shellName(body[j:k+1]) {
+			k++
+		}
+		n := body[j:k]
+		if braced && (k == len(body) || body[k] != '}') {
+			n = ""
+		}
+		v, ok := vars[n]
+		if n == "" || !ok {
+			if n == "" {
+				n = "$"
+			}
+			unknown = append(unknown, n)
+			b.WriteByte(c)
+			continue
+		}
+		b.WriteString(v)
+		if braced {
+			k++
+		}
+		i = k - 1
+	}
+	return b.String(), unknown
+}
+
+// Markdown lists the repository's Markdown files as slash-separated paths
+// from its root, sorted.
+func Markdown(t testing.TB) []string {
+	t.Helper()
+	root := Root(t)
+	var out []string
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, p)
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() {
+			if rel == ".git" || rel == "dist" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(rel, ".md") {
+			out = append(out, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("repotest: %v", err)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Expand replaces $NAME and ${NAME} in s with vars[NAME], and

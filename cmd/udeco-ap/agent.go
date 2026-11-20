@@ -38,6 +38,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -123,13 +124,19 @@ type runner interface {
 	Run(ctx context.Context, name string, args ...string) ([]byte, error)
 }
 
-// Locations (device paths; Root is prepended).
+// Locations (device paths; Root is prepended). The run directory (ramfs:
+// lock, PID file, start log, the Wi-Fi backend's run files) is unit.RunDir.
 const (
-	defaultRunDir = "/tmp/udeco" // ramfs: lock, PID file, start log, bcmwifi run files
-	sessionSub    = "session"    // under the config's directory: state.json, system_cfg, keys (0700)
-	wifiStateSub  = "state"      // under the config's directory: bcmwifi last-good
-	eventsFile    = "events.log" // under the config's directory: rare-event ring (R13)
+	sessionSub   = "session"     // under the config's directory: state.json, system_cfg, keys (0700)
+	wifiStateSub = unit.StateSub // under the config's directory: bcmwifi last-good
+	eventsFile   = "events.log"  // under the config's directory: rare-event ring (R13)
 )
+
+// defaultJobTimeout bounds one Wi-Fi job, an apply with its rollback
+// included. The deploy scripts wait this long, and a margin, for a stopping
+// agent to finish the job it is in (WAIT_EXIT in deploy/lib.sh, held to
+// this by TestDeployWaitsForAJob).
+const defaultJobTimeout = 5 * time.Minute
 
 // timing holds the agent's waits; zero values take the defaults.
 type timing struct {
@@ -138,7 +145,7 @@ type timing struct {
 	immediateWait time.Duration // after an "inform now" reply (device.ImmediateInformWait)
 	retryWait     time.Duration // no reading of the unit yet (5 s)
 	enforceEvery  time.Duration // decosys.Enforce, egress, Wi-Fi health (60 s)
-	jobTimeout    time.Duration // one Wi-Fi job, an apply with its rollback included (5 min)
+	jobTimeout    time.Duration // one Wi-Fi job, an apply with its rollback included (defaultJobTimeout)
 	collectTO     time.Duration // one collection (20 s)
 	scanTO        time.Duration // one band of a neighbour scan (60 s)
 	spectrumTO    time.Duration // one spectrum band: airtime gate (60 s) + Budget (45 s) + margin (2 min)
@@ -175,7 +182,7 @@ func (t *timing) fill() {
 	def(&t.immediateWait, device.ImmediateInformWait)
 	def(&t.retryWait, 5*time.Second)
 	def(&t.enforceEvery, 60*time.Second)
-	def(&t.jobTimeout, 5*time.Minute)
+	def(&t.jobTimeout, defaultJobTimeout)
 	def(&t.collectTO, 20*time.Second)
 	def(&t.scanTO, 60*time.Second)
 	def(&t.spectrumTO, 2*time.Minute)
@@ -358,7 +365,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		o.root = "/"
 	}
 	if o.runDir == "" {
-		o.runDir = defaultRunDir
+		o.runDir = unit.RunDir
 	}
 	if o.logf == nil {
 		o.logf = func(string, ...any) {}

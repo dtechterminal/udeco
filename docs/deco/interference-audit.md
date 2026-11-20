@@ -176,7 +176,7 @@ persistent state, reboots the unit, or runs `wifi`, `network` or init scripts ne
      - from .241, `ssh -p 20001 root@.205` times out;
      - from the Mac, `ssh` to :22 still works;
      - the master shows .205 offline after 4 probes.
-6. **R6 Single instance.** Take `syscall.Flock(LOCK_EX|LOCK_NB)` on `/tmp/udeco/udeco-ap.lock` and hold it for
+6. **R6 Single instance.** Take `syscall.Flock(LOCK_EX|LOCK_NB)` on `/tmp/udeco/agent.lock` and hold it for
    the whole process lifetime (`system.go:84-100`). A second start exits non-zero.
    - Test: start two agents concurrently in a unit test using a temp dir.
 7. **R7 Clock-safe bookkeeping.**

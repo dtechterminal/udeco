@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -129,6 +130,167 @@ func TestExpand(t *testing.T) {
 		if got := Expand(in, vars); got != want {
 			t.Errorf("Expand(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+const deployScript = `#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Deploy the thing.
+#
+#   deploy/thing.sh [options]
+#
+# Options: --host IP (default 192.168.0.9).
+set -eu
+DIR=/tp_data/udeco
+BIN=$DIR/udeco-ap
+usage() { sed -n '3,8p' "$0"; exit 2; }
+guard() {
+	GW=192.168.0.1
+	AFTER=${GUARD_AFTER:-180} # s
+	if [ -f $D/guard.conf ]; then
+		NESTED=no
+	fi
+	log() { echo "$*"; }
+}
+unlock() {
+	return 0
+}
+got=$(remote <<END || true
+md5sum $BIN.new
+END
+)
+remote <<EOF
+set -e
+cat >$BIN.tmp <<'LAUNCH'
+#!/bin/sh
+B=$BIN
+want=\$(cat ${DIR}/udeco-ap.md5 2>/dev/null)
+[ -x \$B ] || exit 0
+echo \$\$ >$RAMDIR/agent.pid
+echo 'a \\ and a \n' $(date) ${X:-y} $1
+LAUNCH
+chmod 755 $BIN.tmp
+EOF
+cat <<'JSON'
+{"a": "$b"}
+JSON
+`
+
+func TestShellFunc(t *testing.T) {
+	if got, want := ShellFunc(t, deployScript, "unlock"), "unlock() {\n\treturn 0\n}\n"; got != want {
+		t.Errorf("ShellFunc(unlock) = %q, want %q", got, want)
+	}
+	if got, want := ShellFunc(t, deployScript, "usage"), "usage() { sed -n '3,8p' \"$0\"; exit 2; }\n"; got != want {
+		t.Errorf("ShellFunc(usage) = %q, want %q", got, want)
+	}
+	g := ShellFunc(t, deployScript, "guard")
+	if !strings.HasPrefix(g, "guard() {\n\tGW=192.168.0.1\n") || !strings.HasSuffix(g, "\tlog() { echo \"$*\"; }\n}\n") {
+		t.Errorf("ShellFunc(guard) = %q", g)
+	}
+	// log is defined inside guard, not in column 0
+	for _, name := range []string{"log", "nosuch", "remote"} {
+		if msg := reported(func(tb testing.TB) { ShellFunc(tb, deployScript, name) }); msg == "" {
+			t.Errorf("ShellFunc(%s) did not fail", name)
+		}
+	}
+}
+
+func TestShellFuncVar(t *testing.T) {
+	for name, want := range map[string]string{"GW": "192.168.0.1", "AFTER": "180"} {
+		if got := ShellFuncVar(t, deployScript, "guard", name); got != want {
+			t.Errorf("ShellFuncVar(guard, %s) = %q, want %q", name, got, want)
+		}
+	}
+	// nested deeper, the script's own, not there at all
+	for _, name := range []string{"NESTED", "DIR", "nosuch"} {
+		if msg := reported(func(tb testing.TB) { ShellFuncVar(tb, deployScript, "guard", name) }); msg == "" {
+			t.Errorf("ShellFuncVar(guard, %s) did not fail", name)
+		}
+	}
+	if msg := reported(func(tb testing.TB) { ShellFuncVar(tb, deployScript, "nosuch", "GW") }); msg == "" {
+		t.Error("ShellFuncVar did not fail for a function the script does not have")
+	}
+}
+
+func TestHeader(t *testing.T) {
+	want := "\nDeploy the thing.\n\n  deploy/thing.sh [options]\n\nOptions: --host IP (default 192.168.0.9).\n"
+	if got := Header(deployScript, 3); got != want {
+		t.Errorf("Header(3) = %q, want %q", got, want)
+	}
+	if got := Header(deployScript, 4); got != want[1:] {
+		t.Errorf("Header(4) = %q, want %q", got, want[1:])
+	}
+	if got := Header(deployScript, 9); got != "" {
+		t.Errorf("Header from a line that is not a comment = %q", got)
+	}
+	// one blank after the # goes, no more; a later comment is not the header
+	if got := Header("#!/bin/sh\n#\n#x\n#  y\n# z \nset -e\n# later\n", 2); got != "\nx\n y\nz \n" {
+		t.Errorf("Header = %q", got)
+	}
+}
+
+func TestHeredoc(t *testing.T) {
+	launch := Heredoc(t, deployScript, "LAUNCH")
+	if !strings.HasPrefix(launch, "#!/bin/sh\nB=$BIN\n") || !strings.HasSuffix(launch, "${X:-y} $1") {
+		t.Errorf("Heredoc(LAUNCH) = %q", launch)
+	}
+	if got := Heredoc(t, deployScript, "JSON"); got != `{"a": "$b"}` {
+		t.Errorf("Heredoc(JSON) = %q", got)
+	}
+	if got := Heredoc(t, deployScript, "END"); got != "md5sum $BIN.new" {
+		t.Errorf("Heredoc(END) = %q", got)
+	}
+	if outer := Heredoc(t, deployScript, "EOF"); !strings.HasPrefix(outer, "set -e\ncat >$BIN.tmp <<'LAUNCH'\n") || !strings.HasSuffix(outer, "\nchmod 755 $BIN.tmp") {
+		t.Errorf("Heredoc(EOF) = %q", outer)
+	}
+	// E is a prefix of END and EOF, LAUNCHER has LAUNCH as its prefix
+	for _, tag := range []string{"NOSUCH", "E", "LAUNCHER"} {
+		if msg := reported(func(tb testing.TB) { Heredoc(tb, deployScript, tag) }); msg == "" {
+			t.Errorf("Heredoc(%s) did not fail", tag)
+		}
+	}
+}
+
+func TestHeredocText(t *testing.T) {
+	vars := map[string]string{"BIN": "/tp_data/udeco/udeco-ap", "DIR": "/tp_data/udeco", "RAMDIR": "/tmp/udeco-bin"}
+	text, unknown := HeredocText(Heredoc(t, deployScript, "LAUNCH"), vars)
+	want := "#!/bin/sh\nB=/tp_data/udeco/udeco-ap\nwant=$(cat /tp_data/udeco/udeco-ap.md5 2>/dev/null)\n" +
+		"[ -x $B ] || exit 0\necho $$ >/tmp/udeco-bin/agent.pid\n" +
+		"echo 'a \\ and a \\n' $(date) ${X:-y} $1"
+	if text != want {
+		t.Errorf("HeredocText = %q, want %q", text, want)
+	}
+	if text, _ := HeredocText("a \\` b \\x", vars); text != "a ` b \\x" {
+		t.Errorf("HeredocText = %q", text)
+	}
+	// what it does not render: $(date), ${X:-y} and $1
+	if !reflect.DeepEqual(unknown, []string{"$", "$", "$"}) {
+		t.Errorf("unknown = %q", unknown)
+	}
+	if _, unknown := HeredocText("$BIN $OTHER ${THIRD}", vars); !reflect.DeepEqual(unknown, []string{"OTHER", "THIRD"}) {
+		t.Errorf("unknown = %q", unknown)
+	}
+	text, unknown = HeredocText("${BIN}.gz $BIN.tmp cost 5$", vars)
+	if text != "/tp_data/udeco/udeco-ap.gz /tp_data/udeco/udeco-ap.tmp cost 5$" || !reflect.DeepEqual(unknown, []string{"$"}) {
+		t.Errorf("HeredocText = %q, %q", text, unknown)
+	}
+}
+
+func TestMarkdown(t *testing.T) {
+	got := Markdown(t)
+	for _, want := range []string{"README.md", "docs/deco/agent-design.md", "docs/deco/features/login-lock.md"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("Markdown() lacks %s", want)
+		}
+	}
+	for _, p := range got {
+		if !strings.HasSuffix(p, ".md") || strings.Contains(p, `\`) || strings.HasPrefix(p, ".git/") {
+			t.Errorf("Markdown() lists %q", p)
+		}
+	}
+	if !slices.IsSorted(got) {
+		t.Error("Markdown() is not sorted")
 	}
 }
 

@@ -67,25 +67,24 @@
 # A rollback to an older build (by hand or by the guard) does the same.
 set -euo pipefail
 
+# is_ipv4, md5_local, size_local, kb_local, build_agent, header_text,
+# SITE_GATEWAY and WAIT_EXIT (s: the old agent finishing its job), shared
+# with deploy/deco-ap.sh (read here, before the cd below: $0 may be a
+# relative path)
+. "$(dirname "$0")/lib.sh"
+
 ALLOWED_HOST=192.168.0.51
 DIR=/flash2/udeco
 GZ=$DIR/udeco-ap.gz
 RAM=/tmp/udeco-bin
 OUT=dist/udeco-ap-linux-mipsle
 MIN_SPARE_KB=1024 # /flash2 free after the download, beyond the new gzip
-WAIT_EXIT=330     # s: the old agent finishing its job (one Wi-Fi job is at most 5 min)
 
-host=$ALLOWED_HOST ucg=192.168.0.1 port=18080
+host=$ALLOWED_HOST ucg=$SITE_GATEWAY port=18080
 force_host=0 force=0 preflight_only=0 build_only=0
 
-usage() { sed -n '3,67p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { header_text "$0" >&2; exit 2; }
 die() { echo "jio-ap: $*" >&2; exit 1; }
-
-is_ipv4() {
-	[[ $1 =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
-	local o
-	for o in "${BASH_REMATCH[@]:1}"; do ((10#$o <= 255)) || return 1; done
-}
 
 while [ $# -gt 0 ]; do
 	case $1 in
@@ -110,21 +109,16 @@ fi
 
 cd "$(dirname "$0")/.."
 
-md5_local() {
-	if command -v md5sum >/dev/null 2>&1; then md5sum "$1" | cut -d' ' -f1; else md5 -q "$1"; fi
-}
-
 # --- 1. build -----------------------------------------------------------------
 echo "building $OUT (linux/mipsle softfloat, static, stripped)"
 mkdir -p dist
-GOOS=linux GOARCH=mipsle GOMIPS=softfloat CGO_ENABLED=0 \
-	go build -trimpath -ldflags '-s -w -buildid=' -o "$OUT" ./cmd/udeco-ap
+build_agent "$OUT" GOARCH=mipsle GOMIPS=softfloat
 gzip -9 -n -c "$OUT" >"$OUT.gz"
 bin_md5=$(md5_local "$OUT")
 gz_md5=$(md5_local "$OUT.gz")
-gz_bytes=$(wc -c <"$OUT.gz" | tr -d ' ')
-gz_kb=$(((gz_bytes + 1023) / 1024))
-echo "  $(wc -c <"$OUT" | tr -d ' ') bytes, md5 $bin_md5; gzip $gz_bytes bytes, md5 $gz_md5"
+gz_bytes=$(size_local "$OUT.gz")
+gz_kb=$(kb_local "$OUT.gz")
+echo "  $(size_local "$OUT") bytes, md5 $bin_md5; gzip $gz_bytes bytes, md5 $gz_md5"
 [ "$build_only" = 1 ] && exit 0
 
 PW=${JIO_TELNET_PW:-${GPW:-}}

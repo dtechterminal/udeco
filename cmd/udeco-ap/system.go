@@ -70,7 +70,7 @@ func setupLog(dest string, stderr io.Writer) {
 	if dest != logSyslog {
 		return
 	}
-	w, err := syslog.New(syslog.LOG_DAEMON|syslog.LOG_INFO, "udeco-ap")
+	w, err := syslog.New(syslog.LOG_DAEMON|syslog.LOG_INFO, decosys.SyslogTag)
 	if err != nil {
 		log.Printf("udeco-ap: syslog unavailable (%v): logging to stderr", err)
 		return

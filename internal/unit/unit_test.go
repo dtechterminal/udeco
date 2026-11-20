@@ -4,6 +4,19 @@ package unit
 
 import "testing"
 
+// The paths installed units have: a changed value strands an install. The
+// deploy scripts write them out too (cmd/udeco-ap TestUnitLayout).
+func TestInstallPaths(t *testing.T) {
+	for _, c := range [][2]string{
+		{DecoDir, "/tp_data/udeco"}, {JioDir, "/flash2/udeco"}, {RunDir, "/tmp/udeco"}, {RAMDir, "/tmp/udeco-bin"},
+		{ConfigFile, "udeco-ap.json"}, {Launcher, "start.sh"}, {StateSub, "state"},
+	} {
+		if c[0] != c[1] {
+			t.Errorf("%q, want %q", c[0], c[1])
+		}
+	}
+}
+
 func TestBridgeNames(t *testing.T) {
 	if LANBridge != "br-lan" || JioLANBridge != "bdg2" || VLANBridgePrefix != "br-v" {
 		t.Errorf("bridges %q %q %q", LANBridge, JioLANBridge, VLANBridgePrefix)
