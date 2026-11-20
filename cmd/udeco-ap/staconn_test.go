@@ -629,8 +629,9 @@ func TestConnDNSFamilies(t *testing.T) {
 // A client that resolves only over DNS over TLS: its queries cannot be
 // read, so the missing DNS answer is no failure. With an address and a
 // frame, and a DoT server that accepted its connection, the attempt is
-// dropped unjudged (no soft failure, now or when it leaves); any other
-// gap is still a soft failure.
+// set aside unjudged (no soft failure, now or when it leaves); a plaintext
+// answer within staConnFixup after that is still a success; any other gap
+// is still a soft failure.
 func TestConnEncryptedDNS(t *testing.T) {
 	judgeAt := int(staConnJudge/time.Millisecond) + 100
 	for _, v6 := range []bool{false, true} {
@@ -644,6 +645,69 @@ func TestConnEncryptedDNS(t *testing.T) {
 		r.frame(40000, dotObs(false, v6))
 		if got := r.judge(200000); len(got) != 0 {
 			t.Fatalf("v6 %v: later: %v", v6, got)
+		}
+
+		// set aside, not dropped: a plaintext answer within staConnFixup
+		// (Private DNS falling back) is still a success, once
+		r = newConnRig()
+		authorizedDHCP(r)
+		r.frame(400, dotObs(false, v6))
+		r.frame(420, dotObs(true, v6))
+		if got := r.judge(judgeAt); len(got) != 0 {
+			t.Fatalf("v6 %v: DoT-only client judged: %v", v6, got)
+		}
+		r.frame(judgeAt+5000, dnsObs(7, false))
+		r.frame(judgeAt+5020, dnsObs(7, true))
+		got := r.judge(judgeAt + 10000)
+		if len(got) != 1 {
+			t.Fatalf("v6 %v: fallback events %v", v6, got)
+		}
+		wantFields(t, got[0], map[string]any{"event_type": "success", "dns_resp_seen": "yes", "dns_responses": 1})
+		if got := r.judge(judgeAt + 20000); len(got) != 0 {
+			t.Fatalf("v6 %v: more: %v", v6, got)
+		}
+
+		// an answer after staConnFixup: dropped by then, nothing
+		r = newConnRig()
+		authorizedDHCP(r)
+		r.frame(400, dotObs(false, v6))
+		r.frame(420, dotObs(true, v6))
+		r.judge(judgeAt)
+		late := judgeAt + int(staConnFixup/time.Millisecond) + 1000
+		if got := r.judge(late); len(got) != 0 {
+			t.Fatalf("v6 %v: held: %v", v6, got)
+		}
+		r.frame(late+100, dnsObs(8, false))
+		r.frame(late+120, dnsObs(8, true))
+		if got := r.judge(late + 1000); len(got) != 0 {
+			t.Fatalf("v6 %v: after staConnFixup: %v", v6, got)
+		}
+
+		// set aside, then answered and gone before the next reading: a success
+		r = newConnRig()
+		authorizedDHCP(r)
+		r.frame(400, dotObs(false, v6))
+		r.frame(420, dotObs(true, v6))
+		r.judge(judgeAt)
+		r.frame(judgeAt+5000, dnsObs(9, false))
+		r.frame(judgeAt+5020, dnsObs(9, true))
+		r.sock(judgeAt+6000, hapdmon.Disconnected)
+		got = r.judge(judgeAt + 10000)
+		if len(got) != 1 {
+			t.Fatalf("v6 %v: leaving fallback events %v", v6, got)
+		}
+		wantFields(t, got[0], map[string]any{"event_type": "success", "dns_responses": 1})
+
+		// set aside, then an unanswered plaintext query and gone: still nothing
+		r = newConnRig()
+		authorizedDHCP(r)
+		r.frame(400, dotObs(false, v6))
+		r.frame(420, dotObs(true, v6))
+		r.judge(judgeAt)
+		r.frame(judgeAt+1000, dnsObs(10, false))
+		r.sock(judgeAt+2000+int(staDNSTimeout/time.Millisecond), hapdmon.Disconnected)
+		if got := r.judge(judgeAt + 3000 + int(staDNSTimeout/time.Millisecond)); len(got) != 0 {
+			t.Fatalf("v6 %v: leaving set-aside client judged: %v", v6, got)
 		}
 
 		// it leaves before the judge time: judged at once, still nothing

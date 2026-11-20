@@ -47,9 +47,11 @@ package main
 //     address an ip_failure, no frame a traffic_failure); a success within
 //     staConnFixup after that sends a "fixup" with the completed values;
 //     but an attempt lacking only the DNS answer, with no plaintext query
-//     and a DNS-over-TLS server that accepted its connection, is dropped
-//     unjudged: its DNS cannot be read, and the controller would count
-//     the missing answer as a failure (dnsUnseen);
+//     and a DNS-over-TLS server that accepted its connection, is set
+//     aside unjudged: its DNS cannot be read, and the controller would
+//     count the missing answer as a failure (dnsUnseen); a plaintext
+//     answer within staConnFixup after that (a fallback) still sends a
+//     "success", and nothing else is ever sent for it;
 //   - never authorized staConnJudge after it started, and not associated
 //     in the reading: "failure" (PSK mismatches and EAPOL timeouts count as
 //     wpa_auth_failures, a full BSS as an assoc_failure, an EAP rejection
@@ -238,8 +240,9 @@ type connAttempt struct {
 	assocFails int
 	rssi       int // the first signal seen (auth_rssi)
 	soft       time.Time
-	id         string  // event_id, once given: one per attempt, reused by its fixup
-	ts         float64 // auth_ts, once given
+	held       time.Time // set aside at the judge time with no verdict (dnsUnseen)
+	id         string    // event_id, once given: one per attempt, reused by its fixup
+	ts         float64   // auth_ts, once given
 }
 
 // connTracker turns the inputs into events (loop goroutine).
@@ -540,7 +543,7 @@ func (c *connTracker) judge(r connReading, push func(map[string]any)) {
 		switch {
 		case a.complete():
 			push(c.event(a, "success", vap, r))
-		case a.dnsUnseen():
+		case a.dnsUnseen() || !a.held.IsZero():
 		default:
 			push(c.event(a, "soft failure", vap, r))
 		}
@@ -583,8 +586,12 @@ func (c *connTracker) judge(r connReading, push func(map[string]any)) {
 			if r.now.Sub(a.soft) > staConnFixup {
 				delete(c.att, m)
 			}
+		case !a.held.IsZero():
+			if r.now.Sub(a.held) > staConnFixup {
+				delete(c.att, m)
+			}
 		case r.now.Sub(a.wpa) >= staConnJudge && a.dnsUnseen():
-			delete(c.att, m) // its DNS went encrypted: no basis for a verdict
+			a.held = r.now // its DNS went encrypted: no basis for a verdict; a later answer is still a success
 		case r.now.Sub(a.wpa) >= staConnJudge:
 			a.soft = r.now
 			push(c.event(a, "soft failure", vap, r))
@@ -614,7 +621,8 @@ func (a *connAttempt) complete() bool {
 // cannot read it: no plaintext query, and a DNS-over-TLS server accepted
 // its connection. The controller counts a soft failure without
 // dns_responses as a failure, and success needs dns_responses > 0, so
-// such an attempt is reported not at all rather than as a false failure.
+// such an attempt is set aside rather than sent as a false failure: only a
+// later success (a plaintext fallback answered) is ever sent for it.
 // A roam's soft failure is a success to the controller and is still sent.
 func (a *connAttempt) dnsUnseen() bool {
 	return a.dot && a.dnsQueries == 0 && a.ipType != "" && a.ipType != "roam" && !a.traffic.IsZero()
