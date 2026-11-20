@@ -261,7 +261,7 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   | Multicast enhancement | per SSID on 5 GHz | controller |
   | Tx power | dB steps, live, reported in dBm with the mode | controller |
   | Beamforming, 20/40 coexistence | implicit BF off, coexistence off | always |
-  | Uplink loss | SSIDs down except one management SSID | `uplink_loss` (on), `uplink_loss_ssid` |
+  | Uplink loss | SSIDs down except one management SSID; LED red fast blink (the firmware's "no WAN") | `uplink_loss` (on), `uplink_loss_ssid` |
   | Station events | leaves at once from driver events | always |
   | BSS slot pinning | each WLAN keeps its netdev and BSSID | `bss_pinning` (off) |
   | Guest WLANs | the Deco's fail-closed ebtables rules, portal | controller |

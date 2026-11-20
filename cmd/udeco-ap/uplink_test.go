@@ -275,7 +275,9 @@ func TestUplinkLEDReleasedAtStop(t *testing.T) {
 	if h.rec.index("led-release") < 0 {
 		t.Fatalf("not released at the stop: %v", h.rec.list())
 	}
-	if _, ok := any((*mtkwifi.Applier)(nil)).(ledReleaser); ok {
-		t.Error("the jio-mtk backend has a release: the Garage would change")
+	// the Garage's uplink-loss hold blinks its LED red too (mtkwifi
+	// uplinkLED): the stop releases it the same way
+	if _, ok := any((*mtkwifi.Applier)(nil)).(ledReleaser); !ok {
+		t.Error("the jio-mtk backend has no release: its red blink would outlive the agent")
 	}
 }

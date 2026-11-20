@@ -115,6 +115,7 @@ func (a *Applier) SetUplinkDown(ctx context.Context, down bool) error {
 		if down && isolatedPlans(a.want, a.o.KeepSSID) == nil {
 			a.o.Logf("mtkwifi: uplink down: no management SSID (%q) is served: every SSID stays up", a.o.KeepSSID)
 		}
+		a.uplinkLED(ctx, down)
 		return nil
 	}
 	defer a.changingRadios()()
@@ -133,5 +134,6 @@ func (a *Applier) SetUplinkDown(ctx context.Context, down bool) error {
 	}
 	a.live = target
 	a.flushLive(ctx)
+	a.uplinkLED(ctx, down)
 	return nil
 }
