@@ -153,6 +153,10 @@ func vm(t *testing.T, prog []Insn, pkt []byte) uint32 {
 			a, ok = ld(in.K, 1)
 		case 0x48: // ldh ind
 			a, ok = ld(x+in.K, 2)
+		case 0x50: // ldb ind
+			a, ok = ld(x+in.K, 1)
+		case 0x54: // and k
+			a &= in.K
 		case 0xb1: // ldxb msh
 			var v uint32
 			v, ok = ld(in.K, 1)
@@ -292,6 +296,235 @@ func TestGARP(t *testing.T) {
 	for _, bad := range [][2]string{{"x", "192.168.1.50"}, {sta, "fe80::1"}, {sta, ""}, {"ff:ff:ff:ff:ff:ff", "192.168.1.50"}, {sta, "0.0.0.0"}} {
 		if _, err := GARP(bad[0], bad[1]); err == nil {
 			t.Errorf("GARP(%q, %q) accepted", bad[0], bad[1])
+		}
+	}
+}
+
+const (
+	sta6 = "2001:db8:1::50"
+	res6 = "2001:db8:1::1"
+)
+
+// ext6 is one IPv6 extension header: its type and its body after the
+// next-header and length octets (6 + 8n bytes).
+type ext6 struct {
+	typ  byte
+	body []byte
+}
+
+// ip6 is an IPv6 packet: the fixed header, the extension headers in
+// order, then the upper-layer header and data (protocol proto).
+func ip6(src, dst string, exts []ext6, proto byte, l4 []byte) []byte {
+	h := make([]byte, 40)
+	h[0] = 0x60
+	h[7] = 64
+	copy(h[8:], net.ParseIP(src).To16())
+	copy(h[24:], net.ParseIP(dst).To16())
+	var chain []byte
+	nh := &h[6]
+	for _, e := range exts {
+		*nh = e.typ
+		b := append([]byte{0, byte((len(e.body)+2)/8 - 1)}, e.body...)
+		if e.typ == 44 {
+			b[1] = 0 // the fragment header's second octet is reserved
+		}
+		chain = append(chain, b...)
+		nh = &chain[len(chain)-len(b)]
+	}
+	*nh = proto
+	p := append(append(h, chain...), l4...)
+	binary.BigEndian.PutUint16(p[4:], uint16(len(p)-40))
+	return p
+}
+
+func udp(sport, dport uint16, payload []byte) []byte {
+	u := make([]byte, 8)
+	binary.BigEndian.PutUint16(u[0:], sport)
+	binary.BigEndian.PutUint16(u[2:], dport)
+	binary.BigEndian.PutUint16(u[4:], uint16(8+len(payload)))
+	return append(u, payload...)
+}
+
+// tcp is a bare TCP header (no options) with flags (0x02 SYN, 0x10 ACK).
+func tcp(sport, dport uint16, flags byte) []byte {
+	t := make([]byte, 20)
+	binary.BigEndian.PutUint16(t[0:], sport)
+	binary.BigEndian.PutUint16(t[2:], dport)
+	t[12], t[13] = 5<<4, flags
+	binary.BigEndian.PutUint16(t[14:], 64240)
+	return t
+}
+
+// tcp4 is an IPv4/TCP packet.
+func tcp4(src, dst string, sport, dport uint16, flags byte, frag uint16) []byte {
+	p := udp4(src, dst, 0, 0, frag, 5, nil)[:20]
+	p[9] = 6
+	binary.BigEndian.PutUint16(p[2:], 40)
+	return append(p, tcp(sport, dport, flags)...)
+}
+
+var (
+	hbh  = ext6{0, []byte{1, 4, 0, 0, 0, 0}}                           // hop-by-hop, PadN
+	dst6 = ext6{60, []byte{1, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}} // destination options, 16 bytes
+	rt0  = ext6{43, []byte{4, 0, 0, 0, 0, 0}}                          // routing, segments left 0
+	frg  = ext6{44, []byte{0, 1, 0, 0, 0, 1}}                          // fragment, offset 0, more fragments
+	frg1 = ext6{44, []byte{0, 0x08, 0, 0, 0, 1}}                       // fragment, offset 1, last
+)
+
+// IPv6 DNS is read like IPv4 DNS: the transaction id and both addresses,
+// across hop-by-hop, routing and destination-options headers; a fragment
+// (any fragment header) is never whole and is dropped. DHCP ports over
+// IPv6 are not DHCP.
+func TestParseIPv6(t *testing.T) {
+	q := func(exts ...ext6) []byte {
+		return eth(gw, sta, 0x86dd, ip6(sta6, res6, exts, 17, udp(50000, 53, dns(0x1234, false, 0))))
+	}
+	query := Obs{Kind: DNSQuery, V6: true, Src: sta, Dst: gw, SrcIP: sta6, DstIP: res6, ID: 0x1234}
+	truncated := q(dst6)
+	truncated = truncated[:14+40+8] // the destination options header cut short
+	for name, tc := range map[string]struct {
+		frame []byte
+		out   bool
+		want  Obs
+		ok    bool
+	}{
+		"query": {q(), false, query, true},
+		"response": {eth(sta, gw, 0x86dd, ip6(res6, sta6, nil, 17, udp(53, 50000, dns(0x1234, true, 2)))), true,
+			Obs{Kind: DNSResponse, V6: true, Out: true, Src: gw, Dst: sta, SrcIP: res6, DstIP: sta6, ID: 0x1234}, true},
+		"link-local resolver": {eth(gw, sta, 0x86dd, ip6("fe80::50", "fe80::1", nil, 17, udp(40000, 53, dns(9, false, 0)))), false,
+			Obs{Kind: DNSQuery, V6: true, Src: sta, Dst: gw, SrcIP: "fe80::50", DstIP: "fe80::1", ID: 9}, true},
+		"hop-by-hop":                   {q(hbh), false, query, true},
+		"hop-by-hop, routing, dstopts": {q(hbh, rt0, dst6), false, query, true},
+		"fragment":                     {q(frg), false, Obs{}, false},
+		"later fragment":               {q(frg1), false, Obs{}, false},
+		"fragment after hop-by-hop":    {q(hbh, frg), false, Obs{}, false},
+		"truncated extension":          {truncated, false, Obs{}, false},
+		"truncated fixed header":       {q()[:14+39], false, Obs{}, false},
+		"version 4 in an ipv6 frame":   {func() []byte { f := q(); f[14] = 0x40; return f }(), false, Obs{}, false},
+		"short dns":                    {eth(gw, sta, 0x86dd, ip6(sta6, res6, nil, 17, udp(50000, 53, []byte{1, 2}))), false, Obs{}, false},
+		"other udp":                    {eth(gw, sta, 0x86dd, ip6(sta6, res6, nil, 17, udp(50000, 443, dns(1, false, 0)))), false, Obs{}, false},
+		"dhcp ports":                   {eth(gw, sta, 0x86dd, ip6(sta6, res6, nil, 17, udp(68, 67, dhcp(1, 1, sta, "0.0.0.0", 1)))), false, Obs{}, false},
+		"icmpv6 after hop-by-hop":      {eth(gw, sta, 0x86dd, ip6(sta6, "ff02::16", []ext6{hbh}, 58, make([]byte, 28))), false, Obs{}, false},
+		"udp header cut":               {q()[:14+40+6], false, Obs{}, false},
+	} {
+		got, ok := Parse(tc.frame, tc.out)
+		if ok != tc.ok || ok && got != tc.want {
+			t.Errorf("%s: %+v %v, want %+v", name, got, ok, tc.want)
+		}
+	}
+}
+
+// DNS over TLS cannot be read, only seen: a station's SYN to port 853 and
+// the server's SYN-ACK back, over IPv4 or IPv6. Anything else on TCP is
+// not an observation.
+func TestParseDoT(t *testing.T) {
+	for name, tc := range map[string]struct {
+		frame []byte
+		out   bool
+		want  Obs
+		ok    bool
+	}{
+		"syn v4": {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "8.8.8.8", 41000, 853, 0x02, 0x4000)), false,
+			Obs{Kind: DoTSyn, Src: sta, Dst: gw, SrcIP: "192.168.1.50", DstIP: "8.8.8.8"}, true},
+		"syn-ack v4": {eth(sta, gw, 0x0800, tcp4("8.8.8.8", "192.168.1.50", 853, 41000, 0x12, 0)), true,
+			Obs{Kind: DoTSynAck, Out: true, Src: gw, Dst: sta, SrcIP: "8.8.8.8", DstIP: "192.168.1.50"}, true},
+		"syn v6": {eth(gw, sta, 0x86dd, ip6(sta6, "2001:4860:4860::8888", nil, 6, tcp(41000, 853, 0x02))), false,
+			Obs{Kind: DoTSyn, V6: true, Src: sta, Dst: gw, SrcIP: sta6, DstIP: "2001:4860:4860::8888"}, true},
+		"syn-ack v6": {eth(sta, gw, 0x86dd, ip6("2001:4860:4860::8888", sta6, nil, 6, tcp(853, 41000, 0x12))), true,
+			Obs{Kind: DoTSynAck, V6: true, Out: true, Src: gw, Dst: sta, SrcIP: "2001:4860:4860::8888", DstIP: sta6}, true},
+		"ack v4":          {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "8.8.8.8", 41000, 853, 0x10, 0)), false, Obs{}, false},
+		"syn to 443":      {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "8.8.8.8", 41000, 443, 0x02, 0)), false, Obs{}, false},
+		"syn from 853":    {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "8.8.8.8", 853, 41000, 0x02, 0)), false, Obs{}, false},
+		"tcp fragment v4": {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "8.8.8.8", 41000, 853, 0x02, 0x2000)), false, Obs{}, false},
+		"short tcp":       {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "8.8.8.8", 41000, 853, 0x02, 0)[:20+12]), false, Obs{}, false},
+	} {
+		got, ok := Parse(tc.frame, tc.out)
+		if ok != tc.ok || ok && got != tc.want {
+			t.Errorf("%s: %+v %v, want %+v", name, got, ok, tc.want)
+		}
+	}
+}
+
+// The socket filter also passes IPv6 UDP from or to port 53, IPv6
+// packets with a hop-by-hop, routing or destination-options header first
+// (Parse walks those), and TCP SYNs from or to port 853 over either
+// family; IPv6 fragments and everything else stay in the kernel.
+func TestFilterIPv6AndDoT(t *testing.T) {
+	q := func(exts ...ext6) []byte {
+		return eth(gw, sta, 0x86dd, ip6(sta6, res6, exts, 17, udp(50000, 53, dns(1, false, 0))))
+	}
+	for name, tc := range map[string]struct {
+		frame []byte
+		pass  bool
+	}{
+		"v6 query":           {q(), true},
+		"v6 response":        {eth(sta, gw, 0x86dd, ip6(res6, sta6, nil, 17, udp(53, 50000, dns(1, true, 0)))), true},
+		"v6 hop-by-hop":      {q(hbh), true},
+		"v6 routing":         {q(rt0), true},
+		"v6 dstopts":         {q(dst6), true},
+		"v6 fragment":        {q(frg), false},
+		"v6 other udp":       {eth(gw, sta, 0x86dd, ip6(sta6, res6, nil, 17, udp(50000, 443, nil))), false},
+		"v6 dhcpv6":          {eth(gw, sta, 0x86dd, ip6("fe80::50", "ff02::1:2", nil, 17, udp(546, 547, make([]byte, 20)))), false},
+		"v6 icmpv6":          {eth(gw, sta, 0x86dd, ip6(sta6, res6, nil, 58, make([]byte, 24))), false},
+		"v6 tcp 853 syn":     {eth(gw, sta, 0x86dd, ip6(sta6, res6, nil, 6, tcp(41000, 853, 0x02))), true},
+		"v6 tcp 853 syn-ack": {eth(sta, gw, 0x86dd, ip6(res6, sta6, nil, 6, tcp(853, 41000, 0x12))), true},
+		"v6 tcp 853 ack":     {eth(gw, sta, 0x86dd, ip6(sta6, res6, nil, 6, tcp(41000, 853, 0x10))), false},
+		"v6 tcp 443 syn":     {eth(gw, sta, 0x86dd, ip6(sta6, res6, nil, 6, tcp(41000, 443, 0x02))), false},
+		"v6 truncated":       {q()[:14+30], false},
+		"v4 tcp 853 syn":     {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "1.1.1.1", 41000, 853, 0x02, 0x4000)), true},
+		"v4 tcp 853 syn-ack": {eth(sta, gw, 0x0800, tcp4("1.1.1.1", "192.168.1.50", 853, 41000, 0x12, 0)), true},
+		"v4 tcp 853 ack":     {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "1.1.1.1", 41000, 853, 0x10, 0)), false},
+		"v4 tcp 443 syn":     {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "1.1.1.1", 41000, 443, 0x02, 0)), false},
+		"v4 tcp fragment":    {eth(gw, sta, 0x0800, tcp4("192.168.1.50", "1.1.1.1", 41000, 853, 0x02, 0x0001)), false},
+	} {
+		got := vm(t, filter, tc.frame)
+		if (got != 0) != tc.pass {
+			t.Errorf("%s: %d", name, got)
+		}
+	}
+}
+
+// filterV4 is the filter as it was before IPv6 and DoT: ARP and IPv4 UDP
+// from or to 53, 67 and 68.
+var filterV4 = []Insn{
+	{Code: 0x28, K: 12}, {Code: 0x15, Jt: 14, K: 0x0806}, {Code: 0x15, Jf: 14, K: 0x0800},
+	{Code: 0x30, K: 23}, {Code: 0x15, Jf: 12, K: 17}, {Code: 0x28, K: 20}, {Code: 0x45, Jt: 10, K: 0x1fff},
+	{Code: 0xb1, K: 14}, {Code: 0x48, K: 14}, {Code: 0x15, Jt: 6, K: 53}, {Code: 0x15, Jt: 5, K: 67},
+	{Code: 0x15, Jt: 4, K: 68}, {Code: 0x48, K: 16}, {Code: 0x15, Jt: 2, K: 53}, {Code: 0x15, Jt: 1, K: 67},
+	{Code: 0x15, Jt: 0, Jf: 1, K: 68}, {Code: 0x06, K: snap}, {Code: 0x06, K: 0},
+}
+
+// IPv4 regression: on ARP and every IPv4 UDP frame, and on IPv4 TCP away
+// from port 853, the filter decides exactly as before; Parse reads the
+// same frames the same way (never as IPv6).
+func TestFilterIPv4Unchanged(t *testing.T) {
+	var frames [][]byte
+	ports := []uint16{0, 53, 67, 68, 80, 123, 443, 853, 5353}
+	for _, sp := range ports {
+		for _, dp := range ports {
+			for _, frag := range []uint16{0, 0x4000, 0x2000, 0x2001, 0x0001} {
+				for _, ihl := range []int{5, 6, 15} {
+					frames = append(frames,
+						eth(gw, sta, 0x0800, udp4("192.168.1.50", "192.168.1.1", sp, dp, frag, ihl, dns(1, false, 0))),
+						eth(gw, sta, 0x0800, udp4("192.168.1.50", "192.168.1.1", sp, dp, frag, ihl, nil)))
+				}
+			}
+			if sp != 853 && dp != 853 {
+				frames = append(frames, eth(gw, sta, 0x0800, tcp4("192.168.1.50", "1.1.1.1", sp, dp, 0x02, 0)))
+			}
+		}
+	}
+	frames = append(frames,
+		eth("ff:ff:ff:ff:ff:ff", sta, 0x0806, arp(1, sta, "192.168.1.50", "00:00:00:00:00:00", "192.168.1.1")),
+		eth("ff:ff:ff:ff:ff:ff", sta, 0x0806, nil)[:12],
+		eth(gw, sta, 0x0800, udp4("192.168.1.50", "192.168.1.1", 1, 53, 0, 5, nil))[:30],
+		eth(gw, sta, 0x88cc, make([]byte, 40)))
+	for i, f := range frames {
+		if a, b := vm(t, filter, f), vm(t, filterV4, f); a != b {
+			t.Errorf("frame %d: %d, was %d", i, a, b)
+		}
+		if o, ok := Parse(f, false); ok && o.V6 {
+			t.Errorf("frame %d read as IPv6: %+v", i, o)
 		}
 	}
 }
