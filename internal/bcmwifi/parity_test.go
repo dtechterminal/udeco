@@ -270,12 +270,20 @@ func TestHandbackRestoresDriver(t *testing.T) {
 
 func TestParseInterference(t *testing.T) {
 	for in, want := range map[string]int{"361": 361, "Mode 361": 361, "mode: 360 (desense)": 360,
-		"All interference mitigation is enabled. (mode 3)": 3} {
+		"All interference mitigation is enabled. (mode 3)": 3,
+		// the X20's own output (wl 17.10.121.39, 2026-11-20)
+		"Mode = 361. Following ACI modes are enabled:\n\tbit-mask 1:  Receiver Desense based on glitch count\n\tbit-mask 8:  Preemption is enabled\n": 361,
+		"Mode = 360. Following ACI modes are enabled:\n\tbit-mask 8:  Preemption is enabled\n":                                                        360} {
 		if got, ok := parseInterference(in); !ok || got != want {
 			t.Errorf("%q: %d %v", in, got, ok)
 		}
 	}
 	if _, ok := parseInterference("wl: Unsupported"); ok {
 		t.Error("unsupported parsed")
+	}
+	for in, want := range map[string]int{"-1": -1, "0": 0, "Mode = -1. Following ACI modes :\nInterference override disabled.\n": -1} {
+		if got, ok := parseInterferenceOverride(in); !ok || got != want {
+			t.Errorf("override %q: %d %v", in, got, ok)
+		}
 	}
 }

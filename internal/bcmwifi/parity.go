@@ -143,8 +143,12 @@ func (a *Applier) readDriver(ctx context.Context, primary, band string) map[stri
 				if x, ok := parseInterference(out); ok {
 					v = x
 				}
+			case interfOverIov:
+				if x, ok := parseInterferenceOverride(out); ok {
+					v = x
+				}
 			default:
-				if x, err := parseIntOut(out); err == nil && (x >= 0 || n == interfOverIov) {
+				if x, err := parseIntOut(out); err == nil && x >= 0 {
 					v = x
 				}
 			}
@@ -154,27 +158,49 @@ func (a *Applier) readDriver(ctx context.Context, primary, band string) map[stri
 	return m
 }
 
-// parseInterference reads `wl interference`: the mode number, written
-// "Mode 361 ...", "mode 361", or a bare "361". The exact wording on the
-// X20 is not captured; anything else is unreadable (left alone).
+// parseInterference reads `wl interference`: the mode number. The X20
+// (wl 17.10.121.39) prints "Mode = 361. Following ACI modes are enabled:"
+// and a bit list; "Mode 361", "mode: 360" and a bare "361" are read too.
+// Anything else is unreadable (left alone).
 func parseInterference(s string) (int, bool) {
+	n, ok := parseModeNum(s)
+	return n, ok && n >= 0
+}
+
+// parseInterferenceOverride reads `wl interference_override`, which the
+// X20 prints as "Mode = -1. Following ACI modes :\nInterference override
+// disabled." (-1 is off); a bare number is read too.
+func parseInterferenceOverride(s string) (int, bool) {
+	if n, err := parseIntOut(s); err == nil {
+		return n, true
+	}
+	return parseModeNum(s)
+}
+
+// parseModeNum finds the number after "mode" (optionally "mode:", "mode
+// =", "(mode"), else a leading number.
+func parseModeNum(s string) (int, bool) {
+	num := func(w string) (int, bool) {
+		n, err := strconv.ParseInt(strings.Trim(w, "():,."), 0, 32)
+		return int(n), err == nil
+	}
 	f := strings.Fields(strings.ToLower(s))
 	for i, w := range f {
-		if strings.TrimRight(w, ":=") == "mode" && i+1 < len(f) {
-			if n, err := strconv.ParseInt(strings.Trim(f[i+1], "():,"), 0, 32); err == nil && n >= 0 {
-				return int(n), true
-			}
+		if strings.TrimRight(strings.TrimLeft(w, "("), ":=") != "mode" {
+			continue
 		}
-		if strings.HasPrefix(w, "(mode") && i+1 < len(f) {
-			if n, err := strconv.ParseInt(strings.Trim(f[i+1], "():,"), 0, 32); err == nil && n >= 0 {
-				return int(n), true
+		j := i + 1
+		if j < len(f) && (f[j] == "=" || f[j] == ":") {
+			j++
+		}
+		if j < len(f) {
+			if n, ok := num(f[j]); ok {
+				return n, true
 			}
 		}
 	}
 	if len(f) > 0 {
-		if n, err := strconv.ParseInt(strings.Trim(f[0], "():,"), 0, 32); err == nil && n >= 0 {
-			return int(n), true
-		}
+		return num(f[0])
 	}
 	return 0, false
 }
