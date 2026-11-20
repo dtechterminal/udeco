@@ -149,3 +149,14 @@ Wi-Fi 6 matters more than DFS here, so every Deco runs US/0 on both bands
 since 19:07 IST: Hallway 40/80; Bedroom and Owner's Room 149/80, which hear
 each other at -76 dBm and so share air time; the Garage 149/80, which none
 of the Decos hear. Do not set a band to IN/288 while Wi-Fi 6 is wanted.
+
+Which countries have DFS and Wi-Fi 6 together (checked on Bedroom, 2026-11-20)?
+None of the real ones. `wl chanspecs -c <cc> -b 5 -w 80` over all 267 codes in
+the driver gives DFS at 80 MHz for 45 base tables (AU, SG, SA, DO and others;
+EU, E0, GB, FR, CA, JP and CN give no DFS or no 80 MHz). Setting the radio to
+AU, SG, SA, DO and IN/288 in turn and reading `curppr` showed every HE rate
+disabled for all of them, on 36/80 and 149/80 as well as on 52/80, 100/80 and
+132/80, so it is the country table and not the channel. Only US/0 and `#a`
+fill the HE rows. `#a` is Broadcom's all-channels test table, not a country:
+it gives HE at 23.5 dBm on 52/80 and 100/80. Whether it runs radar detection
+was not checked. TP-Link's data for this board carries Wi-Fi 6 only for US.
