@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/openwrt"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
@@ -20,7 +21,7 @@ func main() {
 	user := flag.String("user", "root", "ssh user")
 	key := flag.String("key", "ap_ed25519", "ssh private key for the AP")
 	kh := flag.String("known-hosts", "ap_known_hosts", "known_hosts file with the AP's host key")
-	cfgPath := flag.String("cfg", "system_cfg.txt", "system_cfg from the controller (saved by the daemon in its state directory)")
+	cfgPath := flag.String("cfg", device.SystemCfgFile, "system_cfg from the controller (saved by the daemon in its state directory)")
 	flag.Parse()
 	cfg, err := os.ReadFile(*cfgPath)
 	if err != nil {

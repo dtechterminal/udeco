@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/antoniocosta/unifi-openwrt/internal/inform"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
 )
 
@@ -437,10 +437,7 @@ func (c *Config) ftSAE() bool { return c.WPA3 && (c.FTSAE == nil || *c.FTSAE) }
 // twt: TWT is on unless the twt key is false.
 func (c *Config) twt() bool { return c.TWT == nil || *c.TWT }
 
-func (c *Config) controllerIP() string {
-	u, _ := url.Parse(c.InformURL)
-	return u.Hostname()
-}
+func (c *Config) controllerIP() string { return inform.URLHost(c.InformURL) }
 
 // validDriverCountryBands: keys "ng"/"na", values two-letter country codes
 // or "#a".

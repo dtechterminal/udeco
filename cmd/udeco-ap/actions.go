@@ -14,15 +14,16 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 func (a *agent) action(ctx context.Context, act string) {
-	verb, arg, _ := strings.Cut(act, ":")
+	verb, arg := device.SplitAction(act)
 	if !a.takeover.Load() {
 		switch verb {
-		case "unblock", "guest-auth", "guest-unauth":
-		case "rate-update":
+		case device.ActUnblock, device.ActGuestAuth, device.ActGuestUnauth:
+		case device.ActRateUpdate:
 			a.logf("observe mode: per-client speed limit for %s kept, applied at takeover", arg)
 		default:
 			a.logf("observe mode: %s logged only, nothing on the unit changes", act)
@@ -30,37 +31,37 @@ func (a *agent) action(ctx context.Context, act string) {
 		return
 	}
 	switch verb {
-	case "reboot":
+	case device.ActReboot:
 		a.rebootReq = true // after this reply is handled and the state saved
-	case "led":
+	case device.ActLED:
 		mode := bcmwifi.LEDOff
-		if arg == "on" {
+		if arg == device.ArgOn {
 			mode = bcmwifi.LEDOn
 		}
 		a.submit("led "+mode, func(ctx context.Context) { a.led(ctx, mode) })
-	case "locate":
+	case device.ActLocate:
 		mode := bcmwifi.LEDLocateOff
-		if arg == "on" {
+		if arg == device.ArgOn {
 			mode = bcmwifi.LEDLocate
 		}
 		a.submit("locate "+arg, func(ctx context.Context) { a.led(ctx, mode) })
-	case "kick":
-		mac := arg // strings.Cut keeps the rest, colons included
+	case device.ActKick:
+		mac := arg // SplitAction keeps the rest, colons included
 		a.submit("kick", func(ctx context.Context) {
 			if err := a.wifi.Kick(ctx, mac); err != nil {
 				a.logf("kick %s: %v", mac, err)
 			}
 		})
-	case "block":
+	case device.ActBlock:
 		list := append([]string{}, a.x.S.Blocked...)
 		a.submit("blocked list", func(ctx context.Context) { a.setBlocked(ctx, list) })
-	case "unblock":
+	case device.ActUnblock:
 		// the whole new list arrives with the "block" action
-	case "scan":
+	case device.ActScan:
 		a.startScan(ctx, rf.Bands())
-	case "spectrum-scan":
+	case device.ActSpectrumScan:
 		a.spectrumScan(ctx)
-	case "quick-scan":
+	case device.ActQuickScan:
 		band, bws, _ := strings.Cut(arg, ":")
 		if band == "6e" {
 			// no rows and no change to any table (design §6.5)
@@ -69,10 +70,10 @@ func (a *agent) action(ctx context.Context, act string) {
 		}
 		bw, _ := strconv.Atoi(bws) // 0 or junk: the runner makes it 20
 		a.quickScan(ctx, band, bw)
-	case "guest-auth", "guest-unauth":
-		mac, on := arg, verb == "guest-auth"
+	case device.ActGuestAuth, device.ActGuestUnauth:
+		mac, on := arg, verb == device.ActGuestAuth
 		a.submit(verb+" "+mac, func(ctx context.Context) { a.guestAuth(ctx, mac, on) })
-	case "rate-update":
+	case device.ActRateUpdate:
 		a.pushClientRates("rate-update " + arg)
 	default:
 		a.logf("action %q: ignored", act)

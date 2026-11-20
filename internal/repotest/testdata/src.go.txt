@@ -1,0 +1,43 @@
+package sample
+
+import "example.com/dev"
+
+const (
+	A = "a"
+	B, C = "b", "c:d"
+	N = 3
+	E = A + "x"
+)
+
+const Lone = `raw "text"`
+
+var notConst = "v"
+
+func other(v string) {
+	switch v {
+	case "elsewhere":
+	}
+}
+
+func (r *recv) act(a string, n int) {
+	verb, arg := dev.Split(a)
+	if n > 0 {
+		switch verb {
+		case dev.Unblock, dev.GuestAuth:
+		default:
+			return
+		}
+	}
+	switch verb {
+	case dev.Reboot:
+	case dev.Scan, "spectrum-scan":
+		switch {
+		case arg == "x":
+		}
+	case dev.LED + ":" + dev.On:
+	default:
+	}
+	switch r.Cmd {
+	case "kick-sta", "kick":
+	}
+}

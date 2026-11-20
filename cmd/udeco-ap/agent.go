@@ -133,9 +133,9 @@ const (
 
 // timing holds the agent's waits; zero values take the defaults.
 type timing struct {
-	interval      time.Duration // inform interval until the controller sets one (10 s)
-	minWait       time.Duration // floor of the inform interval (1 s)
-	immediateWait time.Duration // after an "inform now" reply (500 ms)
+	interval      time.Duration // inform interval until the controller sets one (device.DefaultInformInterval)
+	minWait       time.Duration // floor of the inform interval (device.MinInformWait)
+	immediateWait time.Duration // after an "inform now" reply (device.ImmediateInformWait)
 	retryWait     time.Duration // no reading of the unit yet (5 s)
 	enforceEvery  time.Duration // decosys.Enforce, egress, Wi-Fi health (60 s)
 	jobTimeout    time.Duration // one Wi-Fi job, an apply with its rollback included (5 min)
@@ -168,11 +168,11 @@ func (t *timing) fill() {
 			*d = v
 		}
 	}
-	def(&t.interval, 10*time.Second)
+	def(&t.interval, device.DefaultInformInterval)
 	def(&t.uplinkPoll, time.Second)
 	def(&t.gwProbe, gwProbeEvery)
-	def(&t.minWait, time.Second)
-	def(&t.immediateWait, 500*time.Millisecond)
+	def(&t.minWait, device.MinInformWait)
+	def(&t.immediateWait, device.ImmediateInformWait)
 	def(&t.retryWait, 5*time.Second)
 	def(&t.enforceEvery, 60*time.Second)
 	def(&t.jobTimeout, 5*time.Minute)
@@ -428,8 +428,8 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		return nil, err
 	}
 	os.Chmod(a.sessDir, 0o700)
-	a.statePath = filepath.Join(a.sessDir, "state.json")
-	a.sysCfgPath = filepath.Join(a.sessDir, "system_cfg.txt")
+	a.statePath = filepath.Join(a.sessDir, device.StateFile)
+	a.sysCfgPath = filepath.Join(a.sessDir, device.SystemCfgFile)
 	// the session directory is on flash (ubifs, mounted sync): keep few
 	// system_cfg versions
 	device.HistoryKeep = 5
@@ -697,7 +697,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 		Dev: inform.Device{MAC: mac, IP: s.IP, Netmask: s.Netmask, Gateway: s.Gateway, Hostname: s.Hostname,
 			Model: p.Model, ModelDisplay: p.Display, Radios: radios},
 	}
-	a.x.Unhandled, a.x.KnownSection = device.OpenLedger(filepath.Join(a.sessDir, "unhandled.json")), translate.Handled
+	a.x.Unhandled, a.x.KnownSection = device.OpenLedger(filepath.Join(a.sessDir, device.UnhandledFile)), translate.Handled
 	// radio names: ra0/rai0, or wifi0/wifi1 kept for an earlier adoption
 	// (radionames.go)
 	if chooseRadioNames(&a.x.S, found) {
@@ -815,7 +815,7 @@ func (a *agent) startSSH() error {
 	a.sa = &device.SSHAdopt{
 		Listen:    net.JoinHostPort(host, strconv.Itoa(a.cfg.SSHDPort)),
 		AllowFrom: []string{a.cfg.ConsoleIP},
-		HostKey:   filepath.Join(a.sessDir, "ssh_host_ed25519.pem"),
+		HostKey:   filepath.Join(a.sessDir, device.SSHHostKeyFile),
 		Requests:  a.adopt,
 		Auth:      a.sshAuth,
 		Site:      a.siteSSHOptions(),
@@ -885,7 +885,7 @@ func (a *agent) loop(ctx context.Context) {
 		}
 		if errs > 0 {
 			// like a real AP: keep informing, further and further apart
-			wait = min(max(interval, 5*time.Second)*time.Duration(1<<min(errs-1, 4)), time.Minute)
+			wait = device.InformBackoff(interval, errs)
 		}
 		// a port change waits for an answered inform (ports.go): no
 		// backing off past portsRetry until it has one
@@ -1057,8 +1057,17 @@ func (a *agent) guestAuthorized(s *apstate.Snapshot, now time.Time) map[string]b
 	return m
 }
 
-// informOnce sends one inform and handles the answer (cmd/udeco/runner.go
-// informOnce). ok=false counts as a bad answer.
+// informOnce sends one inform and handles the answer. ok=false counts as
+// a bad answer.
+//
+// It follows device.InformOnce (the inform of cmd/udeco and cmd/uow) step
+// by step, with the same log lines, and is kept apart from it because the
+// agent runs on the unit itself and is stricter: a reply must decode with
+// the key the inform was sealed with (no second try with the factory
+// key), an unencrypted reply is refused, the POST is the agent's own
+// client under ctx (post.go), and the reply feeds the agent's hooks (the
+// controller's clock, the login lock, the port monitor). A change of the
+// status or reply handling there is one to make here too.
 func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 	x := a.x
 	start := a.o.now() // a port change finished before this is confirmed by its reply (ports.go)

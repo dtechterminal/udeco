@@ -106,6 +106,17 @@ func (s State) Save(path string) error {
 	return os.Rename(tmp, path)
 }
 
+// The files of a session's state directory (Session.StateDir), for the
+// session, which writes the system_cfg ones, and for every daemon that
+// reads or writes them by path.
+const (
+	StateFile           = "state.json"           // the State (State.Save, Load)
+	SystemCfgFile       = "system_cfg.txt"       // the last system_cfg a setparam carried
+	SystemCfgHistoryDir = "system_cfg.history"   // its HistoryKeep last versions
+	UnhandledFile       = "unhandled.json"       // the Ledger (OpenLedger)
+	SSHHostKeyFile      = "ssh_host_ed25519.pem" // the adoption SSH server's host key (SSHAdopt.HostKey)
+)
+
 // Session ties the state to the device description and a boot clock.
 type Session struct {
 	// GuestMu guards S.Guests (the inform loop and the :8882 portal handler).
@@ -113,7 +124,7 @@ type Session struct {
 	S        State
 	Dev      inform.Device
 	Boot     time.Time
-	StateDir string // where state.json and system_cfg.txt live (mode 700)
+	StateDir string // where StateFile, SystemCfgFile and the others live (mode 700)
 	SSHPort  int    // reported as sshd_port: where the console SSHes to adopt
 	ledKnown bool
 	// the last setparam and how often it was repeated unchanged
@@ -328,9 +339,9 @@ type Outcome struct {
 	Immediate  bool          // inform again right away
 	Changed    bool          // state changed: save it
 	Reset      bool          // controller sent setdefault (device was removed)
-	SystemCfg  bool          // a setparam carried a system_cfg (saved as system_cfg.txt)
+	SystemCfg  bool          // a setparam carried a system_cfg (saved as SystemCfgFile)
 	CfgVersion string        // the cfgversion the reply carried ("" = none)
-	Actions    []string      // for a real AP: "reboot", "led:on", "led:off", "locate:on", "locate:off", "kick:<mac>", "block", "unblock:<mac>", "scan", "spectrum-scan", "quick-scan:<band>:<bw>", "guest-auth:<mac>", "guest-unauth:<mac>", "rate-update:<mac>"
+	Actions    []string      // for a real AP: the Act* verbs with their arguments (action.go)
 }
 
 // Handle applies a decoded reply to the session.
@@ -357,7 +368,7 @@ func (x *Session) Handle(js []byte, now time.Time) (Outcome, error) {
 	case "reboot":
 		x.Boot = now
 		o.Immediate = true
-		o.Actions = append(o.Actions, "reboot")
+		o.Actions = append(o.Actions, ActReboot)
 		o.Events = append(o.Events, "reboot requested")
 	case "setdefault":
 		x.setdefault(&o)
@@ -408,7 +419,7 @@ func (x *Session) setparam(r Reply, now time.Time, o *Outcome) {
 			if on != x.S.LED || !x.ledKnown {
 				x.S.LED, x.ledKnown = on, true
 				o.Changed = true
-				o.Actions = append(o.Actions, map[bool]string{true: "led:on", false: "led:off"}[on])
+				o.Actions = append(o.Actions, Action(ActLED, onOff(on)))
 			}
 		}
 	}
@@ -472,7 +483,7 @@ func (x *Session) setparam(r Reply, now time.Time, o *Outcome) {
 		x.S.SystemCfgN = len(r.SystemCfg)
 		o.Changed = true
 		o.SystemCfg = true
-		path := filepath.Join(x.StateDir, "system_cfg.txt")
+		path := filepath.Join(x.StateDir, SystemCfgFile)
 		if err := os.WriteFile(path, []byte(r.SystemCfg), 0o600); err != nil {
 			ev += " (saving system_cfg failed: " + err.Error() + ")"
 		}
@@ -481,7 +492,7 @@ func (x *Session) setparam(r Reply, now time.Time, o *Outcome) {
 		if now.Before(ClockSane) {
 			ev += " (clock not set yet: no history copy)"
 		} else {
-			hist := filepath.Join(x.StateDir, "system_cfg.history")
+			hist := filepath.Join(x.StateDir, SystemCfgHistoryDir)
 			os.MkdirAll(hist, 0o700)
 			os.WriteFile(filepath.Join(hist, now.Format("20060102-150405")+"-"+x.WantedCfgVersion()+".txt"), []byte(r.SystemCfg), 0o600)
 			pruneHistory(hist, HistoryKeep)
@@ -601,17 +612,17 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 	case "reboot", "restart":
 		x.Boot = now
 		o.Immediate = true
-		o.Actions = append(o.Actions, "reboot")
+		o.Actions = append(o.Actions, ActReboot)
 		o.Events = append(o.Events, "cmd "+r.Cmd+": reboot requested")
 	case "locate", "set-locate", "locate-on":
 		x.S.Locating = true
 		o.Changed, o.Immediate = true, true
-		o.Actions = append(o.Actions, "locate:on")
+		o.Actions = append(o.Actions, Action(ActLocate, ArgOn))
 		o.Events = append(o.Events, "cmd "+r.Cmd+": locate on")
 	case "unset-locate", "locate-off", "stop-locate":
 		x.S.Locating = false
 		o.Changed, o.Immediate = true, true
-		o.Actions = append(o.Actions, "locate:off")
+		o.Actions = append(o.Actions, Action(ActLocate, ArgOff))
 		o.Events = append(o.Events, "cmd "+r.Cmd+": locate off")
 	case "setdefault":
 		x.setdefault(o)
@@ -624,7 +635,7 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 			break
 		}
 		o.Immediate = true
-		o.Actions = append(o.Actions, "kick:"+m[0])
+		o.Actions = append(o.Actions, Action(ActKick, m[0]))
 		o.Events = append(o.Events, "cmd "+r.Cmd+": kick "+m[0])
 	case "authorize-guest", "unauthorize-guest":
 		m := ParseMACs(r.MAC)
@@ -640,7 +651,7 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 		o.Changed, o.Immediate = true, true
 		if r.Cmd == "unauthorize-guest" {
 			delete(x.S.Guests, m[0])
-			o.Actions = append(o.Actions, "guest-unauth:"+m[0])
+			o.Actions = append(o.Actions, Action(ActGuestUnauth, m[0]))
 			o.Events = append(o.Events, "cmd unauthorize-guest "+m[0])
 			break
 		}
@@ -652,7 +663,7 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 			end = now.Add(time.Duration(r.Minutes) * time.Minute).Unix()
 		}
 		x.S.Guests[m[0]] = end
-		o.Actions = append(o.Actions, "guest-auth:"+m[0])
+		o.Actions = append(o.Actions, Action(ActGuestAuth, m[0]))
 		o.Events = append(o.Events, fmt.Sprintf("cmd authorize-guest %s until %s", m[0], time.Unix(end, 0).Format("15:04")))
 	case "block-sta", "unblock-sta":
 		m := ParseMACs(r.MAC)
@@ -677,12 +688,12 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 		// neighbour scan / RF scan: the daemon scans the radios and reports
 		// scan_table / spectrum_table (docs/internals.md)
 		o.Immediate = true
-		o.Actions = append(o.Actions, r.Cmd)
+		o.Actions = append(o.Actions, map[string]string{"scan": ActScan, "spectrum-scan": ActSpectrumScan}[r.Cmd])
 		o.Events = append(o.Events, "cmd "+r.Cmd)
 	case "quick-scan":
 		// The controller's nightly channel optimisation: one band per cmd,
 		// the next only after the AP reported the finished scan
-		// (study-actions-scans.md). Action "quick-scan:<band>:<bw>".
+		// (study-actions-scans.md). Action ActQuickScan with <band>:<bw>.
 		if r.ScanBand == nil {
 			o.Events = append(o.Events, "cmd quick-scan without scan-band: ignored")
 			x.note("cmd", r.Cmd, redactReply(js), now, o)
@@ -698,7 +709,7 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 			bw = int(*r.ScanBW)
 		}
 		o.Immediate = true
-		o.Actions = append(o.Actions, fmt.Sprintf("quick-scan:%s:%d", band, bw))
+		o.Actions = append(o.Actions, Action(ActQuickScan, band, strconv.Itoa(bw)))
 		o.Events = append(o.Events, fmt.Sprintf("cmd quick-scan band=%s bw=%d", band, bw))
 	case "rate-update":
 		x.rateUpdate(r, js, now, o)
@@ -712,7 +723,8 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 // rate-update: mac, dl_max, ul_max in kbit/s, -1 = no limit; sent when a
 // client of a non-default user group shows up on the AP, and when its
 // group or the group's limits change). Both -1 removes the client's entry.
-// The "rate-update:<mac>" action asks the AP to apply the whole list.
+// The ActRateUpdate action (with the MAC) asks the AP to apply the whole
+// list.
 func (x *Session) rateUpdate(r Reply, js []byte, now time.Time, o *Outcome) {
 	m := ParseMACs(r.MAC)
 	if len(m) != 1 {
@@ -761,7 +773,7 @@ func (x *Session) rateUpdate(r Reply, js []byte, now time.Time, o *Outcome) {
 		}
 		return strconv.Itoa(n) + "kbit"
 	}
-	o.Actions = append(o.Actions, "rate-update:"+mac)
+	o.Actions = append(o.Actions, Action(ActRateUpdate, mac))
 	o.Events = append(o.Events, fmt.Sprintf("cmd rate-update %s down=%s up=%s", mac, kb(down), kb(up)))
 }
 
@@ -798,7 +810,7 @@ func ParseMACs(s string) []string {
 }
 
 // setBlocked records the blocked-client list; a change asks the AP to
-// enforce it ("block" action).
+// enforce it (ActBlock).
 func (x *Session) setBlocked(list []string, o *Outcome) {
 	sort.Strings(list)
 	if strings.Join(list, " ") == strings.Join(x.S.Blocked, " ") {
@@ -810,12 +822,12 @@ func (x *Session) setBlocked(list []string, o *Outcome) {
 	}
 	for _, m := range x.S.Blocked {
 		if !now[m] {
-			o.Actions = append(o.Actions, "unblock:"+m)
+			o.Actions = append(o.Actions, Action(ActUnblock, m))
 		}
 	}
 	x.S.Blocked = list
 	o.Changed = true
-	o.Actions = append(o.Actions, "block")
+	o.Actions = append(o.Actions, ActBlock)
 	o.Events = append(o.Events, fmt.Sprintf("blocked clients now %d", len(list)))
 }
 

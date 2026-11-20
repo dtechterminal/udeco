@@ -25,6 +25,13 @@ import (
 // PortalPort is where UniFi APs take the redirect ("portal.redirector.port.wired").
 const PortalPort = 8882
 
+// PortalHostPorts are the TCP ports of the portal host (the controller) a
+// guest may reach before it is authorised: the portal over HTTP (8880) and
+// HTTPS (8843) and its redirector ports (8881 and PortalPort), in the
+// order docs/internals.md gives them. Every guest rule set opens them from
+// this list. Each call returns a new slice.
+func PortalHostPorts() []int { return []int{8880, 8843, 8881, PortalPort} }
+
 // NewGuestToken returns a random token in the controller's format (16 bytes,
 // 32 upper-case hex). Secret: it decrypts the portal cookies for this AP.
 func NewGuestToken() (string, error) {

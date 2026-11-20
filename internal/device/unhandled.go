@@ -241,6 +241,6 @@ func (x *Session) noteUnread(js []byte, typ string, now time.Time, o *Outcome) {
 // note records one unhandled thing and logs the first sighting.
 func (x *Session) note(kind, name, sample string, now time.Time, o *Outcome) {
 	if x.Unhandled.Note(kind, name, sample, now) {
-		o.Events = append(o.Events, "unhandled "+kind+" "+name+" (first time; listed in unhandled.json)")
+		o.Events = append(o.Events, "unhandled "+kind+" "+name+" (first time; listed in "+UnhandledFile+")")
 	}
 }

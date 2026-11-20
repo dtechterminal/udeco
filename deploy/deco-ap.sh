@@ -115,6 +115,18 @@ is_ipv4() {
 	for o in "${BASH_REMATCH[@]:1}"; do ((10#$o <= 255)) || return 1; done
 }
 
+# is_port ":N" or "": no port, or one from 1 to 65535.
+is_port() {
+	local p=${1#:}
+	[ -z "$p" ] || ((10#$p >= 1 && 10#$p <= 65535))
+}
+
+# is_agent_ipv4: an IPv4 address the agent takes in its inform URL (Go
+# reads it): is_ipv4, with no octet written with a leading zero.
+is_agent_ipv4() {
+	is_ipv4 "$1" && [[ ! $1 =~ (^|\.)0[0-9] ]]
+}
+
 while [ $# -gt 0 ]; do
 	case $1 in
 	--force-host) force_host=1 ;;
@@ -134,8 +146,12 @@ while [ $# -gt 0 ]; do
 done
 
 # The values below end up in remote shell commands and in the agent's JSON
-# config: accept only strict forms.
-[[ $inform_url =~ ^http://([0-9.]+)(:[0-9]{1,5})?/inform$ ]] && is_ipv4 "${BASH_REMATCH[1]}" ||
+# config: accept only strict forms. The agent checks the URL again when it
+# starts (device.CheckInformURL) and exits on one it refuses, so nothing
+# may pass here that fails there: cmd/udeco-ap TestDeployInformURL runs
+# both over one list of URLs. (is_port comes first: is_ipv4 has a match of
+# its own, which replaces BASH_REMATCH.)
+[[ $inform_url =~ ^http://([0-9.]+)(:[0-9]{1,5})?/inform$ ]] && is_port "${BASH_REMATCH[2]:-}" && is_agent_ipv4 "${BASH_REMATCH[1]}" ||
 	die "--inform-url $inform_url: want http://<IPv4>[:port]/inform (the agent blocks DNS outside the LAN)"
 is_ipv4 "$console_ip" || die "--console-ip $console_ip: want an IPv4 address"
 [ -z "$udeco_config" ] || [ -r "$udeco_config" ] || die "--udeco-config $udeco_config: not readable"

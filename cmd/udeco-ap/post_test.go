@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/inform"
 )
 
 // The minimal client against Go's own HTTP server: the request it sends is
@@ -49,8 +51,12 @@ func TestHTTPPostAgainstServer(t *testing.T) {
 		t.Fatalf("inform: %d %q %v", st, resp, err)
 	}
 	if got.method != "POST" || got.path != "/inform?x=1" || got.host != strings.TrimPrefix(srv.URL, "http://") ||
-		got.ctype != "application/x-binary" || got.ua != informUA || got.length != int64(len(body)) || !bytes.Equal(got.body, body) {
+		got.ctype != "application/x-binary" || got.ua != "AirControl Agent v1.0" || got.length != int64(len(body)) || !bytes.Equal(got.body, body) {
 		t.Errorf("request %+v", got)
+	}
+	// the texts on the wire are the shared constants
+	if got.ctype != inform.ContentType || got.ua != inform.UserAgent || inform.MaxReply != 4<<20 {
+		t.Errorf("inform.ContentType %q, inform.UserAgent %q, inform.MaxReply %d", inform.ContentType, inform.UserAgent, inform.MaxReply)
 	}
 	if st, resp, err := httpPost(context.Background(), srv.URL+"/chunked", nil, 5*time.Second); err != nil || st != 200 || string(resp) != "abcdef" {
 		t.Errorf("chunked: %d %q %v", st, resp, err)
@@ -99,7 +105,7 @@ func rawServer(t *testing.T, resp string, hang bool) string {
 }
 
 func TestHTTPPostResponses(t *testing.T) {
-	big := strings.Repeat("x", informMaxReply+1)
+	big := strings.Repeat("x", inform.MaxReply+1)
 	for _, c := range []struct {
 		name, resp string
 		status     int

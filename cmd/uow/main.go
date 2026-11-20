@@ -21,11 +21,9 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"flag"
 	"fmt"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -42,6 +40,7 @@ import (
 
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/antoniocosta/unifi-openwrt/internal/informhttp"
 	"github.com/antoniocosta/unifi-openwrt/internal/openwrt"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 	"github.com/antoniocosta/unifi-openwrt/internal/unifiapi"
@@ -60,7 +59,7 @@ func main() {
 	uplinkName := flag.String("uplink-port", "", "port that is always the uplink (e.g. wan); empty = the port the gateway is behind")
 	flag.BoolVar(&meshUplink, "mesh-uplink", false, "join the site's mesh as a wireless uplink when no cable has link (AP-side watcher)")
 	flag.IntVar(&hwCaps, "hw-caps", 0, "hw_caps to claim (2 = LED colour, 16384 = LED brightness); 0 = the model's")
-	flag.StringVar(&portalListen, "portal-listen", "", "guest portal redirect endpoint (UniFi APs: :8882); empty = off")
+	flag.StringVar(&portalListen, "portal-listen", "", fmt.Sprintf("guest portal redirect endpoint (UniFi APs: :%d); empty = off", device.PortalPort))
 	flag.StringVar(&ledIdle, "led-idle", "", "idle LED effect instead of steady blue: \"rainbow\" (RGB LED rings, daemon on the AP); empty = blue like the UniFi model")
 	informEvery := flag.Duration("inform-every", 0, "inform at least this often (0 = the controller's interval, 10 s); 2s makes the panel's live bars move")
 	modelCode := flag.String("model", models.DefaultModel, "UniFi model to be adopted as (see -models / -suggest)")
@@ -130,7 +129,7 @@ func main() {
 		log.Fatal(err)
 	}
 	os.Chmod(*stateDir, 0o700)
-	statePath := filepath.Join(*stateDir, "state.json")
+	statePath := filepath.Join(*stateDir, device.StateFile)
 	st, found, err := device.Load(statePath)
 	if err != nil {
 		log.Fatal(err)
@@ -151,7 +150,7 @@ func main() {
 		Dev: inform.Device{MAC: mac, IP: myIP, Netmask: "255.255.255.0", Gateway: "192.168.1.1",
 			Hostname: *hostname, Model: profile.Model, ModelDisplay: profile.Display},
 	}
-	x.Unhandled, x.KnownSection = device.OpenLedger(filepath.Join(*stateDir, "unhandled.json")), translate.Handled
+	x.Unhandled, x.KnownSection = device.OpenLedger(filepath.Join(*stateDir, device.UnhandledFile)), translate.Handled
 	guestSession = x
 	if x.S.HashID == "" {
 		h, err := device.NewHashID()
@@ -208,7 +207,7 @@ func main() {
 				lastErr = ""
 			}
 			s.UplinkName, s.RearUplink = *uplinkName, model.RearUplinkPort()
-			cfg, _ := os.ReadFile(filepath.Join(*stateDir, "system_cfg.txt"))
+			cfg, _ := os.ReadFile(filepath.Join(*stateDir, device.SystemCfgFile))
 			info := openwrt.InfoFromCfg(string(cfg))
 			info.Authorized = map[string]bool{}
 			for m, end := range x.S.Guests {
@@ -236,7 +235,7 @@ func main() {
 			allow = append(allow, snap.IP) // console SSH forwarded through the AP
 		}
 		sa := &device.SSHAdopt{Listen: *sshListen, AllowFrom: allow,
-			HostKey: filepath.Join(*stateDir, "ssh_host_ed25519.pem"), Requests: make(chan device.AdoptRequest, 4)}
+			HostKey: filepath.Join(*stateDir, device.SSHHostKeyFile), Requests: make(chan device.AdoptRequest, 4)}
 		if err := sa.Start(); err != nil {
 			log.Fatalf("ssh-adopt: %v", err)
 		}
@@ -268,13 +267,13 @@ func main() {
 	}
 	lastHealth := time.Now()
 	x.RestoreFromMgmtCfg()
-	ledCfgPath = filepath.Join(*stateDir, "system_cfg.txt")
+	ledCfgPath = filepath.Join(*stateDir, device.SystemCfgFile)
 	if ap != nil {
 		ledUpdate(ap, x) // flashing white until the controller answers
 	}
 	if ap != nil {
-		if _, err := os.Stat(filepath.Join(*stateDir, "system_cfg.txt")); err == nil {
-			syncAP(ap, filepath.Join(*stateDir, "system_cfg.txt"), *apply, api, base)
+		if _, err := os.Stat(filepath.Join(*stateDir, device.SystemCfgFile)); err == nil {
+			syncAP(ap, filepath.Join(*stateDir, device.SystemCfgFile), *apply, api, base)
 		}
 	}
 
@@ -282,7 +281,7 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	interval := 10 * time.Second
+	interval := device.DefaultInformInterval
 	errs := 0
 	lastListing := ""
 	wlanBadChecks := 0
@@ -299,7 +298,7 @@ func main() {
 			}
 		}
 		if ap != nil && x.S.CfgVersion != cfgBefore {
-			syncAP(ap, filepath.Join(*stateDir, "system_cfg.txt"), *apply, api, base)
+			syncAP(ap, filepath.Join(*stateDir, device.SystemCfgFile), *apply, api, base)
 			lastBan = time.Time{} // a wifi reload drops hostapd's bans
 			scans.rrmSoon()       // ... and its neighbour lists
 		}
@@ -329,13 +328,13 @@ func main() {
 			}
 		}
 		if next.Interval > 0 {
-			interval = max(next.Interval, time.Second) // 1 s while the panel watches us
+			interval = max(next.Interval, device.MinInformWait) // 1 s while the panel watches us
 		}
 		// Optional floor of our own (-inform-every; default off). The
 		// controller itself asks for 1 s informs while the device is watched,
 		// because we report inform_min_interval=1 (docs/internals.md).
 		if *informEvery > 0 && interval > *informEvery {
-			interval = max(*informEvery, time.Second)
+			interval = max(*informEvery, device.MinInformWait)
 		}
 
 		if api != nil && time.Since(lastHealth) >= *healthEvery {
@@ -383,11 +382,11 @@ func main() {
 
 		wait := interval
 		if next.Immediate {
-			wait = 500 * time.Millisecond
+			wait = device.ImmediateInformWait
 		}
 		if errs > 0 {
 			// like a real AP: keep informing, further and further apart
-			wait = min(max(interval, 5*time.Second)*time.Duration(1<<min(errs-1, 4)), time.Minute)
+			wait = device.InformBackoff(interval, errs)
 			if errs == 1 || errs%10 == 0 {
 				log.Printf("%d bad answer(s) in a row: next inform in %s", errs, wait)
 			}
@@ -411,69 +410,10 @@ func main() {
 	}
 }
 
-// informOnce sends one inform and handles the answer. ok=false counts
-// toward the error limit.
+// informOnce sends one inform and handles the answer (device.InformOnce,
+// shared with cmd/udeco). ok=false counts toward the error limit.
 func informOnce(x *device.Session, c *http.Client, statePath string) (device.Outcome, bool) {
-	js, err := x.Payload(time.Now())
-	if err != nil {
-		log.Printf("payload: %v", err)
-		return device.Outcome{}, false
-	}
-	pkt, err := inform.Encode(x.Dev.MAC, x.S.Key, x.Cipher(), js, nil)
-	if err != nil {
-		log.Printf("encode: %v", err)
-		return device.Outcome{}, false
-	}
-	req, _ := http.NewRequest(http.MethodPost, x.S.InformURL, bytes.NewReader(pkt))
-	req.Header.Set("Content-Type", "application/x-binary")
-	resp, err := c.Do(req)
-	if err != nil {
-		log.Printf("POST: %v", err)
-		return device.Outcome{}, false
-	}
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
-	resp.Body.Close()
-
-	switch resp.StatusCode {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		if !x.S.Adopted {
-			return device.Outcome{}, true // pending: normal
-		}
-		log.Printf("HTTP 404 while adopted (forgotten?)")
-		return device.Outcome{}, false
-	default:
-		log.Printf("HTTP %d (%d bytes)", resp.StatusCode, len(body))
-		return device.Outcome{}, false
-	}
-
-	if len(body) == 0 {
-		return device.Outcome{}, true // nothing for us this time
-	}
-	_, plain, err := inform.Decode(body, x.S.Key)
-	if err != nil && x.S.Key != inform.DefaultKeyHex {
-		_, plain, err = inform.Decode(body, inform.DefaultKeyHex)
-	}
-	if err != nil {
-		log.Printf("reply did not decode: %v", err)
-		return device.Outcome{}, false
-	}
-	o, err := x.Handle(plain, time.Now())
-	if err != nil {
-		log.Printf("%v", err)
-		return o, false
-	}
-	for _, e := range o.Events {
-		if !strings.HasPrefix(e, "noop ") || o.Immediate {
-			log.Print(e)
-		}
-	}
-	if o.Changed {
-		if err := x.S.Save(statePath); err != nil {
-			log.Printf("saving state: %v", err)
-		}
-	}
-	return o, true
+	return device.InformOnce(x, informhttp.Poster(c), statePath, log.Printf)
 }
 
 func listing(api *unifiapi.Client, mac net.HardwareAddr) string {
@@ -502,18 +442,28 @@ func fmtHealth(h unifiapi.Health) string {
 }
 
 func localIPToward(informURL string) (string, error) {
+	c, err := net.Dial("udp4", net.JoinHostPort(informHost(informURL), "9"))
+	if err != nil {
+		return "", err
+	}
+	defer c.Close()
+	return c.LocalAddr().(*net.UDPAddr).IP.String(), nil
+}
+
+// informHost is the host of the state's inform URL (the -url flag for a
+// new state), cut by hand. For a URL a device accepts
+// (device.CheckInformURL) it is inform.URLHost's answer; it is kept, and
+// inform.LocalIPToward not used, because the two differ for some other
+// values of the unchecked -url flag (TestInformHostCut): a value without
+// "http://" works here, and one with user info does not.
+func informHost(informURL string) string {
 	host := strings.TrimPrefix(informURL, "http://")
 	host, _, _ = strings.Cut(host, "/")
 	h, _, err := net.SplitHostPort(host)
 	if err != nil {
 		h = host
 	}
-	c, err := net.Dial("udp4", net.JoinHostPort(h, "9"))
-	if err != nil {
-		return "", err
-	}
-	defer c.Close()
-	return c.LocalAddr().(*net.UDPAddr).IP.String(), nil
+	return h
 }
 
 // syncAP plans the UCI changes the controller's system_cfg implies for the
@@ -611,46 +561,45 @@ func plan(ap *openwrt.Client, cfgPath string) (translate.Result, error) {
 	return translate.Plan(translate.ParseCfg(string(cfg)), translate.ParseUCI(string(out)), f), nil
 }
 
-// runAction carries out a controller action on the real AP.
+// runAction carries out a controller action on the real AP. A verb
+// without a case (device.ActQuickScan, device.ActRateUpdate: the list is
+// in TestRunActionHandlesEveryAction) is not served here.
 func runAction(ap *openwrt.Client, x *device.Session, a string) {
-	if mac, ok := strings.CutPrefix(a, "guest-auth:"); ok {
+	verb, arg := device.SplitAction(a)
+	switch verb {
+	case device.ActGuestAuth:
+		mac := arg
 		ttl := time.Until(time.Unix(x.S.Guests[mac], 0))
 		log.Printf("GUEST AUTHORIZED: %s for %s", mac, ttl.Round(time.Minute))
 		if err := ap.AuthorizeGuest(mac, ttl); err != nil {
 			log.Printf("authorize guest: %v", err)
 		}
-		return
-	}
-	if mac, ok := strings.CutPrefix(a, "guest-unauth:"); ok {
+	case device.ActGuestUnauth:
+		mac := arg
 		log.Printf("GUEST UNAUTHORIZED: %s", mac)
 		if err := ap.UnauthorizeGuest(mac); err != nil {
 			log.Printf("unauthorize guest: %v", err)
 		}
-		return
-	}
-	if mac, ok := strings.CutPrefix(a, "unblock:"); ok {
+	case device.ActUnblock:
+		mac := arg
 		log.Printf("UNBLOCK: %s", mac)
 		if err := ap.Unblock([]string{mac}); err != nil {
 			log.Printf("unblock: %v", err)
 		}
-		return
-	}
-	if mac, ok := strings.CutPrefix(a, "kick:"); ok {
+	case device.ActKick:
+		mac := arg
 		log.Printf("KICK: disconnecting %s (Reconnect from the controller)", mac)
 		if err := ap.Kick(mac); err != nil {
 			log.Printf("kick: %v", err)
 		}
-		return
-	}
-	switch a {
-	case "scan", "spectrum-scan":
+	case device.ActScan, device.ActSpectrumScan:
 		log.Printf("SCAN: %s requested by the controller (radios leave their channel for a few seconds)", a)
-		scans.start(ap, true, a == "spectrum-scan")
-	case "led:on", "led:off", "locate:off":
+		scans.start(ap, true, verb == device.ActSpectrumScan)
+	case device.ActLED:
 		ledUpdate(ap, x)
-	case "locate:on":
+	case device.ActLocate:
 		ledUpdate(ap, x)
-		if !locateBeepOn {
+		if arg != device.ArgOn || !locateBeepOn {
 			break
 		}
 		if ok, err := ap.Beep(); err != nil {
@@ -658,12 +607,12 @@ func runAction(ap *openwrt.Client, x *device.Session, a string) {
 		} else if ok {
 			log.Printf("locate: beeping")
 		}
-	case "block":
+	case device.ActBlock:
 		log.Printf("BLOCK: %d client(s) blocked: %v", len(x.S.Blocked), x.S.Blocked)
 		if err := ap.EnforceBlocked(x.S.Blocked); err != nil {
 			log.Printf("block: %v", err)
 		}
-	case "reboot":
+	case device.ActReboot:
 		log.Printf("RESTART: rebooting the AP (requested by the controller)")
 		if err := ap.Reboot(); err != nil {
 			log.Printf("reboot: %v", err)
@@ -1040,14 +989,14 @@ func syslogForwarder(x *device.Session, stateDir string) {
 	var cur target
 	var stop func()
 	for {
-		b, _ := os.ReadFile(filepath.Join(stateDir, "system_cfg.txt"))
+		b, _ := os.ReadFile(filepath.Join(stateDir, device.SystemCfgFile))
 		c := translate.ParseCfg(string(b))
 		want := target{}
 		if c["syslog.status"] == "enabled" && c["syslog.remote.status"] == "enabled" &&
 			c["syslog.remote.encrypt"] == "enabled" && c["syslog.remote.ip"] != "" && len(c["syslog.remote.key"]) == 64 {
 			port := c["syslog.remote.port"]
 			if port == "" {
-				port = "5514"
+				port = strconv.Itoa(translate.DefaultEncryptedSyslogPort)
 			}
 			want = target{net.JoinHostPort(c["syslog.remote.ip"], port), c["syslog.remote.key"]}
 		}
@@ -1088,20 +1037,16 @@ func startSyslog(x *device.Session, addr, key string) (func(), error) {
 		conn.Close()
 		return nil, err
 	}
-	tag := fmt.Sprintf("%s,%s,%s:", x.Dev.Model, strings.ReplaceAll(strings.ToLower(x.Dev.MAC.String()), ":", ""), x.S.Version)
+	tag := device.SyslogTag(x.Dev.Model, x.Dev.MAC, x.S.Version)
 	go func() {
 		sc := bufio.NewScanner(out)
-		sc.Buffer(make([]byte, 8192), 8192)
-		tokens, last := 100.0, time.Now()
+		sc.Buffer(make([]byte, device.SyslogLineMax), device.SyslogLineMax)
+		limit := device.NewSyslogLimiter(time.Now()) // device.SyslogRate lines/s, bursts of device.SyslogBurst
 		failed := false
 		for sc.Scan() {
-			now := time.Now()
-			tokens = min(100, tokens+now.Sub(last).Seconds()*50) // 50/s, bursts of 100
-			last = now
-			if tokens < 1 {
+			if !limit.Allow(time.Now()) {
 				continue
 			}
-			tokens--
 			d, err := device.SealSyslog(key, x.S.HashID, []byte(uafSyslogLine(sc.Text(), x.Dev.Hostname, tag)))
 			if err == nil {
 				_, err = conn.Write(d)
@@ -1126,16 +1071,12 @@ func uafSyslogLine(line, host, tag string) string {
 	}
 	pri := 14
 	if fac, lvl, ok := strings.Cut(f[5], "."); ok {
-		pri = syslogFacility[fac]*8 + syslogLevel[lvl]
+		fv, _ := device.SyslogFacility(fac) // a name it does not know counts as 0, as before
+		lv, _ := device.SyslogSeverity(lvl)
+		pri = fv*8 + lv
 	}
 	return fmt.Sprintf("<%d>%s %2s %s %s %s %s", pri, f[1], f[2], f[3], host, tag, f[6])
 }
-
-var syslogFacility = map[string]int{"kern": 0, "user": 1, "mail": 2, "daemon": 3, "auth": 4, "syslog": 5,
-	"lpr": 6, "news": 7, "uucp": 8, "cron": 9, "authpriv": 10, "ftp": 11, "local0": 16, "local1": 17,
-	"local2": 18, "local3": 19, "local4": 20, "local5": 21, "local6": 22, "local7": 23}
-var syslogLevel = map[string]int{"emerg": 0, "alert": 1, "crit": 2, "err": 3, "warn": 4, "warning": 4,
-	"notice": 5, "info": 6, "debug": 7}
 
 // Status LED (UniFi AP behaviour, docs/internals.md).
 var (

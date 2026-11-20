@@ -1,0 +1,25 @@
+-A UDECO-GIN -p 0x888e -j ACCEPT
+-A UDECO-GIN -p ARP -j ACCEPT
+-A UDECO-GIN -p IPv4 --ip-proto udp --ip-sport 68 --ip-dport 67 -j ACCEPT
+-A UDECO-GIN -p IPv4 --ip-dst 192.168.0.1 --ip-proto udp --ip-dport 53 -j ACCEPT
+-A UDECO-GIN -p IPv4 --ip-dst 192.168.0.1 --ip-proto tcp --ip-dport 53 -j ACCEPT
+-A UDECO-GIN -p IPv6 --ip6-proto 58 --ip6-icmp-type router-advertisement -j DROP
+-A UDECO-GIN -p IPv6 --ip6-proto 58 --ip6-icmp-type redirect -j DROP
+-A UDECO-GIN -p IPv6 -d Multicast --ip6-proto 58 --ip6-icmp-type neighbour-advertisement -j DROP
+-A UDECO-GIN -p IPv6 -d Multicast --ip6-proto 58 -j ACCEPT
+-A UDECO-GIN -p IPv6 -d Multicast --ip6-proto udp --ip6-dport 547 -j ACCEPT
+-A UDECO-GIN -p IPv4 --ip-dst 192.168.0.50 -j ACCEPT
+-A UDECO-GIN -d ! 1c:6a:1b:c5:04:c2 -j DROP
+-A UDECO-GIN -p IPv4 --ip-dst 192.168.0.1 -j ACCEPT
+-A UDECO-GIN -p IPv4 --ip-dst 10.0.0.0/8 -j DROP
+-A UDECO-GIN -p IPv4 --ip-dst 172.16.0.0/12 -j DROP
+-A UDECO-GIN -p IPv4 --ip-dst 192.168.0.0/16 -j DROP
+-A UDECO-GIN -p IPv4 --ip-dst 169.254.0.0/16 -j DROP
+-A UDECO-GIN -p IPv4 --ip-dst 224.0.0.0/4 -j DROP
+-A UDECO-GIN -p IPv4 --ip-dst 100.64.0.0/10 -j DROP
+-A UDECO-GIN -p IPv6 --ip6-dst fc00::/7 -j DROP
+-A UDECO-GIN -j ACCEPT
+-A UDECO-GOUT -s 1c:6a:1b:c5:04:c2 -j ACCEPT
+-A UDECO-GOUT -p ARP -j ACCEPT
+-A UDECO-GOUT -p IPv4 --ip-src 192.168.0.50 -j ACCEPT
+-A UDECO-GOUT -p IPv4 --ip-src 192.168.0.1 -j ACCEPT

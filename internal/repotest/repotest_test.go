@@ -5,6 +5,7 @@ package repotest
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -153,6 +154,78 @@ func TestFenced(t *testing.T) {
 		got, ok := Fenced(doc, c.lang, c.n)
 		if got != c.want || ok != c.ok {
 			t.Errorf("Fenced(%q, %d) = %q, %v, want %q, %v", c.lang, c.n, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+const goSample = "internal/repotest/testdata/src.go.txt"
+
+func TestStringConsts(t *testing.T) {
+	want := map[string]string{"A": "a", "B": "b", "C": "c:d", "Lone": `raw "text"`}
+	if got := StringConsts(t, goSample); !reflect.DeepEqual(got, want) {
+		t.Errorf("StringConsts = %q, want %q", got, want)
+	}
+}
+
+func TestSwitches(t *testing.T) {
+	want := []Switch{
+		{Tag: "verb", Cases: [][]string{{"dev.Unblock", "dev.GuestAuth"}}},
+		{Tag: "verb", Cases: [][]string{{"dev.Reboot"}, {"dev.Scan", `"spectrum-scan"`}, {`dev.LED + ":" + dev.On`}}},
+		{Tag: "", Cases: [][]string{{`arg == "x"`}}},
+		{Tag: "r.Cmd", Cases: [][]string{{`"kick-sta"`, `"kick"`}}},
+	}
+	got := Switches(t, goSample, "act")
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Switches(act) = %+v, want %+v", got, want)
+	}
+	if !got[1].Has("dev.Scan") || got[1].Has("dev.Unblock") || got[1].Has("dev.LED") {
+		t.Errorf("Has: %+v", got[1])
+	}
+	if s := SwitchOn(t, goSample, "act", "r.Cmd"); !s.Has(`"kick"`) {
+		t.Errorf("SwitchOn(r.Cmd) = %+v", s)
+	}
+	if s := SwitchOn(t, goSample, "act", "verb"); !s.Has("dev.Unblock") {
+		t.Errorf("SwitchOn(verb) is not the first one: %+v", s)
+	}
+	if msg := reported(func(tb testing.TB) { Switches(tb, goSample, "nosuch") }); msg == "" {
+		t.Error("Switches did not fail for a function the file does not have")
+	}
+	if msg := reported(func(tb testing.TB) { SwitchOn(tb, goSample, "other", "verb") }); msg == "" {
+		t.Error("SwitchOn did not fail for a tag the function does not switch on")
+	}
+}
+
+func TestSwitchConsts(t *testing.T) {
+	consts := map[string]string{"Reboot": "reboot", "Scan": "scan", "LED": "led", "On": "on"}
+	values, other := SwitchOn(t, goSample, "act", "r.Cmd").Consts("dev", consts)
+	if values != nil || !reflect.DeepEqual(other, []string{`"kick-sta"`, `"kick"`}) {
+		t.Errorf("Consts = %q, %q", values, other)
+	}
+	sw := Switches(t, goSample, "act")[1]
+	values, other = sw.Consts("dev", consts)
+	if !reflect.DeepEqual(values, []string{"reboot", "scan"}) || !reflect.DeepEqual(other, []string{`"spectrum-scan"`, `dev.LED + ":" + dev.On`}) {
+		t.Errorf("Consts = %q, %q", values, other)
+	}
+	if values, _ := sw.Consts("device", consts); values != nil {
+		t.Errorf("Consts for another package = %q", values)
+	}
+}
+
+func TestCover(t *testing.T) {
+	all := []string{"a", "b", "c"}
+	for _, c := range []struct {
+		handled, exempt []string
+		ok              bool
+	}{
+		{[]string{"a", "b"}, []string{"c"}, true},
+		{[]string{"c", "b", "a"}, nil, true},
+		{[]string{"a"}, []string{"c"}, false},           // b is in neither
+		{[]string{"a", "b", "c"}, []string{"c"}, false}, // c is in both
+		{[]string{"a", "b", "c"}, []string{"d"}, false}, // d is not an item
+	} {
+		msg := reported(func(tb testing.TB) { Cover(tb, "x", all, c.handled, c.exempt) })
+		if (msg == "") != c.ok {
+			t.Errorf("Cover(%q, %q) reported %q, want ok=%v", c.handled, c.exempt, msg, c.ok)
 		}
 	}
 }

@@ -120,7 +120,10 @@ controller shows it as connected.
   informing, up to a minute apart.
 - `cmd`: `set-adopt`, `set-locate` / `unset-locate`, `kick-sta`,
   `block-sta` / `unblock-sta` (with `mac`), `authorize-guest` /
-  `unauthorize-guest`, `scan`, `spectrum-scan`, `reboot`, `setdefault`.
+  `unauthorize-guest`, `scan`, `spectrum-scan`, `quick-scan` (one band of
+  the nightly channel optimisation: `scan-band`, `scan-bw`), `rate-update`
+  (a client's speed limit: `mac`, `dl_max`, `ul_max`), `reboot`,
+  `setdefault`, `upgrade` (answered, never applied).
 - Top-level `_type` `reboot`, `setdefault`, `upgrade`.
 
 **What nothing acts on is listed.** A reply `_type` or `cmd` the daemon

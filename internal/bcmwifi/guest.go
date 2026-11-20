@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/device"
 )
 
 // Guest isolation with ebtables (docs/deco/device-capabilities.md).
@@ -33,7 +35,7 @@ import (
 //     (the ND counterpart of ARP spoofing; unlike ARP, it can be matched);
 //     the rest of IPv6 neighbour discovery and DHCPv6 to multicast pass;
 //  5. the portal allow-list (guest_pre_allow) passes, to any MAC;
-//  6. with the portal on: the portal host's ports 8880-8882 and 8843 pass,
+//  6. with the portal on: the portal host's ports (device.PortalHostPorts) pass,
 //     then UDECO-GAUTH (policy DROP; one "-s <mac> -j RETURN" per authorised
 //     guest, since among is missing) drops every unauthorised guest;
 //  7. anything not addressed to the gateway's MAC is dropped: no LAN host,
@@ -91,8 +93,41 @@ var ourChains = []string{GuestChainIn, GuestChainOut, GuestChainAuth}
 // multicast), whatever the controller's guest_restricted holds.
 var defaultRestricted = []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "224.0.0.0/4"}
 
-// portalPorts are the controller's guest portal ports (internals.md).
-var portalPorts = []string{"8880:8882", "8843"}
+// portalPorts are the controller's guest portal ports
+// (device.PortalHostPorts) as --ip-dport takes them: "8880:8882", "8843".
+var portalPorts = portRanges(device.PortalHostPorts())
+
+// portRanges writes ports for ebtables' --ip-dport: consecutive ports as
+// one "first:last" range, any other port alone, each where the list first
+// names one of its ports.
+func portRanges(ports []int) []string {
+	listed, done := map[int]bool{}, map[int]bool{}
+	for _, p := range ports {
+		listed[p] = true
+	}
+	var out []string
+	for _, p := range ports {
+		if done[p] {
+			continue
+		}
+		lo, hi := p, p
+		for listed[lo-1] {
+			lo--
+		}
+		for listed[hi+1] {
+			hi++
+		}
+		for q := lo; q <= hi; q++ {
+			done[q] = true
+		}
+		r := strconv.Itoa(lo)
+		if hi > lo {
+			r += ":" + strconv.Itoa(hi)
+		}
+		out = append(out, r)
+	}
+	return out
+}
 
 // guestRules is a validated GuestPolicy.
 type guestRules struct {

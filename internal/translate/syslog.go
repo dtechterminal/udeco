@@ -2,7 +2,23 @@
 
 package translate
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
+
+// The remote syslog port for a system_cfg that names none
+// (syslog.remote.port; the controller normally sends it).
+const (
+	// DefaultSyslogPort is the syslog port.
+	DefaultSyslogPort = 514
+	// DefaultEncryptedSyslogPort is the controller's intake for
+	// UniFi-encrypted syslog (device.SealSyslog). cmd/uow's forwarder falls
+	// back to it; the intent (intentSyslog, for cmd/udeco-ap) falls back to
+	// DefaultSyslogPort for an encrypted target too. The two readers are
+	// not unified yet: TestSyslogDefaultPorts shows both.
+	DefaultEncryptedSyslogPort = 5514
+)
 
 // planSyslog: the controller's remote syslog -> logd's log_ip/log_port/
 // log_proto. UniFi-encrypted syslog (syslog.remote.encrypt, the console's own
@@ -19,7 +35,7 @@ func planSyslog(cfg Cfg, cur UCI, r *Result) []Op {
 	default:
 		port := cfg["syslog.remote.port"]
 		if port == "" {
-			port = "514"
+			port = strconv.Itoa(DefaultSyslogPort)
 		}
 		want = map[string]string{"log_ip": cfg["syslog.remote.ip"], "log_port": port, "log_proto": "udp"}
 	}

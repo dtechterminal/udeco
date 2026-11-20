@@ -1170,7 +1170,9 @@ func intentSyslog(cfg Cfg, nb *noteList) *SyslogIntent {
 	if cfg["syslog.status"] != "enabled" || cfg["syslog.remote.status"] != "enabled" || cfg["syslog.remote.ip"] == "" {
 		return nil
 	}
-	s := &SyslogIntent{Host: cfg["syslog.remote.ip"], Port: 514, Encrypted: cfg["syslog.remote.encrypt"] == "enabled"}
+	// DefaultSyslogPort also for an encrypted target without a port: see
+	// DefaultEncryptedSyslogPort
+	s := &SyslogIntent{Host: cfg["syslog.remote.ip"], Port: DefaultSyslogPort, Encrypted: cfg["syslog.remote.encrypt"] == "enabled"}
 	if v, err := strconv.Atoi(cfg["syslog.remote.port"]); err == nil && v > 0 && v < 65536 {
 		s.Port = v
 	}

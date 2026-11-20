@@ -8,7 +8,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"net"
 	"strings"
+	"time"
 )
 
 // UniFi encrypted remote syslog (UniFi Network 10.6.109, RemoteLoggerServer on
@@ -80,4 +82,69 @@ func OpenSyslog(keyHex string, d []byte) (hashID string, msg []byte, err error) 
 	gcm, _ := cipher.NewGCM(blk)
 	msg, err = gcm.Open(nil, d[17:29], d[syslogHeader:], d[:syslogHeader])
 	return hex.EncodeToString(d[9:17]), msg, err
+}
+
+// The syslog line a UniFi AP sends, for the two forwarders (cmd/uow's and
+// cmd/udeco-ap's). Each has its own reader of the unit's log lines; the
+// tag, the priority tables and the send limit are the same.
+
+// SyslogTag is the tag of a UniFi AP's syslog lines: "MODEL,mac12,version:",
+// the MAC as 12 lower-case hex digits.
+func SyslogTag(model string, mac net.HardwareAddr, version string) string {
+	return model + "," + strings.ReplaceAll(strings.ToLower(mac.String()), ":", "") + "," + version + ":"
+}
+
+// SyslogFacility is the code of a facility as logread and BusyBox syslogd
+// name it ("daemon" in "daemon.err"); ok is false for a name it does not
+// know. A line's priority is facility*8 + severity.
+func SyslogFacility(name string) (code int, ok bool) {
+	code, ok = syslogFacilities[name]
+	return code, ok
+}
+
+// SyslogSeverity is the code (0 to 7) of a severity as logread and BusyBox
+// syslogd name it ("err" in "daemon.err").
+func SyslogSeverity(name string) (code int, ok bool) {
+	code, ok = syslogSeverities[name]
+	return code, ok
+}
+
+var syslogFacilities = map[string]int{"kern": 0, "user": 1, "mail": 2, "daemon": 3, "auth": 4, "syslog": 5,
+	"lpr": 6, "news": 7, "uucp": 8, "cron": 9, "authpriv": 10, "ftp": 11, "local0": 16, "local1": 17,
+	"local2": 18, "local3": 19, "local4": 20, "local5": 21, "local6": 22, "local7": 23}
+
+var syslogSeverities = map[string]int{"emerg": 0, "alert": 1, "crit": 2, "err": 3, "warn": 4, "warning": 4,
+	"notice": 5, "info": 6, "debug": 7}
+
+const (
+	// SyslogRate is how many lines a second a forwarder sends at most,
+	// over time; SyslogBurst is how many it may send at once.
+	SyslogRate  = 50
+	SyslogBurst = 100
+	// SyslogLineMax is the longest log line a forwarder reads, in bytes.
+	SyslogLineMax = 8192
+)
+
+// SyslogLimiter is a forwarder's send limit: a token bucket of SyslogBurst
+// lines that fills at SyslogRate a second. A line it does not allow is
+// dropped, not queued. Not for concurrent use.
+type SyslogLimiter struct {
+	tokens float64
+	last   time.Time
+}
+
+// NewSyslogLimiter returns a full bucket.
+func NewSyslogLimiter(now time.Time) *SyslogLimiter {
+	return &SyslogLimiter{tokens: SyslogBurst, last: now}
+}
+
+// Allow reports whether a line may be sent at now, and counts it.
+func (l *SyslogLimiter) Allow(now time.Time) bool {
+	l.tokens = min(SyslogBurst, l.tokens+now.Sub(l.last).Seconds()*SyslogRate)
+	l.last = now
+	if l.tokens < 1 {
+		return false
+	}
+	l.tokens--
+	return true
 }

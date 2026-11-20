@@ -154,9 +154,9 @@ func (c *Config) validate() error {
 		return fmt.Errorf("clients_every %s is below the %s minimum (0x4012 is slow and blocks the session)",
 			time.Duration(c.ClientsEvery), deco.MinClientsEvery)
 	}
-	u, err := url.Parse(c.InformURL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || net.ParseIP(u.Hostname()) == nil {
-		return fmt.Errorf("inform_url %q: want http://<ip>:8080/inform (IP-literal host)", c.InformURL)
+	u, err := startInformURL(c.InformURL)
+	if err != nil {
+		return err
 	}
 	if c.ConsoleIP == "" {
 		c.ConsoleIP = u.Hostname()
@@ -397,17 +397,17 @@ func readEnvFile(path string, warn func(string, ...any)) (map[string]string, err
 	return out, nil
 }
 
-// localIPToward is the local address the kernel would use to reach the
-// inform host (no packet is sent: UDP connect only).
-func localIPToward(informURL string) (string, error) {
-	u, err := url.Parse(informURL)
-	if err != nil {
-		return "", err
+// startInformURL is the rule for the config's inform_url: http or https
+// to an IP-literal host. It is wider than device.CheckInformURL, the rule
+// for every later change of the URL (a setparam, a set-adopt, an SSH
+// set-inform), which takes http to an IPv4 literal only, without user
+// info and with a port in range: an https or IPv6 start URL passes here
+// and could not be set again later. TestStartInformURL lists where the
+// two differ. Which rule the config should have is the owner's call.
+func startInformURL(s string) (*url.URL, error) {
+	u, err := url.Parse(s)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || net.ParseIP(u.Hostname()) == nil {
+		return nil, fmt.Errorf("inform_url %q: want http:// or https:// to an IP-literal host, like http://192.168.1.1:8080/inform", s)
 	}
-	c, err := net.Dial("udp4", net.JoinHostPort(u.Hostname(), "9"))
-	if err != nil {
-		return "", err
-	}
-	defer c.Close()
-	return c.LocalAddr().(*net.UDPAddr).IP.String(), nil
+	return u, nil
 }

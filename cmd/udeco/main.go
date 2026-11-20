@@ -40,6 +40,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/deco"
+	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/inform"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
 )
@@ -107,8 +108,8 @@ type hooks struct {
 	heartbeat     time.Duration                                                // TMP heartbeat
 	sshListenHost string                                                       // SSH-adopt bind host; "" = all
 	httpClient    *http.Client
-	minWait       time.Duration            // floor of the inform interval; default 1s
-	immediateWait time.Duration            // after an "inform now" reply; default 500ms
+	minWait       time.Duration            // floor of the inform interval; default device.MinInformWait
+	immediateWait time.Duration            // after an "inform now" reply; default device.ImmediateInformWait
 	gatedWait     time.Duration            // re-check while not informing; default 5s
 	offlineGrace  time.Duration            // a unit offline this long stops informing; default 60s
 	masterDownMax time.Duration            // master session down this long stops all; default 120s
@@ -126,8 +127,8 @@ func (h *hooks) fill() {
 			*d = v
 		}
 	}
-	def(&h.minWait, time.Second)
-	def(&h.immediateWait, 500*time.Millisecond)
+	def(&h.minWait, device.MinInformWait)
+	def(&h.immediateWait, device.ImmediateInformWait)
 	def(&h.gatedWait, 5*time.Second)
 	def(&h.offlineGrace, 60*time.Second)
 	def(&h.masterDownMax, 120*time.Second)
@@ -200,7 +201,7 @@ func newDaemon(cfg *Config, sec Secrets, h hooks) (*daemon, error) {
 	model, _ := models.Lookup(cfg.Model)
 	d := &daemon{cfg: cfg, h: h, profile: models.Profile(model), daemonIP: cfg.DaemonIP}
 	if d.daemonIP == "" {
-		ip, err := localIPToward(cfg.InformURL)
+		ip, err := inform.LocalIPToward(cfg.InformURL)
 		if err != nil {
 			return nil, fmt.Errorf("daemon_ip: %w", err)
 		}
