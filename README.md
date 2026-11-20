@@ -96,7 +96,7 @@ Status key:
 |---|---|---|
 | Client list with signal, rates, traffic, Wi-Fi generation | Verified | Only stations the driver reports as associated are listed, so clients don't flap between APs. |
 | Connect and leave events | Verified | A departed client leaves UniFi at once, not after about 5 minutes. |
-| Connection-timing events | Built | Success, failure, soft failure and fixup per connection attempt, with the controller's timings and counters, from hostapd's log and sockets and a read-only tap of each client's ARP, DHCP and DNS. `"sta_snoop": false` turns it off. [connection-events](docs/deco/features/connection-events.md) |
+| Connection-timing events | Built | Success, failure, soft failure and fixup per connection attempt, with the controller's timings and counters, from hostapd's log and sockets and a read-only tap of each client's ARP, DHCP and DNS (IPv4 and IPv6). A client whose DNS goes encrypted (DNS over TLS) gets no event rather than a false failure, or a success if a plaintext answer follows within the fixup window. `"sta_snoop": false` turns it off. [connection-events](docs/deco/features/connection-events.md) |
 | Gratuitous ARP on association | Built | Once a client is authorized and its address is known, the unit announces it on the wired ports so switches learn it at once. `"assoc_garp": false` turns it off. [assoc-garp](docs/deco/features/assoc-garp.md) |
 | Per-client TX retries | Verified | Attempts, retries and retry % on each client's page. |
 | Reconnect, block, unblock | Verified | |

@@ -35,9 +35,14 @@
     AP-STA-DISCONNECTED, AP-STA-POSSIBLE-PSK-MISMATCH, CTRL-EVENT-EAP-STARTED / -SUCCESS[2] /
     -FAILURE[2] / -TIMEOUT-FAILURE[2], AP-REJECTED-MAX-STA (only the first two move a station in
     the association/sta_leave events);
-  - a read-only AF_PACKET tap per served BSS (internal/stasnoop): a kernel BPF filter passes only
-    ARP and IPv4 UDP to or from ports 53/67/68, frames go to a ring of 1024 that drops the oldest,
-    nothing blocks the inform loop.
+  - a read-only AF_PACKET tap per served BSS (internal/stasnoop): a kernel BPF filter (48
+    instructions) passes only ARP, IPv4 UDP to or from ports 53/67/68 (decided as before IPv6 was
+    added; a test runs the old program beside the new one), IPv6 UDP to or from port 53, IPv6
+    whose first header is hop-by-hop, routing or destination options (rare on a LAN: mostly MLD
+    reports; the parser walks up to 8 such headers to the UDP header and drops the rest), and TCP
+    SYNs to or from port 853 over either family; IPv6 fragments (a fragment header right after the
+    fixed header in the filter, anywhere in the chain in the parser) and IPv4 later fragments are
+    dropped. Frames go to a ring of 1024 that drops the oldest, nothing blocks the inform loop.
 - `cmd/udeco-ap/staconn.go`: one attempt per station, started at its first anchor. Deltas:
   `assoc_delta` authenticated -> associated, `wpa_auth_delta` associated -> authorized,
   `ip_delta` authorized -> DHCP ACK, `traffic_delta` authorized -> its first frame,
@@ -46,7 +51,12 @@
   EAP TIMEOUT-FAILURE is `auth_failures` 1 with `radius_auth_status` "failure" (a timeout used to
   count as a 4-way `wpa_auth_failure`). PSK: no `auth_delta` (omitted, as the spec says). `ip_assign_type` "dhcp" (an ACK seen), "roam" (an address used without
   DHCP after a fast transition), "static" (used without DHCP otherwise). Judged at each reading:
-  - success: authorized, an address, a frame from the station and a DNS answer;
+  - success: authorized, an address, a frame from the station and a DNS answer (IPv4 or IPv6);
+  - DNS: a query is answered by a response of the same address family with the same id on the
+    same attempt (the station's MAC); the server address is not compared, for IPv4 as before
+    (a response comes from the address the query went to). IPv6 frames count as the station's
+    first frame but never as its address: `ip_assign_type`, `ip_failures` and the GARP address
+    stay IPv4;
   - soft failure: authorized 30 s ago without that (unanswered queries older than 5 s are
     `dns_timeouts`, no address an `ip_failure`, no frame a `traffic_failure`), or the station left
     before; a success within 2 minutes after a soft failure sends a fixup with the completed
@@ -62,6 +72,17 @@
     (one that failed before it was ever associated in a reading) has no signal: both are omitted,
     never 0 (the controller's -75 dBm gate takes 0 as strong and would count a far neighbour's
     retries). Whether the controller then counts or drops those counters is INFERRED (drops).
+- Encrypted DNS cannot be read and no timing is guessed from it. DNS over TLS shows only as
+  the station's SYN to port 853 and the server's SYN-ACK: an attempt that would be a soft
+  failure only for the missing DNS answer (it has an address and a frame), sent no plaintext
+  query and had a DoT server accept its connection is set aside unjudged, no event, as the
+  controller counts both a soft failure and a success without `dns_responses` as a failure.
+  It stays open for the fixup window: a plaintext DNS answer inside it (Private DNS falling
+  back) sends a success, and a leave with no answer sends nothing.
+  A roam's soft failure (a success to the controller) and any other gap are still sent; a
+  plaintext query left unanswered is still a `dns_timeout`. DNS over HTTPS (TCP or QUIC 443) is
+  indistinguishable from other HTTPS: a DoH-only client still reads as a soft failure
+  (`dns_responses` 0, `dns_resp_seen` omitted, as no query was seen).
 - One event per extra inform, through the same bounded queue (128) as association/sta_leave.
 - No attempt is judged on a BSS without a running tap (without DNS every attempt would read as a
   soft failure). A tap that dies with its vif (hostapd restart at an apply) is reopened at the
@@ -85,6 +106,9 @@
   with the flow cache on (fcache may bypass the netdev for accelerated flows; DNS/DHCP are short
   and usually not accelerated), and the CPU cost on a busy BSS.
 - How the controller's WiFi Connectivity view shows these events from this agent.
-- Clients that resolve only over IPv6 or encrypted DNS (DoT/DoH): the tap passes IPv4 UDP 53
-  only, so such a client would read as a soft failure on every connection. Whether this site
-  advertises an IPv6 resolver was not checked (deferred).
+- IPv6 DNS and the DoT handshake (2026-11-20, tests with hand-built frames only): that the wl
+  vifs' ETH_P_ALL taps see a client's IPv6 DNS and its TCP 853 SYN/SYN-ACK in both directions,
+  that the kernel on the X20 accepts the 48-instruction filter, whether this site advertises an
+  IPv6 resolver (RA RDNSS / DHCPv6), and which clients (Android Private DNS) use DoT here.
+- DoH-only clients (deferred): still a soft failure on every connection; nothing on the wire
+  tells their DNS apart.
