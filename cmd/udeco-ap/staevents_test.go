@@ -480,3 +480,40 @@ func TestStaEventsStaleReading(t *testing.T) {
 		t.Fatalf("events %v, want x's association once", got)
 	}
 }
+
+// A covered BSS's events held from the previous reading's collection
+// window are not replayed for a station that reading's diff (an uncovered
+// BSS of the same unit) already moved: the diff told the outcome (review
+// finding, TestProbeCrossVapWindow). x joins the covered wl12 and moves to
+// wl02, whose socket was just attached again, while reading 1 is taken;
+// reading 1 shows x on wl02. The controller hears one association on
+// wifi0ap1 and nothing else.
+func TestStaEventsCrossVapWindow(t *testing.T) {
+	const x = "aa:bb:cc:00:02:01"
+	t0 := time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	at := func(i int) time.Time { return t0.Add(time.Duration(i) * 10 * time.Second) }
+	vifs := map[string]string{"wl12": "wifi1ap1", "wl02": "wifi0ap1"}
+	since := map[string]time.Time{"wl12": t0.Add(-time.Hour)} // wl02 is not covered
+	var e staEvents
+	read := func(i int, on string, evs ...hapdmon.Event) {
+		vaps := map[string][][2]any{"wifi1ap1": {}, "wifi0ap1": {}}
+		if on != "" {
+			vaps[on] = [][2]any{{x, -60}}
+		}
+		e.observe(staReading(100+int64(i)*10, vaps), &staFeed{read: at(i), now: at(i).Add(2 * time.Second), since: since, vifs: vifs, evs: evs})
+	}
+	read(0, "")
+	read(1, "wifi0ap1",
+		staLive("wl12", x, hapdmon.Connected, at(1).Add(300*time.Millisecond)),
+		staLive("wl12", x, hapdmon.Disconnected, at(1).Add(800*time.Millisecond)))
+	for i := 2; i < 6; i++ {
+		read(i, "wifi0ap1")
+	}
+	var got []string
+	for _, ev := range e.queue {
+		got = append(got, ev["event_type"].(string)+" "+ev["vap"].(string))
+	}
+	if len(got) != 1 || got[0] != "association wifi0ap1" {
+		t.Fatalf("events %v, want [association wifi0ap1]", got)
+	}
+}

@@ -66,6 +66,10 @@ import (
 //     the reading before it, which used the diff: that reading was taken
 //     after it started, so a station it already shows on the BSS is no
 //     association again for a CONNECTED from while it was taken.
+//   - likewise a station whose place the previous reading's diff set or
+//     removed (it moved to or from a BSS that is not covered): that
+//     reading's outcome holds, and a covered BSS's events from its
+//     collection window are not replayed after it.
 //
 // A BSS that is not covered (no socket, just attached, the Garage) keeps
 // the reading diff below.
@@ -98,6 +102,10 @@ type staEvents struct {
 	taken   time.Time       // when the last reading had been taken (its feed's now)
 	cov     map[string]bool // the VAPs the last reading covered
 	odd     map[string]int  // "mac|vap|+/-": readings in a row a covered VAP disagreed
+	// moved: the stations whose place the last reading's diff set or
+	// removed (an uncovered BSS): their covered events from that reading's
+	// collection window are in its outcome already
+	moved map[string]bool
 }
 
 // staFeed is the hostapd socket's part of one reading (nil: none).
@@ -181,6 +189,9 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 		if p, ok := e.prev[ev.MAC]; ok && p.vap == vap && ev.Kind == hapdmon.Connected && fresh[vap] && ev.At.Before(taken) {
 			continue // the last reading (the diff's) had it there already
 		}
+		if e.moved[ev.MAC] && ev.At.Before(taken) {
+			continue // the last reading's diff told where it ended up
+		}
 		e.live(ev, vap, names, cur, up-int64(feed.now.Sub(ev.At).Round(time.Second)/time.Second))
 	}
 	// the other BSSes: the reading diff. A client counts as gone from a VAP
@@ -196,10 +207,12 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 		}
 	}
 	sort.Strings(gone)
+	moved := map[string]bool{}
 	for _, mac := range gone {
 		p := e.prev[mac]
 		e.leave(mac, p, p.lastSeen)
 		delete(e.prev, mac)
+		moved[mac] = true
 	}
 	for mac, c := range cur {
 		if covered[c.vap] {
@@ -219,7 +232,9 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 		}
 		e.assoc(mac, c)
 		e.prev[mac] = c
+		moved[mac] = true
 	}
+	e.moved = moved
 	e.reconcile(cur, names, covered, touched)
 	// clients of a VAP missing from this reading stay on record for a
 	// while, so the VAP's return is no wave of associations

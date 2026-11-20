@@ -404,3 +404,63 @@ func TestRoamRefused(t *testing.T) {
 		}
 	})
 }
+
+// steerRoamWifi is fakeWifi with both the band steering and the Roaming
+// Assistant primitives.
+type steerRoamWifi struct{ roamWifi }
+
+func (w steerRoamWifi) SteerToBand(ctx context.Context, vif, mac, bssid string) error {
+	w.rec.add(fmt.Sprintf("steer:%s@%s->%s", mac, vif, bssid))
+	return nil
+}
+
+// A Roaming Assistant request that succeeded keeps band steering off the
+// client from the very next reading: the worker's outcome is applied before
+// band steering looks at that reading (review finding: the stamp came one
+// reading late, so a client that went to this unit's 2.4 GHz BSS instead of
+// the other AP was asked straight back to 5 GHz).
+func TestSteerAfterRoam(t *testing.T) {
+	u := newRoamUnit(t)
+	u.h.a.wifi = steerRoamWifi{roamWifi{fakeWifi: u.h.wifi}}
+	u.h.a.policy.Store(&wifiPolicy{steer: map[string]string{"ng": "prefer_5g"}, roam: map[string]int{"net|na": -75}})
+	sib := apstate.BSS{BSSID: "02:00:00:00:77:01", SSID: "net", Channel: 149, Signal: -60}
+	read := func(stale bool, bss string, signal int) {
+		u.now = u.now.Add(10 * time.Second)
+		s := testSnapshot()
+		s.Radios[0].VAPs = []apstate.Radio{{Iface: "wl02", Band: "ng", SSID: "net", BSSID: "aa:a7:b9:3e:15:f8"}}
+		s.Radios[1].VAPs[0].BSSID = "ba:a7:b9:3e:15:f8"
+		s.Radios[1].VAPs[0].Stations = nil
+		ph := apstate.Station{MAC: roamPhone, Signal: signal}
+		if bss == "wl12" {
+			s.Radios[1].VAPs[0].Stations = []apstate.Station{ph}
+		} else {
+			s.Radios[0].VAPs[0].Stations = []apstate.Station{ph}
+		}
+		u.h.a.stale = stale
+		u.h.a.clientsReading(s, u.now)
+		for {
+			select {
+			case j := <-u.h.a.jobs:
+				j.fn(context.Background())
+				continue
+			default:
+			}
+			break
+		}
+	}
+	for i := 0; i < 12 && len(roamCalls(u.h)) == 0; i++ {
+		u.heard(0, sib)
+		read(false, "wl12", -80)
+	}
+	if len(roamCalls(u.h)) != 1 {
+		t.Fatalf("no Roaming Assistant request: %v", u.h.rec.list())
+	}
+	for _, stale := range []bool{true, false} { // a stale reading first: the outcome still counts
+		read(stale, "wl02", -50)
+	}
+	for _, c := range u.h.rec.list() {
+		if strings.HasPrefix(c, "steer:") {
+			t.Fatalf("band steering right after a Roaming Assistant request: %v", u.h.rec.list())
+		}
+	}
+}

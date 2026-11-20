@@ -230,6 +230,17 @@ func (a *agent) observeReading(s *apstate.Snapshot, f map[string]any) {
 	if a.portsOn() {
 		a.portFields(f, s)
 	}
+	a.clientsReading(s, now)
+}
+
+// clientsReading is band steering and the Roaming Assistant for one reading
+// (loop goroutine). The worker's Roaming Assistant outcomes are applied
+// first, on a stale reading too: a request that succeeded keeps band
+// steering off the client from this reading on, so a client that went to
+// this unit's 2.4 GHz BSS instead of the other AP is not asked straight
+// back to 5 GHz.
+func (a *agent) clientsReading(s *apstate.Snapshot, now time.Time) {
+	a.roamOutcomes()
 	a.steerReading(s, now)
 	if !a.stale {
 		a.roamReading(s, now)
