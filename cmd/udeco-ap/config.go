@@ -68,12 +68,26 @@ type Config struct {
 	// all-channels table, has both but runs no radar detection; under it
 	// the agent refuses channels 120-128 (weather radar). Takeover only.
 	DriverCountryBands map[string]string `json:"driver_country_bands,omitempty"`
+	// DriverDTIMBands overrides the DTIM period of one radio ("ng" or
+	// "na") for every SSID it serves, over the controller's (UniFi sends
+	// 1 on 2.4 GHz unless a WLAN sets its own). The JCOW414 runs one DTIM
+	// per radio, the lowest its SSIDs ask (mtkwifi features.go), so a
+	// WLAN shared with the Decos keeps it at 1 there; this key sets the
+	// Garage alone. Its stock firmware ran 2 on 2.4 GHz. 1-255, takeover
+	// only.
+	DriverDTIMBands map[string]int `json:"driver_dtim_bands,omitempty"`
 	// FTSAE is the kill switch for FT-SAE (802.11r for WPA3 clients) on top
 	// of wpa3: absent or true serves it (bcmwifi.Options.FTSAE, the agents
 	// learning each other's key holders: ftsae.go) and claims radio_caps2
 	// WPA3 fast roaming; false keeps WPA3 clients on a full SAE at every
 	// roam (FT-PSK for WPA2 clients is not affected). Only with wpa3.
 	FTSAE *bool `json:"ft_sae,omitempty"`
+	// DownlinkWatchdog is the kill switch for the Garage's downlink
+	// watchdog (mtkwifi stuckps.go): absent or true disconnects a station
+	// the driver holds dozing while ARP probes to it go unanswered, so it
+	// re-associates at once instead of ~300 s later; false leaves such a
+	// station to recover by itself. jio-mtk with takeover only.
+	DownlinkWatchdog *bool `json:"downlink_watchdog,omitempty"`
 	// MdnsBridge (takeover with apply only) claims fw2_caps mDNS service
 	// bridge and runs internal/mdnsbr (mdnsbr.go). Off by default until
 	// AF_PACKET sends on the wl vifs are verified on the X20: the
@@ -365,6 +379,12 @@ func (c *Config) validate() error {
 	if err := validDriverCountryBands(c.DriverCountryBands); err != nil {
 		return err
 	}
+	if len(c.DriverDTIMBands) > 0 && !c.Takeover {
+		return errors.New("config: driver_dtim_bands needs takeover (observe mode never changes the unit)")
+	}
+	if err := validDriverDTIMBands(c.DriverDTIMBands); err != nil {
+		return err
+	}
 	if c.RxDesense && !c.Takeover {
 		return errors.New("config: rx_desense needs takeover (observe mode never changes the unit)")
 	}
@@ -424,12 +444,28 @@ func (c *Config) validate() error {
 // refused FT authentication badly.
 func (c *Config) ftSAE() bool { return c.WPA3 && (c.FTSAE == nil || *c.FTSAE) }
 
+// downlinkWatchdog: the downlink watchdog runs unless the key is false.
+func (c *Config) downlinkWatchdog() bool { return c.DownlinkWatchdog == nil || *c.DownlinkWatchdog }
+
 // twt: TWT is on unless the twt key is false.
 func (c *Config) twt() bool { return c.TWT == nil || *c.TWT }
 
 func (c *Config) controllerIP() string {
 	u, _ := url.Parse(c.InformURL)
 	return u.Hostname()
+}
+
+// validDriverDTIMBands: keys "ng"/"na", periods 1-255.
+func validDriverDTIMBands(m map[string]int) error {
+	for b, v := range m {
+		if b != "ng" && b != "na" {
+			return fmt.Errorf("config: driver_dtim_bands: band %q is not ng or na", b)
+		}
+		if v < 1 || v > 255 {
+			return fmt.Errorf("config: driver_dtim_bands: %s period %d is not 1-255", b, v)
+		}
+	}
+	return nil
 }
 
 // validDriverCountryBands: keys "ng"/"na", values two-letter country codes

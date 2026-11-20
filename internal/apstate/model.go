@@ -100,6 +100,9 @@ type Station struct {
 	// NSS: the client's spatial streams in its best mode (HE, else VHT,
 	// else HT) from wl sta_info's rate sets; 0 when unknown.
 	NSS int
+	// PowerSave: the AP holds the station as dozing (MediaTek stainfo
+	// PSM 1): its unicast frames wait for it to wake and fetch them.
+	PowerSave bool `json:",omitempty"`
 }
 
 type Port struct {

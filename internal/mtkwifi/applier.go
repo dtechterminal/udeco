@@ -111,6 +111,10 @@ type Applier struct {
 	// weak: per station, the minimum RSSI kick's count and back-off
 	// (minrssi.go)
 	weak map[string]*weakSta
+	// down, stuck: the downlink watchdog's learner and per-station state
+	// (stuckps.go)
+	down  downProber
+	stuck map[string]*stuckSta
 	// uplinkDown: the uplink is down and the SSIDs are isolated
 	// (uplinkloss.go); want: the controller's plan a.live is made from
 	// (a.live is its isolated form meanwhile)
@@ -874,6 +878,7 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 	}
 	a.clearLive(ctx)    // what only the agent sets live (live.go)
 	a.parpOff(ctx)      // proxy ARP (proxyarp.go)
+	a.stopStuck()       // downlink watchdog (stuckps.go)
 	defer a.restarted() // the collector leaves the driver alone a while longer
 	for _, rd := range a.o.Layout {
 		a.dfsRestarted(rd)

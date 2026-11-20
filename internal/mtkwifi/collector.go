@@ -650,7 +650,8 @@ var (
 //	NO                                                              MaxCap:HTMIX     20M   7     1   1    -    72
 //
 // Columns are found from the RSSI field (MODE and AID print as one token):
-// BSS is 4 before it; PhMd, BW, MCS follow it, Rate is 7 after it (Mbit/s);
+// BSS is 4 before it, PSM 3 before it; PhMd, BW, MCS follow it, Rate is 7
+// after it (Mbit/s);
 // the trailing ", <seconds>, <n>%" is the association time.
 func parseMacTable(log string) []sta {
 	i := -1
@@ -691,6 +692,7 @@ func parseMacTable(log string) []sta {
 		}
 		st := sta{Station: apstate.Station{MAC: mac, Authorized: true, Connected: conn, Noise: -95}}
 		st.bss, _ = strconv.Atoi(tok[k-4])
+		st.PowerSave = tok[k-3] == "1"
 		best := 0
 		for _, r := range strings.Split(tok[k], "/") {
 			v, _ := strconv.Atoi(r)

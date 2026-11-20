@@ -37,6 +37,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -598,6 +599,8 @@ func (a *agent) logIntent(pv provision) (bcmwifi.Desired, translate.Intent) {
 	dn = append(dn, cn...)
 	d, cn = withDriverCountryBands(d, a.cfg.DriverCountryBands)
 	dn = append(dn, cn...)
+	d, cn = withDriverDTIMBands(d, a.cfg.DriverDTIMBands)
+	dn = append(dn, cn...)
 	gw, _ := a.topo.gwIP.Load().(string)
 	gwMAC, _ := a.topo.gwMAC.Load().(string)
 	var gn []string
@@ -749,6 +752,64 @@ func withDriverCountry(d bcmwifi.Desired, override string) (bcmwifi.Desired, []s
 
 // bandNames names the radios in notes.
 var bandNames = map[string]string{"ng": "2.4 GHz", "na": "5 GHz"}
+
+// withDriverDTIMBands applies driver_dtim_bands: every SSID serving a
+// listed radio asks that DTIM period there, whatever the controller sent.
+// The SSIDs' maps are copied (d's may share them with the plan).
+func withDriverDTIMBands(d bcmwifi.Desired, bands map[string]int) (bcmwifi.Desired, []string) {
+	var notes []string
+	if len(bands) == 0 {
+		return d, nil
+	}
+	ssids := slices.Clone(d.SSIDs)
+	for _, b := range []string{"ng", "na"} {
+		v := bands[b]
+		if v <= 0 {
+			continue
+		}
+		n := 0
+		for i, s := range ssids {
+			if !ssidServes(s, b) {
+				continue
+			}
+			m := map[string]int{}
+			for k, p := range s.DTIM {
+				if bandKey(k) != b {
+					m[k] = p
+				}
+			}
+			m[b] = v
+			ssids[i].DTIM = m
+			n++
+		}
+		if n > 0 {
+			notes = append(notes, fmt.Sprintf("DTIM: the %s radio runs DTIM %d for its %d SSID(s) (driver_dtim_bands)", bandNames[b], v, n))
+		}
+	}
+	d.SSIDs = ssids
+	return d, notes
+}
+
+// bandKey is a band key as "ng"/"na" (the controller's may be "2g"/"5g").
+func bandKey(k string) string {
+	switch strings.ToLower(k) {
+	case "2g", "ng":
+		return "ng"
+	case "5g", "na":
+		return "na"
+	}
+	return strings.ToLower(k)
+}
+
+// ssidServes: s is on band b.
+func ssidServes(s bcmwifi.SSID, b string) bool {
+	for _, x := range s.Bands {
+		if bandKey(x) == b {
+			return true
+		}
+	}
+	return false
+}
 
 // withDriverCountryBands applies driver_country_bands: each listed radio
 // runs in its own country (bcmwifi.Desired.BandCountry); one that equals

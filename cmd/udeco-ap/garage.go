@@ -26,14 +26,25 @@ type weakKicker interface {
 	KickWeak(context.Context, *apstate.Snapshot) []string
 }
 
+// stuckKicker is the applier's downlink watchdog (mtkwifi stuckps.go).
+type stuckKicker interface {
+	KickStuck(context.Context, *apstate.Snapshot) []string
+}
+
 // garageReading runs after a fresh reading's station events were taken
-// (loop goroutine). The kicked stations' leaves carry assoc_status 16.
+// (loop goroutine). The minimum RSSI kick's leaves carry assoc_status 16;
+// the downlink watchdog's are plain leaves (the U6 has no such kick).
 func (a *agent) garageReading(ctx context.Context, s *apstate.Snapshot) {
 	if !a.cfg.jio() || !a.takeover.Load() {
 		return
 	}
 	if k, ok := a.wifi.(weakKicker); ok {
 		a.sta.kicked(k.KickWeak(ctx, s))
+	}
+	if k, ok := a.wifi.(stuckKicker); ok && a.cfg.downlinkWatchdog() {
+		for _, mac := range k.KickStuck(ctx, s) {
+			a.event(fmt.Sprintf("downlink watchdog: %s stopped receiving while dozing: disconnected so it re-associates", mac))
+		}
 	}
 	if g, ok := a.wifi.(garageNet); ok {
 		a.garageStations(ctx, g, s)

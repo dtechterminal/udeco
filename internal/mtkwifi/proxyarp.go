@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"slices"
 )
@@ -402,6 +403,10 @@ type arpTable struct {
 	sta   map[string]string // MAC -> the BSS netdev it is associated to
 	byIP  map[string]string // ip -> MAC
 	byMAC map[string]string // MAC -> ip
+	// heard: MAC -> when the station's own ARP (either op) was last seen
+	// on its BSS (the downlink watchdog's probe replies, stuckps.go)
+	heard map[string]time.Time
+	now   func() time.Time // time.Now when nil
 }
 
 func (t *arpTable) setStations(m map[string][]string) {
@@ -419,6 +424,18 @@ func (t *arpTable) setStations(m map[string][]string) {
 			delete(t.byIP, ip)
 		}
 	}
+	for mac := range t.heard {
+		if _, ok := t.sta[mac]; !ok {
+			delete(t.heard, mac)
+		}
+	}
+}
+
+// lastHeard is when mac's own ARP was last seen (zero: never).
+func (t *arpTable) lastHeard(mac string) time.Time {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.heard[mac]
 }
 
 func (t *arpTable) set(mac, ip string) {
@@ -443,6 +460,14 @@ func (t *arpTable) learnFrame(vif string, f []byte) {
 		m := a.sha.String()
 		if t.sta[m] == vif && bytes.Equal(a.src, a.sha) && !a.spa.Equal(net.IPv4zero) {
 			t.set(m, a.spa.String())
+			if t.heard == nil {
+				t.heard = map[string]time.Time{}
+			}
+			now := time.Now
+			if t.now != nil {
+				now = t.now
+			}
+			t.heard[m] = now()
 		}
 		return
 	}
