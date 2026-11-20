@@ -266,6 +266,14 @@ deploy/deco-ap.sh --build-only   # writes dist/udeco-ap-linux-armv7
 
 Run `go test ./... && go vet ./...` before deploying a change.
 
+**Prebuilt binaries.** GitHub Actions ([build.yml](.github/workflows/build.yml))
+tests every push and builds one agent per device: `udeco-ap-deco-x20`
+(`udeco-ap-linux-armv7`, with its gzip) and `udeco-ap-jio-jcow414`
+(`udeco-ap-linux-mipsle`, with its gzip), each with `SHA256SUMS` and `MD5SUMS`.
+Download them from the run's Artifacts. Each is built by its device's
+`--build-only`, with the Go toolchain go.mod names, so its md5 matches what a
+deploy of the same commit installs.
+
 ## Second platform: JioFiber JCOW414
 
 With `"platform": "jio-mtk"`, the agent runs a JioFiber JCOW414 (MediaTek
@@ -399,6 +407,7 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 | `internal/atomicfile` | the one write-a-temporary-file-and-rename used for the state files |
 | `internal/repotest` | test helpers that hold the shell scripts and the docs to the Go code |
 | `deploy/` | `deco-ap.sh` (Deco deploy; it writes the unit's launcher), `jio-ap.sh` (JioFiber deploy), `jio-start.sh` (JioFiber supervisor with the gateway guard), `unraid.sh` (the off-device `udeco` on an Unraid host), `lib.sh` (what those scripts share), `udeco.example.json` (example config for `udeco`) |
+| `.github/workflows/build.yml` | CI: tests, then one agent build per device (a new device needs its deploy script and a matrix entry) |
 | `packaging/deco` | what a persistent install on a Deco consists of |
 | `tools/wifi-inet-monitor` | per-client internet monitor that runs on the gateway |
 | `docs/deco/` | [design](docs/deco/agent-design.md), [device capabilities](docs/deco/device-capabilities.md), [interference audit](docs/deco/interference-audit.md), [feature notes](docs/deco/features/) |

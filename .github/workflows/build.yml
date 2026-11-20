@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Tests the repository, then builds the on-device agent once per supported
+# device. Each device builds through its own deploy script's --build-only,
+# so the binary here is the one a deploy of the same commit ships (same Go
+# toolchain from go.mod: -trimpath, empty build id and gzip -n make the
+# build reproducible). Download them from the run's Artifacts.
+#
+# A new device gets its own deploy script (deploy/<device>-ap.sh with
+# --build-only) and its own entry in the matrix below;
+# TestCIBuildsEveryDevice (cmd/udeco-ap) fails until both exist.
+name: build
+
+on:
+  push:
+    branches: [deco, main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - device: deco-x20
+            script: deploy/deco-ap.sh
+            out: dist/udeco-ap-linux-armv7
+          - device: jio-jcow414
+            script: deploy/jio-ap.sh
+            out: dist/udeco-ap-linux-mipsle
+    name: build (${{ matrix.device }})
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: build
+        env:
+          SCRIPT: ${{ matrix.script }}
+        run: bash "$SCRIPT" --build-only
+      - name: checksums
+        env:
+          OUT: ${{ matrix.out }}
+        run: |
+          cd "$(dirname "$OUT")"
+          files=$(ls "$(basename "$OUT")" "$(basename "$OUT").gz" 2>/dev/null)
+          sha256sum $files > SHA256SUMS
+          md5sum $files > MD5SUMS
+          cat SHA256SUMS MD5SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: udeco-ap-${{ matrix.device }}
+          path: |
+            ${{ matrix.out }}
+            ${{ matrix.out }}.gz
+            dist/SHA256SUMS
+            dist/MD5SUMS
+          if-no-files-found: error
