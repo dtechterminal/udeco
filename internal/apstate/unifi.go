@@ -201,10 +201,14 @@ func (s *Snapshot) FieldsWith(prev *Snapshot, info CfgInfo, caps map[string]Radi
 	for i, r := range s.Radios {
 		name := rnames[i]
 		ht := fmt.Sprintf("%d", r.Width)
+		txMode := r.TxPowerMode
+		if txMode == "" {
+			txMode = "custom" // the reading's power, no preset known
+		}
 		radios = append(radios, map[string]any{
 			"name": name, "radio": r.Band, "channel": r.Channel, "ht": ht,
 			"min_txpower": r.TxMin, "max_txpower": r.TxMax, "nss": r.NSS,
-			"tx_power": r.TxPower, "tx_power_mode": "custom",
+			"tx_power": r.TxPower, "tx_power_mode": txMode,
 			"radio_caps": 0, "antenna_gain": 3, "builtin_antenna": true, "builtin_ant_gain": 3,
 			"is_11ac": r.VHT, "is_11ax": r.HE,
 		})

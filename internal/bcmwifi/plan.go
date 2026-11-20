@@ -453,11 +453,17 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 			phy = append(phy, wl("set chanspec "+want.String(), "chanspec", want.String()))
 			cs = want
 		}
-		q, n2 := txpwrDegrade(rl.Radio, lr.TargetMax)
+		ceil, n1 := a.txCeiling(p, lr.Chanspec, cs, lr.Degrade, lr.TargetMax)
+		if n1 != "" {
+			note(n1)
+		}
+		q, n2 := txpwrDegrade(rl.Radio, ceil)
 		if n2 != "" {
 			note(n2)
 		}
 		degrade = q
+		mode, dbm := txReportFor(rl.Radio, ceil, q)
+		a.setTxReport(rl.Band, txReport{Mode: mode, DBm: dbm})
 	}
 	txStep := wl("set tx power", "txpwr_degrade", itoa(degrade))
 	txChange := degrade != lr.Degrade

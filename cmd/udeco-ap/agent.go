@@ -906,6 +906,7 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 		info.Authorized = a.guestAuthorized(&c, time.Now()) // a copy: a.info stays as read
 	}
 	a.ctr.Begin(c.Uptime)
+	a.txPowerFields(&c)
 	f := c.FieldsWith(a.prev, info, a.radioCaps, a.ctr)
 	// Uptime runs from the session's boot time, which is the unit's boot
 	// until the controller's upgrade or (observe-mode) restart is faked.
@@ -1125,5 +1126,28 @@ func (a *agent) wakeLoop() {
 	select {
 	case a.wake <- struct{}{}:
 	default:
+	}
+}
+
+// txPowerer is a Wi-Fi backend that knows the tx power it set: the
+// controller's preset and the resulting dBm (bcmwifi txpower.go).
+type txPowerer interface {
+	TxPower(band string) (mode string, dbm int, ok bool)
+}
+
+// txPowerFields reports each radio's tx power as the backend set it,
+// instead of the reading's target maximum and "custom". s is the inform's
+// copy: its radios are copied before they change.
+func (a *agent) txPowerFields(s *apstate.Snapshot) {
+	tp, ok := a.wifi.(txPowerer)
+	if !ok || !a.takeover.Load() {
+		return
+	}
+	s.Radios = append([]apstate.Radio(nil), s.Radios...)
+	for i := range s.Radios {
+		r := &s.Radios[i]
+		if m, dbm, ok := tp.TxPower(r.Band); ok {
+			r.TxPowerMode, r.TxPower = m, dbm
+		}
 	}
 }

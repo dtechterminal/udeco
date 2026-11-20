@@ -377,10 +377,8 @@ func (a *Applier) readLive(ctx context.Context, l *layout) (*liveState, error) {
 		if lr.BWCap, err = parseIntOut(out); err != nil {
 			return nil, fmt.Errorf("%s bw_cap %q: %w", p, out, err)
 		}
-		if strings.EqualFold(rl.Radio.TxPowerMode, "custom") {
-			if out, err = a.wlGet(ctx, p, "txpwr_target_max"); err == nil {
-				lr.TargetMax = parseTargetMax(out)
-			}
+		if out, err = a.wlGet(ctx, p, "txpwr_target_max"); err == nil {
+			lr.TargetMax = parseTargetMax(out)
 		}
 		lr.MAC = a.readMAC(ctx, p)
 		lr.TWT = a.readTWT(ctx, p)

@@ -113,3 +113,28 @@ func TestConfigRxDesense(t *testing.T) {
 		}
 	}
 }
+
+// The controller is told each radio's real tx power mode and the power it
+// gives (bcmwifi TxPower), not "custom" and the target maximum.
+func TestE2ETxPowerReport(t *testing.T) {
+	cfg, _ := mtkCfg(t)
+	e := newE2E(t, cfg, true)
+	e.adopt()
+	eventually(t, "the bcmwifi dry-run apply", func() bool { return strings.Contains(e.logs.all(), "is live") })
+	var mode any
+	eventually(t, "a radio_table with the planned tx power", func() bool {
+		m := e.ctl.lastPayload()
+		if m == nil || m["radio_table"] == nil {
+			return false
+		}
+		rr := radioRow(t, m, "na")
+		mode = rr["tx_power_mode"]
+		_, dbm, ok := e.wifi.TxPower("na")
+		return ok && mode != "custom" && num(rr["tx_power"]) == float64(dbm)
+	})
+	e.stop()
+	want, _, _ := e.wifi.TxPower("na")
+	if mode != want {
+		t.Errorf("tx_power_mode %v, want %s", mode, want)
+	}
+}

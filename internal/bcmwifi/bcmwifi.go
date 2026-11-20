@@ -173,6 +173,11 @@ type Applier struct {
 	fcNote string
 	// twtSeen: band -> the TWT line Tick logged last (twt.go)
 	twtSeen map[string]string
+	// txCeil: radio+chanspec -> tx power ceiling (dBm), txRep: band -> the
+	// last planned tx power (txpower.go)
+	txMu   sync.Mutex
+	txCeil map[string]float64
+	txRep  map[string]txReport
 
 	sleep func(time.Duration)
 	poll  time.Duration

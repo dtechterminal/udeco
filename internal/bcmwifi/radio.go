@@ -4,7 +4,6 @@ package bcmwifi
 
 import (
 	"fmt"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -163,35 +162,6 @@ func bandArg(band string) string {
 		return "2g"
 	}
 	return "5g"
-}
-
-// txpwrDegrade maps a UniFi tx power mode to wl txpwr_degrade (quarter-dB
-// below the target maximum). TP-Link uses 0/12/24 for high/middle/low.
-// targetMax is the radio's txpwr_target_max in dBm (needed for custom).
-func txpwrDegrade(r Radio, targetMax float64) (q int, note string) {
-	switch strings.ToLower(r.TxPowerMode) {
-	case "", "auto", "high":
-		return 0, ""
-	case "medium", "middle":
-		return 12, ""
-	case "low":
-		return 24, ""
-	case "custom":
-		if targetMax <= 0 {
-			return 0, "custom tx power: target maximum unknown, using high"
-		}
-		q = int(math.Round((targetMax - float64(r.TxPower)) * 4))
-		const maxQ = 48 // 12 dB: well inside what TP-Link uses, unverified beyond
-		switch {
-		case q < 0:
-			q = 0
-		case q > maxQ:
-			note = fmt.Sprintf("custom tx power %d dBm clamped to %.2f dBm", r.TxPower, targetMax-maxQ/4.0)
-			q = maxQ
-		}
-		return q, note
-	}
-	return 0, fmt.Sprintf("tx power mode %q unknown, using high", r.TxPowerMode)
 }
 
 // parseTargetMax reads "Maximum Tx Power Target (chanspec:0xe22a):\t23.50  23.50".
