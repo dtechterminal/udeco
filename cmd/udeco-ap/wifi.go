@@ -230,10 +230,10 @@ func (a *agent) startupJobs() {
 }
 
 // tick is the periodic takeover enforcement and Wi-Fi health check.
-// Order: the inbound fence, decosys.Enforce (which also re-asserts the R8a
-// address watch, the R11 reset-button wrapper, the crontab invariant and
-// the TP-Link QoS removal, and holds while an upgrade is in flight),
-// egress, the site users, the self-check; then Wi-Fi: a pending provision,
+// Order: the inbound fence, the login lock, decosys.Enforce (which also
+// re-asserts the R8a address watch, the R11 reset-button wrapper, the
+// crontab invariant and the TP-Link QoS removal, and holds while an upgrade
+// is in flight), egress, the site users, the self-check; then Wi-Fi: a pending provision,
 // else bcmwifi.Tick (non-disruptive repairs, each followed by a flow-cache
 // flush inside bcmwifi) and the health check.
 func (a *agent) tick(ctx context.Context) {
@@ -241,6 +241,7 @@ func (a *agent) tick(ctx context.Context) {
 	if err := a.sys.Ingress(ctx, true); err != nil {
 		a.logf("decosys: inbound fence: %v", err)
 	}
+	a.lockEval(ctx, true) // re-asserts the login lock (loginlock.go)
 	rep, err := a.sys.Enforce(ctx)
 	if rep.Changed() {
 		a.logf("decosys: enforce: %d step(s)", len(rep.Steps))
@@ -547,7 +548,8 @@ func (a *agent) dropToObserve(ctx context.Context, why string) {
 	a.worker.applied, a.worker.pending, a.worker.full = nil, nil, nil
 	a.ftDrop() // no more FT-SAE key holders to announce (ftsae.go)
 	a.policy.Store(nil)
-	a.radsecStop() // TP-Link's hostapd does not use the RadSec proxy (radsec.go)
+	a.radsecStop()             // TP-Link's hostapd does not use the RadSec proxy (radsec.go)
+	a.lockRelease("hand-back") // root logins open again (loginlock.go; Restore removes it too)
 	// Restore also puts TP-Link's reset-button handler and QoS back and
 	// removes the inbound fence: the unit is TP-Link's again.
 	if err := a.sys.Restore(ctx); err != nil {

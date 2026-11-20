@@ -162,7 +162,8 @@ func (a *agent) refreshCreds() {
 		c.users = in.Users
 	}
 	a.creds.Store(c)
-	a.siteFromCfg(c.adopted, in) // site SSH logins follow it at once (sitessh.go)
+	a.siteFromCfg(c.adopted, in)      // site SSH logins follow it at once (sitessh.go)
+	a.lockFromCfg(c.adopted, in.SSHD) // and the login lock at the loop's next look (loginlock.go)
 }
 
 // sshAuth is SSHAdopt.Auth (SSH goroutines). Adopted and no site user

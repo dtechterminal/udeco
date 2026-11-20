@@ -617,12 +617,17 @@ func TestRestore(t *testing.T) {
 		r.on(b+" -w -S UDECO-OUT", "", errExit1)
 		r.on(b+" -w -C INPUT -j UDECO-IN", "", errExit1)
 		r.on(b+" -w -S UDECO-IN", "", errExit1)
+		r.on(b+" -w -S UDECO-LOCK", "", errExit1)
 	}
 
 	if err := m.Restore(ctx); err != nil {
 		t.Fatalf("Restore: %v", err)
 	}
 	diff(t, r.take(), []string{
+		"/usr/sbin/iptables -w -S INPUT", // the login lock first (loginlock.go)
+		"/usr/sbin/iptables -w -S UDECO-LOCK",
+		"/usr/sbin/ip6tables -w -S INPUT",
+		"/usr/sbin/ip6tables -w -S UDECO-LOCK",
 		"/usr/sbin/iptables -w -C OUTPUT -j UDECO-OUT",
 		"/usr/sbin/iptables -w -S UDECO-OUT",
 		"/usr/sbin/ip6tables -w -C OUTPUT -j UDECO-OUT",

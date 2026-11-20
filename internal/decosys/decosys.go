@@ -191,6 +191,9 @@ type Manager struct {
 	// siteSSH: the site's device users may log in on SSHDPort from the
 	// :22 sources (sitessh.go); guarded by mu
 	siteSSH bool
+	// locked: the last LoginLock(true) succeeded (loginlock.go); guarded
+	// by mu
+	locked bool
 	// termMu guards termAt: when each still-running PID was first sent
 	// SIGTERM by a kill step (killGrace).
 	termMu sync.Mutex

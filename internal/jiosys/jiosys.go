@@ -5,10 +5,12 @@
 // on a Deco only as far as this unit needs it: it keeps Jio's management
 // services down (the owner's boot script, /flash2/pfrm2.0/etc/customInit,
 // kills them once at boot, but dms, ras, captivePortald and the service
-// hosts start after it and ignore SIGTERM). It installs no firewall and
+// hosts start after it and ignore SIGTERM). Its only firewall is the
+// login lock (UDECO-LOCK, loginlock.go: new telnet and SSH connections
+// dropped while the controller is healthy and Device SSH is off), and it
 // never restarts a Jio service: telnet stays as it is (the web UI is kept
-// down too), and
-// a hand-back leaves the unit as the owner's script wants it.
+// down too), and a hand-back leaves the unit as the owner's script wants
+// it, the lock removed.
 package jiosys
 
 import (
@@ -62,6 +64,8 @@ type Options struct {
 	// KeepDown is then unused.
 	KeepOnly []string
 	Logf     func(string, ...any)
+	// Run runs iptables for the login lock (nil: no lock).
+	Run decosys.Runner
 	// kill and self are test hooks.
 	kill func(pid int, sig syscall.Signal) error
 	self int
@@ -275,12 +279,11 @@ func (m *Manager) keptSet(ps []proc) map[int]bool {
 	return kept
 }
 
-// Egress, Ingress, Restore, RestoreLoopGuard and FlushFlows change nothing:
-// the unit keeps its own firewall, its bridge has no loop guard records and
-// no flow cache. Restore leaves the Jio services down (the owner's choice).
+// Egress, Ingress, RestoreLoopGuard and FlushFlows change nothing: the
+// unit keeps its own firewall, its bridge has no loop guard records and no
+// flow cache.
 func (m *Manager) Egress(context.Context, bool) error                  { return nil }
 func (m *Manager) Ingress(context.Context, bool) error                 { return nil }
-func (m *Manager) Restore(context.Context) error                       { return nil }
 func (m *Manager) RestoreLoopGuard(context.Context) error              { return nil }
 func (m *Manager) SetLAN(decosys.LAN) bool                             { return false }
 func (m *Manager) FlushFlows(context.Context, decosys.FlowScope) error { return nil }

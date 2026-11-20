@@ -237,6 +237,11 @@ func canonRule(f []string) string {
 			i++
 		case i > 0 && f[i-1] == "-p" && (f[i] == "icmpv6" || f[i] == "58"):
 			out = append(out, "ipv6-icmp")
+		case f[i] == "-m" && i+2 < len(f) && f[i+1] == "state" && f[i+2] == "--state":
+			// the state match lists as itself on some firmware and as
+			// conntrack on others: the same rule either way
+			out = append(out, "-m", "conntrack", "--ctstate")
+			i += 2
 		default:
 			out = append(out, f[i])
 		}

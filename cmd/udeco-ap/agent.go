@@ -256,6 +256,7 @@ type agent struct {
 	acks     chan string                // cfgversions whose configuration is live (any goroutine -> loop)
 	creds    atomic.Pointer[sshCreds]   // what ssh-adopt checks once adopted
 	site     siteSSH                    // site SSH logins on sshd_port (sitessh.go)
+	login    loginLockState             // the login lock (loginlock.go)
 	policy   atomic.Pointer[wifiPolicy] // the live Wi-Fi's steering settings (worker -> loop)
 	cfgs     cfgTrack
 	topo     *topology
@@ -376,7 +377,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		}
 		if o.newSys == nil {
 			o.newSys = func(so decosys.Options) sysManager {
-				return jiosys.New(jiosys.Options{Root: so.Root, Logf: so.Logf, KeepOnly: jiosys.DefaultKeepOnly})
+				return jiosys.New(jiosys.Options{Root: so.Root, Run: so.Run, Logf: so.Logf, KeepOnly: jiosys.DefaultKeepOnly})
 			}
 		}
 		if o.newWifi == nil {
@@ -517,7 +518,8 @@ func (a *agent) run(parent context.Context) error {
 	a.loop(ctx)
 	a.mdnsShutdown() // the vifs get their native mDNS back (mdnsbr.go)
 	a.bg.Wait()
-	a.releaseLED() // no uplink-loss blink left behind (uplink.go)
+	a.releaseLED()              // no uplink-loss blink left behind (uplink.go)
+	a.lockRelease("agent stop") // no login lock left behind (loginlock.go)
 	a.logf("udeco-ap: stopped (Wi-Fi left as it is)")
 	if c := context.Cause(ctx); errors.Is(c, errResources) {
 		return c
@@ -858,6 +860,7 @@ func (a *agent) loop(ctx context.Context) {
 			a.refreshCreds()
 		}
 		a.onReply(next)
+		a.lockEval(ctx, false) // the login lock follows the decision (loginlock.go)
 		a.expireGuests(time.Now())
 		if a.rebootReq {
 			a.reboot(ctx)
@@ -1106,6 +1109,7 @@ func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 		a.logf("reply did not decode: %v", err)
 		return device.Outcome{}, false
 	}
+	a.lockAnswered(a.o.now())                   // the controller answers (loginlock.go)
 	a.noteControllerTime(plain, sent, answered) // clock.go
 	o, err := x.Handle(plain, time.Now())
 	if err != nil {
