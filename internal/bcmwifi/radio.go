@@ -194,6 +194,36 @@ var countryRev = map[string]int{"US": 0, "CA": 2, "JP": 0, "KR": 1, "AU": 8, "DE
 // driver refuses countryRev's rev for the country.
 var countryFallback = map[string]string{"IN": "IN"}
 
+// NormCountry is a driver country code as wl takes it: two-letter codes
+// in upper case, Broadcom's '#' tables ("#a") as they are, since wl tells
+// "#a" and "#A" apart.
+func NormCountry(cc string) string {
+	cc = strings.TrimSpace(cc)
+	if strings.HasPrefix(cc, "#") {
+		return cc
+	}
+	return strings.ToUpper(cc)
+}
+
+// NoRadarCountry: a driver country that marks no 5 GHz channel radar-
+// sensitive. Under Broadcom's all-channels table "#a" the X20 offers
+// 52-144 with Wi-Fi 6 rates at 23.5 dBm, but `wl chan_info 100` reads
+// only "5G Band" (IN/288: "RADAR Sensitive, Passive"), so the driver runs
+// no CAC and no in-service monitoring there: dfs_status stayed IDLE on
+// 100/80 (Bedroom and Owner's Room, 2026-11-20).
+func NoRadarCountry(cc string) bool { return cc == "#a" }
+
+// weatherRadar: a 5 GHz chanspec that covers 5600-5650 MHz (channels
+// 120-128), the band weather radars use. Refused under a NoRadarCountry.
+func weatherRadar(cs chanspec) bool {
+	for _, ch := range subChannels(cs) {
+		if ch >= 120 && ch <= 128 {
+			return true
+		}
+	}
+	return false
+}
+
 // country is a parsed wl country: code and rev (-1 = unknown).
 type country struct {
 	Code string
@@ -222,7 +252,7 @@ func parseCountry(s string) country {
 // countryArg is the wl country argument for code, and whether live already
 // matches it.
 func countryArg(code string, live country) (arg string, same bool) {
-	code = strings.ToUpper(code)
+	code = NormCountry(code)
 	if rev, ok := countryRev[code]; ok {
 		return fmt.Sprintf("%s/%d", code, rev), live.Code == code && live.Rev == rev
 	}

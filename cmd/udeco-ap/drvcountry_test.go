@@ -61,6 +61,8 @@ func TestDriverCountryBandsConfig(t *testing.T) {
 		{map[string]string{"6e": "US"}, false},
 		{map[string]string{"ng": "USA"}, false},
 		{map[string]string{"ng": ""}, false},
+		{map[string]string{"na": "#a"}, true},
+		{map[string]string{"na": "#b"}, false},
 	} {
 		err := validDriverCountryBands(tc.m)
 		if (err == nil) != tc.ok {
