@@ -320,8 +320,9 @@ func TestMinRate(t *testing.T) {
 	}
 }
 
-// TestIgmpSnooping: on when an SSID asks for multicast enhancement, in the
-// vendor's form per driver; never written as 0.
+// TestIgmpSnooping: 2.4 GHz (one value per radio) is on when an SSID asks
+// for multicast enhancement and never written as 0; 5 GHz is per BSS and
+// follows each served SSID (the slots not served keep the vendor's).
 func TestIgmpSnooping(t *testing.T) {
 	d := twoSSIDs()
 	ps, notes := plans(d, JCOW414, false)
@@ -340,7 +341,7 @@ func TestIgmpSnooping(t *testing.T) {
 	}
 	wantKeys(t, "ng", profile([]byte(baseDat+off), JCOW414[0], ps["ng"]), map[string]string{"IgmpSnEnable": "1"})
 	naOff := strings.Replace(featNA, "IgmpSnEnable=1;1;1;1", "IgmpSnEnable=0;0;0;0", 1)
-	wantKeys(t, "na", profile([]byte(baseDat+naOff), JCOW414[1], ps["na"]), map[string]string{"IgmpSnEnable": "1;1;1;1"})
+	wantKeys(t, "na", profile([]byte(baseDat+naOff), JCOW414[1], ps["na"]), map[string]string{"IgmpSnEnable": "1;0;0;0"})
 	j := joined(notes)
 	if !strings.Contains(j, `ng: multicast enhancement (IGMP snooping) is per radio in this driver: on for every SSID (asked by ["home"])`) ||
 		strings.Contains(j, "na: multicast enhancement") {

@@ -85,6 +85,12 @@ type BSS struct {
 	RRM   bool `json:",omitempty"` // 802.11k (RRMEnable)
 	BTM   bool `json:",omitempty"` // 802.11v BSS transition management (WNMEnable)
 	UAPSD bool `json:",omitempty"` // U-APSD (APSDCapable); only where RadioDef.UAPSD
+	// GroupRekey is the GTK rekey interval in seconds (RekeyMethod TIME
+	// and RekeyInterval); 0 = never (DISABLE), always 0 for an open BSS
+	GroupRekey int `json:",omitempty"`
+	// M2U is the SSID's multicast enhancement: the MT7663's per-BSS
+	// IgmpSnEnable (the MT7603 has one value per radio: RadioPlan.IgmpSn)
+	M2U bool `json:",omitempty"`
 }
 
 // RadioPlan is what one radio serves. The zero value of each per-radio
@@ -208,7 +214,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			}
 			s = s.ForBand(rd.Band) // the controller's own values for this radio
 			b := BSS{ID: s.ID, SSID: s.SSID, Hidden: s.Hidden, Isolate: s.Isolation, MaxSta: maxSta, VLAN: s.VLAN,
-				RRM: s.RRM, BTM: s.BSSTransition, UAPSD: s.UAPSD && rd.UAPSD}
+				RRM: s.RRM, BTM: s.BSSTransition, UAPSD: s.UAPSD && rd.UAPSD, M2U: s.MulticastToUnicast}
 			switch s.Security {
 			case "open", "":
 				b.Auth, b.Encr = "OPEN", "NONE"
@@ -239,6 +245,9 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			default:
 				note("%s: SSID %q: security %s is not supported by this driver: not served", rd.Band, s.SSID, s.Security)
 				continue
+			}
+			if b.Auth != "OPEN" && s.GroupRekey > 0 {
+				b.GroupRekey = s.GroupRekey
 			}
 			if s.Guest {
 				note("%s: SSID %q: guest networks are not supported here: not served", rd.Band, s.SSID)
