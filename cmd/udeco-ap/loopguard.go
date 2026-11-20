@@ -14,7 +14,7 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/decosys"
 )
 
 // loopGuardDevPath is the loop guard's record as a device path (decosys

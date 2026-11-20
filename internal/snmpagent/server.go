@@ -20,7 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
+	"github.com/dtechterminal/udeco/internal/atomicfile"
 )
 
 // DefaultAddr is the UDP address the agent answers on (IPv4 only): what

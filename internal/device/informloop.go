@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/dtechterminal/udeco/internal/inform"
 )
 
-// The inform loop's timing, the same for every daemon here (cmd/uow,
+// The inform loop's timing, the same for every daemon here (upstream's uow,
 // cmd/udeco, cmd/udeco-ap). Each keeps its own HTTP timeout.
 const (
 	// DefaultInformInterval is the time between informs until a reply
@@ -54,7 +54,7 @@ type PostFunc func(url string, pkt []byte) (status int, body []byte, err error)
 // not decode or parse.
 //
 // A reply that does not decode with the session's key is tried with the
-// factory key. This is the inform of cmd/udeco and cmd/uow. The AP agent
+// factory key. This is the inform of cmd/udeco and upstream's uow. The AP agent
 // has its own, stricter one (cmd/udeco-ap informOnce): no factory-key
 // retry, no unencrypted reply, and its own hooks around the reply.
 func InformOnce(x *Session, post PostFunc, statePath string, logf func(format string, args ...any)) (o Outcome, ok bool) {

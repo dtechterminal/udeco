@@ -5,7 +5,7 @@ package translate
 import (
 	"strconv"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // radioNames is the one table of the radio names UniFi uses (radio_table

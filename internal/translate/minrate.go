@@ -5,7 +5,7 @@ package translate
 import (
 	"strconv"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // Minimum data rate control (UniFi "2G/5G Data Rate Control").

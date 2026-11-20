@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/deco"
+	"github.com/dtechterminal/udeco/internal/deco"
 )
 
 // ---- helpers ----

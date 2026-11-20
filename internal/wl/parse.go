@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // Parsers for the output of read-only `wl` getters (wl 17.10.121.39, as

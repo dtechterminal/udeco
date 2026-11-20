@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/snmpagent"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/snmpagent"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // snmpState is the SNMP agent (loop goroutine fields).

@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/decosys"
 )
 
 // lockPorts are the Garage's root logins: telnetd (:23, the root password

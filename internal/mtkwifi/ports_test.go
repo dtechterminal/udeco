@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/jioports"
 )
 
 // newPortsDev is the fake JCOW414 with its four switch ports: eth0.P with

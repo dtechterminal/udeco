@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/dtechterminal/udeco/internal/device"
 )
 
 // The portal ports as --ip-dport takes them: consecutive ports fold into

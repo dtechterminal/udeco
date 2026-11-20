@@ -84,7 +84,7 @@ func OpenSyslog(keyHex string, d []byte) (hashID string, msg []byte, err error) 
 	return hex.EncodeToString(d[9:17]), msg, err
 }
 
-// The syslog line a UniFi AP sends, for the two forwarders (cmd/uow's and
+// The syslog line a UniFi AP sends, for the two forwarders (upstream uow's and
 // cmd/udeco-ap's). Each has its own reader of the unit's log lines; the
 // tag, the priority tables and the send limit are the same.
 

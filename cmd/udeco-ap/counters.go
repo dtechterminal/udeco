@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/atomicfile"
 )
 
 // Monotonic inform counters (apstate.Counters, agent-design §3.9). The state

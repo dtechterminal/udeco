@@ -112,9 +112,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/atomicfile"
+	"github.com/dtechterminal/udeco/internal/device"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 const (

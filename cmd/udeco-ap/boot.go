@@ -24,10 +24,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/atomicfile"
+	"github.com/dtechterminal/udeco/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/device"
 )
 
 // ------------------------------------------------------------ R6 lock

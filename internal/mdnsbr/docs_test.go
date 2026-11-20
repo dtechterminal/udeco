@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // The flood limits docs/deco/features/mdns-bridge.md gives are this

@@ -67,7 +67,7 @@ func TestSyslogPriorityTables(t *testing.T) {
 	if len(syslogFacilities) != len(fac) || len(syslogSeverities) != len(sev) {
 		t.Errorf("%d facilities, %d severities", len(syslogFacilities), len(syslogSeverities))
 	}
-	// an unknown name is 0 and not ok: cmd/uow takes the 0, the agent the ok
+	// an unknown name is 0 and not ok: upstream's uow takes the 0, the agent the ok
 	if got, ok := SyslogFacility("local8"); ok || got != 0 {
 		t.Errorf("local8 = %d, %v", got, ok)
 	}

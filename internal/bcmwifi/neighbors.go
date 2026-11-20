@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // 802.11k neighbor lists.

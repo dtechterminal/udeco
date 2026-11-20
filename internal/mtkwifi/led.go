@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 )
 
 // The JCOW414's front LED is one RGB LED on three GPIOs, driven by the

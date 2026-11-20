@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // planStamgr: the UniFi's per-radio station manager (docs/internals.md),
@@ -19,7 +19,7 @@ import (
 //	stamgr.<n>.loadbalance.status=true|false  stamgr.<n>.loadbalance.maxsta=<n>
 //
 // Minimum RSSI -> the radio's rssi_reject_assoc_rssi (hostapd refuses weaker
-// clients; the daemon also drops connected ones, cmd/uow). Load balancing ->
+// clients; the daemon also drops connected ones, upstream's uow). Load balancing ->
 // maxassoc on the radio's UniFi-managed interfaces (unifi_* and any
 // interface carrying a UniFi SSID).
 func planStamgr(cfg Cfg, cur UCI, r *Result) []Op {
@@ -97,7 +97,7 @@ type StamgrEntry struct {
 const legacyStamgrMax = 8
 
 // LegacyStamgr reads the station manager sections the way the OpenWrt path
-// always has (planStamgr here, and cmd/uow's minimum RSSI kick): stamgr.1
+// always has (planStamgr here, and upstream uow's minimum RSSI kick): stamgr.1
 // to stamgr.8 only, a setting is on only when its status is "true", and
 // neither stamgr.status nor stamgr.N.status is looked at. It returns the
 // sections that say anything (a radio, a minimum RSSI or a client limit),

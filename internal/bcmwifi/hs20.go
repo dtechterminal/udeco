@@ -5,8 +5,8 @@ package bcmwifi
 import (
 	"fmt"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/hs20"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/hs20"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // Hotspot 2.0 / Passpoint (docs/deco/features/hotspot2.md). The agent maps

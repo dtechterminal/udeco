@@ -16,9 +16,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/radsec"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/radsec"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // radsecRouter is what the agent uses of *radsec.Proxy.

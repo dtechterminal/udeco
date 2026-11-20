@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/dtechterminal/udeco/internal/inform"
 )
 
-// The waits cmd/uow, cmd/udeco and cmd/udeco-ap each computed with their
+// The waits upstream's uow, cmd/udeco and cmd/udeco-ap each computed with their
 // own copy of the expression.
 func TestInformBackoff(t *testing.T) {
 	s := time.Second
@@ -52,7 +52,7 @@ func reply(t *testing.T, x *Session, key, js string) []byte {
 	return pkt
 }
 
-// InformOnce, case by case as cmd/uow's and cmd/udeco's informOnce had it:
+// InformOnce, case by case as upstream uow's and cmd/udeco's informOnce had it:
 // what counts as a bad answer, what is logged, when the state is saved.
 func TestInformOnce(t *testing.T) {
 	adopted := func(x *Session) { x.S.Key, x.S.Adopted = newKey, true }

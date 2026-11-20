@@ -11,10 +11,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/rf"
+	"github.com/dtechterminal/udeco/internal/translate"
+	"github.com/dtechterminal/udeco/internal/unit"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // Desired is the complete Wi-Fi state the agent wants. It mirrors

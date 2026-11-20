@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/decosys"
 )
 
 const (

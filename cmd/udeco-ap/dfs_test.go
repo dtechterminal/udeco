@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/models"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // A radar move bcmwifi's Tick reports goes to the controller as a U6 Pro's

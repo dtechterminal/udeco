@@ -231,13 +231,13 @@ Also: answer `quick-scan` per band with only that band's rows. Inform right afte
 
 ## 10. Where the current code differs (no code changed)
 
-- `internal/wl/scan.go:78-89` → `internal/openwrt/scan.go:368, 376-387`: `interference` is the chanim noise floor (block = the highest noise of its parts). Every channel looks interference-free, and random noise-floor differences decide the ranking.
-- `internal/openwrt/scan.go:366-395` (`Spectrum`): returns 20 MHz rows plus 40/80 MHz blocks together for every request. `scan-bw` is logged and ignored (`cmd/udeco-ap/actions.go:62-65`).
-- `internal/openwrt/scan.go:468-475` (`SpectrumRows`): sends only 5 of the 9 keys.
+- `internal/wl/scan.go:78-89` → `upstream's openwrt/scan.go:368, 376-387`: `interference` is the chanim noise floor (block = the highest noise of its parts). Every channel looks interference-free, and random noise-floor differences decide the ranking.
+- `upstream's openwrt/scan.go:366-395` (`Spectrum`): returns 20 MHz rows plus 40/80 MHz blocks together for every request. `scan-bw` is logged and ignored (`cmd/udeco-ap/actions.go:62-65`).
+- `upstream's openwrt/scan.go:468-475` (`SpectrumRows`): sends only 5 of the 9 keys.
 - `internal/wl/parse.go:292-298`: `utilization` = `txdur + inbss + obss + nocat + nopkt` from acsd2's or our "last scan" values. It is fine as a busy %, but it counts our own BSS on the home channel.
 - `cmd/udeco-ap/scan.go:79` and `actions.go:65`: a quick-scan sets `spectrum_scanning=true`. `quickscan_scanning` and `spectrum_scanning_abnormal` are never sent.
 - `cmd/udeco-ap/scan.go:103-107`: `spectrum_table` and its time are left out until the first scan. That is probably fine, since a freshly booted real AP has no rftable either; not verified.
-- scan_table: `internal/openwrt/scan.go:449-461` sends `is_unifi`/`serialno` and `rssi = signal + 95`, without `is_ubnt`, `noise`, `rssi_age` or `ap_name` (§7).
+- scan_table: `upstream's openwrt/scan.go:449-461` sends `is_unifi`/`serialno` and `rssi = signal + 95`, without `is_ubnt`, `noise`, `rssi_age` or `ap_name` (§7).
 
 ---
 

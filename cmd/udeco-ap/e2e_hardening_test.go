@@ -21,7 +21,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 )
 
 // liveRe matches the worker's "this system_cfg is live" line.

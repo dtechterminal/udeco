@@ -16,9 +16,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/pathmon"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/pathmon"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // pathmonState is the agent's path monitor (loop goroutine fields).

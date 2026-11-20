@@ -9,8 +9,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/translate"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // Transmit power presets (docs/deco/features/tx-power.md). A U6 Pro maps

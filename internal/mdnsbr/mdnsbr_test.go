@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // --- DNS message builder (uncompressed unless a test adds pointers) ---

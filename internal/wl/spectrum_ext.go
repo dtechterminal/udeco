@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // Spectrum runners of other drivers. A SpectrumRunner made by

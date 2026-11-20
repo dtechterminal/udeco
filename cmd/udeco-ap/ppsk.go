@@ -3,8 +3,8 @@
 package main
 
 import (
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // desiredPSKs maps a WLAN's private pre-shared keys (translate.PSK, from

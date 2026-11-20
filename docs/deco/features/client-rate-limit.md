@@ -185,7 +185,7 @@ supported on platform jio-mtk; not applied" and keeps the list in the
 session. No tc or other command runs there.
 
 The other users of `internal/device` apply nothing either: `cmd/udeco` (the
-app-API Deco runner) logs the action as ignored, `cmd/uow` (OpenWrt) drops it
+app-API Deco runner) logs the action as ignored, upstream's `uow` (OpenWrt) drops it
 silently; both now log the parsed `cmd rate-update` event and keep the list
 in their state.json instead of noting the cmd as unhandled.
 

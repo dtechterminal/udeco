@@ -8,7 +8,7 @@ import (
 	"math"
 	"regexp"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // Caps are the static hardware facts of the unit, as the driver reports

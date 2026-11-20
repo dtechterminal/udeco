@@ -5,7 +5,7 @@ package models
 import (
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/dtechterminal/udeco/internal/inform"
 )
 
 func TestCatalog(t *testing.T) {

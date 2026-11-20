@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/stasnoop"
 )
 
 // The downlink watchdog. Seen on the Garage 2026-11-20 (the pump, a Tuya

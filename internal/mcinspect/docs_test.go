@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // The bounds docs/deco/features/multicast-inspect.md lists are this

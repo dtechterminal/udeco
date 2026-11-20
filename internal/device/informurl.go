@@ -21,7 +21,7 @@ import (
 // SSH set-adopt/set-inform. A rejected URL leaves the old one in place.
 // The start URL of the other two daemons does not: cmd/udeco's config has
 // a wider rule of its own (startInformURL, with a test of the difference)
-// and cmd/uow's -url flag is not checked.
+// and upstream uow's -url flag is not checked.
 func CheckInformURL(s string) error {
 	u, err := url.Parse(s)
 	if err != nil {

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 )
 
 // clocked is an applier on f whose monotonic clock the test moves.

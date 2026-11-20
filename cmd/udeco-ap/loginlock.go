@@ -41,8 +41,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // loginLocker is the optional part of sysManager that locks

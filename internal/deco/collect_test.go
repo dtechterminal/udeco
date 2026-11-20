@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/openwrt"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files in testdata")
@@ -79,15 +79,15 @@ func TestCollectGolden(t *testing.T) {
 	}
 }
 
-func vapsOf(r openwrt.Radio) map[string]openwrt.Radio {
-	m := map[string]openwrt.Radio{}
+func vapsOf(r apstate.Radio) map[string]apstate.Radio {
+	m := map[string]apstate.Radio{}
 	for _, v := range r.VAPs {
 		m[v.Iface] = v
 	}
 	return m
 }
 
-func stationMACs(v openwrt.Radio) string {
+func stationMACs(v apstate.Radio) string {
 	var out []string
 	for _, st := range v.Stations {
 		out = append(out, st.MAC)
@@ -202,7 +202,7 @@ func TestCollectStations(t *testing.T) {
 	phone := vapsOf(sat.Radios[1])["main"].Stations[0]
 	tests := []struct {
 		name                string
-		st                  openwrt.Station
+		st                  apstate.Station
 		signal, tx, rx, mhz int
 		conn                int64
 		ht, vht, he         bool
@@ -233,7 +233,7 @@ func TestCollectFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info := openwrt.CfgInfo{
+	info := apstate.CfgInfo{
 		IDs:      map[string]string{"Home": "w1", "Home-Guest": "w2"},
 		DevName:  map[string]string{"Home|wifi0": "ath0", "Home-Guest|wifi0": "ath1", "Home|wifi1": "ath2", "Home-Guest|wifi1": "ath3"},
 		GuestVAP: map[string]bool{"ath1": true, "ath3": true},
@@ -278,7 +278,7 @@ func TestCollectFields(t *testing.T) {
 func TestCollectByteCounters(t *testing.T) {
 	s := loadState(t)
 	c := newCollector(t, testUnits[1])
-	phoneBytes := func(snap *openwrt.Snapshot) (int64, int64) {
+	phoneBytes := func(snap *apstate.Snapshot) (int64, int64) {
 		st := vapsOf(snap.Radios[1])["main"].Stations[0]
 		return st.TxBytes, st.RxBytes
 	}
@@ -350,7 +350,7 @@ func TestCollectErrorsAndSkeleton(t *testing.T) {
 	if sk.Uptime != 3600 || sk.MAC != "b0:a7:b9:3e:16:94" || len(sk.Radios) != 2 || len(sk.Ports) != 1 || sk.ARP == nil {
 		t.Fatalf("skeleton: %+v", sk)
 	}
-	f := sk.Fields(nil, openwrt.CfgInfo{}, nil)
+	f := sk.Fields(nil, apstate.CfgInfo{}, nil)
 	if len(f["radio_table"].([]map[string]any)) != 2 || f["uptime"] != int64(3600) || f["if_table"] == nil {
 		t.Fatalf("skeleton fields: %v", f)
 	}

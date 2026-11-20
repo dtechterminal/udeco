@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 )
 
 // steerBanWifi has the steering and the ban primitives.

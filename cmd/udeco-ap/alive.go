@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/dtechterminal/udeco/internal/atomicfile"
+	"github.com/dtechterminal/udeco/internal/device"
 )
 
 // The alive record (R13): a small file on flash, rewritten at start, every

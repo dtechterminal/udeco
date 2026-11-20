@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // deploy/jio-start.sh's gateway guard, run without a device: guard.conf

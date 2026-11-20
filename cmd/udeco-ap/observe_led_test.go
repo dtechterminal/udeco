@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 )
 
 // TestJioDropToObserveEndsLocate: on jio-mtk nothing but the agent sets

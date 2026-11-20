@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/dtechterminal/udeco/internal/device"
 )
 
 // Guest isolation with ebtables (docs/deco/device-capabilities.md).

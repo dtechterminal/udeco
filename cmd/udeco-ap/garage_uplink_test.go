@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
+	"github.com/dtechterminal/udeco/internal/mtkwifi"
 )
 
 type uplinkWifi struct {

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 )
 
 // TestUplinkWatch: isolation after uplinkLossAfter without carrier, back

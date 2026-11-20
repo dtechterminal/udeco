@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // fixtureCaps reads the unit's hardware caps with the real collector from

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/deco"
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/deco"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // The inbound fence names TP-Link's management ports as text for iptables.

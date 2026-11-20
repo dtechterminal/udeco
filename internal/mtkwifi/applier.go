@@ -21,9 +21,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/atomicfile"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 // Runner executes commands on the device.

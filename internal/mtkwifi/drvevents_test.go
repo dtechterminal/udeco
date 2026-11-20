@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
+	"github.com/dtechterminal/udeco/internal/hapdmon"
 )
 
 // rtnlFrame is an RTM_NEWLINK message for ifname carrying one IWEVCUSTOM

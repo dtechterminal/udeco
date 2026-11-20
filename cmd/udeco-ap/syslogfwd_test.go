@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/dtechterminal/udeco/internal/device"
 )
 
 // testSyslogKey is a fake syslog key (never a real one).

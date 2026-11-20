@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // Documents that state what this package defines: each fails here when

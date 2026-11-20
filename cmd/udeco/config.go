@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/deco"
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/dtechterminal/udeco/internal/deco"
+	"github.com/dtechterminal/udeco/internal/models"
 )
 
 // Duration is a time.Duration written as a Go duration string ("15s").

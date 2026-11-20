@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
-	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/device"
+	"github.com/dtechterminal/udeco/internal/inform"
+	"github.com/dtechterminal/udeco/internal/jioports"
+	"github.com/dtechterminal/udeco/internal/models"
+	"github.com/dtechterminal/udeco/internal/rf"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 // DefaultConfigPath is where persist_shell.sh starts the agent from.

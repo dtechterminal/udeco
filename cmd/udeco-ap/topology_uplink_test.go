@@ -5,7 +5,7 @@ package main
 import (
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // The Deco's eth0 row has the wired U6 Pro's key set (docs/reference/u6pro):

@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // Band steering primitive. The X20 has no Broadcom steering daemon (no

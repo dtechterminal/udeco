@@ -33,8 +33,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/deco"
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/dtechterminal/udeco/internal/deco"
+	"github.com/dtechterminal/udeco/internal/inform"
 )
 
 const (

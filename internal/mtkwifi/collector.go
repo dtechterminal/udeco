@@ -16,10 +16,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/rf"
+	"github.com/dtechterminal/udeco/internal/unit"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // CollectorOptions configures a Collector.

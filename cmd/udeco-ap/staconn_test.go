@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
-	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
+	"github.com/dtechterminal/udeco/internal/hapdmon"
+	"github.com/dtechterminal/udeco/internal/stasnoop"
 )
 
 const (

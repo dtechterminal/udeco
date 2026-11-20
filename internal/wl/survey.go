@@ -5,7 +5,7 @@ package wl
 import (
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // surveyState turns successive `wl chanim_stats us` rows of one radio into

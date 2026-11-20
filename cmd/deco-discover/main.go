@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/deco"
+	"github.com/dtechterminal/udeco/internal/deco"
 )
 
 func main() {

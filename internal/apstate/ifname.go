@@ -6,7 +6,7 @@ package apstate
 // what the interface names of the supported units are made of (wl1.2,
 // eth0.4.1, br-lan, rai0, phy0-ap0), and nothing a shell could read as
 // anything else. It is the one character rule behind the validators of
-// internal/wl, internal/bcmwifi and internal/openwrt.
+// internal/wl, internal/bcmwifi and upstream's openwrt package.
 //
 // A name that starts with '-' passes: a caller that puts the name where a
 // command would take an option refuses that itself (wl's ifaceOK does).

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/mtkwifi"
 )
 
 // gateWifi is a Wi-Fi backend with mtkwifi's restart gate.

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 // Env is the unit as the planner needs it (the agent reads it from its

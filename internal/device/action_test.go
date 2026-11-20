@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // Actions() is the list the agents' tests walk: it must have every Act*

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/hapdmon"
 )
 
 func staReading(up int64, vaps map[string][][2]any) map[string]any {

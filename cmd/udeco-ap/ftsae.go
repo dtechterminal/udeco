@@ -6,8 +6,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/ftpeer"
 )
 
 // FT-SAE (802.11r for WPA3 clients) between the units running the agent.

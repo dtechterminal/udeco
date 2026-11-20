@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/device"
+	"github.com/dtechterminal/udeco/internal/models"
 )
 
 // mtkCfg is the U6-Lite system_cfg with MediaTek devnames (two 5 GHz SSIDs

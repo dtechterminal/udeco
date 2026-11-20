@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	wlcaps "github.com/antoniocosta/unifi-openwrt/internal/wl" // planRadio has a local wl
+	wlcaps "github.com/dtechterminal/udeco/internal/wl" // planRadio has a local wl
 )
 
 // StepKind says what a Step does.

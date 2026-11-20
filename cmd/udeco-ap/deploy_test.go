@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 // deploy/deco-ap.sh, judged without a device: --preflight-file feeds the

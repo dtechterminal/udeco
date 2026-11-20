@@ -19,7 +19,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 )
 
 // clientShaper is bcmwifi's per-client speed limits. Optional: a Wi-Fi

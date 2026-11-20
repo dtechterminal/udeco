@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/deco"
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/deco"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // What surrounds the daemon and cannot read its code: the image
@@ -510,10 +510,9 @@ func TestDockerfileGoVersion(t *testing.T) {
 	if len(tags) != 1 || tags[0] != gomod[1] {
 		t.Errorf("%s builds with golang:%q, go.mod says go %s", dockerfile, tags, gomod[1])
 	}
-	// the documents leave the number to go.mod
-	repotest.MustContain(t, "docs/packaging.md", "needs the Go version in `go.mod`")
-	if regexp.MustCompile(`golang[: ]\d`).MatchString(repotest.Read(t, "docs/packaging.md") + repotest.Read(t, designDoc)) {
-		t.Errorf("docs/packaging.md or %s names a Go version again", designDoc)
+	// the design document leaves the number to go.mod
+	if regexp.MustCompile(`golang[: ]\d`).MatchString(repotest.Read(t, designDoc)) {
+		t.Errorf("%s names a Go version again", designDoc)
 	}
 }
 

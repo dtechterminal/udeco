@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
+	"github.com/dtechterminal/udeco/internal/ftpeer"
 )
 
 // FT-SAE peers: the other units' key holders each FT-SAE BSS lists

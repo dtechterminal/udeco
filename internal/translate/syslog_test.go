@@ -25,7 +25,7 @@ func TestSyslog(t *testing.T) {
 }
 
 // The port for a system_cfg without syslog.remote.port. The intent gives
-// DefaultSyslogPort to an encrypted target too, where cmd/uow's forwarder
+// DefaultSyslogPort to an encrypted target too, where upstream uow's forwarder
 // (syslogForwarder) takes DefaultEncryptedSyslogPort: kept as it is until
 // one reader serves both.
 func TestSyslogDefaultPorts(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 // Bridger is what the port VLANs need of the Wi-Fi applier

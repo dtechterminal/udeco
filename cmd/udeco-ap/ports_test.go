@@ -16,10 +16,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/jioports"
+	"github.com/dtechterminal/udeco/internal/models"
 )
 
 // portsWifi is the fake Wi-Fi backend with mtkwifi's port bridging: an

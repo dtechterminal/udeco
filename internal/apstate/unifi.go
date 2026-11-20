@@ -4,9 +4,9 @@ package apstate
 
 import (
 	"fmt"
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/models"
+	"github.com/dtechterminal/udeco/internal/rf"
+	"github.com/dtechterminal/udeco/internal/translate"
 	"sort"
 	"strings"
 )

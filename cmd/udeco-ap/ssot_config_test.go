@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
-	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/jioports"
+	"github.com/dtechterminal/udeco/internal/models"
+	"github.com/dtechterminal/udeco/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // Tests that hold the agent's config (config.go) to itself and to what

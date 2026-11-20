@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/dtechterminal/udeco/internal/inform"
 )
 
 // postFunc sends body to rawURL and returns the HTTP status and the answer's

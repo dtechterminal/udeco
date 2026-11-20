@@ -1,10 +1,10 @@
-unifi-openwrt
+udeco
 SPDX-License-Identifier: GPL-2.0-or-later (see LICENSE)
 
-unifi-openwrt is not affiliated with, endorsed by or supported by Ubiquiti
-Inc. or the OpenWrt project. "UniFi" and "Ubiquiti" are trademarks of
-Ubiquiti Inc.; "OpenWrt" is a trademark of its owner. The names are used
-only to say what this software works with.
+udeco is not affiliated with, endorsed by or supported by Ubiquiti Inc.,
+TP-Link or Reliance Jio. "UniFi" and "Ubiquiti" are trademarks of Ubiquiti
+Inc.; "Deco" and "TP-Link" of TP-Link; "JioFiber" of Reliance Jio. The
+names are used only to say what this software works with.
 
 No Ubiquiti software, firmware or code is included. Protocol and format
 details were learned from the public projects below and from the behaviour
@@ -12,6 +12,15 @@ of a UniFi controller.
 
 Third-party material
 ====================
+
+0. unifi-openwrt (https://github.com/antoniocosta/unifi-openwrt),
+   GPL-2.0-or-later, by abmc (antoniocosta) and its contributors.
+   udeco is a fork of it: the UniFi inform protocol, adoption, reply
+   handling, the reading model and its inform rendering, the model
+   catalogue and their tests (internal/inform, internal/device,
+   internal/apstate, internal/translate, internal/models and others) began
+   there. Its OpenWrt code was removed; docs/internals.md is its
+   contributor guide, kept for the UniFi findings.
 
 1. unifi-emu (https://github.com/jamesbraid/unifi-emu), MIT License,
    Copyright (c) 2026 James Braid.

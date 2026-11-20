@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
-	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/device"
+	"github.com/dtechterminal/udeco/internal/inform"
+	"github.com/dtechterminal/udeco/internal/models"
+	"github.com/dtechterminal/udeco/internal/mtkwifi"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 type netWifi struct {

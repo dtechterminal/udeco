@@ -57,9 +57,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/jioports"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // portState: ctr belongs to the loop goroutine; mgr (set at setup) and

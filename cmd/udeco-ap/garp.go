@@ -25,10 +25,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
-	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/hapdmon"
+	"github.com/dtechterminal/udeco/internal/stasnoop"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 const garpEvery = 10 * time.Second

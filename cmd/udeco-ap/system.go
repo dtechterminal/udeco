@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/decosys"
 )
 
 // agentPATH is set explicitly: persist_shell.sh runs the agent from cron,

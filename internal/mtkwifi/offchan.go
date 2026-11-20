@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/rf"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // Spectrum on the MT7603 (2.4 GHz, ra0, mt7603eap.ko): the off-channel

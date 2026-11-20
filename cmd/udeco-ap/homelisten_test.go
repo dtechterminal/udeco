@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 type homeCol struct {

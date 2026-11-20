@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/dtechterminal/udeco/internal/inform"
 )
 
 // Once adopted, the inform reply is the controller's only authenticated

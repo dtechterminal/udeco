@@ -5,7 +5,7 @@ package inform
 import (
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // The inform POST's headers are the ones a real UniFi AP sends: the

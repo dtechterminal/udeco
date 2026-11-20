@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // The controller's RADIUS filter (aaa.N.filter_id) reaches bcmwifi's

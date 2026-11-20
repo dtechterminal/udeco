@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // Guest WLANs. The JCOW414 has ebtables with the filter table and the ip,

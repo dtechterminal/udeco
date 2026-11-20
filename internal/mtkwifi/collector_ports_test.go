@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // The JCOW414's wired ports are the switch port devices in bdg2

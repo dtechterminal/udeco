@@ -14,7 +14,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // fakeMT7603 is mt7603eap.ko's private ioctls on the test unit, as the

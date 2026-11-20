@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
+	"github.com/dtechterminal/udeco/internal/atomicfile"
 )
 
 // Unhandled is one thing the controller sent that was not acted on.

@@ -23,23 +23,23 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
-	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
-	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
-	"github.com/antoniocosta/unifi-openwrt/internal/jiosys"
-	"github.com/antoniocosta/unifi-openwrt/internal/lldp"
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
-	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/pathmon"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
-	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/device"
+	"github.com/dtechterminal/udeco/internal/ftpeer"
+	"github.com/dtechterminal/udeco/internal/inform"
+	"github.com/dtechterminal/udeco/internal/jioports"
+	"github.com/dtechterminal/udeco/internal/jiosys"
+	"github.com/dtechterminal/udeco/internal/lldp"
+	"github.com/dtechterminal/udeco/internal/models"
+	"github.com/dtechterminal/udeco/internal/mtkwifi"
+	"github.com/dtechterminal/udeco/internal/pathmon"
+	"github.com/dtechterminal/udeco/internal/rf"
+	"github.com/dtechterminal/udeco/internal/stasnoop"
+	"github.com/dtechterminal/udeco/internal/translate"
+	"github.com/dtechterminal/udeco/internal/unit"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // collector is what the agent uses of *wl.Collector.
@@ -1094,7 +1094,7 @@ func (a *agent) guestAuthorized(s *apstate.Snapshot, now time.Time) map[string]b
 // informOnce sends one inform and handles the answer. ok=false counts as
 // a bad answer.
 //
-// It follows device.InformOnce (the inform of cmd/udeco and cmd/uow) step
+// It follows device.InformOnce (the inform of cmd/udeco and upstream's uow) step
 // by step, with the same log lines, and is kept apart from it because the
 // agent runs on the unit itself and is stricter: a reply must decode with
 // the key the inform was sealed with (no second try with the factory

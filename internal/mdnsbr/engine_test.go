@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // env205 is .205 as read on 2026-11-19 (br-lan: eth0 eth1 wl02 wl12;

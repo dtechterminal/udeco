@@ -14,8 +14,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/mdnsbr"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/mdnsbr"
 )
 
 // ebSim is a minimal ebtables: FORWARD rules and user chains.

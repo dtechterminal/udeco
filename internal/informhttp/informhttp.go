@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // Package informhttp is the inform POST over net/http, for the daemons
-// that inform from a host with room for it (cmd/udeco, cmd/uow). It is a
+// that inform from a host with room for it (cmd/udeco, upstream's uow). It is a
 // package of its own because internal/device is linked into the AP agent
 // (cmd/udeco-ap), which must stay without net/http and brings its own
 // small client (cmd/udeco-ap/post.go).
@@ -12,8 +12,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/dtechterminal/udeco/internal/device"
+	"github.com/dtechterminal/udeco/internal/inform"
 )
 
 // Poster returns the inform POST through c, for device.InformOnce: the

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
+	"github.com/dtechterminal/udeco/internal/ftpeer"
 )
 
 // 802.11r (fast BSS transition) for the agent's SSIDs.

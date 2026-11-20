@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/mdnsbr"
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/mdnsbr"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // Tests that hold the agent's small helpers to the one copy each now calls
@@ -100,7 +100,7 @@ func (refuseAll) Run(context.Context, string, ...string) ([]byte, error) {
 }
 
 // The two interface-name rules, side by side. apstate.IfNameChars is the
-// character rule of internal/wl, internal/bcmwifi and internal/openwrt;
+// character rule of internal/wl, internal/bcmwifi and upstream's openwrt package;
 // internal/mdnsbr, which does not import apstate, has its own and wants a
 // letter or a digit first. Every name of the supported units passes both,
 // and they part only on a first character of '-', '.' or '_'.

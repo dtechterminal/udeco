@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 )
 
 func testARP(op uint16, ethDst, sha string, spa string, tha string, tpa string) []byte {

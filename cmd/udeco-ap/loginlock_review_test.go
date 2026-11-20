@@ -18,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/inform"
+	"github.com/dtechterminal/udeco/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 // stamped is a noop reply with the controller's time (ms).

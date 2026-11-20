@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/ftpeer"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // hapdRadio is the input to renderHostapd for one radio.

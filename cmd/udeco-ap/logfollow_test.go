@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/dtechterminal/udeco/internal/device"
 )
 
 func appendFile(t *testing.T, path, s string) {

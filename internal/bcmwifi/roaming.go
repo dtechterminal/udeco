@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // Roaming Assistant primitive (docs/deco/features/roaming-assistant.md).

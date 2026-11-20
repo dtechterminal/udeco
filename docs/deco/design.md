@@ -23,7 +23,7 @@
    - `--network host` on 192.168.0.4.
    - One shared daemon IP, with a different `sshd_port` per emulated AP: 22201, 22202 and 22203.
    - Never put a Deco MAC on a macvlan, which would cause an ARP conflict with the real Deco.
-5. **Upstream code is reused unchanged:** `internal/inform`, `internal/device`, `internal/models`, `internal/unifiapi`, plus `openwrt.Snapshot`, `Fields`, `InfoFromCfg` and satisfaction. There is one additive file, `internal/translate/wlans.go`. `cmd/uow` is untouched.
+5. **Upstream code is reused unchanged:** `internal/inform`, `internal/device`, `internal/models`, upstream's `unifiapi`, plus `openwrt.Snapshot`, `Fields`, `InfoFromCfg` and satisfaction. There is one additive file, `internal/translate/wlans.go`. upstream's `uow` is untouched.
 
 ## 1. Facts this design rests on
 

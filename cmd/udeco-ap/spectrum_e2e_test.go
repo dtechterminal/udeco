@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // specFake answers the spectrum runner's `wl` calls for wl0 (home control

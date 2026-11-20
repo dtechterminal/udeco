@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/decosys"
 )
 
 // Tests that hold a value of this package to the package that owns it,

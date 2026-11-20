@@ -1,5 +1,15 @@
 # Internals
 
+> **Origin.** This guide comes from
+> [unifi-openwrt](https://github.com/antoniocosta/unifi-openwrt), the
+> project udeco was forked from, which ran OpenWrt access points as UniFi
+> APs. Its UniFi findings (inform protocol, adoption and keys, replies,
+> stats, the Wi-Fi Experience score, the model catalogue) are what udeco's
+> shared packages implement, and tests hold this guide to them. The
+> sections on OpenWrt itself (UCI options, `uow` flags, OpenWrt rendering,
+> mesh) describe upstream's OpenWrt code, which udeco removed; udeco's own
+> design is in [docs/deco](deco/).
+
 How unifi-openwrt works, for contributors. Everything here was worked out against
 UniFi Network 10.6 and UAP firmware 6.8.2; other versions may differ.
 
@@ -172,7 +182,7 @@ logd's `log_ip` / `log_port` instead.
 
 The controller provisions a UniFi AP with `system_cfg`: flat
 `section.N.key=value` lines (several KB). `internal/translate` turns it into
-OpenWrt UCI changes; `internal/openwrt` applies them and runs the parts that
+OpenWrt UCI changes; upstream's `openwrt` package applies them and runs the parts that
 are not UCI (nftables, tc, usteer, snmpd, hostapd runtime lists).
 
 ### How a change is applied
@@ -247,7 +257,7 @@ right before the first adoption).
 ## Stats in the inform
 
 What the daemon reads on the AP and where the controller expects it. Code:
-`internal/openwrt/collect.go` (reading), `internal/apstate/unifi.go` (inform
+upstream's `openwrt/collect.go` (reading), `internal/apstate/unifi.go` (inform
 fields), `internal/apstate/satisfaction.go`.
 
 ### Reading the AP
@@ -544,7 +554,7 @@ Whether a given model is accepted depends on the controller version: Network
 
 ## Status LED
 
-Code: `internal/openwrt/led.go` (states and renderer), `internal/openwrt/actions.go`.
+Code: upstream's `openwrt/led.go` (states and renderer), upstream's `openwrt/actions.go`.
 
 ### What a UniFi AP shows
 
@@ -594,7 +604,7 @@ LED rings. Empty (the default) behaves like the UniFi model.
 An AP adopted with UCI `mesh_uplink '1'` joins the site's UniFi mesh as a
 wireless uplink when it has no cable, like a UniFi AP that loses its wire.
 Tested: an OpenWrt AP meshing to a UniFi console's AP, shown as "Meshing to"
-the parent in the UniFi. Code: `internal/openwrt/mesh.go`,
+the parent in the UniFi. Code: upstream's `openwrt/mesh.go`,
 `internal/apstate/unifi.go` (`uplinkVAP`).
 
 ### What the controller sends
@@ -698,7 +708,7 @@ port list.
 
 ## Guest WLANs and the guest portal
 
-Code: `internal/translate/guest.go`, `internal/openwrt/guest.go`,
+Code: `internal/translate/guest.go`, upstream's `openwrt/guest.go`,
 `internal/device/portal.go`.
 
 ### Isolation
@@ -747,7 +757,7 @@ time as timeout, and redirects to `url`. A forged cookie gets 403.
 
 ## RF scan and 802.11k neighbour list
 
-Code: `internal/openwrt/scan.go`, `internal/openwrt/rrm.go`, `cmd/uow/scan.go`.
+Code: upstream's `openwrt/scan.go`, upstream's `openwrt/rrm.go`, upstream's `uow/scan.go`.
 
 ### What the controller reads
 

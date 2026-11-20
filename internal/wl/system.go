@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // readSystem fills the system fields of s from /proc, /sys and /tmp under
@@ -148,7 +148,7 @@ func parseRoute(s string) string {
 }
 
 // parseARP reads /proc/net/arp into mac -> ip (complete entries only:
-// internal/openwrt's Parse keeps an incomplete one that has a MAC, so the
+// upstream's openwrt package's Parse keeps an incomplete one that has a MAC, so the
 // two readers stay two, apstate/proc.go).
 func parseARP(s string) map[string]string {
 	m := map[string]string{}

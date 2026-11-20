@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // ScanPlan shapes one band measurement. DefaultScanPlan returns the design

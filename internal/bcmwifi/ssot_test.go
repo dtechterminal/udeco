@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // Tests that hold bcmwifi to the Intent vocabulary and rules of

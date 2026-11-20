@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/hs20"
+	"github.com/dtechterminal/udeco/internal/hs20"
 )
 
 func testHotspot2() *Hotspot2 {

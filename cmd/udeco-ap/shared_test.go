@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // What the agent takes from the shared packages (rf, unit, bcmwifi), as

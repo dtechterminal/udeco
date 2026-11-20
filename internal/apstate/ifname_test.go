@@ -5,7 +5,7 @@ package apstate
 import "testing"
 
 // IfNameChars: 1 to 15 characters of [A-Za-z0-9._-], whatever the first.
-// internal/wl, internal/bcmwifi and internal/openwrt hold their validators
+// internal/wl, internal/bcmwifi and upstream's openwrt package hold their validators
 // to the same answers (each had its own copy of this loop or pattern).
 func TestIfNameChars(t *testing.T) {
 	for _, c := range []struct {

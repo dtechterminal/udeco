@@ -5,8 +5,8 @@ package models
 import (
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/inform"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // The model codes named in agent.go are catalogue entries, and the agent's
@@ -59,16 +59,13 @@ func TestDefaultModelIsU7PG2(t *testing.T) {
 	}
 }
 
-// The default model is also written where Go cannot be asked: the OpenWrt
-// package's own fallback and shipped config (a device script and its UCI
-// file, self-contained on purpose), the example config of cmd/udeco, and
-// the docs that tell the reader what they get without choosing.
+// The default model is also written where Go cannot be asked: the example
+// config of cmd/udeco, and the docs that tell the reader what they get
+// without choosing.
 func TestDefaultModelWhereItIsWritten(t *testing.T) {
 	code, display, version := DefaultModel, inform.U7PG2ModelDisplay, inform.U7PG2Version
 	for rel, phrases := range map[string][]string{
-		"packaging/files/etc/init.d/unifi-openwrt": {"config_get model main model '" + code + "'"},
-		"packaging/files/etc/config/unifi-openwrt": {"option model '" + code + "'"},
-		"deploy/udeco.example.json":                {`"model": "` + code + `",`},
+		"deploy/udeco.example.json": {`"model": "` + code + `",`},
 		"docs/internals.md": {"(default `" + code + "`, `" + display + "`, `" + version + "`)",
 			"default `" + code + "`, " + display + ")"},
 		"docs/deco/README.md": {"(default model `" + code + "`)"},

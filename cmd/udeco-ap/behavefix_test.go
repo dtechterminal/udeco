@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
-	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/hapdmon"
+	"github.com/dtechterminal/udeco/internal/stasnoop"
 )
 
 // While the uplink-loss hold stands, a reading with only one other port

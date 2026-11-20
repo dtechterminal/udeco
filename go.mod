@@ -1,4 +1,4 @@
-module github.com/antoniocosta/unifi-openwrt
+module github.com/dtechterminal/udeco
 
 go 1.26.0
 

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // sweepBackend stands in for the MT7603 sweep: 2.4 GHz rows 1..11 at 20

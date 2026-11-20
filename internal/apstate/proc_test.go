@@ -9,7 +9,7 @@ import (
 )
 
 // ParseCPULine on what each caller hands it: internal/wl the first line
-// of /proc/stat, internal/openwrt the output of `head -1 /proc/stat`. The
+// of /proc/stat, upstream's openwrt package the output of `head -1 /proc/stat`. The
 // answers are what the two gave while each summed the line itself.
 func TestParseCPULine(t *testing.T) {
 	for _, c := range []struct {

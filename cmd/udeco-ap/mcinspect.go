@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/mcinspect"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/mcinspect"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // mcastRetry is how long a VAP whose socket failed to open waits before

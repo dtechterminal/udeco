@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 )
 
 // macDump is the JCOW414's MT7603 table as printed (2026-11-19, keys in

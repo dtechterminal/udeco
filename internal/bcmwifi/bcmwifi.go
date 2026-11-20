@@ -59,9 +59,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/ftpeer"
+	"github.com/dtechterminal/udeco/internal/unit"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // Runner executes a command and returns its stdout. It is the same small

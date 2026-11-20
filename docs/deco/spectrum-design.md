@@ -36,7 +36,7 @@ REV2: T1, T2, T3, T5, T7, T8 and a lite T4 have now run (§12 has the status of 
 - Device side: 7 saved 2.4 GHz sweeps on .205. They live in the session scratchpad `/private/tmp/claude-501/-private-tmp/98c08704-0f7d-42d1-8ad0-d700c555e21a/scratchpad/spec/raw/` (`e1.txt` .. `e7_wl0_passive_p50_r2.txt`), with SSIDs hashed and vendor IEs dropped. The `wl -h` dump is in `.../scratchpad/wl-h.txt`. The per-field model used for the worked numbers below is `.../scratchpad/spec/design/model.py`. These files must be copied into `internal/wl/testdata/spectrum/` (§11.4), because the scratchpad can be wiped.
   - REV2: done. The e1-e7 files are now in `internal/wl/testdata/spectrum/` next to the `t*` captures, and that folder's `README.md` describes every file and line format.
 - REV2: device tests: `docs/deco/spectrum-measurements.md` (one section per test) and the `t0`..`t8`, `trx_*`, `t_final_state` captures in `internal/wl/testdata/spectrum/`.
-- Code: `internal/wl/scan.go`, `parse.go` (`parseChanimAll`), `survey.go`, `collect.go`, `internal/openwrt/scan.go` (`Spectrum`, `SpectrumRows`), `cmd/udeco-ap/scan.go`, `actions.go`, `wifi.go`.
+- Code: `internal/wl/scan.go`, `parse.go` (`parseChanimAll`), `survey.go`, `collect.go`, upstream's `openwrt/scan.go` (`Spectrum`, `SpectrumRows`), `cmd/udeco-ap/scan.go`, `actions.go`, `wifi.go`.
 
 ---
 
@@ -186,7 +186,7 @@ Off-channel share comes from beacon counting. At idle wl0 sends 19.2 beacons/s.
 - REV2: `chanim_stats` without `all` returns the **current** home chanspec's interval stats (`tx inbss obss nocat nopkt … knoise idle`, plus `chan_util`) [M `trx_rxiqest_default.txt`]. Not used; noted as a cross-check (§2.2).
 - `assoclist` ("AP only: Get the list of associated MAC addresses") [D wl -h:3325]. `dfs_status` [D wl -h:844].
 - `chanim_mode` is `external (acsd)` and interference mitigation is 361 on both radios [M]. `wl help <cmd>` fails; use `wl -h` [M].
-- The OpenWrt path already scans one channel per step "about 0.1 s away, then 1 s back on its channel" (`internal/openwrt/scan.go:62-66`) [D]. The chunked plan follows the same principle.
+- The OpenWrt path already scans one channel per step "about 0.1 s away, then 1 s back on its channel" (`upstream's openwrt/scan.go:62-66`) [D]. The chunked plan follows the same principle.
 
 ---
 
@@ -714,7 +714,7 @@ Changes to existing code:
 - `Collector.sleep` / `now` stay the test hooks, so plan timing is tested without real sleeps.
 - The package doc's "only mutating command is `wl scan`" becomes "`wl scan` and `wl scanabort`".
 
-### 11.2 `internal/openwrt`
+### 11.2 upstream's `openwrt` package
 
 - `SpectrumEntry` gains `OtherBSS, PerfIndex, TotalSamples int` and `InterferenceType []string`.
 - `SpectrumRows` emits all 9 keys, with `interference_type` as `[]`, never `null` [D CE §3: every real row carries all 9 keys].
@@ -841,7 +841,7 @@ Expected numbers are from `design/model.py` on the fixtures. The `Nhome = -97` c
 - VERIFIER: `TestChannelInterference` additions: a record with `txdur 58` and noise -71 gives no `N_elev`. `N_elev` is relative to the sweep's chanim baseline (§4.2 VERIFIER).
 - VERIFIER: `TestBSSPower` addition, if the primary rule in §4.2 is adopted: a 40 MHz BSS at -50 with primary 9 gives ch9 → -50 and ch5 → -53. This replaces ch9 in the "ch5..9 → -53" expectation above, and `TestChannelInterference` p200 ch9 becomes -50.
 
-`internal/openwrt`:
+upstream's `openwrt` package:
 - `TestSpectrumRowsNineKeys`: every row has the 9 keys and `interference_type` marshals to `[]`.
 
 `cmd/udeco-ap`:
@@ -955,7 +955,7 @@ Still [A]:
 
 ## Implementation (build)
 
-Built 2026-11-19 inside `internal/wl` only (no device touched; `cmd/udeco-ap`, `internal/openwrt` unchanged). The `go doc` of `wl.SpectrumRunner` has the full API comment.
+Built 2026-11-19 inside `internal/wl` only (no device touched; `cmd/udeco-ap`, upstream's `openwrt` package unchanged). The `go doc` of `wl.SpectrumRunner` has the full API comment.
 
 **Files.** `spectrum.go` (runner, gate, guard, band lock), `spectrum_calc.go` (pure: records, classes, §4 formulas, blocks, rows, `cca_get_stats` parser), `spectrum_test.go` + `spectrum_calc_test.go`. Small edits: `collect.go` (current-channel reads go through `readCurrent`), `wl.go` (Collector fields; `scanMu` is now a ctx-aware lock with the same `Lock`/`Unlock`), `caps.go` (keeps each radio's chanspec list for blocks).
 
@@ -984,7 +984,7 @@ Errors: `ErrScanAborted` (ctx, Budget, client drop, Guard), `ErrIncomplete` (a n
 - Synthetic fakes: sticky unmeasured set across bands, STALE re-read and one retry, fallback trigger, hex-style rejection → sweep, mode remembered, Busy retry, guard / budget / cancel / client-drop aborts with `scanabort`, CallMax, chanspec mismatch, all-ZERO band fails with the old table kept, Collect during a band reports the band-start chanspec and never reads `wl chanspec`.
 
 **Differences from §11 (decided while building).**
-- Per-radio `SpectrumRunner` instead of `Collector.MeasureSpectrum`; rows are `wl.SpectrumRow` (9 keys) because `internal/openwrt` was out of scope (`SpectrumRow.Entry()` gives the 5-key `openwrt.SpectrumEntry`). `Associated` is internal to the client guard. `ScanPlan` has no `Chunk`; it adds `StaleReread`, `BusyRetry/BusyTries`, `SweepGap`, `SweepMax` (5 s, [A]), the gate and client-guard numbers.
+- Per-radio `SpectrumRunner` instead of `Collector.MeasureSpectrum`; rows are `wl.SpectrumRow` (9 keys) because upstream's `openwrt` package was out of scope (`SpectrumRow.Entry()` gives the 5-key `openwrt.SpectrumEntry`). `Associated` is internal to the client guard. `ScanPlan` has no `Chunk`; it adds `StaleReread`, `BusyRetry/BusyTries`, `SweepGap`, `SweepMax` (5 s, [A]), the gate and client-guard numbers.
 - The gate runs `cca_get_stats -c 0 -s 5 -i` (`-i` gives the per-second rows the §11.5 0.066 case needs); without rows it uses the Summaries row.
 - The §3.3 STALE trigger fires as soon as the first two candidates are decided (after the second one's retry), not after every retry of pass 1.
 - `scanresults` "Not Found" counts as done only after the dwell. `scanabort` is sent on any error after the first call, but not after "Busy" (that scan is acsd2's) and not for row errors after a finished band.

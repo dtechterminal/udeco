@@ -29,10 +29,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/mdnsbr"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/mdnsbr"
+	"github.com/dtechterminal/udeco/internal/translate"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 type mdnsState struct {

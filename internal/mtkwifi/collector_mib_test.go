@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // mibFixture is what one `iwpriv ra0 show mibinfo` added to the MT7603's

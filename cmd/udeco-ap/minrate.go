@@ -7,8 +7,8 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // Minimum data rate control (docs/deco/features/minrate.md).

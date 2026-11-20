@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // On the JCOW414 the uplink is the WAN socket (eth0.4.1) by wiring. On

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // Neighbour scan from the driver's site survey (`iwpriv <radio>

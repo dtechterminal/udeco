@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/dtechterminal/udeco/internal/inform"
 )
 
-// What cmd/udeco and cmd/uow put on the wire, as before they shared this:
+// What cmd/udeco and upstream's uow put on the wire, as before they shared this:
 // a POST of the packet as application/x-binary with Go's own User-Agent,
 // and the answer read up to 4 MiB whatever the status.
 func TestPoster(t *testing.T) {

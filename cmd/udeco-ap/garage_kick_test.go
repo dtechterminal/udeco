@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
-	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
-	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/hapdmon"
+	"github.com/dtechterminal/udeco/internal/mtkwifi"
 )
 
 // TestKickedLeaveStatus: a station the minimum RSSI kick disconnected

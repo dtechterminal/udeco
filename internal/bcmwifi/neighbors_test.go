@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // A peer AP as .205's 5 GHz scan printed .241 (2026-11-19), and a foreign

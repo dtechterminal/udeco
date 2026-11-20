@@ -2,7 +2,7 @@
 
 package deco
 
-// collect.go maps the Mesh cache to one openwrt.Snapshot per Deco unit, the
+// collect.go maps the Mesh cache to one apstate.Snapshot per Deco unit, the
 // reading the upstream inform code turns into a UniFi AP payload
 // (docs/deco/design.md §6). Nothing here does I/O: a runner calls Collect
 // with Mesh.Snapshot() on every inform.
@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/openwrt"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 var (
@@ -168,16 +168,16 @@ func UnitOnline(d *Deco) bool {
 // Skeleton is the reading for a unit the Mesh has not described yet: identity,
 // the uptime since the daemon started, an up eth0 and both radios without
 // VAPs, so the UniFi payload stays valid.
-func (c *Collector) Skeleton(now time.Time) *openwrt.Snapshot {
+func (c *Collector) Skeleton(now time.Time) *apstate.Snapshot {
 	s := c.base(now)
 	s.Uptime = int64(now.Sub(c.start) / time.Second)
-	s.Radios = []openwrt.Radio{c.radio("ng", nil, nil), c.radio("na", nil, nil)}
-	s.Ports = []openwrt.Port{{Name: "eth0", MAC: c.mac, Up: true, Speed: defaultPortMbs, FullDuplex: true, BridgePort: 1}}
+	s.Radios = []apstate.Radio{c.radio("ng", nil, nil), c.radio("na", nil, nil)}
+	s.Ports = []apstate.Port{{Name: "eth0", MAC: c.mac, Up: true, Speed: defaultPortMbs, FullDuplex: true, BridgePort: 1}}
 	return s
 }
 
-func (c *Collector) base(now time.Time) *openwrt.Snapshot {
-	return &openwrt.Snapshot{
+func (c *Collector) base(now time.Time) *apstate.Snapshot {
+	return &apstate.Snapshot{
 		Time:       now,
 		Model:      "TP-Link Deco",
 		Hostname:   c.unit.Name,
@@ -193,7 +193,7 @@ func (c *Collector) base(now time.Time) *openwrt.Snapshot {
 // Collect maps the cached mesh state to this unit's Snapshot. It fails with
 // ErrNoDeviceList or ErrUnitAbsent; the runner then reuses its previous
 // reading or a Skeleton.
-func (c *Collector) Collect(s *MeshState, now time.Time) (*openwrt.Snapshot, error) {
+func (c *Collector) Collect(s *MeshState, now time.Time) (*apstate.Snapshot, error) {
 	if s == nil || s.Devices.Value == nil {
 		return nil, ErrNoDeviceList
 	}
@@ -245,7 +245,7 @@ func (c *Collector) Collect(s *MeshState, now time.Time) (*openwrt.Snapshot, err
 
 	stations, wired, arp := c.assign(s, dev, now)
 	c.integrate(s, stations, wired, now)
-	byBand := map[string]*openwrt.Radio{"ng": &ng, "na": &na}
+	byBand := map[string]*apstate.Radio{"ng": &ng, "na": &na}
 	for _, st := range stations {
 		r := byBand[st.band]
 		v := c.vapFor(r, st.guest, bandOf(wi, st.band))
@@ -253,7 +253,7 @@ func (c *Collector) Collect(s *MeshState, now time.Time) (*openwrt.Snapshot, err
 		st.Station.RxBytes, st.Station.TxBytes = cnt.rx, cnt.tx
 		r.VAPs[v].Stations = append(r.VAPs[v].Stations, st.Station)
 	}
-	for _, r := range []*openwrt.Radio{&ng, &na} {
+	for _, r := range []*apstate.Radio{&ng, &na} {
 		for i := range r.VAPs {
 			v := &r.VAPs[i]
 			sort.Slice(v.Stations, func(a, b int) bool { return v.Stations[a].MAC < v.Stations[b].MAC })
@@ -262,7 +262,7 @@ func (c *Collector) Collect(s *MeshState, now time.Time) (*openwrt.Snapshot, err
 			}
 		}
 	}
-	snap.Radios = []openwrt.Radio{ng, na}
+	snap.Radios = []apstate.Radio{ng, na}
 	snap.Ports, snap.FDB = c.ports(s, dev, wired)
 	for mac, ip := range arp {
 		snap.ARP[mac] = ip
@@ -276,7 +276,7 @@ func (c *Collector) Collect(s *MeshState, now time.Time) (*openwrt.Snapshot, err
 
 // GuestAuthorized lists every station MAC in snap: a Deco guest network has
 // no portal, so every guest that associated is authorized (unifi.go:234-237).
-func GuestAuthorized(snap *openwrt.Snapshot) map[string]bool {
+func GuestAuthorized(snap *apstate.Snapshot) map[string]bool {
 	out := map[string]bool{}
 	if snap == nil {
 		return out
@@ -307,13 +307,13 @@ func bandOf(wi *WirelessInfo, band string) *WirelessBand {
 	return wi.Band5G2
 }
 
-func (c *Collector) radio(band string, wb *WirelessBand, tdp *DecoInfo) openwrt.Radio {
+func (c *Collector) radio(band string, wb *WirelessBand, tdp *DecoInfo) apstate.Radio {
 	idx, name := 0, "wifi0"
 	if band == "na" {
 		idx, name = 1, "wifi1"
 	}
 	spec := c.opts.Radios[band]
-	r := openwrt.Radio{
+	r := apstate.Radio{
 		Iface: name, Phy: fmt.Sprintf("phy%d", idx), Mode: "Master", Band: band,
 		NSS: spec.NSS, TxMin: spec.TxMin, TxMax: spec.TxMax, TxPower: spec.TxMax,
 		Noise: noiseFloor, HWName: "Deco", Stats: zeroStats(),
@@ -360,8 +360,8 @@ func (c *Collector) radio(band string, wb *WirelessBand, tdp *DecoInfo) openwrt.
 
 // vap0 builds an empty VAP. Iface is "main" or "guest"; the inform names VAPs
 // from the controller's devnames, not from this.
-func (c *Collector) vap0(r openwrt.Radio, kind, ssid, enc string) openwrt.Radio {
-	return openwrt.Radio{
+func (c *Collector) vap0(r apstate.Radio, kind, ssid, enc string) apstate.Radio {
+	return apstate.Radio{
 		Iface: kind, Phy: r.Phy, Mode: "Master", Band: r.Band, SSID: ssid,
 		BSSID: SyntheticBSSID(c.mac, r.Band, kind == "guest"), Channel: r.Channel, Width: r.Width,
 		TxPower: r.TxPower, Noise: r.Noise, Encryption: enc, Stats: zeroStats(),
@@ -371,7 +371,7 @@ func (c *Collector) vap0(r openwrt.Radio, kind, ssid, enc string) openwrt.Radio 
 // vapFor returns the index of the VAP for a station, adding one when the
 // client list shows a station on a VAP the wireless info did not (stale
 // 0x4009, or wireless info not read yet).
-func (c *Collector) vapFor(r *openwrt.Radio, guest bool, wb *WirelessBand) int {
+func (c *Collector) vapFor(r *apstate.Radio, guest bool, wb *WirelessBand) int {
 	kind := "main"
 	if guest {
 		kind = "guest"
@@ -424,7 +424,7 @@ func SyntheticBSSID(unitMAC, band string, guest bool) string {
 // ---- stations ----
 
 type assigned struct {
-	openwrt.Station
+	apstate.Station
 	band  string // ng | na
 	guest bool
 }
@@ -657,7 +657,7 @@ func widthOf(s string) int {
 
 // ports builds eth0 (the uplink) and the other Ethernet ports from 0x4327,
 // and the FDB rows that list wired clients on the first LAN port.
-func (c *Collector) ports(s *MeshState, dev *Deco, wired []string) ([]openwrt.Port, []openwrt.FDBEntry) {
+func (c *Collector) ports(s *MeshState, dev *Deco, wired []string) ([]apstate.Port, []apstate.FDBEntry) {
 	type pinfo struct {
 		speed      int
 		up, uplink bool
@@ -700,17 +700,17 @@ func (c *Collector) ports(s *MeshState, dev *Deco, wired []string) ([]openwrt.Po
 			up = i
 		}
 	}
-	eth0 := openwrt.Port{Name: "eth0", MAC: c.mac, Up: true, Speed: defaultPortMbs, FullDuplex: true, BridgePort: 1,
+	eth0 := apstate.Port{Name: "eth0", MAC: c.mac, Up: true, Speed: defaultPortMbs, FullDuplex: true, BridgePort: 1,
 		RxBytes: c.port.rx, TxBytes: c.port.tx}
 	if up >= 0 && infos[up].speed > 0 {
 		eth0.Speed = infos[up].speed
 	}
-	ports := []openwrt.Port{eth0}
+	ports := []apstate.Port{eth0}
 	for i, x := range infos {
 		if i == up || up < 0 && i == 0 {
 			continue // eth0 stands for it
 		}
-		p := openwrt.Port{Name: fmt.Sprintf("eth%d", len(ports)), MAC: c.mac, Up: x.up, FullDuplex: x.up,
+		p := apstate.Port{Name: fmt.Sprintf("eth%d", len(ports)), MAC: c.mac, Up: x.up, FullDuplex: x.up,
 			BridgePort: len(ports) + 1}
 		if x.up {
 			p.Speed = defaultPortMbs
@@ -734,12 +734,12 @@ func (c *Collector) ports(s *MeshState, dev *Deco, wired []string) ([]openwrt.Po
 		lan = 1
 	}
 	if lan < 0 {
-		ports = append(ports, openwrt.Port{Name: "eth1", MAC: c.mac, Up: true, Speed: defaultPortMbs, FullDuplex: true, BridgePort: 2})
+		ports = append(ports, apstate.Port{Name: "eth1", MAC: c.mac, Up: true, Speed: defaultPortMbs, FullDuplex: true, BridgePort: 2})
 		lan = 1
 	}
-	var fdb []openwrt.FDBEntry
+	var fdb []apstate.FDBEntry
 	for _, mac := range wired {
-		fdb = append(fdb, openwrt.FDBEntry{MAC: mac, Port: ports[lan].BridgePort})
+		fdb = append(fdb, apstate.FDBEntry{MAC: mac, Port: ports[lan].BridgePort})
 	}
 	return ports, fdb
 }

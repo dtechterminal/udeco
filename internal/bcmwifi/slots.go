@@ -8,7 +8,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
+	"github.com/dtechterminal/udeco/internal/atomicfile"
 )
 
 // Stable vif slots. An SSID keeps the vif it is on when the SSID set of its

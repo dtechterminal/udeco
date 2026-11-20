@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
+	"github.com/dtechterminal/udeco/internal/ftpeer"
 )
 
 // ctrlRec is a fake hostapd control socket: it records the commands per

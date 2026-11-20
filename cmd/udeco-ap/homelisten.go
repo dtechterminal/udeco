@@ -5,7 +5,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // homeListenEvery: how often each radio listens on its own channel. A U6 Pro

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // DFS on the 5 GHz radio (docs/deco/features/dfs.md). A U6 Pro serves the

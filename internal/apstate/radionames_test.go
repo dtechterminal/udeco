@@ -5,9 +5,9 @@ package apstate
 import (
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/models"
+	"github.com/dtechterminal/udeco/internal/rf"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // A system_cfg the controller builds for a U6-Lite reported with radios

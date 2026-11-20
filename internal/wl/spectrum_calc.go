@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // Pure helpers of the spectrum measurement (docs/deco/spectrum-design.md

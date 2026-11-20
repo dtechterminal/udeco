@@ -3,7 +3,7 @@
 package main
 
 // runner presents one Deco unit to UniFi as an AP: a port of uow's inform
-// loop (cmd/uow/main.go) on internal/device.Session, reading the Deco only
+// loop (upstream's uow/main.go) on internal/device.Session, reading the Deco only
 // from the Mesh cache (docs/deco/design.md §4). Controller actions go to the
 // Mesh command queue; nothing here blocks on a Deco.
 
@@ -18,12 +18,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/deco"
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
-	"github.com/antoniocosta/unifi-openwrt/internal/informhttp"
-	"github.com/antoniocosta/unifi-openwrt/internal/openwrt"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/deco"
+	"github.com/dtechterminal/udeco/internal/device"
+	"github.com/dtechterminal/udeco/internal/inform"
+	"github.com/dtechterminal/udeco/internal/informhttp"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 type runner struct {
@@ -35,7 +35,7 @@ type runner struct {
 	dir, statePath, cfgPath string
 	x                       *device.Session
 	col                     *deco.Collector
-	prev                    *openwrt.Snapshot
+	prev                    *apstate.Snapshot
 	collectErr              string
 
 	sa    *device.SSHAdopt
@@ -147,7 +147,7 @@ func (r *runner) extra() map[string]any {
 	c := *s
 	c.IP = r.reportIP(s)
 	cfg, _ := os.ReadFile(r.cfgPath)
-	info := openwrt.InfoFromCfg(string(cfg))
+	info := apstate.InfoFromCfg(string(cfg))
 	info.Authorized = deco.GuestAuthorized(&c) // a Deco guest network has no portal
 	f := c.Fields(r.prev, info, nil)
 	if c.Hostname != "" {
@@ -159,7 +159,7 @@ func (r *runner) extra() map[string]any {
 
 // reportIP is the daemon IP (the controller SSHes there to adopt and
 // re-provision), or with report_ip=deco and once adopted, the Deco's own.
-func (r *runner) reportIP(s *openwrt.Snapshot) string {
+func (r *runner) reportIP(s *apstate.Snapshot) string {
 	if r.d.cfg.ReportIP == reportDeco && r.x.S.Adopted && s.IP != "" {
 		return s.IP
 	}
@@ -293,7 +293,7 @@ func (r *runner) loop(ctx context.Context) {
 	}
 }
 
-// informOnce sends one inform and handles the answer, as cmd/uow does
+// informOnce sends one inform and handles the answer, as upstream's uow does
 // (device.InformOnce). ok=false counts as a bad answer.
 func (r *runner) informOnce() (device.Outcome, bool) {
 	return device.InformOnce(r.x, informhttp.Poster(r.d.h.httpClient), r.statePath, r.logf)

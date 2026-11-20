@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/wl"
+	"github.com/dtechterminal/udeco/internal/wl"
 )
 
 // Per-client rate limits with tc (docs/deco/device-capabilities.md; audit

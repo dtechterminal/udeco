@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
+	"github.com/dtechterminal/udeco/internal/ftpeer"
 )
 
 // testFTKey stands in for the controller's per-WLAN iapp_key (32 hex digits,

@@ -15,8 +15,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // bcmwifi deliberately has no per-SSID switch: a scheduled-off SSID must

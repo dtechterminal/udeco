@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // Audit B5: netifd can bring TP-Link's lan default 192.168.0.1/22 (the

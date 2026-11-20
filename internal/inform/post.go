@@ -25,9 +25,9 @@ const (
 // "" when rawURL does not parse or names no host. device.CheckInformURL
 // reads the host the same way before it judges it.
 //
-// informIP (u7pg2.go) and cmd/uow's localIPToward cut the URL by hand
+// informIP (u7pg2.go) and upstream uow's localIPToward cut the URL by hand
 // instead and give other answers for some URLs no device accepts
-// (TestURLHostAndHostOf, cmd/uow TestInformHostCut).
+// (TestURLHostAndHostOf, upstream's uow TestInformHostCut).
 func URLHost(rawURL string) string {
 	h, _ := urlHost(rawURL)
 	return h

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // Uplink loss. A U6 whose uplink goes down takes its user and guest SSIDs

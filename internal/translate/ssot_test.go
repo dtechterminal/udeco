@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // The words of the Intent are what the controller's settings are called in
@@ -153,7 +153,7 @@ func TestValidWPAPassphrase(t *testing.T) {
 }
 
 // The station manager's sections (stamgr.N) have two readers with two
-// rules. LegacyStamgr is the OpenWrt path's (planStamgr, and cmd/uow's
+// rules. LegacyStamgr is the OpenWrt path's (planStamgr, and upstream uow's
 // minimum RSSI kick); intentStamgr is IntentFromCfg's. They share how a
 // value is read (stamgrMinRSSI, stamgrMaxSta) and nothing else. This table
 // is every input they are known to differ on; which rule is right is the
@@ -239,7 +239,7 @@ func TestStamgrReaders(t *testing.T) {
 
 	// what LegacyStamgr hands back: the sections that say anything, by
 	// number, a section without a radio included (its meaning is the
-	// caller's: planStamgr passes it over, cmd/uow keeps it under "")
+	// caller's: planStamgr passes it over, upstream's uow keeps it under "")
 	got := LegacyStamgr(ParseCfg("stamgr.3.minrssi.status=true\nstamgr.3.minrssi.rssi=-70\n" +
 		"stamgr.1.radio=6e\nstamgr.2.minrssi.rssi=-60\nstamgr.2.loadbalance.maxsta=9\nstamgr.4.radio=na\nstamgr.4.loadbalance.status=true\nstamgr.4.loadbalance.maxsta=40"))
 	want := []StamgrEntry{{N: 1, Radio: "6e"}, {N: 3, MinRSSI: -70, MinRSSIOn: true}, {N: 4, Radio: "na", MaxSta: 40}}

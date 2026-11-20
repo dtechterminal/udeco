@@ -7,8 +7,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // DFS (docs/deco/features/dfs.md). bcmwifi follows a radar move and

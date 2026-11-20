@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/dtechterminal/udeco/internal/models"
 )
 
 // mdns_bridge needs takeover and apply, hotspot2 needs takeover; both are

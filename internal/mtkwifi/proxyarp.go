@@ -14,7 +14,7 @@ import (
 
 	"slices"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
+	"github.com/dtechterminal/udeco/internal/stasnoop"
 )
 
 // Proxy ARP (the controller's per-WLAN proxy_arp; agent config proxy_arp,

@@ -10,7 +10,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // Broadcom flow cache (interference audit D1, requirement R21).

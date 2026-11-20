@@ -13,7 +13,7 @@ const (
 	// DefaultSyslogPort is the syslog port.
 	DefaultSyslogPort = 514
 	// DefaultEncryptedSyslogPort is the controller's intake for
-	// UniFi-encrypted syslog (device.SealSyslog). cmd/uow's forwarder falls
+	// UniFi-encrypted syslog (device.SealSyslog). upstream uow's forwarder falls
 	// back to it; the intent (intentSyslog, for cmd/udeco-ap) falls back to
 	// DefaultSyslogPort for an encrypted target too. The two readers are
 	// not unified yet: TestSyslogDefaultPorts shows both.

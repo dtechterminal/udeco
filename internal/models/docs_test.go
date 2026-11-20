@@ -9,8 +9,8 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/inform"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // Tests that hold the documents to this package: the capability table and

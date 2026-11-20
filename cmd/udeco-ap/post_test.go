@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/dtechterminal/udeco/internal/inform"
 )
 
 // The minimal client against Go's own HTTP server: the request it sends is

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // DFS on the MT7663 (Options.DFS, agent config dfs; off by default until

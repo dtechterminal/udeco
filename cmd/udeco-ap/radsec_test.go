@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/radsec"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/radsec"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // radsecSystemCfg: a WPA-Enterprise WLAN whose auth and acct servers are

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
+	"github.com/dtechterminal/udeco/internal/hapdmon"
 )
 
 // Driver events: what the MediaTek drivers announce on their own, read by

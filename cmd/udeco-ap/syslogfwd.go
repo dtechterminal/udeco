@@ -29,9 +29,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
-	"github.com/antoniocosta/unifi-openwrt/internal/snmpagent"
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/device"
+	"github.com/dtechterminal/udeco/internal/snmpagent"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // syslogTarget is one forwarding setup; a change of any field restarts it.

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/apstate"
 )
 
 // hookRun is the applier's runner on a klogDev: before runs ahead of each

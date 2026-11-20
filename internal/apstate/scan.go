@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // RF scan and neighbour list (docs/internals.md). A UAP reports, per radio

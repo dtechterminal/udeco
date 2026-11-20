@@ -12,7 +12,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // Tests that hold the documents to the agent: the code paths they name,
@@ -42,7 +42,7 @@ var docPathSkip = struct {
 }{
 	dirs: map[string]string{
 		// studies of a real U6 Pro against the upstream tree as it was on
-		// their date (internal/openwrt/unifi.go has moved since)
+		// their date (upstream's openwrt/unifi.go has moved since)
 		"docs/reference/u6pro/": "dated study of the upstream tree",
 	},
 	paths: map[string]map[string]string{

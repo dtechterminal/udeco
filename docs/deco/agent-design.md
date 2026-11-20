@@ -645,7 +645,7 @@ read-to-EOF answers, 1xx skipped, a 4 MiB answer cap, a 16 KiB header cap, a 10 
 cancelling the connection at once. No TLS, redirects, proxies or keep-alive: `https://` inform URLs are
 refused at config load.
 
-**Binary size and import graph.** The reading model and its inform rendering moved from `internal/openwrt`
+**Binary size and import graph.** The reading model and its inform rendering moved from upstream's `openwrt` package
 to `internal/apstate` (aliases kept in openwrt), so the agent no longer links the OpenWrt SSH collector
 (`x/crypto/ssh/knownhosts`, its `os/exec` use) or anything off-device. `x/crypto/ssh` stays: the SSH adopt
 server (`device.SSHAdopt`) needs it. Stripped linux/arm GOARMv7: 9,371,772 bytes before, 7,602,300 after

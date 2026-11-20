@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // WLAN is one UniFi WLAN on one radio: a wireless.N section and its aaa.N

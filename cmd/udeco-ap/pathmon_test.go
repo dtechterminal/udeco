@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/lldp"
-	"github.com/antoniocosta/unifi-openwrt/internal/pathmon"
+	"github.com/dtechterminal/udeco/internal/lldp"
+	"github.com/dtechterminal/udeco/internal/pathmon"
 )
 
 // pathmonCfg is the controller's pathmon section (Network 11.1.50, as sent

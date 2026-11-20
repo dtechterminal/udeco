@@ -37,7 +37,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 func main() {

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/hs20"
+	"github.com/dtechterminal/udeco/internal/hs20"
 )
 
 // Hotspot 2.0 / Passpoint (fw_caps 0x800000, the controller's

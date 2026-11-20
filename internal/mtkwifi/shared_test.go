@@ -7,8 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // What mtkwifi takes from the shared packages (rf, unit), as its callers

@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 // liveRadio is the PHY state read with wl getters.

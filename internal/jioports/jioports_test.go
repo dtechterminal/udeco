@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/dtechterminal/udeco/internal/models"
 )
 
 func parse(s string) map[string]string {

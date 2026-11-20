@@ -2,7 +2,7 @@
 
 package models
 
-import "github.com/antoniocosta/unifi-openwrt/internal/inform"
+import "github.com/dtechterminal/udeco/internal/inform"
 
 // Capability words the on-device Deco agent (cmd/udeco-ap) claims when it
 // presents a Deco X20 as a U6-Lite. The reasoning, bit by bit, is in
@@ -162,7 +162,7 @@ const (
 	// DecoAgentModel is the one model a Deco is reported as, the agent's
 	// default: its capability words (above) are chosen for that hardware.
 	DecoAgentModel = ModelUAL6
-	// DefaultModel is what the controller-side tools (cmd/udeco, cmd/uow)
+	// DefaultModel is what the controller-side tools (cmd/udeco, upstream's uow)
 	// report an AP as unless told otherwise: the one model with fully
 	// measured capability words (inform.U7PG2).
 	DefaultModel = inform.U7PG2Model

@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/dtechterminal/udeco/internal/translate"
 )
 
 // userGECOS marks the accounts the agent manages.

@@ -10,7 +10,7 @@ import (
 
 // The readers of /proc text that more than one collector needs. Each is
 // the one copy: internal/wl (and through it internal/mtkwifi),
-// internal/openwrt and cmd/udeco-ap call them.
+// upstream's openwrt package and cmd/udeco-ap call them.
 //
 // Not here, each for a reason: /proc/net/arp has two readers that take
 // different rows (wl's parseARP skips an incomplete entry, flags 0x0;

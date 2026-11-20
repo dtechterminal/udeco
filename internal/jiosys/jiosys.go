@@ -26,8 +26,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
-	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/dtechterminal/udeco/internal/decosys"
+	"github.com/dtechterminal/udeco/internal/unit"
 )
 
 // DefaultKeepDown is the owner's KILL_ONT_PATTERNS (customInit): the Jio

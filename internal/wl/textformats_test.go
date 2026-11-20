@@ -5,7 +5,7 @@ package wl
 import (
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/dtechterminal/udeco/internal/rf"
 )
 
 // The Broadcom text formats this package reads for bcmwifi too: each has

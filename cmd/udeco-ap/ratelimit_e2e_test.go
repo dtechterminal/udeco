@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/dtechterminal/udeco/internal/device"
 )
 
 // A rate-update from the controller on the captured unit, takeover with
