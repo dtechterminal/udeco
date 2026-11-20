@@ -224,6 +224,8 @@ type options struct {
 	// staMon follows hostapd's station events; nil = hapdmon on
 	// bcmwifi.CtrlDir (staevents.go)
 	staMon staSource
+	// drvEv stands in for the Garage's driver leave events (tests)
+	drvEv leaveSource
 }
 
 type agent struct {
@@ -296,7 +298,9 @@ type agent struct {
 	sta   staEvents // station events for the controller (staevents.go); loop goroutine
 	// hapd follows the hostapd control sockets' station events (nil: not
 	// running; staevents.go); readAt: when the reading in use started
-	hapd   staSource
+	hapd staSource
+	// drv: the Garage's driver leave events (mtkwifi.Events; garage.go)
+	drv    leaveSource
 	readAt time.Time
 	// stale: the reading in use is the last one again (it failed): no new
 	// look at the clients (station events, Roaming Assistant)
