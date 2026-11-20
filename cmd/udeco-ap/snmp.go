@@ -83,7 +83,7 @@ func (a *agent) snmpFollow(ctx context.Context, f map[string]any, s *apstate.Sna
 	v := snmpagent.FromFields(f)
 	v.Model, v.Version = a.profile.Display, a.x.S.Version
 	if v.Model == "" {
-		v.Model = "U6-Lite"
+		v.Model = snmpagent.DefaultDescr
 	}
 	if v.Hostname == "" {
 		v.Hostname = s.Hostname

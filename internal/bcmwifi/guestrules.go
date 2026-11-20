@@ -24,6 +24,6 @@ func GuestEbtables(g *GuestPolicy) *GuestRules {
 		return nil
 	}
 	in, out := r.render()
-	return &GuestRules{In: in, Out: out, Portal: r.Portal, ChainIn: chainGuestIn, ChainOut: chainGuestOut,
-		ChainAuth: chainGuestAuth, Notes: notes}
+	return &GuestRules{In: in, Out: out, Portal: r.Portal, ChainIn: GuestChainIn, ChainOut: GuestChainOut,
+		ChainAuth: GuestChainAuth, Notes: notes}
 }

@@ -14,7 +14,7 @@ import (
 // controller show the same radio, VAP and port names and counters.
 type View struct {
 	Hostname string // sysName
-	Model    string // display model, e.g. "U6-Lite"
+	Model    string // display model (the catalogue's, e.g. DefaultDescr)
 	Version  string // firmware version reported to the controller
 	IP       string // the unit's IPv4 address
 	Uplink   string // the uplink interface name the controller sees ("eth0")

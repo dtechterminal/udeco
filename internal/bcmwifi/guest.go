@@ -71,14 +71,21 @@ type GuestPolicy struct {
 	PortalHost string   // IPv4 of the portal (the controller); a host name is not resolved
 }
 
-// ebtables chain names.
+// The guest ebtables chains, for every applier that isolates guests with
+// them (here and mtkwifi): frames from a guest vif (GuestChainIn), frames
+// to one (GuestChainOut), and the authorised guests of a portal
+// (GuestChainAuth). GuestJumps sends a vif's frames to them.
 const (
-	chainGuestIn   = "UDECO-GIN"
-	chainGuestOut  = "UDECO-GOUT"
-	chainGuestAuth = "UDECO-GAUTH"
+	GuestChainIn   = guestChainPrefix + "IN"   // UDECO-GIN
+	GuestChainOut  = guestChainPrefix + "OUT"  // UDECO-GOUT
+	GuestChainAuth = guestChainPrefix + "AUTH" // UDECO-GAUTH
+
+	// guestChainPrefix starts every guest chain's name: a jump to a chain
+	// so named is one of ours (parseEbJumps), whichever chain it is.
+	guestChainPrefix = "UDECO-G"
 )
 
-var ourChains = []string{chainGuestIn, chainGuestOut, chainGuestAuth}
+var ourChains = []string{GuestChainIn, GuestChainOut, GuestChainAuth}
 
 // defaultRestricted is always blocked for guests (RFC 1918, link-local,
 // multicast), whatever the controller's guest_restricted holds.
@@ -177,7 +184,7 @@ func (r *guestRules) render() (in, out [][]string) {
 				add("-p", "IPv4", "--ip-dst", r.PortalHost, "--ip-proto", "tcp", "--ip-dport", port, "-j", "ACCEPT")
 			}
 		}
-		add("-j", chainGuestAuth)
+		add("-j", GuestChainAuth)
 	}
 	add("-d", "!", r.GwMAC, "-j", "DROP")
 	add("-p", "IPv4", "--ip-dst", r.GwIP, "-j", "ACCEPT")
@@ -210,8 +217,32 @@ type ebJump struct {
 	Target string
 }
 
+// rule is j as ebtables arguments after the operation.
+func (j ebJump) rule() []string { return []string{j.Chain, j.Dir, j.Vif, "-j", j.Target} }
+
 func (j ebJump) args(op string) []string {
-	return []string{"ebtables", op, j.Chain, j.Dir, j.Vif, "-j", j.Target}
+	return append([]string{"ebtables", op}, j.rule()...)
+}
+
+// vifJumps are the jumps that put vif behind the guest chains: what it
+// sends, forwarded or to the unit itself, and what is forwarded to it.
+func vifJumps(vif string) []ebJump {
+	return []ebJump{
+		{"FORWARD", "-i", vif, GuestChainIn},
+		{"FORWARD", "-o", vif, GuestChainOut},
+		{"INPUT", "-i", vif, GuestChainIn},
+	}
+}
+
+// GuestJumps are the rules that put vif behind the guest chains, each as
+// ebtables arguments after the operation: built-in chain, direction, vif,
+// "-j", guest chain ("FORWARD -i <vif> -j UDECO-GIN", ...).
+func GuestJumps(vif string) [][]string {
+	var out [][]string
+	for _, j := range vifJumps(vif) {
+		out = append(out, j.rule())
+	}
+	return out
 }
 
 // guestLive is the live ebtables state of the agent's chains.
@@ -234,7 +265,7 @@ func (a *Applier) readGuest(ctx context.Context) guestLive {
 			continue
 		}
 		g.Chains[c] = true
-		if c == chainGuestAuth {
+		if c == GuestChainAuth {
 			g.Auth = parseEbMACs(string(out))
 		}
 	}
@@ -271,7 +302,7 @@ func parseEbJumps(chain, out string) []ebJump {
 				j.Target = f[i+1]
 			}
 		}
-		if j.Vif != "" && strings.HasPrefix(j.Target, "UDECO-G") {
+		if j.Vif != "" && strings.HasPrefix(j.Target, guestChainPrefix) {
 			j.Chain = chain
 			js = append(js, j)
 		}
@@ -334,10 +365,7 @@ func guestState(r *guestRules, vifs []string) string {
 func wantJumps(vifs []string) []ebJump {
 	var js []ebJump
 	for _, v := range vifs {
-		js = append(js,
-			ebJump{"FORWARD", "-i", v, chainGuestIn},
-			ebJump{"FORWARD", "-o", v, chainGuestOut},
-			ebJump{"INPUT", "-i", v, chainGuestIn})
+		js = append(js, vifJumps(v)...)
 	}
 	return js
 }
@@ -376,9 +404,9 @@ func (a *Applier) guestSteps(r *guestRules, vifs []string, g guestLive) (st []St
 		return append(st, Step{Kind: StepRemove, Desc: "remove guest state", Path: a.guestStatePath(), Optional: true}), nil
 	}
 	state := guestState(r, vifs)
-	chains := []string{chainGuestIn, chainGuestOut}
+	chains := []string{GuestChainIn, GuestChainOut}
 	if r.Portal {
-		chains = append(chains, chainGuestAuth)
+		chains = append(chains, GuestChainAuth)
 	}
 	rebuild := g.State != state
 	for _, c := range chains {
@@ -419,21 +447,21 @@ func (a *Applier) guestSteps(r *guestRules, vifs []string, g guestLive) (st []St
 	}
 	if rebuild {
 		in, out := r.render()
-		st = append(st, eb("flush "+chainGuestIn, "-F", chainGuestIn), eb("flush "+chainGuestOut, "-F", chainGuestOut))
+		st = append(st, eb("flush "+GuestChainIn, "-F", GuestChainIn), eb("flush "+GuestChainOut, "-F", GuestChainOut))
 		if r.Portal {
-			st = append(st, eb("flush "+chainGuestAuth, "-F", chainGuestAuth))
+			st = append(st, eb("flush "+GuestChainAuth, "-F", GuestChainAuth))
 			for _, m := range a.loadGuestAuth() {
-				st = append(st, eb("authorised guest "+m, "-A", chainGuestAuth, "-s", m, "-j", "RETURN"))
+				st = append(st, eb("authorised guest "+m, "-A", GuestChainAuth, "-s", m, "-j", "RETURN"))
 			}
 		}
 		for _, x := range in {
-			st = append(st, eb("guest rule", append([]string{"-A", chainGuestIn}, x...)...))
+			st = append(st, eb("guest rule", append([]string{"-A", GuestChainIn}, x...)...))
 		}
 		for _, x := range out {
-			st = append(st, eb("guest rule", append([]string{"-A", chainGuestOut}, x...)...))
+			st = append(st, eb("guest rule", append([]string{"-A", GuestChainOut}, x...)...))
 		}
-		if !r.Portal && g.Chains[chainGuestAuth] {
-			st = append(st, eb("flush "+chainGuestAuth, "-F", chainGuestAuth), eb("delete "+chainGuestAuth, "-X", chainGuestAuth))
+		if !r.Portal && g.Chains[GuestChainAuth] {
+			st = append(st, eb("flush "+GuestChainAuth, "-F", GuestChainAuth), eb("delete "+GuestChainAuth, "-X", GuestChainAuth))
 		}
 	}
 	for _, j := range stale {
@@ -489,13 +517,13 @@ func (a *Applier) setGuestAuth(ctx context.Context, mac string, on bool) error {
 	} else if err := writeFileAtomic(a.fsPath(a.guestAuthPath()), []byte(strings.Join(list, "\n")), 0o600); err != nil {
 		return err
 	}
-	if out, err := a.o.Run.Run(ctx, "ebtables", "-L", chainGuestAuth); err == nil {
+	if out, err := a.o.Run.Run(ctx, "ebtables", "-L", GuestChainAuth); err == nil {
 		live := contains(parseEbMACs(string(out)), m)
 		var st []Step
 		if on && !live {
-			st = append(st, cmdStep("authorise guest "+m, "ebtables", "-A", chainGuestAuth, "-s", m, "-j", "RETURN"))
+			st = append(st, cmdStep("authorise guest "+m, "ebtables", "-A", GuestChainAuth, "-s", m, "-j", "RETURN"))
 		} else if !on && live {
-			st = append(st, cmdStep("unauthorise guest "+m, "ebtables", "-D", chainGuestAuth, "-s", m, "-j", "RETURN"))
+			st = append(st, cmdStep("unauthorise guest "+m, "ebtables", "-D", GuestChainAuth, "-s", m, "-j", "RETURN"))
 		}
 		if len(st) > 0 {
 			if a.o.DryRun {
@@ -524,7 +552,7 @@ func (a *Applier) guestVerify(ctx context.Context, l *layout) []string {
 	}
 	g := a.readGuest(ctx)
 	var probs []string
-	if !g.Chains[chainGuestIn] || !g.Chains[chainGuestOut] {
+	if !g.Chains[GuestChainIn] || !g.Chains[GuestChainOut] {
 		probs = append(probs, "guest ebtables chains missing")
 	}
 	for _, j := range wantJumps(vifs) {

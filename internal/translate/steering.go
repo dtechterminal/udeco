@@ -5,14 +5,15 @@ package translate
 import "sort"
 
 // Steering is the controller's band steering (bandsteering section): mode
-// "prefer_5g" | "equal" | "" (off) and the VAP devnames in steering groups.
+// BandSteerPrefer5G | BandSteerEqual | "" (off) and the VAP devnames in
+// steering groups. The mode is the controller's word, passed through.
 type Steering struct {
 	Mode     string
 	Devnames []string
 }
 
 func BandSteering(cfg Cfg) Steering {
-	if cfg["bandsteering.status"] != "enabled" || cfg["bandsteering.mode"] == "off" {
+	if cfg["bandsteering.status"] != "enabled" || cfg["bandsteering.mode"] == BandSteerOff {
 		return Steering{}
 	}
 	s := Steering{Mode: cfg["bandsteering.mode"]}

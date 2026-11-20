@@ -9,6 +9,7 @@ import (
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // The controller's per-SSID and per-radio features beyond the BSS list.
@@ -67,21 +68,12 @@ func bssNotes(s bcmwifi.SSID, b BSS, rd RadioDef, note func(string, ...any)) {
 		note("%s: SSID %q: U-APSD is not supported by the %s driver", rd.Band, s.SSID, rd.HWName)
 	}
 	if want := pmfLevel(s.PMF); b.Auth != "OPEN" && want > b.PMF {
-		note("%s: SSID %q: PMF %s not applied: served with PMF %s", rd.Band, s.SSID, s.PMF, pmfName(b.PMF))
+		note("%s: SSID %q: PMF %s not applied: served with PMF %s", rd.Band, s.SSID, s.PMF, translate.PMFWord(b.PMF))
 	}
 }
 
-func pmfLevel(p string) int {
-	switch p {
-	case "required":
-		return 2
-	case "optional":
-		return 1
-	}
-	return 0
-}
-
-func pmfName(l int) string { return []string{"disabled", "optional", "required"}[l] }
+// pmfLevel is translate.PMFLevel, with any other word (and "") as off.
+func pmfLevel(p string) int { return max(translate.PMFLevel(p), 0) }
 
 // radioFeatures sets rp's per-radio settings from the radio and the SSIDs
 // it serves (served is parallel to rp.BSS).

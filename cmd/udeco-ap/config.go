@@ -26,7 +26,7 @@ const DefaultConfigPath = "/tp_data/udeco/udeco-ap.json"
 type Config struct {
 	InformURL string `json:"inform_url"` // http://<controller>:8080/inform (IPv4 host)
 	ConsoleIP string `json:"console_ip"` // the only address allowed to SSH-adopt on SSHDPort
-	Model     string `json:"model"`      // UAL6 (the only model with deliberate capability words)
+	Model     string `json:"model"`      // models.DecoAgentModel on a Deco (the default); a models.JCOW414Models code on platform jio-mtk
 	SSHDPort  int    `json:"sshd_port"`  // SSH-adopt responder; never 22 (the unit's real dropbear)
 	Takeover  bool   `json:"takeover"`   // false = observe: inform only, nothing on the unit changes
 	Apply     bool   `json:"apply"`      // takeover: apply the controller's Wi-Fi (false = plans logged only)
@@ -248,6 +248,15 @@ const PlatformJio = "jio-mtk"
 
 func (c *Config) jio() bool { return c != nil && c.Platform == PlatformJio }
 
+// hasLANPorts reports whether the configured model is reported with LAN
+// ports: one with a rear uplink jack (models.RearUplinkPort, the rule the
+// profile's switch bits follow). Of the models the agent takes that is the
+// UAP-IW-HD, on platform jio-mtk.
+func (c *Config) hasLANPorts() bool {
+	m, ok := models.Lookup(c.Model)
+	return ok && m.RearUplinkPort() > 0
+}
+
 func loadConfig(path string) (*Config, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -257,7 +266,7 @@ func loadConfig(path string) (*Config, error) {
 }
 
 func parseConfig(b []byte) (*Config, error) {
-	c := &Config{Model: "UAL6", SSHDPort: 2222, Log: "syslog"}
+	c := &Config{Model: models.DecoAgentModel, SSHDPort: 2222, Log: "syslog"}
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(c); err != nil {
@@ -283,18 +292,19 @@ func (c *Config) validate() error {
 	c.Model = strings.ToUpper(c.Model)
 	switch c.Platform {
 	case "":
-		if c.Model != "UAL6" {
-			return fmt.Errorf("config: model %q: only UAL6 is supported (its capability words are chosen for this hardware)", c.Model)
+		if c.Model != models.DecoAgentModel {
+			return fmt.Errorf("config: model %q: only %s is supported (its capability words are chosen for this hardware)", c.Model, models.DecoAgentModel)
 		}
 	case PlatformJio:
 		if !models.JCOW414Models[c.Model] {
-			return fmt.Errorf("config: model %q: platform %s is reported as U7LT (UAP-AC-Lite) or UHDIW (UAP-IW-HD, with its LAN ports): set \"model\": \"U7LT\" or \"UHDIW\"", c.Model, c.Platform)
+			return fmt.Errorf("config: model %q: platform %s is reported as %s (UAP-AC-Lite) or %s (UAP-IW-HD, with its LAN ports): set \"model\": %q or %q",
+				c.Model, c.Platform, models.ModelU7LT, models.ModelUHDIW, models.ModelU7LT, models.ModelUHDIW)
 		}
-		if len(c.PortsUnlocked) > 0 && c.Model != "UHDIW" {
-			return fmt.Errorf("config: ports_unlocked needs model UHDIW (the only model reported with LAN ports)")
+		if len(c.PortsUnlocked) > 0 && !c.hasLANPorts() {
+			return fmt.Errorf("config: ports_unlocked needs model %s (the only model reported with LAN ports)", models.ModelUHDIW)
 		}
-		if (c.PortsConfirmS != 0 || c.PortsLossS != 0) && c.Model != "UHDIW" {
-			return fmt.Errorf("config: ports_confirm_s and ports_loss_s need model UHDIW (the only model reported with LAN ports)")
+		if (c.PortsConfirmS != 0 || c.PortsLossS != 0) && !c.hasLANPorts() {
+			return fmt.Errorf("config: ports_confirm_s and ports_loss_s need model %s (the only model reported with LAN ports)", models.ModelUHDIW)
 		}
 		if c.PortsConfirmS != 0 && (c.PortsConfirmS < 60 || c.PortsConfirmS > 900) {
 			return fmt.Errorf("config: ports_confirm_s %d: want 60-900 seconds (default 90)", c.PortsConfirmS)

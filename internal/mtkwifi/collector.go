@@ -174,7 +174,7 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 	for _, rd := range c.o.Layout {
 		main := rd.Ifaces[0]
 		r := apstate.Radio{Iface: main, Phy: main, Mode: "Master", Band: rd.Band,
-			NSS: 2, HWName: rd.HWName, VHT: rd.Band == "na", TxMin: 5, TxMax: rd.MaxTxDBm, Noise: noiseFloor}
+			NSS: rd.NSS, HWName: rd.HWName, VHT: rd.Band == "na", TxMin: rd.MinTxDBm, TxMax: rd.MaxTxDBm, Noise: noiseFloor}
 		r.Width = c.radioWidth(rd)
 		c.radioTx(&r, rd)
 		if !c.isUp(main) {
@@ -520,9 +520,13 @@ func newLogAnchored(before, after string) (string, bool) {
 
 // Caps describes the radios for the agent's capability words.
 func (c *Collector) Caps(context.Context) (wl.Caps, error) {
-	cp := wl.Caps{Country: "IN", MaxBSS: 4, Bands: map[string]wl.BandCaps{}}
-	for _, rd := range c.o.Layout {
-		b := wl.BandCaps{TxMinDBm: 5, TxMaxDBm: rd.MaxTxDBm, NSS: 2, HT: true, Channels: map[int][]int{}}
+	cp := wl.Caps{Country: "IN", Bands: map[string]wl.BandCaps{}}
+	for i, rd := range c.o.Layout {
+		// BSSes per radio: its netdevs (the radio with the fewest)
+		if n := len(rd.Ifaces); i == 0 || n < cp.MaxBSS {
+			cp.MaxBSS = n
+		}
+		b := wl.BandCaps{TxMinDBm: rd.MinTxDBm, TxMaxDBm: rd.MaxTxDBm, NSS: rd.NSS, HT: true, Channels: map[int][]int{}}
 		if rd.Band == "ng" {
 			b.Channels[20], b.Channels[40] = chans24, chans24
 		} else {

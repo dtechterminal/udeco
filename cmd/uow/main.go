@@ -63,7 +63,7 @@ func main() {
 	flag.StringVar(&portalListen, "portal-listen", "", "guest portal redirect endpoint (UniFi APs: :8882); empty = off")
 	flag.StringVar(&ledIdle, "led-idle", "", "idle LED effect instead of steady blue: \"rainbow\" (RGB LED rings, daemon on the AP); empty = blue like the UniFi model")
 	informEvery := flag.Duration("inform-every", 0, "inform at least this often (0 = the controller's interval, 10 s); 2s makes the panel's live bars move")
-	modelCode := flag.String("model", "U7PG2", "UniFi model to be adopted as (see -models / -suggest)")
+	modelCode := flag.String("model", models.DefaultModel, "UniFi model to be adopted as (see -models / -suggest)")
 	listModels := flag.Bool("models", false, "list the UniFi AP models and exit")
 	suggest := flag.Bool("suggest", false, "suggest the closest UniFi model for the AP (-ap) and exit")
 	profileCaps := flag.Bool("profile-caps", false, "report the real U7PG2's capability words (wifi/fw/radio caps); the translator clamps what the AP can't do")
@@ -1241,6 +1241,20 @@ func syncSNMP(ap *openwrt.Client, cfgPath string) {
 	}
 }
 
+// minRSSIByRadio is the controller's minimum RSSI in dBm by radio ("ng",
+// "na"), read with the rule the plan has (translate.LegacyStamgr, as
+// planStamgr): what is dropped here is what hostapd was told to refuse. A
+// section without a radio is kept under "", as it always was.
+func minRSSIByRadio(c translate.Cfg) map[string]int {
+	min := map[string]int{}
+	for _, e := range translate.LegacyStamgr(c) {
+		if e.MinRSSIOn {
+			min[e.Radio] = e.MinRSSI
+		}
+	}
+	return min
+}
+
 // minRSSIKick: UniFi minimum RSSI also drops connected clients that stay
 // below it (hostapd's rssi_reject_assoc_rssi only refuses new ones): below
 // the radio's minimum on every reading for 30 s -> disconnect.
@@ -1253,22 +1267,7 @@ func minRSSIKick(ap *openwrt.Client, s *openwrt.Snapshot) {
 		return
 	}
 	b, _ := os.ReadFile(ledCfgPath) // system_cfg.txt
-	c := translate.ParseCfg(string(b))
-	min := map[string]int{}
-	for i := 1; i <= 8; i++ {
-		p := fmt.Sprintf("stamgr.%d.", i)
-		if c[p+"minrssi.status"] != "true" {
-			continue
-		}
-		v, err := strconv.Atoi(c[p+"minrssi.rssi"])
-		if err != nil || v == 0 {
-			continue
-		}
-		if v > 0 {
-			v -= 95
-		}
-		min[c[p+"radio"]] = v
-	}
+	min := minRSSIByRadio(translate.ParseCfg(string(b)))
 	seen := map[string]bool{}
 	for _, r := range s.Radios {
 		m, ok := min[r.Band]

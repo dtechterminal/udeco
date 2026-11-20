@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/hs20"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // Hotspot 2.0 / Passpoint (docs/deco/features/hotspot2.md). The agent maps
@@ -52,9 +53,9 @@ func normalizeHotspot2(s *SSID, notes *[]string) string {
 	c := s.Hotspot2.Clone() // the caller's Desired is not changed
 	s.Hotspot2 = c
 	switch s.PMF {
-	case "", "disabled", "off", "0":
+	case "", translate.PMFDisabled, "off", "0":
 		*notes = append(*notes, fmt.Sprintf("ssid %s: Hotspot 2.0: PMF raised to optional (Passpoint release 2+ stations need it)", s.ID))
-		s.PMF = "optional"
+		s.PMF = translate.PMFOptional
 	}
 	if c.DisableDGAF && !s.ProxyARP {
 		// hostapd's own proxy_arp cannot run on the vifs it creates here

@@ -33,6 +33,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
@@ -646,7 +647,10 @@ func guestPolicy(d bcmwifi.Desired, g translate.Guest, gwMAC, gwIP string) (*bcm
 }
 
 // desiredFrom maps the controller's intent onto bcmwifi's Desired. The notes
-// list what bcmwifi cannot take (never secrets).
+// list what bcmwifi cannot take (never secrets). The radio and WLAN fields
+// are named one by one below: TestDesiredFromCarriesEveryField fails for a
+// translate.RadioIntent or WLANIntent field that is neither mapped here nor
+// on its list of fields that are not carried.
 func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 	var notes []string
 	d := bcmwifi.Desired{Country: in.Country, Radios: map[string]bcmwifi.Radio{}}
@@ -673,14 +677,10 @@ func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 			NoBSSLoad:   wl.NoBSSLoad,   // per radio in bcmwifi (parity.go)
 			NoBGAFilter: wl.NoBGAFilter} // bcmwifi bga.go
 		s.MinRateOpts = minRateOpts(wl.MinRateOpts)
-		for band, b := range wl.PerBand {
-			if s.PerBand == nil {
-				s.PerBand = map[string]bcmwifi.BandSettings{}
-			}
-			s.PerBand[band] = bcmwifi.BandSettings{Security: b.Security, PMF: b.PMF, FT: b.FT, FTSAE: b.FTSAE,
-				FTOverDS: b.FTOverDS, MobilityDomain: b.MobilityDomain, BSSTransition: b.BSSTransition, RRM: b.RRM,
-				UAPSD: b.UAPSD, ProxyARP: b.ProxyARP, MulticastToUnicast: b.MulticastToUnicast, Hidden: b.Hidden,
-				Isolation: b.Isolation, GroupRekey: b.GroupRekey}
+		// each band's own settings: bcmwifi's type is translate's
+		// (BandSettings = translate.BandWLAN), so every field comes along
+		if len(wl.PerBand) > 0 {
+			s.PerBand = maps.Clone(wl.PerBand)
 		}
 		for _, b := range wl.Bands {
 			if b == "ng" || b == "na" {

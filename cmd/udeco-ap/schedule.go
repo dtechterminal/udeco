@@ -4,19 +4,19 @@ package main
 
 // WLAN broadcast schedules. translate.IntentFromCfg turns the controller's
 // wireless.N.schedule_* into end-exclusive weekly windows ("mon 0800-1730",
-// "2400" = midnight; nil = always on). The worker evaluates them every
-// scheduleEvery in the unit's local time and switches SSIDs by applying the
-// Desired with the SSIDs that are off disabled.
+// "2400" = midnight; nil = always on). The worker evaluates them
+// (translate.ScheduleOn, the reader of that text) every scheduleEvery in the
+// unit's local time and switches SSIDs by applying the Desired with the
+// SSIDs that are off disabled.
 
 import (
 	"context"
 	"errors"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // bcmwifi deliberately has no per-SSID switch: a scheduled-off SSID must
@@ -24,41 +24,11 @@ import (
 // with that SSID disabled guarantees. The cost is one apply per window edge
 // (hostapd restarts on the radios whose SSID set changed).
 
-// scheduleOn reports whether now falls in one of the windows.
-func scheduleOn(windows []string, now time.Time) bool {
-	day := strings.ToLower(now.Weekday().String()[:3])
-	m := now.Hour()*60 + now.Minute()
-	for _, w := range windows {
-		d, span, ok := strings.Cut(w, " ")
-		if !ok || d != day {
-			continue
-		}
-		a, b, ok := strings.Cut(span, "-")
-		if !ok {
-			continue
-		}
-		from, to := hhmm(a), hhmm(b)
-		if from >= 0 && to >= 0 && from <= m && m < to {
-			return true
-		}
-	}
-	return false
-}
-
-// hhmm is "HHMM" in minutes (00:00-24:00); -1 when malformed.
-func hhmm(s string) int {
-	v, err := strconv.Atoi(s)
-	if err != nil || len(s) != 4 || v%100 >= 60 || v > 2400 {
-		return -1
-	}
-	return v/100*60 + v%100
-}
-
 // scheduleOff lists the enabled WLANs (by id) whose schedule is off at now.
 func scheduleOff(d bcmwifi.Desired, now time.Time) map[string]bool {
 	off := map[string]bool{}
 	for _, s := range d.SSIDs {
-		if s.Enabled && s.Schedule != nil && !scheduleOn(s.Schedule, now) {
+		if s.Enabled && s.Schedule != nil && !translate.ScheduleOn(s.Schedule, now) {
 			off[s.ID] = true
 		}
 	}

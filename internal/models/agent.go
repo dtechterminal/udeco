@@ -145,11 +145,27 @@ const (
 	DecoAgentFWCaps = inform.PlaceholderFWCaps | FWCapSHA512SSH | FWCapWlanScheduleMultiBlock | FWCapWlanScheduleInvert |
 		FWCapSyslogEncryption | FWCapSNMPv3
 	// DecoAgentFW3Caps: path monitoring in both modes (ICMP echoes only).
-	DecoAgentFW3Caps      = FW3CapPathMonitoring
-	decoAgentIEEEModesNG  = 90 // measured U6-Pro (11ax) 2.4 GHz value: b, n, ac-rates, ax
-	decoAgentIEEEModesNA  = 85 // measured U6-Pro (11ax) 5 GHz value: a, n, ac, ax
-	decoAgentIEEEModesNGn = 10 // measured U7PG2 (non-ax) 2.4 GHz value
-	decoAgentIEEEModesNAn = 21 // measured U7PG2 (non-ax) 5 GHz value
+	DecoAgentFW3Caps     = FW3CapPathMonitoring
+	decoAgentIEEEModesNG = 90 // measured U6-Pro (11ax) 2.4 GHz value: b, n, ac-rates, ax
+	decoAgentIEEEModesNA = 85 // measured U6-Pro (11ax) 5 GHz value: a, n, ac, ax
+)
+
+// nonAXIEEEModes is the ieee_modes word of a radio that is not 802.11ax:
+// the measured U7PG2's (inform.U7PG2: 10 on 2.4 GHz, 21 on 5 GHz).
+func nonAXIEEEModes(band string) int64 { return inform.U7PG2.Radios[band].IEEEModes }
+
+// The model codes cmd/udeco-ap reports (catalog.json has their entries).
+const (
+	ModelUAL6  = "UAL6"  // U6-Lite: what a Deco X20 is reported as
+	ModelU7LT  = "U7LT"  // UAP-AC-Lite: a JCOW414 without its LAN ports
+	ModelUHDIW = "UHDIW" // UAP-IW-HD: a JCOW414 with its LAN ports
+	// DecoAgentModel is the one model a Deco is reported as, the agent's
+	// default: its capability words (above) are chosen for that hardware.
+	DecoAgentModel = ModelUAL6
+	// DefaultModel is what the controller-side tools (cmd/udeco, cmd/uow)
+	// report an AP as unless told otherwise: the one model with fully
+	// measured capability words (inform.U7PG2).
+	DefaultModel = inform.U7PG2Model
 )
 
 // DecoAgentProfile is the profile cmd/udeco-ap reports for model code m
@@ -331,16 +347,21 @@ type DecoAgentFeatures struct {
 // MT7663 2x2 5 GHz, four switch ports) can be reported as: the
 // UAP-AC-Lite (no ports) and the UAP-IW-HD (four front ports and the rear
 // uplink, the only Wi-Fi 5 UniFi AP with four LAN ports).
-var JCOW414Models = map[string]bool{"U7LT": true, "UHDIW": true}
+var JCOW414Models = map[string]bool{ModelU7LT: true, ModelUHDIW: true}
 
-// jcow414MaxTx: the JCOW414's power at TxPower=100 % (internal/mtkwifi
-// JCOW414); a model's larger catalogue maximum is not claimed.
+// jcow414MaxTx: the JCOW414's power at TxPower=100 %; a model's larger
+// catalogue maximum is not claimed.
 var jcow414MaxTx = map[string]int{"ng": 20, "na": 23}
+
+// JCOW414MaxTx is the JCOW414's transmit power (dBm) on band ("ng", "na")
+// at the driver's TxPower=100 %; 0 for any other band. internal/mtkwifi's
+// layout (JCOW414) takes its MaxTxDBm from here.
+func JCOW414MaxTx(band string) int { return jcow414MaxTx[band] }
 
 // DecoAgentProfileWith is DecoAgentProfile with the optional features f.
 func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (inform.Profile, bool) {
 	jcow := JCOW414Models[m.Code]
-	if m.Code != "UAL6" && !jcow {
+	if m.Code != DecoAgentModel && !jcow {
 		return inform.Profile{}, false
 	}
 	p := inform.Profile{Model: m.Code, Display: m.Display, Version: m.Version,
@@ -392,11 +413,11 @@ func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (i
 		case r.Band == "ng" && ax:
 			rp.IEEEModes = decoAgentIEEEModesNG
 		case r.Band == "ng":
-			rp.IEEEModes = decoAgentIEEEModesNGn
+			rp.IEEEModes = nonAXIEEEModes("ng")
 		case ax:
 			rp.IEEEModes = decoAgentIEEEModesNA
 		default:
-			rp.IEEEModes = decoAgentIEEEModesNAn
+			rp.IEEEModes = nonAXIEEEModes("na")
 		}
 		p.Radios[r.Band] = rp
 	}

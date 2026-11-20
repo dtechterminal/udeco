@@ -99,7 +99,7 @@ type Config struct {
 }
 
 const (
-	defaultModel    = "U7PG2"
+	defaultModel    = models.DefaultModel // the measured UAP-AC-Pro
 	defaultSSHDPort = 22201
 )
 

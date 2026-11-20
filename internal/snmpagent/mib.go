@@ -122,6 +122,13 @@ type mibInput struct {
 	stats    statsSnapshot
 }
 
+// DefaultDescr stands in for a display model nobody set: sysDescr here,
+// and the agent's own fallbacks (cmd/udeco-ap: the SNMP view's model and
+// the syslog host name). It is the display name of the model a Deco is
+// reported as (the catalogue's entry for models.DecoAgentModel; this
+// package does not import models, the agent's test compares the two).
+const DefaultDescr = "U6-Lite"
+
 func buildTree(in mibInput) tree {
 	var b builder
 	v := in.view
@@ -131,7 +138,7 @@ func buildTree(in mibInput) tree {
 	// system
 	descr := strings.TrimSpace(v.Model + " " + v.Version)
 	if descr == "" {
-		descr = "U6-Lite"
+		descr = DefaultDescr
 	}
 	sys := func(n uint32, val Value) { b.add(oidSystem.Append(n, 0), val) }
 	sys(1, OctetString(display(descr)))

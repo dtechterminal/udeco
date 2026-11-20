@@ -99,8 +99,9 @@ const (
 	defaultPortsLoss    = 300 * time.Second
 )
 
-// portsOn reports whether the unit reports LAN ports (jio-mtk as UHDIW).
-func (a *agent) portsOn() bool { return a.cfg.jio() && a.cfg.Model == "UHDIW" }
+// portsOn reports whether the unit reports LAN ports (jio-mtk as the
+// UAP-IW-HD: Config.hasLANPorts).
+func (a *agent) portsOn() bool { return a.cfg.jio() && a.cfg.hasLANPorts() }
 
 // portLocked: the uplink always, port 1 unless ports_unlocked lists it.
 func (a *agent) portLocked(phys int) bool {

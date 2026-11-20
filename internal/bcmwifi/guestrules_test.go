@@ -20,7 +20,7 @@ func TestGuestEbtables(t *testing.T) {
 	if !reflect.DeepEqual(r.In, in) || !reflect.DeepEqual(r.Out, out) {
 		t.Errorf("rules differ from bcmwifi's")
 	}
-	if r.ChainIn != chainGuestIn || r.ChainOut != chainGuestOut || r.ChainAuth != chainGuestAuth {
+	if r.ChainIn != GuestChainIn || r.ChainOut != GuestChainOut || r.ChainAuth != GuestChainAuth {
 		t.Errorf("chains %s %s %s", r.ChainIn, r.ChainOut, r.ChainAuth)
 	}
 	if GuestEbtables(&GuestPolicy{GatewayIP: "192.168.0.1"}) != nil || GuestEbtables(nil) != nil {

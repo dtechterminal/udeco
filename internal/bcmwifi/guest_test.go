@@ -54,12 +54,12 @@ func TestGuestIsolation(t *testing.T) {
 		t.Errorf("wl03 in %q, wl04 in %q", f.bridgeOf("wl03"), f.bridgeOf("wl04"))
 	}
 	// Chains exist with policy DROP and jumps sit first in FORWARD/INPUT.
-	for _, c := range []string{chainGuestIn, chainGuestOut} {
+	for _, c := range []string{GuestChainIn, GuestChainOut} {
 		if f.eb.chains[c] == nil || f.eb.chains[c].policy != "DROP" {
 			t.Fatalf("chain %s: %+v", c, f.eb.chains[c])
 		}
 	}
-	if f.eb.chains[chainGuestAuth] != nil {
+	if f.eb.chains[GuestChainAuth] != nil {
 		t.Error("auth chain without a portal")
 	}
 	fw := ebRules(f, "FORWARD")
@@ -69,7 +69,7 @@ func TestGuestIsolation(t *testing.T) {
 	if in := ebRules(f, "INPUT"); len(in) != 2 || !contains(in, "-i wl03 -j UDECO-GIN") {
 		t.Errorf("INPUT %v", in)
 	}
-	in := strings.Join(ebRules(f, chainGuestIn), "\n")
+	in := strings.Join(ebRules(f, GuestChainIn), "\n")
 	order := []string{
 		"-p 0x888e -j ACCEPT",
 		"-p ARP -j ACCEPT",
@@ -83,7 +83,7 @@ func TestGuestIsolation(t *testing.T) {
 		"--ip6-dst fc00::/7 -j DROP",
 		"-j ACCEPT",
 	}
-	lines := ebRules(f, chainGuestIn)
+	lines := ebRules(f, GuestChainIn)
 	next := 0
 	for _, w := range order {
 		for next < len(lines) && !strings.Contains(lines[next], w) {
@@ -100,7 +100,7 @@ func TestGuestIsolation(t *testing.T) {
 	if strings.Contains(in, "bad") {
 		t.Error("invalid DNS entry used")
 	}
-	out := strings.Join(ebRules(f, chainGuestOut), "\n")
+	out := strings.Join(ebRules(f, GuestChainOut), "\n")
 	for _, w := range []string{"-s " + gwMAC + " -j ACCEPT", "-p IPv4 --ip-src 192.168.0.50 -j ACCEPT"} {
 		if !strings.Contains(out, w) {
 			t.Errorf("UDECO-GOUT lacks %q:\n%s", w, out)
@@ -125,7 +125,7 @@ func TestGuestIsolation(t *testing.T) {
 
 	// Removed behind our back: Verify fails, Tick rebuilds.
 	f.eb.chains["FORWARD"].rules = nil
-	delete(f.eb.chains, chainGuestOut)
+	delete(f.eb.chains, GuestChainOut)
 	if err := a.Verify(ctx, d); err == nil {
 		t.Error("Verify passed without guest chains")
 	}
@@ -133,7 +133,7 @@ func TestGuestIsolation(t *testing.T) {
 	if err != nil || r.NeedsApply {
 		t.Fatalf("Tick %+v %v", r, err)
 	}
-	if !contains(ebRules(f, "FORWARD"), "-o wl13 -j UDECO-GOUT") || len(ebRules(f, chainGuestOut)) == 0 {
+	if !contains(ebRules(f, "FORWARD"), "-o wl13 -j UDECO-GOUT") || len(ebRules(f, GuestChainOut)) == 0 {
 		t.Error("Tick did not rebuild the guest chains")
 	}
 	if !strings.Contains(strings.Join(r.Foreign, "\n"), "chain UDECO-GOUT missing") {
@@ -175,10 +175,10 @@ func TestGuestPortalAuthorize(t *testing.T) {
 	a := newTestApplier(f, false)
 	d := guestDesired(true)
 	applyOK(t, a, d)
-	if c := f.eb.chains[chainGuestAuth]; c == nil || c.policy != "DROP" || len(c.rules) != 0 {
+	if c := f.eb.chains[GuestChainAuth]; c == nil || c.policy != "DROP" || len(c.rules) != 0 {
 		t.Fatalf("auth chain %+v", c)
 	}
-	in := strings.Join(ebRules(f, chainGuestIn), "\n")
+	in := strings.Join(ebRules(f, GuestChainIn), "\n")
 	for _, w := range []string{"--ip-dst 192.168.0.1 --ip-proto tcp --ip-dport 8880:8882 -j ACCEPT", "--ip-dport 8843 -j ACCEPT", "-j UDECO-GAUTH"} {
 		if !strings.Contains(in, w) {
 			t.Errorf("UDECO-GIN lacks %q", w)
@@ -191,7 +191,7 @@ func TestGuestPortalAuthorize(t *testing.T) {
 	if err := a.AuthorizeGuest(ctx, strings.ToUpper(staA)); err != nil {
 		t.Fatal(err)
 	}
-	if r := ebRules(f, chainGuestAuth); len(r) != 1 || r[0] != "-s 02:11:22:33:44:01 -j RETURN" {
+	if r := ebRules(f, GuestChainAuth); len(r) != 1 || r[0] != "-s 02:11:22:33:44:01 -j RETURN" {
 		t.Fatalf("auth rules %v", r)
 	}
 	if !f.called("fc flush --mac " + staA) {
@@ -201,23 +201,23 @@ func TestGuestPortalAuthorize(t *testing.T) {
 	if err := a.AuthorizeGuest(ctx, staA); err != nil {
 		t.Fatal(err)
 	}
-	if len(ebRules(f, chainGuestAuth)) != 1 {
+	if len(ebRules(f, GuestChainAuth)) != 1 {
 		t.Error("duplicate auth rule")
 	}
-	delete(f.eb.chains, chainGuestIn)
+	delete(f.eb.chains, GuestChainIn)
 	f.eb.chains["FORWARD"].rules = nil
 	f.eb.chains["INPUT"].rules = nil
 	if _, err := a.Tick(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if r := ebRules(f, chainGuestAuth); len(r) != 1 {
+	if r := ebRules(f, GuestChainAuth); len(r) != 1 {
 		t.Errorf("auth rules after rebuild %v", r)
 	}
 	f.reset()
 	if err := a.UnauthorizeGuest(ctx, staA); err != nil {
 		t.Fatal(err)
 	}
-	if r := ebRules(f, chainGuestAuth); len(r) != 0 {
+	if r := ebRules(f, GuestChainAuth); len(r) != 0 {
 		t.Errorf("auth rules after unauthorize %v", r)
 	}
 	if !f.called("deauthenticate " + staA) {
@@ -228,7 +228,7 @@ func TestGuestPortalAuthorize(t *testing.T) {
 	}
 	// Portal off: the auth chain goes.
 	applyOK(t, a, guestDesired(false))
-	if f.eb.chains[chainGuestAuth] != nil {
+	if f.eb.chains[GuestChainAuth] != nil {
 		t.Error("auth chain left with the portal off")
 	}
 }
@@ -265,7 +265,7 @@ func TestNormalizeGuest(t *testing.T) {
 func TestParseEbtablesListing(t *testing.T) {
 	out := "Bridge table: filter\n\nBridge chain: FORWARD, entries: 3, policy: ACCEPT\n-i wl13 -j UDECO-GIN \n-o wl13 -j UDECO-GOUT , pcnt = 0 -- bcnt = 0\n-i eth1 -j blacklist\n"
 	js := parseEbJumps("FORWARD", out)
-	if len(js) != 2 || js[0] != (ebJump{"FORWARD", "-i", "wl13", chainGuestIn}) || js[1].Target != chainGuestOut {
+	if len(js) != 2 || js[0] != (ebJump{"FORWARD", "-i", "wl13", GuestChainIn}) || js[1].Target != GuestChainOut {
 		t.Errorf("%+v", js)
 	}
 	if m := parseEbMACs("-s 2:11:22:3:44:1 -j RETURN \n"); len(m) != 1 || m[0] != "02:11:22:03:44:01" {

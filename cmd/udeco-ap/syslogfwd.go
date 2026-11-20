@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/antoniocosta/unifi-openwrt/internal/snmpagent"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
@@ -87,7 +88,7 @@ func (a *agent) syslogFollow(ctx context.Context) {
 			want = syslogTarget{addr: net.JoinHostPort(s.Host, strconv.Itoa(s.Port)), encrypted: s.Encrypted, key: s.Key, level: s.Level,
 				host: a.x.Dev.Hostname, tag: fmt.Sprintf("%s,%s,%s:", a.x.Dev.Model, strings.ReplaceAll(strings.ToLower(a.x.Dev.MAC.String()), ":", ""), a.x.S.Version)}
 			if want.host == "" {
-				want.host = "U6-Lite"
+				want.host = snmpagent.DefaultDescr
 			}
 			if s.Encrypted {
 				want.hashID = a.x.S.HashID

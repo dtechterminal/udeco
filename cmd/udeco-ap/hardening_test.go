@@ -804,22 +804,27 @@ func TestU6ScanRows(t *testing.T) {
 
 // ------------------------------------------------------------ schedules
 
-func TestScheduleOn(t *testing.T) {
+// Whether a window is open is translate.ScheduleOn (its tests are in
+// internal/translate); scheduleOff applies it to the enabled, scheduled
+// WLANs.
+func TestScheduleOff(t *testing.T) {
 	mon := time.Date(2026, 11, 16, 0, 0, 0, 0, time.Local) // a Monday
-	w := []string{"mon 0800-1730", "tue 0000-2400"}
+	d := bcmwifi.Desired{SSIDs: []bcmwifi.SSID{
+		{ID: "always", Enabled: true},
+		{ID: "work", Enabled: true, Schedule: []string{"mon 0800-1730"}},
+		{ID: "never", Enabled: true, Schedule: []string{}},
+		{ID: "disabled", Schedule: []string{"mon 0800-1730"}},
+	}}
 	for _, c := range []struct {
-		at time.Time
-		on bool
+		at   time.Time
+		want []string
 	}{
-		{mon.Add(7*time.Hour + 59*time.Minute), false},
-		{mon.Add(8 * time.Hour), true},
-		{mon.Add(17*time.Hour + 29*time.Minute), true},
-		{mon.Add(17*time.Hour + 30*time.Minute), false},
-		{mon.Add(24*time.Hour + 23*time.Hour + 59*time.Minute), true},
-		{mon.Add(48 * time.Hour), false},
+		{mon.Add(7*time.Hour + 59*time.Minute), []string{"never", "work"}},
+		{mon.Add(8 * time.Hour), []string{"never"}},
+		{mon.Add(17*time.Hour + 30*time.Minute), []string{"never", "work"}},
 	} {
-		if got := scheduleOn(w, c.at); got != c.on {
-			t.Errorf("%s: %v", c.at.Format("Mon 15:04"), got)
+		if got := setKeys(scheduleOff(d, c.at)); !slices.Equal(got, c.want) {
+			t.Errorf("%s: off %v, want %v", c.at.Format("Mon 15:04"), got, c.want)
 		}
 	}
 }

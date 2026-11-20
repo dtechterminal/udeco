@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // hapdRadio is the input to renderHostapd for one radio.
@@ -118,11 +119,11 @@ const ftReassocMS = 1000
 func keyMgmt(s SSID) (mgmt string, pmf int) {
 	pmfWant := func(def int) int {
 		switch s.PMF {
-		case "disabled", "off", "0":
+		case translate.PMFDisabled, "off", "0":
 			return 0
-		case "optional", "1":
+		case translate.PMFOptional, "1":
 			return 1
-		case "required", "2":
+		case translate.PMFRequired, "2":
 			return 2
 		}
 		return def

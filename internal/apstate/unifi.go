@@ -204,7 +204,7 @@ func (s *Snapshot) FieldsWith(prev *Snapshot, info CfgInfo, caps map[string]Radi
 		ht := fmt.Sprintf("%d", r.Width)
 		txMode := r.TxPowerMode
 		if txMode == "" {
-			txMode = "custom" // the reading's power, no preset known
+			txMode = translate.TxCustom // the reading's power, no preset known
 		}
 		radios = append(radios, map[string]any{
 			"name": name, "radio": r.Band, "channel": r.Channel, "ht": ht,
