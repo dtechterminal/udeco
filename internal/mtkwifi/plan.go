@@ -95,6 +95,9 @@ type BSS struct {
 	// M2U is the SSID's multicast enhancement: the MT7663's per-BSS
 	// IgmpSnEnable (the MT7603 has one value per radio: RadioPlan.IgmpSn)
 	M2U bool `json:",omitempty"`
+	// Guest: a guest SSID, isolated by the agent's ebtables chains
+	// (guest.go)
+	Guest bool `json:",omitempty"`
 }
 
 // RadioPlan is what one radio serves. The zero value of each per-radio

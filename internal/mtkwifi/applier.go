@@ -40,6 +40,9 @@ type Options struct {
 	WPA3     bool // serve SAE where the driver has it (5 GHz); the agent claims WPA3 on that radio only
 	Logf     func(string, ...any)
 	Layout   []RadioDef // nil = JCOW414
+	// KeepSSID is the SSID kept up while the uplink is down
+	// (uplinkloss.go); "" = the first LAN SSID
+	KeepSSID string
 	// VerifyTimeout bounds the wait for the BSSes after an apply (20 s).
 	VerifyTimeout time.Duration
 	// Settle: how long after a radio restart the collector's driver reads
@@ -86,6 +89,11 @@ type Applier struct {
 	// weak: per station, the minimum RSSI kick's count and back-off
 	// (minrssi.go)
 	weak map[string]*weakSta
+	// uplinkDown: the uplink is down and the SSIDs are isolated
+	// (uplinkloss.go); want: the controller's plan a.live is made from
+	// (a.live is its isolated form meanwhile)
+	uplinkDown bool
+	want       map[string]RadioPlan
 }
 
 const (
@@ -191,13 +199,14 @@ func (a *Applier) Owned() bool {
 func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	want, notes := plans(d, a.o.Layout, a.o.WPA3)
+	full, notes := plans(d, a.o.Layout, a.o.WPA3)
+	want := a.effective(full)
 	p := bcmwifi.Plan{Desired: d, Notes: notes}
 	cur := a.live
 	if cur == nil {
 		if h, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, appliedFile))); err == nil &&
 			strings.TrimSpace(string(h)) == plansHash(want) && a.check(ctx, want, true) == nil {
-			a.live = want
+			a.live, a.want = want, full
 			a.desired = d
 			a.planACL(&p, want)
 			return p, nil
@@ -207,7 +216,7 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 		cur = a.adopt(ctx, want)
 		a.adopted = cur
 		if len(cur) == len(a.o.Layout) {
-			a.live, a.adopted = cur, nil
+			a.live, a.adopted, a.want = cur, nil, full
 			a.desired = d
 			a.planACL(&p, want)
 			return p, nil
@@ -336,8 +345,9 @@ func chanText(c int) string {
 func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	want, _ := plans(p.Desired, a.o.Layout, a.o.WPA3)
-	h := plansHash(want)
+	full, _ := plans(p.Desired, a.o.Layout, a.o.WPA3)
+	want := a.effective(full)
+	h := plansHash(full)
 	if h == a.failed {
 		return bcmwifi.ErrDesiredFailed
 	}
@@ -366,8 +376,8 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 		}
 		return err
 	}
-	a.live = want
-	a.saveLastGood(want)
+	a.live, a.want = want, full
+	a.saveLastGood(full)
 	a.flushLive(ctx)
 	return nil
 }
@@ -691,7 +701,7 @@ func (a *Applier) Verify(ctx context.Context, d bcmwifi.Desired) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	want, _ := plans(d, a.o.Layout, a.o.WPA3)
-	return a.check(ctx, want, !a.settling())
+	return a.check(ctx, a.effective(want), !a.settling())
 }
 
 // ------------------------------------------------------- baseline, rollback
@@ -749,7 +759,7 @@ func (a *Applier) rollback(ctx context.Context) error {
 			err = a.waitLive(ctx, lg)
 		}
 		if err == nil {
-			a.live = lg
+			a.live, a.want = lg, lg
 			a.o.Logf("mtkwifi: rolled back to last-good")
 			return nil
 		}
@@ -800,7 +810,7 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 		}
 	}
 	_ = a.cleanVLANs(ctx, nil)
-	a.live = nil
+	a.live, a.want = nil, nil
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, ownedFile)))
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, appliedFile)))
 	a.o.Logf("mtkwifi: the vendor's Wi-Fi of this boot is back")

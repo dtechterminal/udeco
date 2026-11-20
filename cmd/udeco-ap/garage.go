@@ -9,6 +9,7 @@ import (
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
+	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
 	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 )
 
@@ -79,4 +80,72 @@ func (a *agent) radiosBusy() bool {
 		done()
 	}
 	return !ok
+}
+
+// uplinkIsolator is the applier's uplink-loss isolation (mtkwifi
+// uplinkloss.go).
+type uplinkIsolator interface {
+	SetUplinkDown(context.Context, bool) error
+}
+
+// uplinkState is the uplink-loss loop's state.
+type uplinkState struct {
+	w        mtkwifi.UplinkWatch
+	isolated bool
+}
+
+// uplinkPoll: how often the uplink port's carrier is read.
+const uplinkPoll = time.Second
+
+// startUplinkLoss follows the uplink port's carrier (uplink_loss, on by
+// default on the Garage; takeover with apply).
+func (a *agent) startUplinkLoss(ctx context.Context) {
+	if !a.cfg.uplinkLoss() || !a.cfg.Apply {
+		return
+	}
+	if _, ok := a.wifi.(uplinkIsolator); !ok {
+		return
+	}
+	a.bg.Add(1)
+	go func() {
+		defer a.bg.Done()
+		var st uplinkState
+		t := time.NewTicker(uplinkPoll)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-t.C:
+				a.uplinkStep(ctx, &st, now)
+			}
+		}
+	}()
+}
+
+// uplinkStep reads the uplink port's carrier once and isolates or
+// restores the SSIDs when UplinkWatch says so. No switch reading (the
+// port missing) is no decision.
+func (a *agent) uplinkStep(ctx context.Context, st *uplinkState, now time.Time) {
+	l, ok := jioports.ReadLinks(a.o.root)[jioports.UplinkPhys]
+	if !ok {
+		return
+	}
+	iso := st.w.Observe(l.Up, now)
+	if iso == st.isolated {
+		return
+	}
+	st.isolated = iso
+	u, ok := a.wifi.(uplinkIsolator)
+	if !ok {
+		return
+	}
+	if iso {
+		a.event("UPLINK LOST: no carrier on the uplink port for 15 s: user and guest SSIDs go down, the management SSID stays up")
+	} else {
+		a.event("UPLINK BACK: carrier on the uplink port for 30 s: every SSID comes back")
+	}
+	if err := u.SetUplinkDown(ctx, iso); err != nil {
+		a.logf("wifi: %v", err)
+	}
 }

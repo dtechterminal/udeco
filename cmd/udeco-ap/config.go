@@ -120,7 +120,25 @@ type Config struct {
 	// change), never by a restart of its own; the hand-back restores
 	// TP-Link's state (internal/bcmwifi/twt.go).
 	TWT *bool `json:"twt,omitempty"`
+	// UplinkLoss (platform jio-mtk, takeover with apply) is the U6's
+	// uplink-loss behaviour: absent or true, after 15 s without carrier on
+	// the uplink port the user and guest SSIDs go down and one management
+	// SSID (UplinkLossSSID, else the first LAN SSID) stays up, so the GL
+	// KVM side door can still join; every SSID comes back after 30 s of
+	// carrier, never isolating again within 5 minutes of a restore. Each
+	// change restarts the radios whose SSIDs change. false keeps every
+	// SSID up whatever the uplink does (mtkwifi uplinkloss.go, garage.go).
+	UplinkLoss *bool `json:"uplink_loss,omitempty"`
+	// UplinkLossSSID is the SSID kept up while the uplink is down (an
+	// SSID name the controller serves on this unit); "" = the first SSID
+	// on the LAN (no VLAN, not a guest SSID). Not served: nothing is taken
+	// down.
+	UplinkLossSSID string `json:"uplink_loss_ssid,omitempty"`
 }
+
+// uplinkLoss: the SSIDs are isolated on uplink loss (platform jio-mtk)
+// unless uplink_loss is false.
+func (c *Config) uplinkLoss() bool { return c.jio() && (c.UplinkLoss == nil || *c.UplinkLoss) }
 
 func (c *Config) portsConfirm() time.Duration {
 	if c.PortsConfirmS == 0 {
@@ -212,6 +230,9 @@ func (c *Config) validate() error {
 		}
 	default:
 		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
+	}
+	if (c.UplinkLoss != nil || c.UplinkLossSSID != "") && !c.jio() {
+		return errors.New("config: uplink_loss and uplink_loss_ssid are for platform " + PlatformJio + " only")
 	}
 	if (len(c.PortsUnlocked) > 0 || c.PortsConfirmS != 0 || c.PortsLossS != 0) && !c.jio() {
 		return errors.New("config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform " + PlatformJio + " only")
