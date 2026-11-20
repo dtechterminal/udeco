@@ -3,7 +3,9 @@
 package mtkwifi
 
 import (
+	"context"
 	"encoding/binary"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -219,5 +221,27 @@ func TestEventsLeaves(t *testing.T) {
 	e.flush()
 	if evs, _ := e.Take(); len(evs) != 1 {
 		t.Errorf("MBO and Delete: %v", evs)
+	}
+}
+
+type closingSource struct{}
+
+func (c *closingSource) Read([]byte) (int, error) { return 0, errors.New("socket gone") }
+func (c *closingSource) Close() error             { return nil }
+
+// TestEventsDown: the rtnetlink listener dying calls Down (proxy ARP's
+// driver flag goes off at once).
+func TestEventsDown(t *testing.T) {
+	down := make(chan struct{}, 4)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	never := func() (packetSource, error) { return nil, errors.New("no") }
+	m := NewEvents(EventsOptions{Down: func() { down <- struct{}{} },
+		openRTNL: func() (packetSource, error) { return &closingSource{}, nil }, openECNT: never, openKmsg: never})
+	go m.Run(ctx)
+	select {
+	case <-down:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Down not called")
 	}
 }

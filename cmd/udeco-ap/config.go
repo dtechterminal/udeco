@@ -141,11 +141,19 @@ type Config struct {
 	// Off by default until the single-BSS down/up test passed on the unit
 	// (mtkwifi slots.go, docs/deco/features/garage-parity.md).
 	BSSPinning bool `json:"bss_pinning,omitempty"`
+	// ProxyARP (platform jio-mtk) answers ARP requests for the stations
+	// of the WLANs the controller set proxy ARP on (mtkwifi proxyarp.go);
+	// false leaves the requests going out on the air. On by default.
+	ProxyARP *bool `json:"proxy_arp,omitempty"`
 }
 
 // uplinkLoss: the SSIDs are isolated on uplink loss (platform jio-mtk)
 // unless uplink_loss is false.
 func (c *Config) uplinkLoss() bool { return c.jio() && (c.UplinkLoss == nil || *c.UplinkLoss) }
+
+// proxyARP: the controller's proxy ARP is served (platform jio-mtk; on
+// unless proxy_arp is false).
+func (c *Config) proxyARP() bool { return c.jio() && (c.ProxyARP == nil || *c.ProxyARP) }
 
 func (c *Config) portsConfirm() time.Duration {
 	if c.PortsConfirmS == 0 {
@@ -238,8 +246,8 @@ func (c *Config) validate() error {
 	default:
 		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
 	}
-	if (c.UplinkLoss != nil || c.UplinkLossSSID != "" || c.BSSPinning) && !c.jio() {
-		return errors.New("config: uplink_loss, uplink_loss_ssid and bss_pinning are for platform " + PlatformJio + " only")
+	if (c.UplinkLoss != nil || c.UplinkLossSSID != "" || c.BSSPinning || c.ProxyARP != nil) && !c.jio() {
+		return errors.New("config: uplink_loss, uplink_loss_ssid, bss_pinning and proxy_arp are for platform " + PlatformJio + " only")
 	}
 	if (len(c.PortsUnlocked) > 0 || c.PortsConfirmS != 0 || c.PortsLossS != 0) && !c.jio() {
 		return errors.New("config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform " + PlatformJio + " only")

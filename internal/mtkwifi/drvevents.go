@@ -249,6 +249,10 @@ type EventsOptions struct {
 	Notify func()
 	// ProxyARP gets the MT7663's proxy ARP requests (proxyarp.go).
 	ProxyARP func(*ProxyARPRequest)
+	// Down is called (from the listener's goroutine) when the rtnetlink
+	// listener closes: nothing answers the 0x93b requests until it is
+	// back (Applier.ProxyARPDown).
+	Down func()
 	// NG2 follows the kernel log for the MT7603's Del Sta lines.
 	NG2 bool
 	Now func() time.Time
@@ -312,6 +316,9 @@ func (m *Events) setUp(up bool) {
 	m.mu.Lock()
 	m.rtnlUp = up
 	m.mu.Unlock()
+	if !up && m.o.Down != nil {
+		m.o.Down()
+	}
 }
 
 // handle takes one event as it arrives.

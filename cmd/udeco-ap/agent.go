@@ -301,6 +301,7 @@ type agent struct {
 	hapd staSource
 	// drv: the Garage's driver leave events (mtkwifi.Events; garage.go)
 	drv    leaveSource
+	gnet   garageNetState // garage.go: stations seen, addresses, GARPs
 	readAt time.Time
 	// stale: the reading in use is the last one again (it failed): no new
 	// look at the clients (station events, Roaming Assistant)
@@ -360,7 +361,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 			o.newWifi = func(bo bcmwifi.Options) wifiApplier {
 				return mtkwifi.New(mtkwifi.Options{Root: bo.Root, Run: bo.Run, StateDir: bo.StateDir, RunDir: bo.RunDir,
 					Uplink: bo.Uplink, DryRun: bo.DryRun, WPA3: bo.WPA3, Logf: bo.Logf, KeepSSID: cfg.UplinkLossSSID,
-					PinSlots: cfg.BSSPinning})
+					PinSlots: cfg.BSSPinning, ProxyARP: cfg.proxyARP()})
 			}
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,6 +47,12 @@ type Options struct {
 	// PinSlots keeps each WLAN on its profile slot (netdev, BSSID) while
 	// others come and go (slots.go); off = the controller's order
 	PinSlots bool
+	// ProxyARP serves the controller's proxy ARP (proxyarp.go); off = the
+	// requests go out on the air as without it
+	ProxyARP bool
+	// sendFrame sends one Ethernet frame on a netdev (nil: an AF_PACKET
+	// socket; tests record them)
+	sendFrame func(dev string, frame []byte) error
 	// VerifyTimeout bounds the wait for the BSSes after an apply (20 s).
 	VerifyTimeout time.Duration
 	// Settle: how long after a radio restart the collector's driver reads
@@ -99,6 +106,14 @@ type Applier struct {
 	want       map[string]RadioPlan
 	// pins: WLAN id -> profile slot per band (slots.go)
 	pins map[string]map[string]int
+	// proxy ARP (proxyarp.go): the responder, the event listener's health,
+	// the 5 GHz flags sent (per netdev; absent = unknown), the 2.4 GHz
+	// drop rules' vifs and state
+	parp      parpResponder
+	eventsOK  func() bool
+	parpFlag  map[string]bool
+	parpJumps []string
+	parpEb    string
 }
 
 const (
@@ -146,7 +161,14 @@ func New(o Options) *Applier {
 	if o.writeLED == nil {
 		o.writeLED = writeProc
 	}
-	return &Applier{o: o, uplink: o.Uplink, ledOn: true}
+	if o.sendFrame == nil {
+		o.sendFrame = sendFrame
+	}
+	a := &Applier{o: o, uplink: o.Uplink, ledOn: true}
+	if o.ProxyARP && !o.DryRun {
+		a.parp = newResponder(o.Logf, func() { a.ProxyARPDown(context.Background()) })
+	}
+	return a
 }
 
 func (a *Applier) dev(p string) string { return filepath.Join(a.o.Root, p) }
@@ -205,6 +227,9 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	full, notes := plans(d, a.o.Layout, a.o.WPA3)
+	if a.o.ProxyARP {
+		notes = slices.DeleteFunc(notes, func(n string) bool { return strings.HasSuffix(n, "proxy ARP not applied") })
+	}
 	full, _ = a.pinned(full)
 	want := a.effective(full)
 	p := bcmwifi.Plan{Desired: d, Notes: notes}
@@ -388,6 +413,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	a.savePins(pins)
 	a.saveLastGood(full)
 	a.flushLive(ctx)
+	a.syncProxyARP(ctx)
 	return nil
 }
 
@@ -437,6 +463,7 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 		return fmt.Errorf("baseline profile: %w", err)
 	}
 	defer a.restarted() // the collector leaves the driver alone a while longer
+	a.parpRestarted(rd)
 	for i := len(rd.Ifaces) - 1; i >= 0; i-- {
 		if err := a.run(ctx, "ifconfig", rd.Ifaces[i], "down"); err != nil {
 			return err
@@ -804,6 +831,7 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 		return err
 	}
 	a.clearLive(ctx)    // what only the agent sets live (live.go)
+	a.parpOff(ctx)      // proxy ARP (proxyarp.go)
 	defer a.restarted() // the collector leaves the driver alone a while longer
 	for _, rd := range a.o.Layout {
 		for i := len(rd.Ifaces) - 1; i >= 0; i-- {
@@ -885,6 +913,7 @@ func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 	if err := a.syncGuest(ctx, &a.desired, a.live, true); err != nil {
 		r.Problems = append(r.Problems, err.Error())
 	}
+	a.syncProxyARP(ctx)
 	ssids := !a.settling()
 	for _, rd := range a.o.Layout {
 		rp := a.live[rd.Band]

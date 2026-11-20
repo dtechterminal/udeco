@@ -49,6 +49,9 @@ type RadioDef struct {
 	HWName string
 	SAE    bool // the driver serves WPA3-Personal (SAE)
 	UAPSD  bool // the driver has U-APSD (APSDCapable, per BSS)
+	// HSFlag: the driver does proxy ARP itself (hs_flag bit 1, the
+	// MT7663; proxyarp.go)
+	HSFlag bool
 	// Spectrum is the radio's spectrum backend: SpectrumOffChan (the
 	// MT7603's ApOffChanScan sweep, offchan.go), or "" for none (the band's
 	// spectrum commands run the neighbour survey: SpectrumBySurvey)
@@ -60,7 +63,8 @@ var JCOW414 = []RadioDef{
 	{Band: "ng", Ifaces: []string{"ra0", "ra1", "ra2", "ra3"}, Dat: "/etc/Wireless/RT2860AP/RT2860AP.dat",
 		MaxStaKey: "MaxStaNum", MaxTxDBm: 20, TxLive: "TxPower", HWName: "MT7603E", Spectrum: SpectrumOffChan},
 	{Band: "na", Ifaces: []string{"rai0", "rai1", "rai2", "rai3"}, Dat: "/etc/Wireless/RT2860AP_AC/RT2860AP.dat",
-		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, TxLive: "PowerDropCtrl", HWName: "MT7663", SAE: true, UAPSD: true},
+		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, TxLive: "PowerDropCtrl", HWName: "MT7663", SAE: true, UAPSD: true,
+		HSFlag: true},
 }
 
 // Channels the units' country (IN, CountryRegion 0 / CountryRegionABand 10)
@@ -101,6 +105,9 @@ type BSS struct {
 	// Sched: the WLAN has a schedule (it comes and goes): never pinned
 	// to slot 0 while an always-on WLAN can be (slots.go)
 	Sched bool `json:",omitempty"`
+	// ProxyARP: the controller's proxy ARP (proxyarp.go; live, never a
+	// restart)
+	ProxyARP bool `json:",omitempty"`
 }
 
 // RadioPlan is what one radio serves. The zero value of each per-radio
@@ -255,7 +262,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			s = s.ForBand(rd.Band) // the controller's own values for this radio
 			b := BSS{ID: s.ID, SSID: s.SSID, Hidden: s.Hidden, Isolate: s.Isolation, MaxSta: maxSta, VLAN: s.VLAN,
 				RRM: s.RRM, BTM: s.BSSTransition, UAPSD: s.UAPSD && rd.UAPSD, M2U: s.MulticastToUnicast,
-				Sched: len(s.Schedule) > 0}
+				Sched: len(s.Schedule) > 0, ProxyARP: s.ProxyARP}
 			switch s.Security {
 			case "open", "":
 				b.Auth, b.Encr = "OPEN", "NONE"
