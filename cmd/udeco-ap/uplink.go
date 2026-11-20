@@ -23,7 +23,10 @@ package main
 //   - each change is logged and kept as an event; a failed change is
 //     retried after uplinkRetry;
 //   - takeover with the Wi-Fi live only; a drop to observe mode forgets
-//     the hold (the hand-back restored TP-Link's BSSes).
+//     the hold (the hand-back restored TP-Link's BSSes);
+//   - the LED shows the hold as TP-Link's conn "ap-lost" red blink (set by
+//     bcmwifi with the SSIDs); the agent's stop puts conn "online" back
+//     (releaseLED).
 //
 // uplink_ssid_down false turns it off: it is the one behaviour here that
 // takes the unit's own Wi-Fi away, so it has a key. Deco only (the
@@ -58,6 +61,27 @@ type ssidHolder interface {
 }
 
 var _ ssidHolder = (*bcmwifi.Applier)(nil)
+
+// ledReleaser is bcmwifi's way back from the uplink-loss LED blink (conn
+// "ap-lost" while the hold stands; bcmwifi uplinkled.go).
+type ledReleaser interface {
+	ReleaseLED(ctx context.Context)
+}
+
+var _ ledReleaser = (*bcmwifi.Applier)(nil)
+
+// releaseLED leaves no uplink-loss blink behind when the agent stops (the
+// SSIDs stay as they are, as for every stop): nothing would clear it. The
+// worker has ended; SIGTERM cancelled ctx, so the call gets its own bound.
+func (a *agent) releaseLED() {
+	r, ok := a.wifi.(ledReleaser)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	r.ReleaseLED(ctx)
+}
 
 // uplinkGuard is the watcher's state (its goroutine), but for the atomics.
 type uplinkGuard struct {
