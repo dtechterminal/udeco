@@ -108,9 +108,16 @@ func TestDriverLeaves(t *testing.T) {
 	e.observe(staReading(140, map[string][][2]any{"wifi0ap0": {{a, -61}}, "wifi1ap1": {{b, -50}}, "wifi0ap1": {}}),
 		&staFeed{read: t0.Add(40 * time.Second), now: t0.Add(40 * time.Second), vifs: vifs, leaves: true,
 			evs: []hapdmon.Event{{Vif: mtkwifi.AnyNG, MAC: a, Kind: hapdmon.Disconnected, At: t0.Add(35 * time.Second)}}})
-	// the reading (taken after the leave) shows a again: it came back
-	if len(e.queue) != 2 || e.queue[0]["event_type"] != staEvLeave || e.queue[1]["event_type"] != staEvAssoc {
+	// the reading shows a again: its station table may predate the leave
+	// (the collector's cache), so the association waits for the next one
+	if len(e.queue) != 1 || e.queue[0]["event_type"] != staEvLeave {
 		t.Fatalf("queue %v", e.queue)
+	}
+	e.queue = nil
+	e.observe(staReading(150, map[string][][2]any{"wifi0ap0": {{a, -61}}, "wifi1ap1": {{b, -50}}, "wifi0ap1": {}}),
+		&staFeed{read: t0.Add(50 * time.Second), now: t0.Add(50 * time.Second), vifs: vifs, leaves: true})
+	if len(e.queue) != 1 || e.queue[0]["event_type"] != staEvAssoc {
+		t.Fatalf("back: %v", e.queue)
 	}
 }
 

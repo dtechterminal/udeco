@@ -239,3 +239,34 @@ func TestMinRSSIDecoOnly(t *testing.T) {
 		t.Fatalf("Deco min-RSSI loop on the Garage: %v", got)
 	}
 }
+
+// The Garage's station table can be older than the reading's start (the
+// collector's 5 s cache, longer around a restart): a driver leave released
+// before the reading wins over the station still listed in it. One
+// sta_leave, no association straight after, no second leave; a station
+// really back shows in the next reading as an association.
+func TestDriverLeaveStaleTable(t *testing.T) {
+	var e staEvents
+	vifs := map[string]string{"ra0": "wifi0ap0"}
+	t0 := time.Unix(1_800_000_000, 0)
+	a := "aa:bb:cc:dd:ee:01"
+	e.observe(staReading(100, map[string][][2]any{"wifi0ap0": {{a, -60}}}), &staFeed{read: t0, now: t0, vifs: vifs, leaves: true})
+	evs := []hapdmon.Event{{Vif: "ra0", MAC: a, Kind: hapdmon.Disconnected, At: t0.Add(7 * time.Second)}}
+	// the reading of t0+10 s reuses the station table of t0+6 s
+	e.observe(staReading(110, map[string][][2]any{"wifi0ap0": {{a, -60}}}),
+		&staFeed{read: t0.Add(10 * time.Second), now: t0.Add(10 * time.Second), vifs: vifs, evs: evs, leaves: true})
+	if len(e.queue) != 1 || e.queue[0]["event_type"] != staEvLeave {
+		t.Fatalf("queue %v, want the leave only", e.queue)
+	}
+	e.queue = nil
+	e.observe(staReading(120, map[string][][2]any{"wifi0ap0": {}}),
+		&staFeed{read: t0.Add(20 * time.Second), now: t0.Add(20 * time.Second), vifs: vifs, leaves: true})
+	if len(e.queue) != 0 {
+		t.Fatalf("second leave: %v", e.queue)
+	}
+	e.observe(staReading(130, map[string][][2]any{"wifi0ap0": {{a, -61}}}),
+		&staFeed{read: t0.Add(30 * time.Second), now: t0.Add(30 * time.Second), vifs: vifs, leaves: true})
+	if len(e.queue) != 1 || e.queue[0]["event_type"] != staEvAssoc {
+		t.Fatalf("back: %v", e.queue)
+	}
+}

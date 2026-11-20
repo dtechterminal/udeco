@@ -38,7 +38,9 @@ import (
 //     in MacTableDeleteEntry, a second source for 2.4 GHz leaves.
 //
 // A Delete becomes a Disconnected hapdmon.Event after leaveHold, unless
-// its BSS had more than burstMax Deletes within burstWindow (a radio
+// its BSS (for a kernel log Del Sta, any 2.4 GHz BSS) had more than
+// burstMax Deletes within burstWindow, counting the ones already released
+// or dropped (a radio
 // restart or a bulk kick: the reading diff handles those) or the radios
 // were changing when it arrived (Options.Busy). staevents.go turns it into
 // a sta_leave only for a station the controller was told is on that BSS,
@@ -272,6 +274,10 @@ type Events struct {
 	mu sync.Mutex
 	// staged Deletes and fallbacks waiting for leaveHold/fallbackHold
 	staged []DrvEvent
+	// dels: every Delete staged lately (released or dropped too), for the
+	// burst count: the staged ones alone lose a burst's head once it is
+	// dropped, and its tail then looked like single leaves
+	dels []DrvEvent
 	// reported: when each station's leave was last released or staged
 	reported map[string]time.Time
 	out      []hapdmon.Event
@@ -353,6 +359,7 @@ func (m *Events) handle(e DrvEvent) {
 		}
 		m.reported[e.MAC] = now
 		m.dropFallback(e.MAC)
+		m.dels = append(m.dels, e)
 	}
 	m.staged = append(m.staged, e)
 }
@@ -398,6 +405,13 @@ func (m *Events) flush() {
 		released = true
 	}
 	m.staged = kept
+	keepDels := m.dels[:0]
+	for _, d := range m.dels {
+		if now.Sub(d.At) <= leaveHold+burstWindow+time.Second {
+			keepDels = append(keepDels, d)
+		}
+	}
+	m.dels = keepDels
 	for mac, t := range m.reported {
 		if now.Sub(t) > time.Minute {
 			delete(m.reported, mac)
@@ -409,15 +423,26 @@ func (m *Events) flush() {
 	}
 }
 
-// burst: s's BSS had more than burstMax Deletes within burstWindow of it.
+// burst: s's BSS had more than burstMax Deletes within burstWindow of it
+// (every Delete seen lately, released or not). The kernel log's Del Sta
+// (AnyNG: some 2.4 GHz BSS) counts with every 2.4 GHz BSS, and they with
+// it: a 2.4 GHz reset shows on either source.
 func (m *Events) burst(s DrvEvent) bool {
 	n := 0
-	for _, x := range m.staged {
-		if x.Kind == DrvDelete && x.Ifname == s.Ifname && x.Ifname != AnyNG && absDur(x.At.Sub(s.At)) <= burstWindow {
+	for _, x := range m.dels {
+		if sameBurstBSS(x.Ifname, s.Ifname) && absDur(x.At.Sub(s.At)) <= burstWindow {
 			n++
 		}
 	}
 	return n > burstMax
+}
+
+func sameBurstBSS(a, b string) bool {
+	ng := func(s string) bool { return s == AnyNG || strings.HasPrefix(s, "ra") && !strings.HasPrefix(s, "rai") }
+	if a == AnyNG || b == AnyNG {
+		return ng(a) && ng(b)
+	}
+	return a == b
 }
 
 func absDur(d time.Duration) time.Duration {

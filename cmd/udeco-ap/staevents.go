@@ -281,12 +281,19 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 	}
 	// the covered BSSes' socket events
 	touched := map[string]bool{}
+	// left: Garage driver leaves applied in this reading. The station
+	// table may predate them (the collector's cache: up to CacheTTL, longer
+	// around a restart), so a station they removed and the reading still
+	// lists is no association now; the next reading tells
+	left := map[string]bool{}
 	for _, ev := range evs {
 		vap := feed.vifs[ev.Vif]
 		if !covered[vap] || ev.Kind != hapdmon.Connected && ev.Kind != hapdmon.Disconnected {
 			if !covered[vap] && feed.leaves && ev.Kind == hapdmon.Disconnected {
 				// a Garage driver leave (driverLeave)
-				e.driverLeave(ev, feed, up-int64(feed.now.Sub(ev.At).Round(time.Second)/time.Second))
+				if e.driverLeave(ev, feed, up-int64(feed.now.Sub(ev.At).Round(time.Second)/time.Second)) {
+					left[ev.MAC] = true
+				}
 			}
 			continue // the other kinds feed the connection timings (staconn.go)
 		}
@@ -332,6 +339,9 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 	sort.Strings(came)
 	for _, mac := range came {
 		c := cur[mac]
+		if left[mac] {
+			continue
+		}
 		if p, ok := e.prev[mac]; ok {
 			e.leave(mac, p, p.lastSeen) // it was on a covered BSS, whose socket has not said so yet
 		}
@@ -354,10 +364,10 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 // the reading started: the station's sta_leave when the controller has it
 // on that BSS (an authenticated-only station never was), at its own time.
 // A kernel log Del Sta names no BSS (mtkwifi.AnyNG): any 2.4 GHz one.
-func (e *staEvents) driverLeave(ev hapdmon.Event, feed *staFeed, at int64) {
+func (e *staEvents) driverLeave(ev hapdmon.Event, feed *staFeed, at int64) bool {
 	p, ok := e.prev[ev.MAC]
 	if !ok {
-		return
+		return false
 	}
 	if ev.Vif == mtkwifi.AnyNG {
 		match := false
@@ -367,13 +377,14 @@ func (e *staEvents) driverLeave(ev hapdmon.Event, feed *staFeed, at int64) {
 			}
 		}
 		if !match {
-			return
+			return false
 		}
 	} else if n := feed.vifs[ev.Vif]; n == "" || n != p.vap {
-		return
+		return false
 	}
 	e.leave(ev.MAC, p, at)
 	delete(e.prev, ev.MAC)
+	return true
 }
 
 // live applies one socket event of a covered VAP; at is its time in the

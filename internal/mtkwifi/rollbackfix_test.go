@@ -281,3 +281,49 @@ func TestKickSettleGuard(t *testing.T) {
 		t.Errorf("deferred kick not sent: %v", f.log[n:])
 	}
 }
+
+// A burst is a burst whatever the flush timing: 5 Deletes on rai1 100 ms
+// apart, flushed every 250 ms (Run's tick), release nothing; the early
+// ones being dropped must not make the tail look like single leaves. The
+// kernel log's 2.4 GHz Del Sta lines (AnyNG) are burst-checked too.
+func TestEventsBurstTail(t *testing.T) {
+	for _, ifc := range []string{"rai1", AnyNG} {
+		busy := false
+		e, ck := newTestEvents(&busy)
+		var got []string
+		next := ck.t.Add(250 * time.Millisecond)
+		for i := 0; i < 5; i++ {
+			e.handle(DrvEvent{Kind: DrvDelete, Ifname: ifc, MAC: "02:00:00:00:00:0" + string(rune('1'+i))})
+			ck.t = ck.t.Add(100 * time.Millisecond)
+			if !ck.t.Before(next) {
+				e.flush()
+				next = next.Add(250 * time.Millisecond)
+			}
+		}
+		for i := 0; i < 12; i++ {
+			ck.t = ck.t.Add(250 * time.Millisecond)
+			e.flush()
+		}
+		evs, _ := e.Take()
+		for _, ev := range evs {
+			got = append(got, ev.MAC)
+		}
+		if len(got) != 0 {
+			t.Errorf("%s: burst tail released: %v", ifc, got)
+		}
+	}
+	// three on one BSS within a second are leaves
+	busy := false
+	e, ck := newTestEvents(&busy)
+	for i := 0; i < 3; i++ {
+		e.handle(DrvEvent{Kind: DrvDelete, Ifname: "rai1", MAC: "02:00:00:00:00:0" + string(rune('1'+i))})
+		ck.t = ck.t.Add(100 * time.Millisecond)
+	}
+	for i := 0; i < 8; i++ {
+		ck.t = ck.t.Add(250 * time.Millisecond)
+		e.flush()
+	}
+	if evs, _ := e.Take(); len(evs) != 3 {
+		t.Errorf("three leaves: %v", evs)
+	}
+}

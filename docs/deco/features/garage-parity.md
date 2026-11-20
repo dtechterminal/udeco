@@ -128,10 +128,20 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   socket (failed joins logged with their reason) and the kernel log's
   2.4 GHz `Del Sta` lines (`internal/mtkwifi/drvevents.go`). A leave is held
   1 s, a burst (more than 3 on one BSS within 1 s: a restart) is dropped,
+  counted over every Delete of the last seconds, released or not (counting
+  only the ones still held let a burst's tail out as leaves once its head
+  was dropped), the kernel log's 2.4 GHz `Del Sta` lines together with the
+  2.4 GHz BSSes,
   events during a restart or its settle time are dropped, and the same
   station's leave from two sources within 5 s is reported once. A released
   leave is the station's `sta_leave` in the next reading and wakes the
-  inform loop (at most every 2 s); joins stay with the reading diff.
+  inform loop (at most every 2 s); joins stay with the reading diff. The
+  station table a reading uses can be older than the reading's start (the
+  collector's 5 s cache, up to 5 min around a restart), so a station a
+  driver leave removed and the same reading still lists is not reported
+  as associated again in that reading: a station really back shows as an
+  association in the next one (it used to give leave, association, leave
+  for one disconnect).
 - **Unverified:** the MT7663's event payloads on the unit (from the
   decompile), whether the Insert/Delete events need `WirelessEvent=1`.
 
