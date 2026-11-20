@@ -176,7 +176,8 @@ func (a *Applier) refreshACLs(ctx context.Context, d Desired, old, blocked []str
 			drv = append(drv, dv)
 			prev = append(prev, driverFor(u, mac, maxSta, old, a.o.MinRates))
 			st = append(st, aclSteps(a.o.RunDir, dv)...)
-			st = append(st, macSteps(u.Vif, dv.Macmode, dv.Maclist)...)
+			live := a.withTempDeny(dv) // bans stay (tempdeny.go)
+			st = append(st, macSteps(u.Vif, live.Macmode, live.Maclist)...)
 		}
 		js, _ := json.MarshalIndent(drv, "", " ")
 		st = append(st, writeStep("write driver state", drvPath(a.o.RunDir, rl.Primary), 0o644, js))

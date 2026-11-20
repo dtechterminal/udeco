@@ -447,7 +447,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 		d := driverFor(u, mac, maxSta, blocked, a.o.MinRates)
 		drv = append(drv, d)
-		drvOf[u.Vif] = d
+		drvOf[u.Vif] = a.withTempDeny(d) // the live filter carries the bans (tempdeny.go); the stored state does not
 		hr.BSS = append(hr.BSS, hapdBSS{Vif: u.Vif, BSSID: mac, Bridge: u.Bridge, SSID: u.SSID, Accept: d.Allow,
 			FTPeers: a.peersFor(u.SSID, rl.Band, u.Bridge)}) // ftpeers.go
 		files = append(files, aclSteps(a.o.RunDir, d)...)

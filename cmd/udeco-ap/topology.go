@@ -245,6 +245,7 @@ func (a *agent) clientsReading(s *apstate.Snapshot, now time.Time) {
 	if !a.stale {
 		a.roamReading(s, now)
 	}
+	a.minRSSIReading(s, now) // minrssi.go
 }
 
 // loopGuard is R9 (loop goroutine; the changes run on the worker).

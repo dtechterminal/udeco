@@ -249,8 +249,9 @@ type agent struct {
 	policy   atomic.Pointer[wifiPolicy] // the live Wi-Fi's steering settings (worker -> loop)
 	cfgs     cfgTrack
 	topo     *topology
-	steer    steerState // loop goroutine only
-	roam     roamState  // loop goroutine only (roaming.go)
+	steer    steerState   // loop goroutine only
+	roam     roamState    // loop goroutine only (roaming.go)
+	minr     minRSSIState // loop goroutine only (minrssi.go)
 	lldp     *lldp.Service
 	res      atomic.Pointer[resources] // the last R4 reading (self-check)
 	pm       *pathmonState             // path monitoring (pathmon.go)

@@ -30,13 +30,18 @@ const (
 type wifiPolicy struct {
 	steer map[string]string // band -> band steering mode ("prefer_5g", "equal")
 	roam  map[string]int    // "SSID|band" -> Roaming Assistant threshold, dBm (roaming.go)
+	// minRSSI: band -> the controller's minimum RSSI, dBm (minrssi.go)
+	minRSSI map[string]int
 }
 
 func policyFrom(d bcmwifi.Desired) *wifiPolicy {
-	p := &wifiPolicy{steer: map[string]string{}, roam: roamPolicy(d)}
+	p := &wifiPolicy{steer: map[string]string{}, roam: roamPolicy(d), minRSSI: map[string]int{}}
 	for band, r := range d.Radios {
 		if r.Enabled && r.BandSteer != "" && r.BandSteer != "off" {
 			p.steer[band] = r.BandSteer
+		}
+		if r.Enabled && r.MinRSSI < 0 {
+			p.minRSSI[band] = r.MinRSSI
 		}
 	}
 	return p

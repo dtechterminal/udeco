@@ -168,6 +168,8 @@ type Applier struct {
 	fcNote string
 	// twtSeen: band -> the TWT line Tick logged last (twt.go)
 	twtSeen map[string]string
+	// tempDeny: vif -> station -> end of its ban (tempdeny.go)
+	tempDeny map[string]map[string]time.Time
 
 	sleep func(time.Duration)
 	poll  time.Duration

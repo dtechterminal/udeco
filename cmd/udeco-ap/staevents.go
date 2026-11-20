@@ -106,6 +106,50 @@ type staEvents struct {
 	// removed (an uncovered BSS): their covered events from that reading's
 	// collection window are in its outcome already
 	moved map[string]bool
+	// hints: why a station is expected to leave (the agent asked it to or
+	// kicked it): its next sta_leave carries that assoc_status
+	hints map[string]staHint
+	at    time.Time        // this reading's time (the feed's, else clock)
+	clock func() time.Time // nil = time.Now
+}
+
+// staHint is a sta_leave's assoc_status for a while.
+type staHint struct {
+	status int
+	until  time.Time
+}
+
+// assoc_status of a sta_leave, as a U6 sends them and the controller reads
+// them (WifiConnectivity triggeredByMinimalRssi / triggeredByRoamingAssistant).
+const (
+	staLeaveMinRSSI    = 16   // KICKED_DUE_TO_MIN_RSSI: the minimum RSSI kick (minrssi.go)
+	staLeaveRoamAssist = 8192 // left after a Roaming Assistant request (roaming.go)
+	staHintFor         = 2 * time.Minute
+)
+
+// hint makes mac's next sta_leave until until carry status.
+func (e *staEvents) hint(mac string, status int, until time.Time) {
+	if e.hints == nil {
+		e.hints = map[string]staHint{}
+	}
+	e.hints[strings.ToLower(mac)] = staHint{status, until}
+}
+
+// unhint drops mac's hint (the request it was for was never sent).
+func (e *staEvents) unhint(mac string) { delete(e.hints, strings.ToLower(mac)) }
+
+// leaveStatus is the assoc_status of mac's sta_leave at now (the hint is
+// used once).
+func (e *staEvents) leaveStatus(mac string, now time.Time) int {
+	h, ok := e.hints[mac]
+	if !ok {
+		return 0
+	}
+	delete(e.hints, mac)
+	if now.After(h.until) {
+		return 0
+	}
+	return h.status
 }
 
 // staFeed is the hostapd socket's part of one reading (nil: none).
@@ -121,6 +165,18 @@ type staFeed struct {
 // is a feed) and queues the events. The first reading only seeds (clients
 // already associated when the agent starts get no association event).
 func (e *staEvents) observe(f map[string]any, feed *staFeed) {
+	if feed != nil {
+		e.at = feed.now
+	} else if e.clock != nil {
+		e.at = e.clock()
+	} else {
+		e.at = time.Now()
+	}
+	for m, h := range e.hints {
+		if e.at.After(h.until) {
+			delete(e.hints, m)
+		}
+	}
 	up, _ := toInt64(f["uptime"])
 	cur := map[string]staSeen{}
 	names := map[string]bool{}
@@ -332,6 +388,7 @@ func (e *staEvents) leave(mac string, p staSeen, at int64) {
 	e.push(map[string]any{
 		"message_type": staTracker, "event_type": staEvLeave,
 		"mac": mac, "vap": p.vap, "avg_rssi": p.signal, "last_seen": at,
+		"assoc_status": e.leaveStatus(mac, e.at),
 	})
 }
 
