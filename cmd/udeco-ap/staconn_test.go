@@ -527,3 +527,181 @@ func TestConnConfig(t *testing.T) {
 		t.Errorf("jio: %v", err)
 	}
 }
+
+const (
+	cIP6  = "2001:db8:1::50"
+	cRes6 = "2001:db8:1::1"
+)
+
+func dns6Obs(id uint32, resp bool) stasnoop.Obs {
+	if resp {
+		return stasnoop.Obs{Kind: stasnoop.DNSResponse, V6: true, Out: true, Src: cGW, Dst: cSta, SrcIP: cRes6, DstIP: cIP6, ID: id}
+	}
+	return stasnoop.Obs{Kind: stasnoop.DNSQuery, V6: true, Src: cSta, Dst: cGW, SrcIP: cIP6, DstIP: cRes6, ID: id}
+}
+
+// dotObs is the station's SYN to a DNS-over-TLS server (v4 or v6), or the
+// server's SYN-ACK back.
+func dotObs(ack, v6 bool) stasnoop.Obs {
+	sta, srv := cIP, "8.8.8.8"
+	if v6 {
+		sta, srv = cIP6, "2001:4860:4860::8888"
+	}
+	if ack {
+		return stasnoop.Obs{Kind: stasnoop.DoTSynAck, V6: v6, Out: true, Src: cGW, Dst: cSta, SrcIP: srv, DstIP: sta}
+	}
+	return stasnoop.Obs{Kind: stasnoop.DoTSyn, V6: v6, Src: cSta, Dst: cGW, SrcIP: sta, DstIP: srv}
+}
+
+// authorizedDHCP is a WPA2 attempt authorized at 50 ms that got cIP by
+// DHCP at 300 ms.
+func authorizedDHCP(r *connRig) {
+	r.anchor(0, anchorAssoc)
+	r.anchor(50, anchorWPA)
+	r.sock(51, hapdmon.Connected)
+	r.frame(100, dhcpObs(stasnoop.DHCPDiscover, false))
+	r.frame(300, dhcpObs(stasnoop.DHCPAck, true))
+}
+
+// A dual-stack client whose DNS goes over IPv6: its answered query fills
+// the same fields an IPv4 one does (a "success"), and its IPv6 address is
+// neither its IPv4 address (GARP) nor a static ip_assign_type.
+func TestConnDNSv6(t *testing.T) {
+	r := newConnRig()
+	authorizedDHCP(r)
+	r.frame(400, dns6Obs(0x1234, false))
+	r.frame(430, dns6Obs(0x1234, true))
+	got := r.judge(5000)
+	if len(got) != 1 {
+		t.Fatalf("events %v", got)
+	}
+	wantFields(t, got[0], map[string]any{"event_type": "success", "dns_resp_seen": "yes", "dns_responses": 1, "dns_timeouts": 0,
+		"ip_assign_type": "dhcp", "ip_delta": 250000, "traffic_delta": 50000})
+	if ip, ok := r.c.ipOf(cSta, "", r.at(5000)); !ok || ip != cIP {
+		t.Errorf("ipOf %q %v, want %s", ip, ok, cIP)
+	}
+
+	// an unanswered IPv6 query is a dns_timeout like an IPv4 one
+	r = newConnRig()
+	authorizedDHCP(r)
+	r.frame(400, dns6Obs(7, false))
+	got = r.judge(int(staConnJudge/time.Millisecond) + 100)
+	if len(got) != 1 {
+		t.Fatalf("events %v", got)
+	}
+	wantFields(t, got[0], map[string]any{"event_type": "soft failure", "dns_resp_seen": "no", "dns_timeouts": 1, "dns_responses": 0})
+
+	// IPv6 frames alone give no IPv4 address: an ip_failure, not "static"
+	r = newConnRig()
+	r.anchor(0, anchorAssoc)
+	r.sock(40, hapdmon.Connected)
+	r.frame(400, dns6Obs(1, false))
+	r.frame(420, dns6Obs(1, true))
+	got = r.judge(int(staConnJudge/time.Millisecond) + 100)
+	if len(got) != 1 {
+		t.Fatalf("events %v", got)
+	}
+	wantFields(t, got[0], map[string]any{"event_type": "soft failure", "ip_failures": 1, "dns_responses": 1, "traffic_delta": 360000})
+	if v, ok := got[0]["ip_assign_type"]; ok {
+		t.Errorf("ip_assign_type %v from IPv6 frames", v)
+	}
+	if ip, ok := r.c.ipOf(cSta, "", r.at(31000)); ok {
+		t.Errorf("ipOf %q from an IPv6 frame", ip)
+	}
+}
+
+// A query is answered only by a response of its own family: an IPv6
+// response with an IPv4 query's id (or the reverse) answers nothing.
+func TestConnDNSFamilies(t *testing.T) {
+	r := newConnRig()
+	authorizedDHCP(r)
+	r.frame(400, dnsObs(5, false))
+	r.frame(410, dns6Obs(5, true))
+	r.frame(500, dns6Obs(6, false))
+	r.frame(510, dnsObs(6, true))
+	got := r.judge(int(staConnJudge/time.Millisecond) + 100)
+	if len(got) != 1 {
+		t.Fatalf("events %v", got)
+	}
+	wantFields(t, got[0], map[string]any{"event_type": "soft failure", "dns_resp_seen": "no", "dns_timeouts": 2, "dns_responses": 0})
+}
+
+// A client that resolves only over DNS over TLS: its queries cannot be
+// read, so the missing DNS answer is no failure. With an address and a
+// frame, and a DoT server that accepted its connection, the attempt is
+// dropped unjudged (no soft failure, now or when it leaves); any other
+// gap is still a soft failure.
+func TestConnEncryptedDNS(t *testing.T) {
+	judgeAt := int(staConnJudge/time.Millisecond) + 100
+	for _, v6 := range []bool{false, true} {
+		r := newConnRig()
+		authorizedDHCP(r)
+		r.frame(400, dotObs(false, v6))
+		r.frame(420, dotObs(true, v6))
+		if got := r.judge(judgeAt); len(got) != 0 {
+			t.Fatalf("v6 %v: DoT-only client judged: %v", v6, got)
+		}
+		r.frame(40000, dotObs(false, v6))
+		if got := r.judge(200000); len(got) != 0 {
+			t.Fatalf("v6 %v: later: %v", v6, got)
+		}
+
+		// it leaves before the judge time: judged at once, still nothing
+		r = newConnRig()
+		authorizedDHCP(r)
+		r.frame(400, dotObs(false, v6))
+		r.frame(420, dotObs(true, v6))
+		r.sock(2000, hapdmon.Disconnected)
+		if got := r.judge(3000); len(got) != 0 {
+			t.Fatalf("v6 %v: leaving DoT-only client judged: %v", v6, got)
+		}
+	}
+
+	// a plaintext query left unanswered is a real DNS failure
+	r := newConnRig()
+	authorizedDHCP(r)
+	r.frame(400, dotObs(false, false))
+	r.frame(420, dotObs(true, false))
+	r.frame(500, dnsObs(3, false))
+	got := r.judge(judgeAt)
+	if len(got) != 1 {
+		t.Fatalf("events %v", got)
+	}
+	wantFields(t, got[0], map[string]any{"event_type": "soft failure", "dns_resp_seen": "no", "dns_timeouts": 1})
+
+	// a SYN no DoT server accepted shows nothing about DNS
+	r = newConnRig()
+	authorizedDHCP(r)
+	r.frame(400, dotObs(false, false))
+	got = r.judge(judgeAt)
+	if len(got) != 1 {
+		t.Fatalf("events %v", got)
+	}
+	wantFields(t, got[0], map[string]any{"event_type": "soft failure", "dns_responses": 0})
+
+	// no address: an ip_failure whatever the DNS
+	r = newConnRig()
+	r.anchor(0, anchorAssoc)
+	r.sock(40, hapdmon.Connected)
+	r.frame(400, dotObs(false, true))
+	r.frame(420, dotObs(true, true))
+	got = r.judge(judgeAt)
+	if len(got) != 1 {
+		t.Fatalf("events %v", got)
+	}
+	wantFields(t, got[0], map[string]any{"event_type": "soft failure", "ip_failures": 1})
+
+	// a fast transition's soft failure is a success to the controller
+	// (ip_assign_type roam): it is still sent
+	r = newConnRig()
+	r.anchor(0, anchorAssoc)
+	r.anchor(5, anchorFT)
+	r.sock(6, hapdmon.Connected)
+	r.frame(50, dotObs(false, false))
+	r.frame(60, dotObs(true, false))
+	got = r.judge(judgeAt)
+	if len(got) != 1 {
+		t.Fatalf("events %v", got)
+	}
+	wantFields(t, got[0], map[string]any{"event_type": "soft failure", "ip_assign_type": "roam"})
+}

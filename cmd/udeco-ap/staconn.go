@@ -31,7 +31,9 @@ package main
 //     AP-REJECTED-MAX-STA;
 //   - the station's own frames on the VAP (internal/stasnoop, AF_PACKET
 //     with a kernel filter for ARP, DHCP and DNS): its DHCP exchange, its
-//     first frame, the gateway's ARP reply, its DNS queries and answers.
+//     first frame, the gateway's ARP reply, its DNS queries and answers
+//     (IPv4 or IPv6; a query is answered by a response of its family with
+//     its id), and a DNS-over-TLS server accepting its connection.
 //
 // An attempt starts at the first anchor of a station not in an open
 // attempt. The deltas are the steps between anchors: assoc_delta
@@ -44,6 +46,10 @@ package main
 //     unanswered query older than staDNSTimeout is a dns_timeout, no
 //     address an ip_failure, no frame a traffic_failure); a success within
 //     staConnFixup after that sends a "fixup" with the completed values;
+//     but an attempt lacking only the DNS answer, with no plaintext query
+//     and a DNS-over-TLS server that accepted its connection, is dropped
+//     unjudged: its DNS cannot be read, and the controller would count
+//     the missing answer as a failure (dnsUnseen);
 //   - never authorized staConnJudge after it started, and not associated
 //     in the reading: "failure" (PSK mismatches and EAPOL timeouts count as
 //     wpa_auth_failures, a full BSS as an assoc_failure, an EAP rejection
@@ -227,6 +233,7 @@ type connAttempt struct {
 	dnsQ       map[uint32]time.Time
 	dnsQueries int
 	dnsResp    int
+	dot        bool // a DNS-over-TLS server accepted its connection
 	wpaFails   int
 	assocFails int
 	rssi       int // the first signal seen (auth_rssi)
@@ -431,7 +438,7 @@ func (c *connTracker) frame(o stasnoop.Obs, at time.Time, gwMAC, gwIP string) {
 	switch {
 	case o.Kind == stasnoop.DHCPAck && o.Out && o.YourIP != "" && o.YourIP != "0.0.0.0":
 		c.setIP(mac, o.YourIP, c.bridge(o.Vif), at)
-	case !o.Out && o.Kind != stasnoop.DHCPDiscover && o.Kind != stasnoop.DHCPRequest && o.SrcIP != "" && o.SrcIP != "0.0.0.0":
+	case !o.Out && !o.V6 && o.Kind != stasnoop.DHCPDiscover && o.Kind != stasnoop.DHCPRequest && o.SrcIP != "" && o.SrcIP != "0.0.0.0":
 		c.setIP(mac, o.SrcIP, c.bridge(o.Vif), at)
 	}
 	a := c.att[mac]
@@ -466,25 +473,39 @@ func (c *connTracker) frame(o stasnoop.Obs, at time.Time, gwMAC, gwIP string) {
 		if !o.Out {
 			a.dnsQueries++
 			if len(a.dnsQ) < 64 {
-				a.dnsQ[o.ID] = at
+				a.dnsQ[dnsKey(o)] = at
 			}
 		}
 	case stasnoop.DNSResponse:
 		if o.Out {
-			if _, ok := a.dnsQ[o.ID]; ok {
-				delete(a.dnsQ, o.ID)
+			if _, ok := a.dnsQ[dnsKey(o)]; ok {
+				delete(a.dnsQ, dnsKey(o))
 				a.dnsResp++
 			}
 		}
+	case stasnoop.DoTSynAck:
+		if o.Out {
+			a.dot = true
+		}
 	}
 	// an address used without DHCP: kept from before (static, or a roam)
-	if !o.Out && a.ipType == "" && o.Kind != stasnoop.DHCPDiscover && o.Kind != stasnoop.DHCPRequest &&
+	if !o.Out && !o.V6 && a.ipType == "" && o.Kind != stasnoop.DHCPDiscover && o.Kind != stasnoop.DHCPRequest &&
 		o.SrcIP != "" && o.SrcIP != "0.0.0.0" {
 		a.ip, a.ipType = o.SrcIP, "static"
 		if a.ft {
 			a.ipType = "roam"
 		}
 	}
+}
+
+// dnsKey is a DNS message's key among its attempt's open queries: its id,
+// kept apart per address family (an IPv6 response never answers an IPv4
+// query with the same id).
+func dnsKey(o stasnoop.Obs) uint32 {
+	if o.V6 {
+		return o.ID | 1<<16
+	}
+	return o.ID
 }
 
 // judge applies the queued inputs in time order and sends the attempts'
@@ -519,6 +540,7 @@ func (c *connTracker) judge(r connReading, push func(map[string]any)) {
 		switch {
 		case a.complete():
 			push(c.event(a, "success", vap, r))
+		case a.dnsUnseen():
 		default:
 			push(c.event(a, "soft failure", vap, r))
 		}
@@ -561,6 +583,8 @@ func (c *connTracker) judge(r connReading, push func(map[string]any)) {
 			if r.now.Sub(a.soft) > staConnFixup {
 				delete(c.att, m)
 			}
+		case r.now.Sub(a.wpa) >= staConnJudge && a.dnsUnseen():
+			delete(c.att, m) // its DNS went encrypted: no basis for a verdict
 		case r.now.Sub(a.wpa) >= staConnJudge:
 			a.soft = r.now
 			push(c.event(a, "soft failure", vap, r))
@@ -584,6 +608,16 @@ func (c *connTracker) rssi(a *connAttempt, r connReading) {
 // complete: an address, a frame and a DNS answer (the controller's success).
 func (a *connAttempt) complete() bool {
 	return a.ipType != "" && !a.traffic.IsZero() && a.dnsResp > 0
+}
+
+// dnsUnseen: a lacks only the DNS answer, and its DNS went where the tap
+// cannot read it: no plaintext query, and a DNS-over-TLS server accepted
+// its connection. The controller counts a soft failure without
+// dns_responses as a failure, and success needs dns_responses > 0, so
+// such an attempt is reported not at all rather than as a false failure.
+// A roam's soft failure is a success to the controller and is still sent.
+func (a *connAttempt) dnsUnseen() bool {
+	return a.dot && a.dnsQueries == 0 && a.ipType != "" && a.ipType != "roam" && !a.traffic.IsZero()
 }
 
 // started is when the attempt began: its first anchor.
