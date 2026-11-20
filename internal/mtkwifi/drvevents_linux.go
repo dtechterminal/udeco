@@ -38,12 +38,27 @@ func openECNTSocket() (packetSource, error) { return openNetlink(netlinkECNT) }
 // overwritten before it was read (EPIPE) is skipped.
 type kmsgFile struct{ f *os.File }
 
+// kmsgPrivate is the agent's own /dev/kmsg node, made where the firmware
+// has none: the JioFiber JCOW414 (kernel 3.18) has no /dev/kmsg node, only
+// /proc/kmsg, which syslogd holds. The kernel's kmsg device (char 1:11)
+// is there; a node made for it reads the log in the same format
+// (verified on the Garage unit 2026-11-20).
+const kmsgPrivate = "/tmp/udeco-kmsg"
+
 func openKmsgFile() (packetSource, error) {
-	fd, err := syscall.Open("/dev/kmsg", syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
+	path := "/dev/kmsg"
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
+	if err == syscall.ENOENT {
+		path = kmsgPrivate
+		_ = os.Remove(path)
+		if err = syscall.Mknod(path, syscall.S_IFCHR|0o400, 1<<8|11); err == nil {
+			fd, err = syscall.Open(path, syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
-	f := os.NewFile(uintptr(fd), "/dev/kmsg")
+	f := os.NewFile(uintptr(fd), path)
 	if _, err := f.Seek(0, io.SeekEnd); err != nil {
 		f.Close()
 		return nil, err
