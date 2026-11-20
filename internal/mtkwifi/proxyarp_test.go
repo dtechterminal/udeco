@@ -164,7 +164,7 @@ func TestProxyARPApply(t *testing.T) {
 	fp := &fakeParp{healthy: map[string]bool{}, known: map[string][]string{"ra0": {"192.168.0.77"}, "rai0": {"192.168.0.78"}}}
 	a.parp = fp
 	events := false
-	a.o.ProxyARP = true
+	a.o.ProxyARP, a.o.ProxyARPDriver = true, true
 	a.SetEventsHealthy(func() bool { return events })
 	ctx := context.Background()
 	p, _ := a.Plan(ctx, parpHome())
@@ -197,7 +197,9 @@ func TestProxyARPApply(t *testing.T) {
 	events = true
 	n = len(f.log)
 	a.Tick(ctx)
-	if c := cmdsFrom(f, n, "iwpriv rai0 set hs_flag=2"); len(c) != 1 {
+	// hs_flag=3: bit0 (the driver learns its stations from their own ARP)
+	// and bit1 (it drops the requests); bit1 alone (2) learns nothing
+	if c := cmdsFrom(f, n, "iwpriv rai0 set hs_flag=3"); len(c) != 1 {
 		t.Errorf("flag on: %v", f.log[n:])
 	}
 	// the listener dies: the flag goes at once (ProxyARPDown), not at the
@@ -236,11 +238,46 @@ func TestProxyARPApply(t *testing.T) {
 	b.Apply(ctx, p)
 	*bnow += time.Minute
 	b.Tick(ctx)
-	if c := cmdsFrom(g, 0, "ebtables -A UDECO-PARP"); len(c) > 0 || len(cmdsFrom(g, 0, "iwpriv rai0 set hs_flag=2")) > 0 {
+	if c := cmdsFrom(g, 0, "ebtables -A UDECO-PARP"); len(c) > 0 || len(cmdsFrom(g, 0, "iwpriv rai0 set hs_flag=3")) > 0 {
 		t.Errorf("proxy ARP off but applied")
 	}
 	if !strings.Contains(joined(p.Notes), "proxy ARP") {
 		t.Errorf("not noted: %q", p.Notes)
+	}
+}
+
+// By default (garage-final proxyarp: "do not enable the MT7663 driver flag
+// by default") the 5 GHz BSS is served like the 2.4 GHz one: the agent
+// learns and answers, an ebtables drop per learnt address; no hs_flag is
+// ever sent. The chain's policy is RETURN: a frame no drop rule matches
+// goes on to the guest isolation chains after it in FORWARD.
+func TestProxyARPDefaultAgentSide(t *testing.T) {
+	f := newFakeDev(t)
+	a, now := clocked(f)
+	fp := &fakeParp{healthy: map[string]bool{"ra0": true, "rai0": true},
+		known: map[string][]string{"ra0": {"192.168.0.77"}, "rai0": {"192.168.0.78"}}}
+	a.parp = fp
+	a.o.ProxyARP = true
+	a.SetEventsHealthy(func() bool { return true })
+	ctx := context.Background()
+	p, _ := a.Plan(ctx, parpHome())
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	if !fp.vifs["rai0"].Learn || !fp.vifs["ra0"].Learn {
+		t.Errorf("responder vifs %+v, want both learnt by the agent", fp.vifs)
+	}
+	*now += time.Minute
+	a.Tick(ctx)
+	got := strings.Join(f.log, "\n")
+	if strings.Contains(got, "hs_flag=2") || strings.Contains(got, "hs_flag=3") {
+		t.Errorf("driver flag by default:\n%s", got)
+	}
+	if !strings.Contains(got, "ebtables -A UDECO-PARP -o rai0 -p ARP --arp-opcode Request --arp-ip-dst 192.168.0.78") {
+		t.Errorf("no 5 GHz drop rule:\n%s", got)
+	}
+	if !strings.Contains(got, "ebtables -N UDECO-PARP -P RETURN") && !strings.Contains(got, "ebtables -P UDECO-PARP RETURN") {
+		t.Errorf("chain without a RETURN policy:\n%s", got)
 	}
 }
 

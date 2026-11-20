@@ -18,20 +18,25 @@ import (
 // on by default, turns it off). A U6 answers ARP requests for its
 // stations itself, so the broadcast requests never go out on the air.
 //
-// 5 GHz (MT7663): the driver has it (hs_flag bit 1, iwpriv rai<N> set
-// hs_flag=2): it keeps the stations' addresses, drops the broadcast ARP
-// requests for them and hands each one to a daemon as an IWEVCUSTOM 0x93b
-// event (drvevents.go). Nothing answers unless a responder does: the flag
-// is set only while the agent's rtnetlink listener (the events' only way
-// in) and the responder's sending socket are both healthy, and cleared at
-// once when either dies, at startup, and at the hand-back. Without the
-// flag the requests go out on the air as before.
+// 5 GHz (MT7663), by default served like 2.4 GHz below (garage-final
+// proxyarp: "do not enable the MT7663 driver flag by default"). With
+// Options.ProxyARPDriver (config proxy_arp_driver) the driver does it
+// instead (iwpriv rai<N> set hs_flag=3: bit0 makes it learn its stations
+// from their own ARP, bit1 drops the broadcast ARP requests for them and
+// hands each one to a daemon as an IWEVCUSTOM 0x93b event, drvevents.go;
+// bit1 alone learns only from a DHCP ACK sent while it is on, so the
+// stations that joined before were black-holed). Nothing answers unless a
+// responder does: the flag is set only while the agent's rtnetlink
+// listener (the events' only way in) and the responder's sending socket
+// are both healthy, and cleared at once when either dies, at startup, and
+// at the hand-back.
 //
-// 2.4 GHz (MT7603): no such driver support. The responder learns each
+// 2.4 GHz (MT7603), and 5 GHz by default: the responder learns each
 // station's address from its own ARP and its DHCP ACK (an AF_PACKET socket
 // on the BSS netdev with learnFilter), answers the broadcast requests the
 // bridge delivers for those addresses, and an ebtables rule per learnt
-// address (UDECO-PARP) keeps them off the air. A request for an address
+// address (UDECO-PARP, policy RETURN: a frame no rule drops goes on to
+// the guest isolation chains) keeps them off the air. A request for an address
 // it has not learnt still goes out (fail open), as the Linux bridge's own
 // proxy ARP does; the rules exist only while the responder's sockets are
 // healthy.
@@ -125,7 +130,7 @@ func (a *Applier) parpVifs() map[string]parpVif {
 			if b.VLAN > 0 {
 				br = vlanBridge(b.VLAN)
 			}
-			out[a.ifaceOf(rd, rp, i)] = parpVif{Bridge: br, Learn: !rd.HSFlag}
+			out[a.ifaceOf(rd, rp, i)] = parpVif{Bridge: br, Learn: !rd.HSFlag || !a.o.ProxyARPDriver}
 		}
 	}
 	return out
@@ -171,7 +176,7 @@ func (a *Applier) syncProxyARP(ctx context.Context) {
 			if known && cur == want || !known && !want && !a.o.ProxyARP || !a.isUp(ifc) {
 				continue
 			}
-			if err := a.run(ctx, "iwpriv", ifc, "set", "hs_flag="+map[bool]string{true: "2", false: "0"}[want]); err != nil {
+			if err := a.run(ctx, "iwpriv", ifc, "set", "hs_flag="+map[bool]string{true: "3", false: "0"}[want]); err != nil {
 				a.o.Logf("mtkwifi: %s: proxy ARP flag: %v", ifc, err)
 				continue
 			}
@@ -202,10 +207,15 @@ func (a *Applier) syncParpEb(ctx context.Context, jumps, rules []string) {
 		return
 	}
 	if !a.chainExists(ctx, chainParp) {
-		if err := a.eb(ctx, "-N", chainParp); err != nil {
+		if err := a.eb(ctx, "-N", chainParp, "-P", "RETURN"); err != nil {
 			a.o.Logf("mtkwifi: proxy ARP: %v", err)
 			return
 		}
+	} else if err := a.eb(ctx, "-P", chainParp, "RETURN"); err != nil {
+		// an older build's chain had the default ACCEPT policy, which let
+		// every frame skip the guest isolation chains after the jump
+		a.o.Logf("mtkwifi: proxy ARP: %v", err)
+		return
 	}
 	if err := a.eb(ctx, "-F", chainParp); err != nil {
 		a.o.Logf("mtkwifi: proxy ARP: %v", err)

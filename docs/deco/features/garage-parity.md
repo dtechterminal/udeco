@@ -22,7 +22,7 @@ Rules the items share:
 - **Opt-out keys only where a behaviour could cut off management.**
 
 New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
-`uplink_loss`, `uplink_loss_ssid`, `bss_pinning`, `proxy_arp`, `dfs`.
+`uplink_loss`, `uplink_loss_ssid`, `bss_pinning`, `proxy_arp`, `proxy_arp_driver`, `dfs`.
 
 ## 1. Minimum RSSI
 
@@ -167,26 +167,40 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
 
 - **U6:** `proxyarp 1` on a WLAN with proxy ARP: the AP answers ARP for
   its clients, so broadcast ARP does not wake them.
-- **Garage, 5 GHz (MT7663):** the driver's proxy ARP (`iwpriv rai<N> set
-  hs_flag=2`, hs_flag bit 1) hands each request for a known station to a
-  daemon as IWEVCUSTOM 0x93b; the agent's responder sends the reply on the
-  BSS's bridge. The flag is set only while the rtnetlink listener and the
-  responder's socket are healthy, outside restart settle times; it is
-  cleared at once when either dies, at startup, after a restart until
-  re-checked, and at the hand-back.
+- **Garage, 5 GHz (MT7663), by default:** served like 2.4 GHz below, by the
+  agent (garage-final proxyarp: "do not enable the MT7663 driver flag by
+  default"). The driver flag was on by default with `hs_flag=2` (bit 1
+  only): the driver then learnt no station from its own ARP (bit 0, the
+  RX snoop, was off), only from a DHCP ACK sent while the flag was on, and
+  it drops every broadcast request toward the BSS whether or not the
+  target is known. Clients that joined during the 20 s settle after a
+  restart were unreachable from the LAN until their next DHCP renew.
+- **Garage, 5 GHz with `proxy_arp_driver: true` (off by default):** the
+  driver's proxy ARP (`iwpriv rai<N> set hs_flag=3`: bit 0 learns from the
+  stations' ARP, bit 1 drops the requests) hands each request for a known
+  station to a daemon as IWEVCUSTOM 0x93b; the agent's responder sends the
+  reply on the BSS's bridge. The flag is set only while the rtnetlink
+  listener and the responder's socket are healthy, outside restart settle
+  times; it is cleared at once when either dies, at startup, after a
+  restart until re-checked, and at the hand-back.
 - **Garage, 2.4 GHz (MT7603):** no driver support. An AF_PACKET responder
   learns each associated station's address from its own ARP and its DHCP
   ACK (a BPF filter passes only those), answers broadcast requests the
   bridge delivers, and an ebtables rule per learnt address (`UDECO-PARP`,
-  FORWARD `-o <vif>`) keeps those requests off the air. Unknown addresses
+  FORWARD `-o <vif>`) keeps those requests off the air. The chain's policy
+  is RETURN (`-N UDECO-PARP -P RETURN`, or `-P UDECO-PARP RETURN` on a chain
+  an older build left): with the default ACCEPT policy a frame no drop rule
+  matched left FORWARD at the jump (FORWARD 1) and skipped the guest
+  isolation chains (UDECO-GIN/GOUT) after it. Unknown addresses
   still go out (fail open, as the Linux bridge's proxy ARP). The rules
   exist only while the responder's sockets are healthy.
 - `proxy_arp: false` leaves every request going out on the air, as before
   (`internal/mtkwifi/proxyarp.go`, `proxyarp_linux.go`). IPv6 neighbour
   solicitations are not proxied.
-- **Unverified:** that `hs_flag` works without `HotSpotEnable`; the 0x93b
-  payload on the unit; that AF_PACKET on ra<N> sees the frames sent to the
-  station (DHCP ACKs) on this driver.
+- **Unverified:** that AF_PACKET on ra<N>/rai<N> sees the frames sent to
+  the station (DHCP ACKs) on these drivers. With `proxy_arp_driver`: that
+  `hs_flag=3` works without `HotSpotEnable`, and the 0x93b payload on the
+  unit.
 
 ## 14. DFS (`dfs`, off by default)
 

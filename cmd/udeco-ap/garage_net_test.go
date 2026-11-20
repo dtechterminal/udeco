@@ -85,6 +85,19 @@ func TestProxyARPConfig(t *testing.T) {
 	if _, err := parseConfig([]byte(`{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","takeover":true,"proxy_arp":false}`)); err == nil {
 		t.Error("Deco accepted proxy_arp")
 	}
+	// the MT7663 driver flag: off by default, opt-in, needs proxy_arp
+	if c.ProxyARPDriver {
+		t.Error("proxy_arp_driver on by default")
+	}
+	if c, err := parseConfig([]byte(base + `,"proxy_arp_driver":true}`)); err != nil || !c.ProxyARPDriver {
+		t.Errorf("proxy_arp_driver true: %v", err)
+	}
+	if _, err := parseConfig([]byte(base + `,"proxy_arp":false,"proxy_arp_driver":true}`)); err == nil {
+		t.Error("proxy_arp_driver accepted without proxy_arp")
+	}
+	if _, err := parseConfig([]byte(`{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","takeover":true,"proxy_arp_driver":true}`)); err == nil {
+		t.Error("Deco accepted proxy_arp_driver")
+	}
 }
 
 type radarWifi struct {

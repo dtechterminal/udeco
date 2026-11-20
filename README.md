@@ -265,7 +265,7 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   | Station events | leaves at once from driver events | always |
   | BSS slot pinning | each WLAN keeps its netdev and BSSID | `bss_pinning` (off) |
   | Guest WLANs | the Deco's fail-closed ebtables rules, portal | controller |
-  | Proxy ARP | 5 GHz driver + responder; 2.4 GHz responder | controller, `proxy_arp` (on) |
+  | Proxy ARP | agent responder + ebtables drops on both radios (MT7663 driver flag `hs_flag=3` only with `proxy_arp_driver`) | controller, `proxy_arp` (on), `proxy_arp_driver` (off) |
   | DFS | 52-64, CAC, radar followed and reported | `dfs` (off) |
   | Station GARP | on association when the address is known | always |
 

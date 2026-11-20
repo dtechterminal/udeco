@@ -169,6 +169,13 @@ type Config struct {
 	// of the WLANs the controller set proxy ARP on (mtkwifi proxyarp.go);
 	// false leaves the requests going out on the air. On by default.
 	ProxyARP *bool `json:"proxy_arp,omitempty"`
+	// ProxyARPDriver (platform jio-mtk, needs proxy_arp) has the MT7663
+	// drop the 5 GHz requests itself (hs_flag=3, its 0x93b events to the
+	// agent's responder) instead of the agent-side learning and ebtables
+	// drop. Off by default: garage-final proxyarp says not to enable the
+	// driver flag by default (unverified on the unit; with no responder
+	// it black-holes inbound ARP to the BSS).
+	ProxyARPDriver bool `json:"proxy_arp_driver,omitempty"`
 	// DFS (platform jio-mtk) lets the 5 GHz radio serve the controller's
 	// DFS channels 52-64 (the driver's region goes from 10 to 0 live, a
 	// 65 s channel availability check, radar followed and reported as
@@ -280,8 +287,11 @@ func (c *Config) validate() error {
 	default:
 		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
 	}
-	if (c.UplinkLoss != nil || c.UplinkLossSSID != "" || c.BSSPinning || c.ProxyARP != nil || c.DFS) && !c.jio() {
-		return errors.New("config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp and dfs are for platform " + PlatformJio + " only")
+	if (c.UplinkLoss != nil || c.UplinkLossSSID != "" || c.BSSPinning || c.ProxyARP != nil || c.ProxyARPDriver || c.DFS) && !c.jio() {
+		return errors.New("config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver and dfs are for platform " + PlatformJio + " only")
+	}
+	if c.ProxyARPDriver && !c.proxyARP() {
+		return errors.New("config: proxy_arp_driver needs proxy_arp")
 	}
 	if (len(c.PortsUnlocked) > 0 || c.PortsConfirmS != 0 || c.PortsLossS != 0) && !c.jio() {
 		return errors.New("config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform " + PlatformJio + " only")

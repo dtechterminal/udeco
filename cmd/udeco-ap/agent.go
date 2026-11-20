@@ -383,7 +383,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 			o.newWifi = func(bo bcmwifi.Options) wifiApplier {
 				return mtkwifi.New(mtkwifi.Options{Root: bo.Root, Run: bo.Run, StateDir: bo.StateDir, RunDir: bo.RunDir,
 					Uplink: bo.Uplink, DryRun: bo.DryRun, WPA3: bo.WPA3, Logf: bo.Logf, KeepSSID: cfg.UplinkLossSSID,
-					PinSlots: cfg.BSSPinning, ProxyARP: cfg.proxyARP(), DFS: cfg.DFS})
+					PinSlots: cfg.BSSPinning, ProxyARP: cfg.proxyARP(), ProxyARPDriver: cfg.ProxyARPDriver, DFS: cfg.DFS})
 			}
 		}
 	}

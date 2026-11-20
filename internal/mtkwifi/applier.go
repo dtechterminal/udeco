@@ -53,6 +53,11 @@ type Options struct {
 	// ProxyARP serves the controller's proxy ARP (proxyarp.go); off = the
 	// requests go out on the air as without it
 	ProxyARP bool
+	// ProxyARPDriver lets the MT7663 drop the requests itself (hs_flag=3,
+	// with the 0x93b events to the responder) instead of the agent-side
+	// path; off by default (garage-final proxyarp: with no responder the
+	// flag black-holes inbound ARP to the BSS)
+	ProxyARPDriver bool
 	// sendFrame sends one Ethernet frame on a netdev (nil: an AF_PACKET
 	// socket; tests record them)
 	sendFrame func(dev string, frame []byte) error
