@@ -41,11 +41,7 @@ func (a *agent) garageReading(ctx context.Context, s *apstate.Snapshot) {
 	if k, ok := a.wifi.(weakKicker); ok {
 		a.sta.kicked(k.KickWeak(ctx, s))
 	}
-	if k, ok := a.wifi.(stuckKicker); ok && a.cfg.downlinkWatchdog() {
-		for _, mac := range k.KickStuck(ctx, s) {
-			a.event(fmt.Sprintf("downlink watchdog: %s stopped receiving while dozing: disconnected so it re-associates", mac))
-		}
-	}
+	a.kickStuck(ctx, s)
 	if g, ok := a.wifi.(garageNet); ok {
 		a.garageStations(ctx, g, s)
 	}
@@ -55,6 +51,39 @@ func (a *agent) garageReading(ctx context.Context, s *apstate.Snapshot) {
 			a.sta.push(radarPayload("na", e.Channel, e.Freq, jioRadarRadioName))
 		}
 	}
+}
+
+// kickStuck runs the downlink watchdog (mtkwifi stuckps.go) on reading s.
+func (a *agent) kickStuck(ctx context.Context, s *apstate.Snapshot) {
+	if k, ok := a.wifi.(stuckKicker); ok && a.cfg.downlinkWatchdog() {
+		for _, mac := range k.KickStuck(ctx, s) {
+			a.event(fmt.Sprintf("downlink watchdog: %s stopped receiving while dozing: disconnected so it re-associates", mac))
+		}
+	}
+}
+
+// garageWatchdogOn: the downlink watchdog also runs on its own tick
+// (timing.watchdogEvery) between informs, so a stall is caught in about
+// half a minute however long the controller's inform interval is (it paces
+// an unwatched device at about 30 s, and a probe miss is only counted at
+// the next reading).
+func (a *agent) garageWatchdogOn() bool {
+	return a.cfg.jio() && a.cfg.downlinkWatchdog()
+}
+
+// garageWatchdogTick reads the unit and runs the downlink watchdog on that
+// reading (loop goroutine, between informs). The driver's station table is
+// read at most once per the collector's cache time (5 s), as for a 1 s
+// live view; a failed reading is skipped.
+func (a *agent) garageWatchdogTick(ctx context.Context) {
+	if !a.takeover.Load() || a.wifi == nil {
+		return
+	}
+	s, err := a.collect(ctx)
+	if err != nil {
+		return
+	}
+	a.kickStuck(ctx, s)
 }
 
 // jioRadarRadioName is the radio_name of the JCOW414's radar event. It is

@@ -224,6 +224,12 @@ type Config struct {
 	// reply that decodes with the device key) before the lock opens.
 	// Seconds; range and default: loginLockFailOpenKey.
 	LoginLockFailOpenS int `json:"login_lock_failopen_s,omitempty"`
+	// InformEveryS is a minimum inform rate of the agent's own: the next
+	// inform is at most this many seconds after the last answered one,
+	// whatever longer interval the controller asks for (it paces unwatched
+	// devices at about 30 s). Absent or 0: the controller's interval.
+	// Seconds; range: informEveryKey.
+	InformEveryS int `json:"inform_every_s,omitempty"`
 }
 
 // The values of the log key.
@@ -251,6 +257,8 @@ var (
 	portsLossKey = secondsKey{name: "ports_loss_s", min: 60, max: 3600, def: 300}
 	// login_lock_failopen_s, the login lock's silence window
 	loginLockFailOpenKey = secondsKey{name: "login_lock_failopen_s", min: 60, max: 3600, def: 600}
+	// inform_every_s, the agent's own minimum inform rate (0: off)
+	informEveryKey = secondsKey{name: "inform_every_s", min: 5, max: 60, def: 0}
 )
 
 // check refuses a set value (v != 0) outside the key's range.
@@ -333,6 +341,10 @@ func (c *Config) portKeys() []keySet {
 func (c *Config) loginLock() bool {
 	return c.Takeover && c.Apply && (c.LoginLock == nil || *c.LoginLock)
 }
+
+// informEvery is the agent's own longest wait between answered informs
+// (0: the controller's interval alone).
+func (c *Config) informEvery() time.Duration { return informEveryKey.of(c.InformEveryS) }
 
 func (c *Config) loginLockFailOpen() time.Duration {
 	return loginLockFailOpenKey.of(c.LoginLockFailOpenS)
@@ -510,6 +522,9 @@ func (c *Config) validate() error {
 		return errors.New("config: login_lock needs takeover and apply (observe mode never changes the unit)")
 	}
 	if err := loginLockFailOpenKey.check(c.LoginLockFailOpenS); err != nil {
+		return err
+	}
+	if err := informEveryKey.check(c.InformEveryS); err != nil {
 		return err
 	}
 	if c.LoginLockFailOpenS != 0 && !c.loginLock() {

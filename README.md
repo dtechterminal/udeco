@@ -217,6 +217,10 @@ You need root SSH on each unit; how to get it is out of scope here.
    DTIM period over the controller's (`{"ng": 2}` there), and
    `downlink_watchdog` (default true) disconnects a 2.4 GHz station that
    stops answering the unit's ARP probes while dozing, so it re-associates.
+   The watchdog has its own 5 s tick between informs. `inform_every_s`
+   (5-60, off by default) informs at least that often, whatever longer
+   interval the controller asks for (it paces unwatched devices at about
+   30 s, so the dashboard's client activity moves in 30 s steps).
 
 2. **Deploy.** From a machine with Go and SSH access to the unit:
 

@@ -154,6 +154,7 @@ type timing struct {
 	fastEnforce   time.Duration // Enforce interval right after the gate opened (5 s)
 	fastMin       time.Duration // fast Enforce lasts at least this long (3 min)
 	resourceEvery time.Duration // R4 check (60 s)
+	watchdogEvery time.Duration // the Garage downlink watchdog's own tick (5 s; garage.go)
 	scheduleEvery time.Duration // WLAN schedule evaluation (60 s)
 	lldpEvery     time.Duration // LLDP transmit interval (30 s)
 	selfCheck     time.Duration // R10 self-check summary (5 min)
@@ -191,6 +192,7 @@ func (t *timing) fill() {
 	def(&t.fastEnforce, 5*time.Second)
 	def(&t.fastMin, 3*time.Minute)
 	def(&t.resourceEvery, 60*time.Second)
+	def(&t.watchdogEvery, 5*time.Second)
 	def(&t.scheduleEvery, 60*time.Second)
 	def(&t.lldpEvery, 30*time.Second)
 	def(&t.selfCheck, 5*time.Minute)
@@ -899,14 +901,39 @@ func (a *agent) loop(ctx context.Context) {
 		if d := a.portsRetry(); d > 0 {
 			wait = min(wait, d)
 		}
+		// the agent's own minimum rate (inform_every_s), only while the
+		// controller answers: a failing controller keeps the backoff
+		if d := a.cfg.informEvery(); d > 0 && errs == 0 {
+			wait = min(wait, d)
+		}
 		if errs > 0 && (errs == 1 || errs%10 == 0) {
 			a.logf("%d bad answer(s) in a row: next inform in %s", errs, wait)
 		}
-		t := time.NewTimer(wait)
+		if !a.waitInform(ctx, wait) {
+			return
+		}
+	}
+}
+
+// waitInform waits wait for the next inform (loop goroutine): an adoption
+// request or a wake ends the wait early, and the Garage's downlink
+// watchdog runs on its own tick meanwhile (garage.go). false: ctx ended.
+func (a *agent) waitInform(ctx context.Context, wait time.Duration) bool {
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	var tick <-chan time.Time
+	if a.garageWatchdogOn() {
+		wd := time.NewTicker(a.t.watchdogEvery)
+		defer wd.Stop()
+		tick = wd.C
+	}
+	for {
 		select {
 		case <-ctx.Done():
-			t.Stop()
-			return
+			return false
+		case <-tick:
+			a.garageWatchdogTick(ctx)
+			continue
 		case req := <-a.adopt:
 			t.Stop()
 			o := a.x.ApplyAdopt(req)
@@ -919,13 +946,13 @@ func (a *agent) loop(ctx context.Context) {
 			a.refreshCreds()
 			select { // let the console finish its SSH job first
 			case <-ctx.Done():
-				return
+				return false
 			case <-time.After(time.Second):
 			}
 		case <-a.wake:
-			t.Stop()
 		case <-t.C:
 		}
+		return true
 	}
 }
 
