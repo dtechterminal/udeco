@@ -613,10 +613,6 @@ func normalizeSSID(s SSID) (SSID, []string, bool) {
 		return skip(why)
 	}
 	s, notes = normalizeFT(s, notes) // 802.11r, FT-SAE: ftsae.go
-	if s.ProxyARP && !s.Isolation {
-		notes = append(notes, fmt.Sprintf("ssid %s: proxy ARP needs client isolation in hostapd, not applied", s.ID))
-		s.ProxyARP = false
-	}
 	if s.VLAN < 0 || s.VLAN > 4094 {
 		return skip(fmt.Sprintf("VLAN %d out of range", s.VLAN))
 	}

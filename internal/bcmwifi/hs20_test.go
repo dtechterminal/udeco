@@ -42,8 +42,9 @@ func TestNormalizeHotspot2(t *testing.T) {
 	if s.Hotspot2 == in.Hotspot2 {
 		t.Error("normalized SSID shares the caller's Hotspot2")
 	}
-	// with isolation and proxy ARP the DGAF note goes away; PMF required stays
-	in.Isolation, in.ProxyARP, in.PMF = true, true, "required"
+	// with proxy ARP (isolation or not) the DGAF note goes away; PMF
+	// required stays
+	in.ProxyARP, in.PMF = true, "required"
 	s, notes, _ = normalizeSSID(in)
 	if s.PMF != "required" || strings.Contains(strings.Join(notes, "\n"), "DGAF") {
 		t.Errorf("PMF %q notes %q", s.PMF, notes)

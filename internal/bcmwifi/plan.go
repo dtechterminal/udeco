@@ -281,8 +281,36 @@ func (a *Applier) vlanUpSteps(uplink string, vid int) []Step {
 				cmdStep("delete VLAN device "+p, "ip", "link", "del", p))
 		}
 	}
+	st = append(st, a.snoopSteps(br, !a.netdevExists(br))...)
 	if !a.netdevExists(br) || !a.ifUp(br) {
 		st = append(st, cmdStep("bring "+br+" up", "ip", "link", "set", br, "up"))
+	}
+	return st
+}
+
+// bridgeSnoop are the IGMP/MLD snooping knobs of the agent's VLAN bridges,
+// as a U6 Pro's mcsd sets them on every bridge (mcsd.conf snooping 1,
+// policy flood; plugin_stop's multicast_querier 0; bridge.conf hash_max
+// 2048): the bridge learns which ports want a group and floods unknown
+// groups (Linux floods while no querier is seen), without querying itself.
+// br-lan is TP-Link's imsnoop's and left alone; Multicast Enhancement stays
+// the driver's wmf_bss_enable.
+var bridgeSnoop = [][2]string{{"hash_max", "2048"}, {"multicast_snooping", "1"}, {"multicast_querier", "0"}}
+
+// snoopSteps sets br's snooping knobs where they read otherwise (all of
+// them for a bridge created by the plan). Optional: a kernel without
+// multicast snooping has no such files, and the bridge forwards anyway.
+func (a *Applier) snoopSteps(br string, created bool) []Step {
+	var st []Step
+	for _, k := range bridgeSnoop {
+		p := "/sys/class/net/" + br + "/bridge/" + k[0]
+		if !created {
+			b, err := a.readFile(p)
+			if err != nil || strings.TrimSpace(string(b)) == k[1] {
+				continue
+			}
+		}
+		st = append(st, Step{Kind: StepPut, Desc: "IGMP/MLD snooping on " + br, Path: p, Data: []byte(k[1] + "\n"), Optional: true})
 	}
 	return st
 }
@@ -742,11 +770,14 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 }
 
 // proxyARPWanted: hostapd's proxy_arp cannot be used here (F5), so an
-// isolated SSID asking for proxy ARP gets the bridge port's proxyarp_wifi:
-// the bridge answers ARP for stations from its neighbour table. There is no
-// hostapd DHCP/ND snooping table behind it, so only addresses the AP has
-// already seen are answered; others are flooded as usual.
-func proxyARPWanted(s SSID) bool { return s.ProxyARP && s.Isolation }
+// SSID asking for it gets the bridge port's proxyarp_wifi: the bridge
+// answers ARP for stations from its neighbour table, and an ARP request it
+// answered is not flooded onto the air. There is no hostapd DHCP/ND
+// snooping table behind it, so only addresses the AP has already seen are
+// answered; others are flooded as usual. A U6 Pro runs proxyarp 1 on a
+// non-isolated SSID too (aaa.conf with l2_isolation disabled), and the
+// bridge port attribute has no isolation precondition.
+func proxyARPWanted(s SSID) bool { return s.ProxyARP }
 
 func proxyARPPath(vif string) string { return "/sys/class/net/" + vif + "/brport/proxyarp_wifi" }
 

@@ -101,7 +101,7 @@ func goldenCases() map[string]struct {
 				{ID: "d", SSID: "NoProxy", Bands: []string{"na"}, Enabled: true, Security: SecOpen, ProxyARP: true},
 			},
 			// proxy_arp fails hostapd on a vif it creates (F5): never written.
-			block: []string{"de:ad:be:ef:00:01"}, notes: []string{"proxy ARP needs client isolation"}, absent: []string{"proxy_arp"}},
+			block: []string{"de:ad:be:ef:00:01"}, absent: []string{"proxy_arp"}},
 	}
 }
 

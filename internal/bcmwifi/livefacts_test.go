@@ -180,6 +180,31 @@ func TestLiveProxyARPOnBridgePort(t *testing.T) {
 	if b, _ := os.ReadFile(f.path("/sys/class/net/wl02/brport/proxyarp_wifi")); strings.TrimSpace(string(b)) != "0" {
 		t.Errorf("wl02 proxyarp_wifi %q, want 0", b)
 	}
+	// A U6 Pro answers ARP for stations on a non-isolated SSID too
+	// (aaa.conf proxyarp 1 with l2_isolation disabled): the bridge port's
+	// proxyarp_wifi has no isolation precondition, applied live.
+	d.SSIDs[1].ProxyARP = true // a-main: not isolated, br-lan, wl02/wl12
+	pn, err := a.Plan(ctx, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(pn.String(), "hostapd") || strings.Contains(strings.Join(pn.Notes, "\n"), "proxy ARP needs client isolation") {
+		t.Fatalf("plan:\n%s", pn)
+	}
+	if err := a.Apply(ctx, pn); err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range []string{"wl02", "wl12"} {
+		if b, _ := os.ReadFile(f.path("/sys/class/net/" + v + "/brport/proxyarp_wifi")); strings.TrimSpace(string(b)) != "1" {
+			t.Errorf("%s proxyarp_wifi %q on the non-isolated SSID, want 1", v, b)
+		}
+	}
+	d.SSIDs[1].ProxyARP = false
+	if p, _ := a.Plan(ctx, d); len(p.Steps) == 0 {
+		t.Fatal("turning it off again plans nothing")
+	} else if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
 	if p, _ := a.Plan(ctx, d); !p.Empty() {
 		t.Fatalf("second plan:\n%s", p)
 	}
