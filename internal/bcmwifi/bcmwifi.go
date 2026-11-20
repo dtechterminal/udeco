@@ -153,18 +153,19 @@ type Options struct {
 type Applier struct {
 	o Options
 
-	mu      sync.Mutex
-	applied *Desired          // last Desired applied and verified in this process
-	blocked []string          // normalized blocked MACs; nil = not loaded yet
-	macs    map[string]string // vif -> cur_etheraddr (fixed per unit)
-	ledOn   bool
-	failed  *failedApply               // the last Desired whose Apply failed and rolled back
-	ph      map[string]hapdPlaceholder // anchor vif -> hostapd placeholder BSS (secret)
-	anchors map[string]string          // primary -> hostapd's interface= vif as last seen (anchor.go)
-	nbr     nbrState                   // 802.11k neighbor scans (neighbors.go)
-	now     func() time.Time
-	ftPeers []ftpeer.Peer           // other units' FT key holders (SetFTPeers)
-	ftLive  map[string]*ftLiveState // primary -> entries added to its running hostapd (ftpeers.go)
+	mu         sync.Mutex
+	applied    *Desired          // last Desired applied and verified in this process
+	backfilled bool              // backfillBaseline ran in this process (parity.go)
+	blocked    []string          // normalized blocked MACs; nil = not loaded yet
+	macs       map[string]string // vif -> cur_etheraddr (fixed per unit)
+	ledOn      bool
+	failed     *failedApply               // the last Desired whose Apply failed and rolled back
+	ph         map[string]hapdPlaceholder // anchor vif -> hostapd placeholder BSS (secret)
+	anchors    map[string]string          // primary -> hostapd's interface= vif as last seen (anchor.go)
+	nbr        nbrState                   // 802.11k neighbor scans (neighbors.go)
+	now        func() time.Time
+	ftPeers    []ftpeer.Peer           // other units' FT key holders (SetFTPeers)
+	ftLive     map[string]*ftLiveState // primary -> entries added to its running hostapd (ftpeers.go)
 	// clientRates: per-client limits (clientrate.go); nil = not loaded yet
 	clientRates map[string]RateLimit
 	// fcOff: the agent turned the flow cache off for its tc limits (also

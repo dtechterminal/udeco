@@ -47,6 +47,8 @@ func (a *Applier) Apply(ctx context.Context, p Plan) error {
 			return fmt.Errorf("bcmwifi: capture TP-Link baseline (nothing changed): %w", err)
 		}
 	}
+	a.backfillBaseline(ctx) // parity.go: an older agent's baseline
+
 	err := a.execute(ctx, p.Steps)
 	if err == nil {
 		err = a.verifyWait(ctx, p.Desired)

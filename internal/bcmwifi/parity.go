@@ -4,6 +4,7 @@ package bcmwifi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,9 +16,10 @@ import (
 //
 //   - BSS Load element (U6 qbssload 1 unless the controller sends
 //     qbssload=disabled): `wl bssload 1`. Per radio in this driver, settable
-//     with the radio up (iovar flags 0); on when any SSID of the radio wants
-//     it (bssload).
-//   - Implicit beamforming off (U6 implicitbf 0): `wl txbf_imp 0`.
+//     with the radio up (iovar flags 0); off when any SSID of the radio has
+//     it off (radioBSSLoad).
+//   - Implicit beamforming off (U6 implicitbf 0): `wl txbf_imp 0`, live
+//     (iovar flags 0).
 //   - No vendor VHT on 2.4 GHz (U6 vht_11ng 0): `wl vht_features 0x6`, TP-Link's
 //     0x7 without bit 0x1 (VHT rates in the 2.4 GHz band). 2.4 GHz only.
 //   - RX-chain and radio power save off (U6 ant_ps_on 0):
@@ -53,6 +55,13 @@ const (
 	interfOverIov   = "interference_override"
 )
 
+// tplinkFallback are TP-Link's values of the settings driverIovars does not
+// list (live-facts 2026-11-20: interference mode 361 on both radios of the
+// three Decos, interference_override -1), restored when the baseline lacks
+// them. spect has none: the hand-back leaves it unless the baseline (or its
+// backfill, backfillBaseline) read it.
+var tplinkFallback = map[string]string{interferenceIov: "361", interfOverIov: "-1"}
+
 // desenseBit is the Broadcom interference mitigation mode's receiver
 // desense (glitch based) bit; the X20 runs mode 361 =
 // desense|preempt|lpd|hw obss|mclip (2026-11-20).
@@ -64,7 +73,9 @@ const desenseBit = 0x1
 func driverIovars(band string, bssload bool) []driverIovar {
 	l := []driverIovar{
 		{name: "bssload", want: b2i(bssload), live: true, tplink: tplinkBSSLoad},
-		{name: "txbf_imp", want: 0, tplink: tplinkTxbfImp},
+		// live: iovar flags 0; it re-evaluates every SCB (deco-crosscheck
+		// l2uf-misc C)
+		{name: "txbf_imp", want: 0, live: true, tplink: tplinkTxbfImp},
 	}
 	if band == "ng" {
 		l = append(l, driverIovar{name: "vht_features", want: 0x6, tplink: tplinkVHTng})
@@ -91,9 +102,12 @@ func allDriverIovars(band string) []string {
 
 // radioBSSLoad: whether the radio advertises the BSS Load element, and a
 // note when an SSID on it asked otherwise. The element is per radio in this
-// driver (the bssload iovar), so it is on when any SSID served on the radio
-// wants it (the controller's default: wireless.N.qbssload absent), and on
-// for a radio that serves none.
+// driver (the bssload iovar). As deco-crosscheck bssload specifies, it is
+// on only when no SSID served on the radio has the controller's
+// qbssload=disabled (the default: wireless.N.qbssload absent), and on for a
+// radio that serves none. One SSID that turns it off (an enhanced-IoT
+// WLAN) turns it off for the radio; when other SSIDs share the radio, a
+// note says they lose it too.
 func radioBSSLoad(rl *radioLayout) (bool, string) {
 	var off, on []string
 	for _, u := range rl.Used {
@@ -109,7 +123,7 @@ func radioBSSLoad(rl *radioLayout) (bool, string) {
 	case len(on) == 0:
 		return false, ""
 	}
-	return true, fmt.Sprintf("ssid %s: the controller turned the BSS Load element off (qbssload disabled), but it is radio-wide here and ssid %s on the same radio wants it: advertised",
+	return false, fmt.Sprintf("ssid %s: the controller turned the BSS Load element off (qbssload disabled); Broadcom BSS Load is radio-wide, so ssid %s on the same radio goes without it too",
 		strings.Join(off, ","), strings.Join(on, ","))
 }
 
@@ -176,7 +190,13 @@ type driverPlan struct {
 // planDriver compares the radio's live driver settings with the wanted
 // ones. An unreadable setting is left out of down and live (it is still in
 // the profile, which is optional step by step).
-func planDriver(p, band string, live map[string]int, bssload, keepDesense bool) driverPlan {
+//
+// keepDesense (Options.KeepDesense, config rx_desense) leaves TP-Link's
+// interference mitigation, and puts the receiver desense back on a radio
+// that reads without it (an earlier run without the opt-out cleared it):
+// baseMode, the baseline's mode, when it has the bit, else the live mode
+// with the bit. Live, no restart.
+func planDriver(p, band string, live map[string]int, bssload, keepDesense bool, baseMode int) driverPlan {
 	var dp driverPlan
 	set := func(name string, v int) Step {
 		return optStep("U6 parity "+name, "wl", "-i", p, name, fmtIovar(name, v))
@@ -195,6 +215,14 @@ func planDriver(p, band string, live map[string]int, bssload, keepDesense bool) 
 		}
 	}
 	if keepDesense {
+		if m, ok := live[interferenceIov]; ok && m != unread && m&desenseBit == 0 {
+			w := m | desenseBit
+			if baseMode != unread && baseMode&desenseBit != 0 {
+				w = baseMode
+			}
+			dp.diff = append(dp.diff, fmt.Sprintf("interference mode %d -> %d (rx_desense: receiver desense back on)", m, w))
+			dp.live = append(dp.live, optStep("rx_desense: interference (desense on)", "wl", "-i", p, interferenceIov, itoa(w)))
+		}
 		return dp
 	}
 	// Interference mitigation applies live (SET_INTERFERENCE_MODE suspends
@@ -258,6 +286,9 @@ func (a *Applier) driverRestore(ctx context.Context, p, band string, br *baseRad
 			want = tp[n].tplink
 		}
 		if want == "" {
+			want = tplinkFallback[n]
+		}
+		if want == "" {
 			continue
 		}
 		w, err := strconv.ParseInt(want, 0, 32)
@@ -284,4 +315,64 @@ func (a *Applier) captureDriver(ctx context.Context, p, band string) [][2]string
 		}
 	}
 	return out
+}
+
+// baseDriver is the baseline's value of a radio-wide driver setting
+// (unread when there is none).
+func (a *Applier) baseDriver(primary, name string) int {
+	b, err := a.loadBaseline()
+	if err != nil || b == nil {
+		return unread
+	}
+	for _, r := range b.Radios {
+		if r.Primary != primary {
+			continue
+		}
+		for _, io := range r.Iovars {
+			if io[0] == name {
+				if v, err := strconv.ParseInt(io[1], 0, 32); err == nil {
+					return int(v)
+				}
+			}
+		}
+	}
+	return unread
+}
+
+// backfillBaseline completes a baseline an older agent captured without the
+// radio-wide driver settings (a unit upgraded in place, still in takeover:
+// Apply captures a baseline only when there is none). The older agent never
+// changed these settings, so what the radio reads before this agent's first
+// change is TP-Link's. Run once per process, before the first Apply or Tick
+// changes anything; called with a.mu held.
+func (a *Applier) backfillBaseline(ctx context.Context) {
+	if a.backfilled {
+		return
+	}
+	a.backfilled = true
+	b, err := a.loadBaseline()
+	if err != nil || b == nil {
+		return
+	}
+	changed := false
+	for i := range b.Radios {
+		r := &b.Radios[i]
+		if len(r.Iovars) > 0 || !a.netdevExists(r.Primary) {
+			continue
+		}
+		if r.Iovars = a.captureDriver(ctx, r.Primary, r.Band); len(r.Iovars) > 0 {
+			changed = true
+			a.o.Logf("bcmwifi: baseline: %s driver settings recorded as TP-Link left them (an older agent's baseline lacked them)", r.Primary)
+		}
+	}
+	if !changed {
+		return
+	}
+	data, err := json.MarshalIndent(b, "", " ")
+	if err == nil {
+		err = writeFileAtomic(a.fsPath(a.baselinePath()), data, 0o600)
+	}
+	if err != nil {
+		a.o.Logf("bcmwifi: baseline: backfill of driver settings failed: %v", err)
+	}
 }

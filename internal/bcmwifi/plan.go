@@ -129,6 +129,8 @@ type Plan struct {
 	// cac: the radios in a DFS channel availability check (Tick leaves
 	// them alone, dfs.go)
 	cac []string
+	// restart: the bands whose radio the plan takes down (RadioRestartBand)
+	restart map[string]bool
 	// twt: band -> the radio's TWT line, band+" driver" -> its driver-parity
 	// line (parity.go), also in Notes (Tick logs changes)
 	twt map[string]string
@@ -150,6 +152,11 @@ func (p Plan) RadioRestart() bool {
 	}
 	return false
 }
+
+// RadioRestartBand: the plan takes band's radio down (a full reconcile, a
+// PHY change, a dwds repair). The auto channel pick rides only such a
+// restart of the same radio (cmd/udeco-ap autochan.go).
+func (p Plan) RadioRestartBand(band string) bool { return p.restart[band] }
 
 // String lists the notes and steps, one per line, without secrets.
 func (p Plan) String() string {
@@ -232,6 +239,18 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 		}
 		p.Foreign = append(p.Foreign, rp.Foreign...)
 		p.disruptive = p.disruptive || rp.Reconcile
+		down := rp.Reconcile
+		for _, s := range rp.Steps {
+			if s.Kind == StepCmd && len(s.Argv) == 4 && s.Argv[0] == "wl" && s.Argv[2] == rl.Primary && s.Argv[3] == "down" {
+				down = true
+			}
+		}
+		if down {
+			if p.restart == nil {
+				p.restart = map[string]bool{}
+			}
+			p.restart[rl.Band] = true
+		}
 		if rl.Band == "na" && a.inCAC(ctx, rl.Primary) {
 			p.cac = append(p.cac, rl.Primary)
 			p.Notes = append(p.Notes, "radio na: DFS channel availability check in progress (no beacons until it ends)")
@@ -446,6 +465,13 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	}
 	cs := lr.Chanspec
 	a.setLiveChannel(rl.Band, cs.Ctrl)
+	// hapdCh is the channel hostapd's conf names. While a radar move is
+	// followed it stays the wanted DFS channel (written as 36, hostapd.go),
+	// whatever channel the driver chose: a conf that followed the driver
+	// (149/80 under IN/288) would differ from the running one and turn
+	// every Tick into a NeedsApply and every provision into a hostapd
+	// restart until the dfs-reset.
+	hapdCh := 0
 	cc := lr.Country.Code
 	if wantCountry != "" {
 		arg, same := countryArg(wantCountry, lr.Country)
@@ -486,6 +512,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 			// radar: follow the driver's move (dfs.go)
 			if moved, n := a.followRadar(ctx, p, want, lr.Chanspec); moved {
 				note(n)
+				hapdCh = want.Ctrl
 				change, want = false, lr.Chanspec
 			}
 		}
@@ -500,12 +527,14 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 			phy = append(phy, wl("set chanspec "+want.String(), "chanspec", want.String()))
 			cs = want
 		}
-		ceil, n1 := a.txCeiling(p, lr.Chanspec, cs, lr.Degrade, lr.TargetMax)
+		ceil, n1, measure := a.txCeiling(p, lr.Country.Code, lr.Chanspec, cc, cs, lr.Degrade, lr.TargetMax)
 		if n1 != "" {
 			note(n1)
 		}
 		q, n2 := txpwrDegrade(rl.Radio, ceil)
-		if n2 != "" {
+		if measure {
+			q = 0 // the next plan reads the new limit and sets the preset live
+		} else if n2 != "" {
 			note(n2)
 		}
 		degrade = q
@@ -524,9 +553,17 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	if bn != "" {
 		note(bn)
 	}
-	dp := planDriver(p, rl.Band, lr.Drv, bssload, a.o.KeepDesense)
+	baseMode := unread
+	if a.o.KeepDesense {
+		baseMode = a.baseDriver(p, interferenceIov)
+	}
+	dp := planDriver(p, rl.Band, lr.Drv, bssload, a.o.KeepDesense, baseMode)
 	// rideAlong: what a radio down/up made for something else also writes
 	// (once per plan).
+	// heldPending: per-vif radio-down iovars (rrm, wnm) whose stored value
+	// differs from the wanted one (heldDriver); they ride the same way.
+	var heldPending []Step
+	heldSet := false
 	rideAlong := func() []Step {
 		if rp.TWTSet {
 			return nil
@@ -536,14 +573,18 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 			st = append(st, twtStep(p, twtWant))
 		}
 		st = append(st, dp.down...)
+		if len(heldPending) > 0 {
+			st = append(st, heldPending...)
+			heldSet = true
+		}
 		rp.TWTSet = len(st) > 0
 		return st
 	}
 	liveDrv := func(profiled bool) []Step {
 		var st []Step
 		for _, s := range dp.live {
-			if profiled && s.Argv[3] == "bssload" {
-				continue // radioProfile wrote it
+			if profiled && s.Argv[3] != interferenceIov && s.Argv[3] != interfOverIov {
+				continue // radioProfile wrote it (bssload, txbf_imp)
 			}
 			st = append(st, s)
 		}
@@ -559,7 +600,10 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	if rl.Radio.MinRSSI < 0 {
 		minRSSI = rl.Radio.MinRSSI
 	}
-	hr := hapdRadio{Band: rl.Band, Channel: cs.Ctrl, Country: cc, MinRSSI: minRSSI, MaxSta: maxSta, RunDir: a.o.RunDir}
+	if hapdCh == 0 {
+		hapdCh = cs.Ctrl
+	}
+	hr := hapdRadio{Band: rl.Band, Channel: hapdCh, Country: cc, MinRSSI: minRSSI, MaxSta: maxSta, RunDir: a.o.RunDir}
 	var drv []vifDriver
 	drvOf := map[string]vifDriver{}
 	var files []Step
@@ -578,6 +622,8 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	}
 	stale := a.staleVifSteps(p, rl) // slots.go
 	var conf, drvJSON []byte
+	var drvACL []vifDriver
+	drvStep := -1
 	if len(hr.BSS) > 0 {
 		ph, err := a.placeholder(rl.Anchor)
 		if err != nil {
@@ -590,8 +636,23 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 		conf = []byte(c)
 		drvJSON, _ = json.MarshalIndent(drv, "", " ")
+		// The stored driver state keeps what the driver holds: rrm/wnm
+		// values that changed only in the agent (an upgrade) wait for the
+		// next radio down/up instead of reconciling the radio (heldDriver).
+		var held []vifDriver
+		var hn []string
+		held, heldPending, hn = a.heldDriver(p, drv)
+		for _, n := range hn {
+			note(n)
+		}
+		heldJSON := drvJSON
+		if len(heldPending) > 0 {
+			heldJSON, _ = json.MarshalIndent(held, "", " ")
+		}
+		drvACL = held
+		drvStep = len(files)
 		files = append(files,
-			writeStep("write driver state", drvPath(a.o.RunDir, p), 0o644, drvJSON),
+			writeStep("write driver state", drvPath(a.o.RunDir, p), 0o644, heldJSON),
 			writeStep("write hostapd conf", confPath(a.o.RunDir, p), 0o600, conf))
 	}
 
@@ -599,11 +660,11 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	reconcile := takeover || len(phy) > 0
 	var acl *aclLive // only station ACLs or live settings changed: updated in place (acllive.go)
 	if len(hr.BSS) > 0 {
-		acl = a.planACLLive(p, conf, drv, files)
+		acl = a.planACLLive(p, conf, drvACL, files)
 		// sameConf: the FT-SAE peer lines are added live (SyncFTPeers), not
 		// by a restart.
 		reconcile = reconcile || !ls.Ours[p] || !acl.covers(confPath(a.o.RunDir, p)) && !a.sameConf(confPath(a.o.RunDir, p), conf) ||
-			!acl.covers(drvPath(a.o.RunDir, p)) && !a.sameFile(drvPath(a.o.RunDir, p), drvJSON)
+			!acl.covers(drvPath(a.o.RunDir, p)) && !a.sameFile(drvPath(a.o.RunDir, p), files[drvStep].Data)
 		for _, f := range files {
 			if f.Kind == StepWrite && !acl.covers(f.Path) && f.Path != confPath(a.o.RunDir, p) && !a.sameFile(f.Path, f.Data) {
 				reconcile = true
@@ -690,13 +751,23 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 		st = append(st, stale...)
 		st = append(st, acl.Steps()...)
+		if heldSet {
+			// the pending rrm/wnm went in with the radio down above
+			st = append(st, writeStep("write driver state", drvPath(a.o.RunDir, p), 0o644, drvJSON))
+		}
 		st = append(st, liveDrv(false)...)
 		rp.Steps = st
 		rp.Driver = driverStatus(dp, rp.TWTSet)
 		return rp, nil
 	}
 
-	// Full reconcile. Every vif goes BSS down while its hostapd still runs:
+	// Full reconcile: radioDownSteps below writes every vif's rrm and wnm,
+	// so the stored state is the wanted one.
+	if drvStep >= 0 {
+		files[drvStep].Data = drvJSON
+	}
+	heldPending = nil
+	// Every vif goes BSS down while its hostapd still runs:
 	// once it stops, the bss= vifs it created are gone (F2) and the
 	// survivors (its interface= vif) are the only ones left to scrub.
 	for _, v := range rl.Vifs {
@@ -812,6 +883,15 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		extra = append(extra, onVif(ph, optStep("backhaul "+ph+" dwds off (audit D8)", "wl", "-i", ph, "dwds", "0")))
 	}
 	extra = append(extra, rideAlong()...)
+	if rl.Band == "na" && rl.Radio.Enabled && hapdChannel(rl.Band, hr.Channel) != cs.Ctrl {
+		// hostapd's conf names another channel than the chanspec (a DFS
+		// channel, a radar move followed): set the chanspec again after
+		// hostapd is up, inside the radio down/up made here anyway, so
+		// its START_AP cannot leave the radio on the conf's channel
+		// (deco-crosscheck dfs step 4; whether wl_cfg80211's start_ap
+		// applies the conf channel is unverified on an X20).
+		extra = append(extra, optStep("chanspec "+cs.String()+" after hostapd (DFS)", "wl", "-i", p, "chanspec", cs.String()))
+	}
 	st = append(st, radioDownSteps(p, ds, extra...)...)
 	// Then what TP-Link's wifi script does per enabled vap (F3), with the
 	// other driver iovars first while the fresh BSS is down (F6).
@@ -902,4 +982,43 @@ func aclSteps(runDir string, d vifDriver) []Step {
 func (a *Applier) sameFile(p string, data []byte) bool {
 	b, err := a.readFile(p)
 	return err == nil && bytes.Equal(b, data)
+}
+
+// heldDriver compares the wanted driver state drv of the primary's vifs
+// with the stored one (drv-wlN.json, what the driver was given). rrm and
+// wnm are taken by the driver only with the radio down (radioDownSteps), so
+// a value that changed only in the agent (an upgrade: the previous build
+// stored rrm 0x0 for an SSID with 11k off and no wnm) must not reconcile
+// the radio: held is drv with the stored rrm/wnm, pending writes the wanted
+// ones inside the next radio down/up made for something else (as TWT,
+// twt.go), and notes say so. A stored state that cannot be read, or that
+// names other vifs, holds nothing back.
+func (a *Applier) heldDriver(primary string, drv []vifDriver) (held []vifDriver, pending []Step, notes []string) {
+	b, err := a.readFile(drvPath(a.o.RunDir, primary))
+	if err != nil {
+		return drv, nil, nil
+	}
+	var prev []vifDriver
+	if json.Unmarshal(b, &prev) != nil || len(prev) != len(drv) {
+		return drv, nil, nil
+	}
+	held = make([]vifDriver, len(drv))
+	for i, d := range drv {
+		if prev[i].Vif != d.Vif {
+			return drv, nil, nil
+		}
+		h := d
+		if prev[i].RRM != d.RRM && prev[i].RRM != "" {
+			h.RRM = prev[i].RRM
+			pending = append(pending, optStep("set "+d.Vif+" rrm (U6 parity)", "wl", "-i", d.Vif, "rrm", d.RRM))
+			notes = append(notes, fmt.Sprintf("%s: rrm %s -> %s at the next radio down/up (never a restart of its own)", d.Vif, prev[i].RRM, d.RRM))
+		}
+		if d.WNM != "" && prev[i].WNM != d.WNM {
+			h.WNM = prev[i].WNM
+			pending = append(pending, optStep("set "+d.Vif+" wnm (no BSS transition)", "wl", "-i", d.Vif, "wnm", d.WNM))
+			notes = append(notes, fmt.Sprintf("%s: wnm -> %s at the next radio down/up (never a restart of its own)", d.Vif, d.WNM))
+		}
+		held[i] = h
+	}
+	return held, pending, notes
 }

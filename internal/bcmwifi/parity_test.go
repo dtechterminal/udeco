@@ -47,7 +47,9 @@ func TestRadioBSSLoad(t *testing.T) {
 		{"no SSID", rl(), true, false},
 		{"default", rl(false, false), true, false},
 		{"all off", rl(true, true), false, false},
-		{"mixed", rl(true, false), true, true},
+		// deco-crosscheck bssload: 0 when any WLAN of the radio turns it
+		// off, with a note when the radio also carries others
+		{"mixed", rl(true, false), false, true},
 	} {
 		got, n := radioBSSLoad(c.r)
 		if got != c.want || (n != "") != c.note {
@@ -131,11 +133,22 @@ func TestDriverParityDrift(t *testing.T) {
 	if f.state["wl1 bssload"] != "1" || f.state["wl1 interference"] != "360" {
 		t.Errorf("live settings not re-asserted: bssload %q interference %q", f.state["wl1 bssload"], f.state["wl1 interference"])
 	}
-	if f.called("wl -i wl1 down") || f.state["wl1 txbf_imp"] != "1" {
-		t.Fatalf("radio restarted for txbf_imp alone (%q)", f.state["wl1 txbf_imp"])
+	// implicit beamforming is live-settable (iovar flags 0, deco-crosscheck
+	// l2uf-misc C): re-asserted by Tick, no restart
+	if f.called("wl -i wl1 down") || f.state["wl1 txbf_imp"] != "0" {
+		t.Fatalf("txbf_imp %q after tick (radio restarted %v)", f.state["wl1 txbf_imp"], f.called("wl -i wl1 down"))
+	}
+	// a radio-down setting waits for a radio down/up made for something else
+	f.state["wl1 rxchain_pwrsave_enable"] = "1"
+	f.reset()
+	if r, err := a.Tick(ctx); err != nil || r.NeedsApply {
+		t.Fatalf("tick: %+v %v", r, err)
+	}
+	if f.called("wl -i wl1 down") || f.state["wl1 rxchain_pwrsave_enable"] != "1" {
+		t.Fatalf("radio restarted for rxchain_pwrsave_enable alone (%q)", f.state["wl1 rxchain_pwrsave_enable"])
 	}
 	p2, _ := a.Plan(ctx, d)
-	if !noteHas(p2, "txbf_imp 1 -> 0; the radio-down ones at the next radio down/up") {
+	if !noteHas(p2, "rxchain_pwrsave_enable 1 -> 0; the radio-down ones at the next radio down/up") {
 		t.Errorf("notes %q", p2.Notes)
 	}
 	// a client vif's dwds drifts: Tick's radio down/up for it carries it
@@ -143,8 +156,8 @@ func TestDriverParityDrift(t *testing.T) {
 	if r, err := a.Tick(ctx); err != nil || r.NeedsApply {
 		t.Fatalf("tick: %+v %v", r, err)
 	}
-	if f.state["wl1 txbf_imp"] != "0" {
-		t.Errorf("txbf_imp %q after the dwds repair", f.state["wl1 txbf_imp"])
+	if f.state["wl1 rxchain_pwrsave_enable"] != "0" {
+		t.Errorf("rxchain_pwrsave_enable %q after the dwds repair", f.state["wl1 rxchain_pwrsave_enable"])
 	}
 }
 
@@ -169,6 +182,9 @@ func TestBSSLoadOff(t *testing.T) {
 	}
 	if !noteHas(p2, "radio ng: ssid b-iot: the controller turned the BSS Load element off") {
 		t.Errorf("notes %q", p2.Notes)
+	}
+	if stepIndex(t, p2, "wl -i wl0 bssload 0") < 0 || planHas(p2, "wl -i wl1 bssload 0") {
+		t.Errorf("mixed 2.4 GHz radio must stop advertising, 5 GHz keeps it:\n%s", p2)
 	}
 	for i := range d.SSIDs {
 		d.SSIDs[i].NoBSSLoad = true
@@ -238,9 +254,7 @@ func TestHandbackRestoresDriver(t *testing.T) {
 		}
 		want := map[string]string{"wl0 bssload": "0", "wl1 bssload": "0", "wl0 txbf_imp": "1", "wl1 txbf_imp": "1",
 			"wl0 vht_features": "0x7", "wl1 interference": "361"}
-		if drop {
-			want["wl1 interference"] = "360" // no known TP-Link value without a baseline: left alone
-		}
+		// without the baseline's: TP-Link's known 361 (tplinkFallback)
 		for k, v := range want {
 			if f.state[k] != v {
 				t.Errorf("drop %v: %s = %q after hand-back, want %q", drop, k, f.state[k], v)

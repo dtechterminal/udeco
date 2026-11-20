@@ -20,12 +20,13 @@ import (
 //   - the ceiling is the radio's `txpwr_target_max` read while
 //     txpwr_degrade is 0 (the board and regulatory limit for the chanspec,
 //     what high transmits), kept per radio and chanspec in
-//     RunDir/txpwr-ceiling.json: whether the target maximum moves with
-//     txpwr_degrade is not known, so a degraded reading never replaces a
-//     learnt ceiling. A chanspec with none learnt yet (a degraded radio
-//     after a reboot of the agent but not the unit, a channel change) takes
-//     the reading plus the live degrade once, or the old chanspec's
-//     ceiling, and keeps that.
+//     RunDir/txpwr-ceiling.json, kept per radio, country and chanspec:
+//     whether the target maximum moves with txpwr_degrade is not known, so
+//     a degraded reading never replaces a learnt ceiling. A channel or
+//     country change to a chanspec with none learnt runs at no degrade, and
+//     the next plan (Tick) reads the new limit and sets the preset live. A
+//     degraded radio with none learnt (the agent restarted but not the
+//     unit) takes the reading plus the live degrade once and keeps that.
 //   - the floor is txMinDBm (5 dBm, as the collector's min_txpower).
 //
 // The controller is told the mode and the resulting dBm (TxPower), not
@@ -136,11 +137,15 @@ func (a *Applier) setTxReport(band string, r txReport) {
 
 func (a *Applier) txCeilPath() string { return path.Join(a.o.RunDir, "txpwr-ceiling.json") }
 
-// txCeiling is the radio's ceiling on cs (see above): the reading with no
-// degrade (learnt), else the learnt one, else an estimate kept from now
-// on. moved: cs is a chanspec the plan moves to (from cur), whose ceiling
-// is the learnt one or cur's.
-func (a *Applier) txCeiling(p string, cur, cs chanspec, degrade int, targetMax float64) (c float64, note string) {
+// txCeiling is the radio's ceiling on cs under country csCC (see above):
+// the reading with no degrade (learnt), else the learnt one, else an
+// estimate kept from now on. A chanspec or country the plan moves to (from
+// cur under curCC) uses its learnt ceiling; with none, measure is set: the
+// move runs at no degrade, so the next plan reads the new limit (the spec's
+// re-run after every chanspec change). The old chanspec's ceiling is never
+// carried over: a lower limit there (IN/288 52/80 18 dBm after 44/80 23.5)
+// would be kept for good, since a degraded reading never replaces a ceiling.
+func (a *Applier) txCeiling(p, curCC string, cur chanspec, csCC string, cs chanspec, degrade int, targetMax float64) (c float64, note string, measure bool) {
 	a.txMu.Lock()
 	defer a.txMu.Unlock()
 	if a.txCeil == nil {
@@ -149,7 +154,7 @@ func (a *Applier) txCeiling(p string, cur, cs chanspec, degrade int, targetMax f
 			_ = json.Unmarshal(b, &a.txCeil)
 		}
 	}
-	key := func(c chanspec) string { return p + " " + c.String() }
+	key := func(cc string, c chanspec) string { return p + " " + strings.ToUpper(cc) + " " + c.String() }
 	set := func(k string, v float64) {
 		if a.txCeil[k] == v {
 			return
@@ -165,26 +170,26 @@ func (a *Applier) txCeiling(p string, cur, cs chanspec, degrade int, targetMax f
 		}
 	}
 	// the live chanspec's
-	switch v, ok := a.txCeil[key(cur)]; {
+	kc := key(curCC, cur)
+	switch v, ok := a.txCeil[kc]; {
 	case degrade == 0 && targetMax > 0:
-		set(key(cur), targetMax)
+		set(kc, targetMax)
 		c = targetMax
 	case ok:
 		c = v
 	case targetMax > 0:
 		c = targetMax + float64(degrade)/4
-		set(key(cur), c)
+		set(kc, c)
 		note = fmt.Sprintf("tx power ceiling on %s estimated from a degraded reading: %.2f dBm", cur, c)
 	}
-	if cs == cur {
-		return c, note
+	ks := key(csCC, cs)
+	if ks == kc {
+		return c, note, false
 	}
-	if v, ok := a.txCeil[key(cs)]; ok {
-		return v, ""
+	if v, ok := a.txCeil[ks]; ok {
+		return v, "", false
 	}
-	if c > 0 {
-		set(key(cs), c)
-		return c, fmt.Sprintf("tx power ceiling on %s taken from %s until it is read: %.2f dBm", cs, cur, c)
-	}
-	return 0, note
+	// c (the old chanspec's, not stored for cs) only sizes the report
+	// until then
+	return c, fmt.Sprintf("tx power ceiling on %s (country %s) not read yet: no degrade until the next plan reads it", cs, csCC), true
 }

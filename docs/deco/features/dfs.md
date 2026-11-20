@@ -30,7 +30,15 @@ recommended.
   GHz ([radio-parity](radio-parity.md)).
 - hostapd's conf names channel 36 for a DFS channel. wl owns the channel,
   and a radar channel in the conf would make hostapd start a CAC of its own
-  over nl80211.
+  over nl80211. While a radar move is followed the conf keeps naming the
+  wanted DFS channel (36), whatever channel the driver chose: a conf that
+  followed the driver to 149/80 would differ from the running one, so every
+  Tick would ask for a full apply (no repairs) and every provision would
+  restart hostapd until the dfs-reset.
+- After hostapd starts, the chanspec is set again inside the dwds/rrm radio
+  down/up the reconcile makes anyway (the spec's "apply the DFS chanspec
+  after hostapd is up"). This costs no extra restart; it keeps hostapd's
+  START_AP from leaving the radio on the conf's 36.
 - The controller's channel is checked against the driver's live chanspec
   list for the country (`wl.Caps`, re-read after every apply). A channel
   the list does not hold is refused with a note, and the radio stays on
@@ -65,9 +73,24 @@ waits for the next night. Other cron jobs are noted and not run.
 takeover on the Deco (`models.DecoAgentFeatures.DFS`) and cleared on a drop
 to observe mode.
 
+## Deploying a DFS channel on a Deco
+
+- **Drop `driver_country`.** Under the X20's US/0 the 5 GHz list is 36-48
+  and 149-165, so 100/116/132 are refused ("not allowed by the driver in
+  this country": the radio stays on auto). The agent logs a note when the
+  override meets a DFS channel.
+- **CAC on every 5 GHz restart.** Each radio down/up on a DFS channel runs
+  the CAC again, during which Tick skips all repairs on both radios. 116/80
+  covers 120-128, the weather channels, so its CAC is expected to be about
+  10 minutes (INFERRED from the driver's ETSI rules, not timed on an X20).
+
 ## Unverified on hardware
 
-- That the X20's driver has an IN/288 table, and what it allows.
+- Verified: the Bedroom X20 accepts `wl country IN/288` with the radio down
+  (2026-11-20, "IN (IN/288) INDIA", 80 MHz blocks 36/52/100/116/132/149,
+  chanspec_txpwr_max 18 dBm on 36-64/80, 25 on 100-144/80, 18.5 on
+  149-161/80). Not verified: the agent's own apply of it, and serving a
+  DFS channel.
 - The output formats of `wl dfs_status` and `wl chan_info`. They are taken
   from the Broadcom `wl` utility's source and have not been read on an X20.
   If either cannot be read, CAC and radar handling stay off: Verify and
@@ -75,6 +98,8 @@ to observe mode.
 - That `wl spect 1` needs the radio down, and that this `wl.ko` runs the CAC
   and radar detection with it (TP-Link's own radar daemon is stopped).
 - That hostapd 2.9 with `ieee80211h=1` and channel 36 in its conf leaves a
-  DFS chanspec set by wl alone.
+  DFS chanspec set by wl alone. The agent sets the chanspec again after
+  hostapd starts in case it does not; read `wl -i wl1 chanspec` right after
+  the takeover apply to see which.
 - The `EVT_AP_RadarDetected` payload keys. They were chosen to match the
   quick-scan event, because the U6's own payload has not been captured.

@@ -280,9 +280,10 @@ func TestLockToAPWithDriverStateDriftReconciles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	drifted := strings.Replace(string(b), `"rrm": "`, `"rrm": "0x1`, 1)
+	// (not rrm or wnm: those wait for the next radio down/up, heldDriver)
+	drifted := strings.Replace(string(b), `"rrm_nbr_scan": 0`, `"rrm_nbr_scan": 7`, 1)
 	if drifted == string(b) {
-		t.Fatalf("no rrm in %s", b)
+		t.Fatalf("no rrm_nbr_scan in %s", b)
 	}
 	if err := os.WriteFile(p, []byte(drifted), 0o644); err != nil {
 		t.Fatal(err)

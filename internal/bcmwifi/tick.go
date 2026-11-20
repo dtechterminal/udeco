@@ -96,6 +96,7 @@ func (a *Applier) Tick(ctx context.Context) (TickReport, error) {
 		a.logPlan("dry-run tick", p)
 		return r, nil
 	}
+	a.backfillBaseline(ctx) // parity.go: before the first change of this process
 	if len(p.Steps) > 0 {
 		r.Steps = len(p.Steps)
 		if err := a.executeAll(ctx, p.Steps); err != nil {

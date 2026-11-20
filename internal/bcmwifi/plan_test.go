@@ -328,7 +328,9 @@ func TestRadioChanges(t *testing.T) {
 	co := stepIndex(t, p, "wl -i wl1 country CA/2")
 	bw := stepIndex(t, p, "wl -i wl1 bw_cap 5g 3")
 	cs := stepIndex(t, p, "wl -i wl1 chanspec 149l")
-	tx := stepIndex(t, p, "wl -i wl1 txpwr_degrade 14") // 23.5 - 20 dB = 14 qdB
+	// the new chanspec and country's limit is read after the move (no
+	// degrade until then: the next plan sets custom 20 dBm live)
+	tx := stepIndex(t, p, "wl -i wl1 txpwr_degrade 0")
 	up := stepIndex(t, p, "wl -i wl1 up")
 	if !(down < co && co < bw && bw < cs && cs < tx && tx < up) {
 		t.Errorf("PHY order %d %d %d %d %d %d", down, co, bw, cs, tx, up)

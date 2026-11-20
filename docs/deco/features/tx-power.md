@@ -21,12 +21,16 @@ settable live (`internal/bcmwifi/txpower.go`).
 
 - **Ceiling.** The radio's `txpwr_target_max` read while the degrade is 0.
   This is the board and regulatory limit for the chanspec, which is what
-  high transmits. It is kept per radio and chanspec in
+  high transmits. It is kept per radio, country and chanspec in
   `RunDir/txpwr-ceiling.json`. It is not known whether the target maximum
   moves with the degrade, so a degraded reading never replaces a learnt
-  ceiling. A chanspec with no ceiling learnt yet takes the reading plus the
-  live degrade once, or, on a channel change, the old chanspec's ceiling.
-  It then keeps that value, so a plan never chases its own write.
+  ceiling, and a plan never chases its own write.
+- **Channel or country change.** The old chanspec's ceiling is never
+  carried over (IN/288 52/80 allows 18 dBm where 44/80 had 23.5). A move to
+  a chanspec with none learnt runs at no degrade; the next plan (Tick, a
+  minute later) reads the new limit and sets the preset live. A degraded
+  radio with none learnt (the agent restarted, not the unit) takes the
+  reading plus the live degrade once.
 - **Floor.** 5 dBm (`min_txpower`, the same as the collector's).
 - **Presets.** `degrade = (ceiling - target) * 4`:
 

@@ -169,6 +169,19 @@ func hwMode(band string) string {
 	return "a"
 }
 
+// hapdChannel is the channel hostapd's conf names for ch on band.
+func hapdChannel(band string, ch int) int {
+	if ch <= 0 { // hostapd has no ACS here; the value is informational
+		ch = map[string]int{"ng": 1, "na": 36}[band]
+	}
+	if dfsChannel(band, ch) {
+		// wl owns the channel (and the DFS CAC, dfs.go); a radar channel
+		// here would make hostapd start a CAC of its own over nl80211
+		ch = 36
+	}
+	return ch
+}
+
 // renderHostapd writes the hostapd 2.9 config for one radio: global lines
 // and the placeholder as interface=, then one bss= section (with bssid=,
 // which this hostapd requires: "Invalid BSSID mask" otherwise, F4) per BSS.
@@ -187,16 +200,7 @@ func renderHostapd(r hapdRadio) (string, error) {
 	w("ctrl_interface_group", 0)
 	w("interface", ph.Vif)
 	w("hw_mode", hwMode(r.Band))
-	ch := r.Channel
-	if ch <= 0 { // hostapd has no ACS here; the value is informational
-		ch = map[string]int{"ng": 1, "na": 36}[r.Band]
-	}
-	if dfsChannel(r.Band, ch) {
-		// wl owns the channel (and the DFS CAC, dfs.go); a radar channel
-		// here would make hostapd start a CAC of its own over nl80211
-		ch = 36
-	}
-	w("channel", ch)
+	w("channel", hapdChannel(r.Band, r.Channel))
 	if r.Country != "" {
 		w("country_code", r.Country)
 		w("ieee80211d", 1)

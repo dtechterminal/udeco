@@ -184,8 +184,10 @@ func parseTargetMax(s string) float64 {
 //
 // IN/288: the driver's IN/0 table has no 80 MHz chanspec at all (verified
 // on .205 2026-11-19, the reason for the driver_country override); IN/288
-// is the India table with 80 MHz and the DFS band (not read on an X20:
-// unverified on hardware). A driver that refuses it gets countryFallback.
+// is the India table with 80 MHz and the DFS band. The Bedroom X20 took
+// `wl country IN/288` with the radio down (2026-11-20: "IN (IN/288)
+// INDIA", 80 MHz blocks 36/52/100/116/132/149). A driver that refuses it
+// gets countryFallback.
 var countryRev = map[string]int{"US": 0, "CA": 2, "JP": 0, "KR": 1, "AU": 8, "DE": 0, "IN": 288}
 
 // countryFallback is set (without a rev: the driver picks one) when the
