@@ -186,3 +186,22 @@ its Wi-Fi only), 19:35-19:38 IST: US/0 149/80 150.6 down / 151.1 up, `#a`
 So the radio and driver do Wi-Fi 6 on DFS channels. Only the country data
 withholds it for every real country, and `#a` gets it by dropping radar
 detection, which is why it stays a test. TP-Link's data for this board carries Wi-Fi 6 only for US.
+
+## 5 GHz on `#a` by the user's choice (2026-11-20 19:55 IST)
+
+The user chose Wi-Fi 6 with the extra channels over radar detection and
+made `#a` the 5 GHz table on all three Decos:
+`"driver_country_bands": {"ng": "US", "na": "#a"}` (2.4 GHz stays US/0,
+already full power with Wi-Fi 6). The agent accepts `#a` since a0873d9 and
+keeps its case (`bcmwifi.NormCountry`). Because `#a` runs no radar
+detection, the planner refuses any 5 GHz chanspec that covers 120-128
+(5600-5650 MHz, weather radar) and keeps the live one with a note. Seen
+live on Owner's Room: UniFi's 116/80 was refused twice ("116/80 covers the
+weather-radar band ... keeping"), and the radio stayed on its channel.
+
+Plan: Hallway 40/80, Owner's Room 100/80 (it does not hear the neighbour
+"Kallu" on 106/80), Bedroom 132/80, Garage 149/80 (MT7603, its own table).
+All Decos at 23.5 dBm with every Wi-Fi 6 rate enabled, each on its own
+80 MHz block. Back to US: set "na" to "US" and restart the agent; US/0 has
+no DFS, so move the channels to 36-48 or 149-161 first.
+
