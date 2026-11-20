@@ -40,6 +40,10 @@ func (a *Applier) flushLive(ctx context.Context) {
 	if a.settling() || a.live == nil {
 		return
 	}
+	for _, m := range a.kickDue { // guests unauthorised inside a settle time (guest.go)
+		a.disconnect(ctx, m)
+	}
+	a.kickDue = nil
 	for _, rd := range a.o.Layout {
 		if !a.due[rd.Band] {
 			continue

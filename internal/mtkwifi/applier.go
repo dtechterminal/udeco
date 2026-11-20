@@ -99,6 +99,8 @@ type Applier struct {
 	// gate's write side is held through Apply and Rollback; quietUntil
 	// (Options.mono, ns) is the end of the last restart's settle time
 	gate       sync.RWMutex
+	gateHeld   bool     // gate's write side is held (by changingRadios; a.mu held)
+	kickDue    []string // guests unauthorised inside a settle time: disconnected after it (guest.go)
 	quietUntil atomic.Int64
 	onChange   atomic.Pointer[func(context.Context)] // OnChange
 	// live settings waiting for a restart's settle time to end, by band
@@ -485,6 +487,7 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 	}
 	defer a.restarted() // the collector leaves the driver alone a while longer
 	a.parpRestarted(rd)
+	a.dfsRestarted(rd)
 	for i := len(rd.Ifaces) - 1; i >= 0; i-- {
 		if err := a.run(ctx, "ifconfig", rd.Ifaces[i], "down"); err != nil {
 			return err
@@ -871,6 +874,7 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 	a.parpOff(ctx)      // proxy ARP (proxyarp.go)
 	defer a.restarted() // the collector leaves the driver alone a while longer
 	for _, rd := range a.o.Layout {
+		a.dfsRestarted(rd)
 		for i := len(rd.Ifaces) - 1; i >= 0; i-- {
 			_ = a.run(ctx, "ifconfig", rd.Ifaces[i], "down")
 		}
@@ -1032,6 +1036,13 @@ func (a *Applier) upIfaces() []string {
 func (a *Applier) Kick(ctx context.Context, mac string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.settling() {
+		// live iwpriv waits for the settle time (flushLive)
+		if m := strings.ToLower(mac); !slices.Contains(a.kickDue, m) {
+			a.kickDue = append(a.kickDue, m)
+		}
+		return nil
+	}
 	mac = strings.ToUpper(mac)
 	var errs []string
 	for _, ifc := range a.upIfaces() {

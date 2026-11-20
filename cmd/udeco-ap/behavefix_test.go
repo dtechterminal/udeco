@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
 	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
 )
@@ -221,5 +222,20 @@ func TestConnSuccessAfterAssociation(t *testing.T) {
 	r.read = 9000
 	if got := r.judge(10000); len(got) != 1 || got[0]["event_type"] != "success" {
 		t.Fatalf("next reading: %v", got)
+	}
+}
+
+// The Garage has its own minimum RSSI kick (mtkwifi KickWeak, settle-
+// guarded): the Deco's agent-side loop never runs there, so no second
+// kicker with other timers and no live iwpriv inside a settle time.
+func TestMinRSSIDecoOnly(t *testing.T) {
+	u := newMinUnit(t, banWifi{banErr: bcmwifi.ErrAllowList})
+	u.h.a.cfg.Platform = PlatformJio
+	var got []string
+	for i := 0; i < 3*minRSSIBelow; i++ {
+		got = append(got, u.reading(false, "wl12", -85)...)
+	}
+	if len(got) != 0 {
+		t.Fatalf("Deco min-RSSI loop on the Garage: %v", got)
 	}
 }

@@ -207,7 +207,7 @@ func (a *Applier) dfsStep(ctx context.Context) {
 			a.dfs.on = cur
 		}
 		if !isDFS(cur) && a.dfs.region0 && !a.nopPending() {
-			if err := a.run(ctx, "iwpriv", main, "set", regionA+"="+a.vendorRegion(*rd)); err != nil {
+			if err := a.driverChange(ctx, a.o.Settle, "iwpriv", main, "set", regionA+"="+a.vendorRegion(*rd)); err != nil {
 				a.o.Logf("mtkwifi: %s: region back: %v", rd.Band, err)
 				return
 			}
@@ -220,14 +220,14 @@ func (a *Applier) dfsStep(ctx context.Context) {
 			return // where the driver put the radio, until the NOP ends
 		}
 		if !a.dfs.region0 {
-			if err := a.run(ctx, "iwpriv", main, "set", regionA+"="+dfsRegA); err != nil {
+			if err := a.driverChange(ctx, a.o.Settle, "iwpriv", main, "set", regionA+"="+dfsRegA); err != nil {
 				a.o.Logf("mtkwifi: %s: region %s refused (a region lock?): channel %d not served: %v", rd.Band, dfsRegA, want, err)
 				a.dfs.nop[want] = a.o.mono() + nopHold
 				return
 			}
 			a.dfs.region0 = true
 		}
-		if err := a.run(ctx, "iwpriv", main, "set", "Channel="+strconv.Itoa(want)); err != nil {
+		if err := a.driverChange(ctx, dfsQuiet, "iwpriv", main, "set", "Channel="+strconv.Itoa(want)); err != nil {
 			a.o.Logf("mtkwifi: %s: channel %d: %v", rd.Band, want, err)
 			return
 		}
@@ -248,7 +248,7 @@ func (a *Applier) dfsStep(ctx context.Context) {
 		to = dfsAlt // automatic: a channel of the vendor's region until the next restart
 	}
 	if isDFS(cur) {
-		if err := a.run(ctx, "iwpriv", main, "set", "Channel="+strconv.Itoa(to)); err != nil {
+		if err := a.driverChange(ctx, a.o.Settle, "iwpriv", main, "set", "Channel="+strconv.Itoa(to)); err != nil {
 			a.o.Logf("mtkwifi: %s: channel %d: %v", rd.Band, to, err)
 			return
 		}
@@ -256,12 +256,24 @@ func (a *Applier) dfsStep(ctx context.Context) {
 	}
 	a.dfs.on, a.dfs.pending = 0, false
 	if a.dfs.region0 && !a.nopPending() {
-		if err := a.run(ctx, "iwpriv", main, "set", regionA+"="+a.vendorRegion(*rd)); err != nil {
+		if err := a.driverChange(ctx, a.o.Settle, "iwpriv", main, "set", regionA+"="+a.vendorRegion(*rd)); err != nil {
 			a.o.Logf("mtkwifi: %s: region back: %v", rd.Band, err)
 			return
 		}
 		a.dfs.region0 = false
 	}
+}
+
+// dfsRestarted: rd restarts (a planned profile restart or the hand-back):
+// the radio comes up on its profile's channel, so the channel it was
+// taken to live is no reference for a radar any more (a restart that
+// leaves 52-64 is no radar). The NOPs and the region stay: the region is
+// put back by dfsStep once off 52-64.
+func (a *Applier) dfsRestarted(rd RadioDef) {
+	if !rd.DFS {
+		return
+	}
+	a.dfs.on, a.dfs.pending, a.dfs.from, a.dfs.moved = 0, false, 0, 0
 }
 
 // radarSeen records a radar on ch (the radio now on to).

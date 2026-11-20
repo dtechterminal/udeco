@@ -3,6 +3,7 @@
 package mtkwifi
 
 import (
+	"context"
 	"time"
 )
 
@@ -68,7 +69,25 @@ func (a *Applier) settling() bool { return int64(a.o.mono()) < a.quietUntil.Load
 // returned func runs.
 func (a *Applier) changingRadios() func() {
 	a.gate.Lock()
-	return a.gate.Unlock
+	a.gateHeld = true
+	return func() {
+		a.gateHeld = false
+		a.gate.Unlock()
+	}
+}
+
+// driverChange runs one live command that makes the driver restart its
+// BSSes or rebuild its channel list (dfs.go: the region, a channel move
+// with its CSA and CAC) from Tick as from Apply (a.mu held): the gate's
+// write side is held (taken here unless Apply or Rollback holds it), and
+// the quiet time starts before the command, so no collector read starts
+// while the driver works.
+func (a *Applier) driverChange(ctx context.Context, quiet time.Duration, name string, args ...string) error {
+	if !a.gateHeld {
+		defer a.changingRadios()()
+	}
+	a.quietFor(quiet)
+	return a.run(ctx, name, args...)
 }
 
 // restarted starts the settle time of a radio restart that just ended.

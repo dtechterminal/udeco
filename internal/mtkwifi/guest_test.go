@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 )
@@ -102,7 +103,7 @@ func TestGuestApply(t *testing.T) {
 // removes it and disconnects the guest.
 func TestGuestPortalAuth(t *testing.T) {
 	f := newFakeDev(t)
-	a, _ := clocked(f)
+	a, now := clocked(f)
 	ctx := context.Background()
 	d := guestHome()
 	d.Guest.Portal, d.Guest.PortalHost = true, "192.168.0.2"
@@ -110,6 +111,7 @@ func TestGuestPortalAuth(t *testing.T) {
 	if err := a.Apply(ctx, p); err != nil {
 		t.Fatal(err)
 	}
+	*now += time.Minute // past the restart's settle time (the disconnect is live iwpriv)
 	n := len(f.log)
 	if err := a.AuthorizeGuest(ctx, "AA:BB:CC:DD:EE:01"); err != nil {
 		t.Fatal(err)

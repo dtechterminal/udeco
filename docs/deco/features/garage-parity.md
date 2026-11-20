@@ -35,7 +35,11 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   disconnects a station after 3 readings in a row at least 5 s apart below
   the threshold (`DisConnectSta`), backing off 30 s doubling to 10 min per
   station, never during a restart or its settle time. The kicked station's
-  leave carries `assoc_status` 16 (`cmd/udeco-ap/staevents.go`).
+  leave carries `assoc_status` 16 (`cmd/udeco-ap/staevents.go`). It is the
+  only kicker: the Deco's agent-side loop (`cmd/udeco-ap/minrssi.go`) used
+  to run here too, with other timers and no settle guard, so a weak client
+  was kicked twice; it is now Deco only. A controller `kick-sta` inside a
+  settle time is sent after it.
 - **Unverified:** that the MT7663's association path uses the threshold
   (only the setter was found); the RSSI scale the drivers compare.
 
@@ -163,7 +167,9 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   after the radios changed. A guest SSID without a usable policy (gateway
   MAC and IP) is not served. Authorise/unauthorise add and remove the
   guest's RETURN rule (kept in the run dir for rebuilds); unauthorising
-  disconnects the guest. Tick rebuilds chains something else removed; the
+  disconnects the guest (inside a restart's settle time the RETURN rule
+  goes at once and the disconnect, live iwpriv, waits for the first Tick
+  after it; a guest authorised again meanwhile is not disconnected). Tick rebuilds chains something else removed; the
   hand-back removes them (`internal/mtkwifi/guest.go`).
 - Rollback: last-good is saved with the Desired it came from
   (`last-good-desired.json` in the state dir), and a rollback restores
@@ -207,6 +213,8 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   isolation chains (UDECO-GIN/GOUT) after it. Unknown addresses
   still go out (fail open, as the Linux bridge's proxy ARP). The rules
   exist only while the responder's sockets are healthy.
+- At the hand-back inside a settle time no `hs_flag=0` is sent (the radio
+  restarts that follow clear it).
 - `proxy_arp: false` leaves every request going out on the air, as before
   (`internal/mtkwifi/proxyarp.go`, `proxyarp_linux.go`). IPv6 neighbour
   solicitations are not proxied.
@@ -237,6 +245,16 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
     `RADAR` in `events.log`, keeps the channel out for 31 min (all of 52-64
     at 80 MHz), writes the driver's channel into the profile meanwhile, and
     then goes back. A move the driver refused is no radar.
+  - A planned profile restart (a channel and width change in one push, a
+    hand-back) resets the radar follow-up: the radio comes up on the
+    profile's channel, which is no radar. It used to compare against the
+    DFS channel set before the restart and report a false
+    `EVT_AP_RadarDetected` with a 31 min NOP on 52-64.
+  - The live region and channel changes hold the RestartGate's write side
+    and start their quiet time before the `iwpriv`, from Tick as from Apply,
+    so no collector read (iwconfig, iwpriv show, site survey) runs while the
+    driver rebuilds its channel list or restarts its BSSes (the 2026-11-19
+    hang rule).
   - Never touched: IEEE80211H, RDRegion, DfsEnable, DfsZeroWait and the
     driver's DFS test commands (`internal/mtkwifi/dfs.go`).
 - **Unverified, before turning `dfs` on:** in a quiet window on an empty
@@ -245,7 +263,10 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   CountryRegionABand=10` while still on 149. Also unverified: the CAC
   length on the unit, that a NOP survives the region change back, and
   automatic channel after leaving DFS (the radio goes to 36 until the next
-  restart).
+  restart). Whether a full close/open rebuilds the driver's cached channel
+  list from the profile (INFERRED): if not, the hand-back leaves the live
+  region at 0 until the vendor's next restart, and a first deploy onto
+  52-64 gets a second, live move after the batched restart.
 
 ## 15. Station GARP
 

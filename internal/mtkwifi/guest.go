@@ -277,10 +277,23 @@ func (a *Applier) setGuestAuth(ctx context.Context, mac string, on bool) error {
 			}
 		}
 	}
+	a.kickDue = slices.DeleteFunc(a.kickDue, func(x string) bool { return x == m })
 	if !on {
-		for _, ifc := range a.upIfaces() {
-			_ = a.run(ctx, "iwpriv", ifc, "set", "DisConnectSta="+strings.ToUpper(m))
+		if a.settling() {
+			// live iwpriv waits for the settle time (flushLive); the
+			// guest's RETURN rule is gone already
+			a.kickDue = append(a.kickDue, m)
+		} else {
+			a.disconnect(ctx, m)
 		}
 	}
 	return nil
+}
+
+// disconnect sends a station off every up BSS (live iwpriv: outside a
+// settle time only).
+func (a *Applier) disconnect(ctx context.Context, mac string) {
+	for _, ifc := range a.upIfaces() {
+		_ = a.run(ctx, "iwpriv", ifc, "set", "DisConnectSta="+strings.ToUpper(mac))
+	}
 }

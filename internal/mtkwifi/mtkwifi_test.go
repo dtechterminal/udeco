@@ -466,6 +466,7 @@ func TestBlockedAndKick(t *testing.T) {
 	if !strings.Contains(j, "iwpriv rai1 set AccessPolicy=2") || !strings.Contains(j, "iwpriv ra0 set ACLAddEntry=AA:BB:CC:DD:EE:FF") {
 		t.Errorf("deny list not applied: %v", f.log[n:])
 	}
+	a.quietUntil.Store(0) // past the restart's settle time (a kick is live iwpriv)
 	n = len(f.log)
 	a.Kick(ctx, "aa:bb:cc:dd:ee:ff")
 	if !strings.Contains(strings.Join(f.log[n:], "\n"), "iwpriv ra2 set DisConnectSta=AA:BB:CC:DD:EE:FF") {

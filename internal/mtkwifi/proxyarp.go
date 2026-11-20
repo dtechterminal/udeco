@@ -254,9 +254,11 @@ func (a *Applier) removeParpEb(ctx context.Context) {
 }
 
 // parpOff turns proxy ARP off (hand-back), before the radios restart.
+// Inside a settle time no hs_flag is sent (live iwpriv): the restart that
+// follows clears the flag anyway.
 func (a *Applier) parpOff(ctx context.Context) {
 	for ifc, on := range a.parpFlag {
-		if on {
+		if on && !a.settling() {
 			_ = a.run(ctx, "iwpriv", ifc, "set", "hs_flag=0")
 		}
 	}

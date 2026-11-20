@@ -251,7 +251,12 @@ func (a *agent) clientsReading(s *apstate.Snapshot, now time.Time) {
 	if !a.stale {
 		a.roamReading(s, now)
 	}
-	a.minRSSIReading(s, now) // minrssi.go
+	if !a.cfg.jio() {
+		// the Garage kicks in its driver backend (mtkwifi KickWeak,
+		// settle-guarded): a second kicker with other timers would kick
+		// twice and send live iwpriv inside a settle time
+		a.minRSSIReading(s, now) // minrssi.go
+	}
 }
 
 // loopGuard is R9 (loop goroutine; the changes run on the worker).
