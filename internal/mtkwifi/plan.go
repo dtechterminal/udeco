@@ -291,8 +291,11 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 				b.GroupRekey = s.GroupRekey
 			}
 			if s.Guest {
-				note("%s: SSID %q: guest networks are not supported here: not served", rd.Band, s.SSID)
-				continue
+				if bcmwifi.GuestEbtables(d.Guest) == nil {
+					note("%s: SSID %q: no usable guest policy (the gateway's MAC and IP): not served", rd.Band, s.SSID)
+					continue
+				}
+				b.Guest = true
 			}
 			if b.VLAN < 0 || b.VLAN > 4094 || b.VLAN == 1 {
 				note("%s: SSID %q: VLAN %d cannot be served: not served", rd.Band, s.SSID, b.VLAN)

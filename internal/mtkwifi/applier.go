@@ -371,6 +371,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 		cur = a.adopted // what Plan found already live
 	}
 	a.adopted = nil
+	a.desired = p.Desired
 	err := a.applyPlans(ctx, want, cur)
 	if err == nil {
 		err = a.waitLive(ctx, want)
@@ -395,6 +396,10 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 		return err
 	}
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, appliedFile)))
+	// guest chains before any guest SSID comes up (guest.go)
+	if err := a.syncGuest(ctx, &a.desired, want, false); err != nil {
+		return fmt.Errorf("guest isolation: %w", err)
+	}
 	for _, rd := range a.o.Layout {
 		w := want[rd.Band]
 		c, ok := cur[rd.Band]
@@ -410,6 +415,9 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 		if err != nil {
 			return fmt.Errorf("%s: %w", rd.Band, err)
 		}
+	}
+	if err := a.syncGuest(ctx, &a.desired, want, true); err != nil {
+		return fmt.Errorf("guest isolation: %w", err)
 	}
 	if err := a.cleanVLANs(ctx, want); err != nil {
 		a.o.Logf("mtkwifi: removing unused VLAN bridges: %v", err)
@@ -827,6 +835,7 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 		}
 	}
 	_ = a.cleanVLANs(ctx, nil)
+	_ = a.syncGuest(ctx, nil, nil, true)
 	a.live, a.want = nil, nil
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, ownedFile)))
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, appliedFile)))
@@ -872,6 +881,10 @@ func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 		return r, nil
 	}
 	a.flushLive(ctx)
+	// the guest chains (an ebtables flush by something else is rebuilt)
+	if err := a.syncGuest(ctx, &a.desired, a.live, true); err != nil {
+		r.Problems = append(r.Problems, err.Error())
+	}
 	ssids := !a.settling()
 	for _, rd := range a.o.Layout {
 		rp := a.live[rd.Band]
@@ -1138,8 +1151,3 @@ func (a *Applier) SetUplink(port string) {
 	a.uplink = port
 	a.mu.Unlock()
 }
-
-var errNoGuest = errors.New("mtkwifi: guest networks are not served on this unit")
-
-func (a *Applier) AuthorizeGuest(context.Context, string) error   { return errNoGuest }
-func (a *Applier) UnauthorizeGuest(context.Context, string) error { return errNoGuest }
