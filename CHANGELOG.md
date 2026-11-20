@@ -193,3 +193,7 @@ Run with `"platform": "jio-mtk"`; adopted as a UAP-AC-Lite (`U7LT`) or, with
   checks, md5-checked install, launcher, and a one-line rollback.
 - GitHub Actions: tests every push and builds one agent per device; tagged
   releases publish the builds with these notes.
+- The Go module is `github.com/dtechterminal/udeco`. The OpenWrt code,
+  tools and packaging inherited from unifi-openwrt (the project udeco was
+  forked from) are removed; its UniFi protocol notes stay in
+  `docs/internals.md`.
