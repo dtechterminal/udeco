@@ -160,7 +160,7 @@ func (e *staEvents) leaveStatus(mac string, now time.Time) int {
 // (the U6's stamgr minrssi disconnect); kickHold is how long a kick waits
 // for its leave.
 const (
-	kickStatus = 16
+	kickStatus = staLeaveMinRSSI
 	kickHold   = time.Minute
 )
 

@@ -14,7 +14,7 @@ import (
 
 // TestKickedLeaveStatus: a station the minimum RSSI kick disconnected
 // leaves with assoc_status 16 (as the U6's stamgr reports it); a later
-// leave of the same station is a plain one again.
+// leave of the same station is a plain one again (assoc_status 0).
 func TestKickedLeaveStatus(t *testing.T) {
 	var e staEvents
 	e.observe(staReading(100, map[string][][2]any{"ra0": {{"aa:bb:cc:dd:ee:01", -88}}}), nil)
@@ -29,8 +29,10 @@ func TestKickedLeaveStatus(t *testing.T) {
 	if len(e.queue) != 2 || e.queue[1]["event_type"] != staEvLeave {
 		t.Fatalf("queue %v", e.queue)
 	}
-	if _, ok := e.queue[1]["assoc_status"]; ok {
-		t.Errorf("a plain leave carries %v", e.queue[1]["assoc_status"])
+	// every sta_leave carries assoc_status (the Deco's leave hints,
+	// staevents.go): a plain one says 0
+	if st, ok := e.queue[1]["assoc_status"]; !ok || st != 0 {
+		t.Errorf("a plain leave carries assoc_status %v (present %v), want 0", st, ok)
 	}
 }
 
