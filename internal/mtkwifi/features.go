@@ -105,14 +105,6 @@ func radioFeatures(rp *RadioPlan, rd RadioDef, ri bcmwifi.Radio, served []bcmwif
 		note("%s: DTIM is one value per radio in this driver: %d for every SSID (asked: %v)", band, rp.DTIM, dtims)
 	}
 
-	// minimum RSSI: neither driver reads AssocReqRssiThres from the
-	// profile; in mt7603eap.ko and in the MT7663 kernel driver it is only
-	// an iwpriv set command (Set_AP_ASSOC_REQ_RSSI_THRESHOLD), so it waits
-	// for a live iwpriv path
-	if ri.MinRSSI != 0 {
-		note("%s: minimum RSSI %d dBm not applied (the driver takes it only through iwpriv, not from its profile)", band, ri.MinRSSI)
-	}
-
 	for _, b := range rp.BSS {
 		if b.RRM {
 			note("%s: 802.11k is advertised, but no neighbour list is configured (the driver has no command to add entries)", band)

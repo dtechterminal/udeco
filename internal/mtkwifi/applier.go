@@ -80,12 +80,19 @@ type Applier struct {
 	gate       sync.RWMutex
 	quietUntil atomic.Int64
 	onChange   atomic.Pointer[func(context.Context)] // OnChange
+	// live settings waiting for a restart's settle time to end, by band
+	// (live.go): the per-BSS ones, and the power
+	due, txDue map[string]bool
+	// weak: per station, the minimum RSSI kick's count and back-off
+	// (minrssi.go)
+	weak map[string]*weakSta
 }
 
 const (
-	ownedFile    = "mtk-owned"    // RunDir: the agent's profiles are installed
-	appliedFile  = "mtk-applied"  // RunDir: hash of the plans live now
-	aclFile      = "mtk-acl.json" // RunDir: the station ACLs last written (lost with the driver's at reboot)
+	ownedFile    = "mtk-owned"       // RunDir: the agent's profiles are installed
+	appliedFile  = "mtk-applied"     // RunDir: hash of the plans live now
+	txModeFile   = "mtk-txmode.json" // RunDir: the controller's power mode per band (collector.go radioTx)
+	aclFile      = "mtk-acl.json"    // RunDir: the station ACLs last written (lost with the driver's at reboot)
 	baselineDir  = "mtk-baseline"
 	lastGoodFile = "last-good.json"
 )
@@ -361,6 +368,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	}
 	a.live = want
 	a.saveLastGood(want)
+	a.flushLive(ctx)
 	return nil
 }
 
@@ -391,6 +399,7 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 	if err := a.applyACL(ctx, want); err != nil {
 		a.o.Logf("mtkwifi: station ACLs: %v", err)
 	}
+	writeTxModes(a.dev(a.o.RunDir), want)
 	return os.WriteFile(a.dev(filepath.Join(a.o.RunDir, appliedFile)), []byte(plansHash(want)+"\n"), 0o644)
 }
 
@@ -425,6 +434,9 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 		}
 	}
 	a.o.Logf("mtkwifi: %s: %d SSID(s) up (ch %s, %d MHz)", rd.Band, len(rp.BSS), chanText(rp.Channel), rp.Width)
+	// the per-BSS live settings, after the settle time (live.go); the
+	// power came from the profile
+	a.queueLive(rd.Band, false)
 	return nil
 }
 
@@ -441,6 +453,9 @@ func (a *Applier) applyLive(ctx context.Context, rd RadioDef, c, rp RadioPlan) e
 				return err
 			}
 		}
+	}
+	if c.TxPct != rp.TxPct || c.MinRSSI != rp.MinRSSI {
+		a.queueLive(rd.Band, c.TxPct != rp.TxPct)
 	}
 	base, err := a.baseline(rd)
 	if err != nil {
@@ -753,6 +768,7 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 	if err := json.Unmarshal(j, &st); err != nil {
 		return err
 	}
+	a.clearLive(ctx)    // what only the agent sets live (live.go)
 	defer a.restarted() // the collector leaves the driver alone a while longer
 	for _, rd := range a.o.Layout {
 		for i := len(rd.Ifaces) - 1; i >= 0; i-- {
@@ -828,6 +844,7 @@ func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 	if a.live == nil {
 		return r, nil
 	}
+	a.flushLive(ctx)
 	ssids := !a.settling()
 	for _, rd := range a.o.Layout {
 		rp := a.live[rd.Band]

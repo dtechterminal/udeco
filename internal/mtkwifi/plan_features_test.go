@@ -3,7 +3,6 @@
 package mtkwifi
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -177,22 +176,24 @@ func TestRRMAndWNM(t *testing.T) {
 
 // TestMinRSSI: neither driver reads AssocReqRssiThres from the profile
 // (in mt7603eap.ko and the MT7663 kernel driver it is only an entry of the
-// iwpriv set table, Set_AP_ASSOC_REQ_RSSI_THRESHOLD; the profile parsers
-// never reference the string), so writing it would change nothing but
-// restart the radio. The minimum RSSI is noted as not applied, the key is
-// never written and the plan does not change with it.
+// iwpriv set table, Set_AP_ASSOC_REQ_RSSI_THRESHOLD), so it is carried in
+// the plan (clamped to the driver's -100..0) for the live path (live.go),
+// never written to the profile and never a reason to restart.
 func TestMinRSSI(t *testing.T) {
 	d := twoSSIDs()
 	ps0, _ := plans(d, JCOW414, false)
-	for _, v := range []int{-75, -101, 5} {
+	base := baseNG()
+	for v, want := range map[int]int{-75: -75, -101: -100, 5: 0} {
 		d.Radios["ng"] = bcmwifi.Radio{Enabled: true, Channel: 6, Width: 20, MinRSSI: v}
 		ps, notes := plans(d, JCOW414, false)
-		if ps["ng"].hash() != ps0["ng"].hash() {
-			t.Errorf("MinRSSI %d changes the plan (a radio restart for nothing)", v)
+		if ps["ng"].MinRSSI != want {
+			t.Errorf("MinRSSI %d planned as %d, want %d", v, ps["ng"].MinRSSI, want)
 		}
-		wantKeys(t, "ng", profile(baseNG(), JCOW414[0], ps["ng"]), map[string]string{"AssocReqRssiThres": ""})
-		if j := joined(notes); !strings.Contains(j, fmt.Sprintf("ng: minimum RSSI %d dBm not applied", v)) ||
-			strings.Contains(j, "refuses associations") {
+		if restartKey(base, JCOW414[0], ps["ng"]) != restartKey(base, JCOW414[0], ps0["ng"]) {
+			t.Errorf("MinRSSI %d changes what a restart makes live", v)
+		}
+		wantKeys(t, "ng", profile(base, JCOW414[0], ps["ng"]), map[string]string{"AssocReqRssiThres": ""})
+		if j := joined(notes); strings.Contains(j, "minimum RSSI") {
 			t.Errorf("MinRSSI %d: notes %q", v, notes)
 		}
 	}

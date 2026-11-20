@@ -56,6 +56,9 @@ type Radio struct {
 	Channel     int
 	Width       int // MHz
 	TxPower     int
+	// TxPowerMode is the controller's power setting the radio runs (auto,
+	// high, medium, low, custom); "" reports "custom"
+	TxPowerMode string `json:",omitempty"`
 	TxMin       int
 	TxMax       int
 	Noise       int

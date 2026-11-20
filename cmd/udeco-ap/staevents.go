@@ -98,6 +98,27 @@ type staEvents struct {
 	taken   time.Time       // when the last reading had been taken (its feed's now)
 	cov     map[string]bool // the VAPs the last reading covered
 	odd     map[string]int  // "mac|vap|+/-": readings in a row a covered VAP disagreed
+	// kicks: stations the agent disconnected (the Garage's minimum RSSI
+	// kick, garage.go), by MAC: their next leave carries kickStatus
+	kicks map[string]time.Time
+}
+
+// kickStatus is the assoc_status of a leave the minimum RSSI kick caused
+// (the U6's stamgr minrssi disconnect); kickHold is how long a kick waits
+// for its leave.
+const (
+	kickStatus = 16
+	kickHold   = time.Minute
+)
+
+// kicked marks stations the agent just disconnected.
+func (e *staEvents) kicked(macs []string) {
+	for _, m := range macs {
+		if e.kicks == nil {
+			e.kicks = map[string]time.Time{}
+		}
+		e.kicks[strings.ToLower(m)] = time.Now()
+	}
 }
 
 // staFeed is the hostapd socket's part of one reading (nil: none).
@@ -314,10 +335,17 @@ func (e *staEvents) reconcile(cur map[string]staSeen, names, covered, touched ma
 }
 
 func (e *staEvents) leave(mac string, p staSeen, at int64) {
-	e.push(map[string]any{
+	ev := map[string]any{
 		"message_type": staTracker, "event_type": staEvLeave,
 		"mac": mac, "vap": p.vap, "avg_rssi": p.signal, "last_seen": at,
-	})
+	}
+	if t, ok := e.kicks[mac]; ok {
+		delete(e.kicks, mac)
+		if time.Since(t) < kickHold {
+			ev["assoc_status"] = kickStatus
+		}
+	}
+	e.push(ev)
 }
 
 func (e *staEvents) assoc(mac string, c staSeen) {

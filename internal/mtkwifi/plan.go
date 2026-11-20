@@ -42,9 +42,13 @@ type RadioDef struct {
 	Dat       string   // driver profile (device path)
 	MaxStaKey string   // per-BSS client limit list in the profile
 	MaxTxDBm  int      // TxPower=100 (%)
-	HWName    string
-	SAE       bool // the driver serves WPA3-Personal (SAE)
-	UAPSD     bool // the driver has U-APSD (APSDCapable, per BSS)
+	// TxLive is the iwpriv set key that changes the power at once: the
+	// MT7603's TxPower (CmdSetTxPowerCtrl), the MT7663's PowerDropCtrl
+	// (its `set TxPower` only stores the value)
+	TxLive string
+	HWName string
+	SAE    bool // the driver serves WPA3-Personal (SAE)
+	UAPSD  bool // the driver has U-APSD (APSDCapable, per BSS)
 	// Spectrum is the radio's spectrum backend: SpectrumOffChan (the
 	// MT7603's ApOffChanScan sweep, offchan.go), or "" for none (the band's
 	// spectrum commands run the neighbour survey: SpectrumBySurvey)
@@ -54,9 +58,9 @@ type RadioDef struct {
 // JCOW414 is the JioFiber JCOW414 layout.
 var JCOW414 = []RadioDef{
 	{Band: "ng", Ifaces: []string{"ra0", "ra1", "ra2", "ra3"}, Dat: "/etc/Wireless/RT2860AP/RT2860AP.dat",
-		MaxStaKey: "MaxStaNum", MaxTxDBm: 20, HWName: "MT7603E", Spectrum: SpectrumOffChan},
+		MaxStaKey: "MaxStaNum", MaxTxDBm: 20, TxLive: "TxPower", HWName: "MT7603E", Spectrum: SpectrumOffChan},
 	{Band: "na", Ifaces: []string{"rai0", "rai1", "rai2", "rai3"}, Dat: "/etc/Wireless/RT2860AP_AC/RT2860AP.dat",
-		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, HWName: "MT7663", SAE: true, UAPSD: true},
+		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, TxLive: "PowerDropCtrl", HWName: "MT7663", SAE: true, UAPSD: true},
 }
 
 // Channels the units' country (IN, CountryRegion 0 / CountryRegionABand 10)
@@ -113,11 +117,18 @@ type RadioPlan struct {
 	// IgmpSn writes IgmpSnEnable=1 (multicast enhancement). false keeps
 	// the vendor's value (1 on both radios): never written as 0.
 	IgmpSn bool `json:",omitempty"`
+	// MinRSSI is the controller's minimum RSSI (dBm, -100..-1; 0 = off):
+	// each BSS's AssocReqRssiThres (live only, never in the profile) and
+	// the agent's weak-station kick (minrssi.go)
+	MinRSSI int `json:",omitempty"`
+	// TxMode is the controller's power mode (auto, high, medium, low,
+	// custom), reported back with the power (collector.go radioTx)
+	TxMode string `json:",omitempty"`
 }
 
 // structural is everything that may need the radio restarted: the BSS
 // list with names, security, keys and 802.11k/v/U-APSD, the channel,
-// width, power, DTIM, basic rates and IGMP snooping (profile() patches the
+// width, DTIM, basic rates and IGMP snooping (profile() patches the
 // vendor baseline, read only when a radio's BSSes come up). Hidden,
 // Isolate and MaxSta are live. The applier restarts a radio only when what
 // it would write differs (restartKey); structural is the fallback without
@@ -125,6 +136,7 @@ type RadioPlan struct {
 func (r RadioPlan) structural() string {
 	c := r
 	c.BSS = nil
+	c.TxPct, c.MinRSSI, c.TxMode = 0, 0, "" // live (applyLive), reported only
 	for _, b := range r.BSS {
 		b.Hidden, b.Isolate, b.MaxSta = false, false, 0
 		c.BSS = append(c.BSS, b)
@@ -134,7 +146,8 @@ func (r RadioPlan) structural() string {
 }
 
 // restartKey is what a restart of the radio would make live: the profile
-// rendered from base without the live settings (Hidden, Isolate, MaxSta),
+// rendered from base without the live settings (Hidden, Isolate, MaxSta,
+// the power, which applyLive sets with the driver's live command),
 // with the netdevs brought up and the bridges they go in. Two plans with
 // the same key need no restart between them, whatever else differs in
 // them (a setting the vendor's profile already has, such as IGMP snooping
@@ -145,6 +158,7 @@ func restartKey(base []byte, rd RadioDef, r RadioPlan) string {
 	}
 	c := r
 	c.BSS = nil
+	c.TxPct = 0
 	var vlans []string
 	for _, b := range r.BSS {
 		b.Hidden, b.Isolate, b.MaxSta = false, false, 0
@@ -179,7 +193,15 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 	out := map[string]RadioPlan{}
 	for _, rd := range layout {
 		ri, ok := d.Radios[rd.Band]
-		rp := RadioPlan{Band: rd.Band, On: ok && ri.Enabled, Width: ri.Width, TxPct: txPct(ri, rd.MaxTxDBm)}
+		pct, tn := txPctNote(ri, rd.MaxTxDBm)
+		if tn != "" {
+			note("%s: %s", rd.Band, tn)
+		}
+		rp := RadioPlan{Band: rd.Band, On: ok && ri.Enabled, Width: ri.Width, TxPct: pct, MinRSSI: minRSSI(ri.MinRSSI),
+			TxMode: ri.TxPowerMode}
+		if rp.TxMode == "" {
+			rp.TxMode = "auto"
+		}
 		allowed := chans24
 		if rd.Band == "na" {
 			allowed = chans5
@@ -307,26 +329,81 @@ func contains(xs []int, x int) bool {
 	return false
 }
 
-// txPct maps the controller's power setting onto the driver's percentage
-// (TxPower=100 is the board's maximum).
-func txPct(r bcmwifi.Radio, maxDBm int) int {
+// Transmit power. Both drivers turn the profile's TxPower percentage into
+// a power drop in the same brackets (MT7663 MtCmdTxPowerDropCtrl, MT7603
+// CmdSetTxPowerCtrl; txpower-kick spec): 91-100 % no drop, 61-90 % 1 dB,
+// 31-60 % 3 dB, 16-30 % 6 dB, 10-15 % 9 dB, 1-9 % 12 dB. 0 is the largest
+// drop on the MT7603 but none on the MT7663, so it is never written. The
+// dB unit is inferred from the field names (the MT7603 firmware might
+// count half-dB steps; checked only by a live step test).
+
+// txDrops are the drops (dB) a percentage can select, with the percentage
+// written for each (the middle of its bracket's top).
+var txDrops = []struct{ db, pct int }{{0, 100}, {1, 75}, {3, 50}, {6, 25}, {9, 12}, {12, 6}}
+
+// txPctNote maps the controller's power setting onto the driver's
+// percentage, with a note when a custom power is below what the driver
+// can drop to. auto/high are the board's maximum, medium and low the 3
+// and 6 dB brackets (as the Deco's presets).
+func txPctNote(r bcmwifi.Radio, maxDBm int) (int, string) {
 	switch r.TxPowerMode {
 	case "medium":
-		return 50
+		return 50, ""
 	case "low":
-		return 25
+		return 25, ""
 	case "custom":
 		if r.TxPower <= 0 || maxDBm <= 0 {
-			return 100
+			return 100, ""
 		}
-		// each halving of power is -3 dB
-		p := 100
-		for db := maxDBm - r.TxPower; db >= 3 && p > 10; db -= 3 {
-			p /= 2
+		want := maxDBm - r.TxPower
+		for _, d := range txDrops {
+			if d.db >= want {
+				return d.pct, ""
+			}
 		}
-		return p
+		last := txDrops[len(txDrops)-1]
+		return last.pct, fmt.Sprintf("transmit power %d dBm is below what the driver can set: %d dBm (the largest drop, %d dB)",
+			r.TxPower, maxDBm-last.db, last.db)
 	}
-	return 100 // auto, high
+	return 100, "" // auto, high
+}
+
+// txPct is txPctNote without the note.
+func txPct(r bcmwifi.Radio, maxDBm int) int { p, _ := txPctNote(r, maxDBm); return p }
+
+// dropOf is the power drop (dB) the driver of band applies for a profile
+// TxPower of pct (an invalid value is the driver's no-drop default).
+func dropOf(pct int, band string) int {
+	switch {
+	case pct == 0 && band == "ng":
+		return 12
+	case pct <= 0, pct > 90:
+		return 0
+	case pct > 60:
+		return 1
+	case pct > 30:
+		return 3
+	case pct > 15:
+		return 6
+	case pct >= 10:
+		return 9
+	}
+	return 12
+}
+
+// txDBm is the power rd transmits at for a profile TxPower of pct.
+func txDBm(pct int, rd RadioDef) int { return rd.MaxTxDBm - dropOf(pct, rd.Band) }
+
+// minRSSI clamps the controller's minimum RSSI to what the drivers take
+// (Set_AP_ASSOC_REQ_RSSI_THRESHOLD: -100..0, 0 = off).
+func minRSSI(v int) int {
+	switch {
+	case v >= 0:
+		return 0
+	case v < -100:
+		return -100
+	}
+	return v
 }
 
 // ---------------------------------------------------------------- profiles

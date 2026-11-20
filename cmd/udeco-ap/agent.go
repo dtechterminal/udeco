@@ -342,7 +342,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		// firewall of the agent's own
 		if o.col == nil {
 			o.col = mtkwifi.NewCollector(mtkwifi.CollectorOptions{Root: o.root, Run: o.run, Model: "JCOW414",
-				FreshScan: cfg.SiteSurvey})
+				FreshScan: cfg.SiteSurvey, RunDir: o.runDir})
 		}
 		if cfg.SiteSurvey {
 			o.logf("site_survey: on: the controller's scan, spectrum-scan and quick-scan commands run a driver site survey (the radio leaves its channel for a few seconds); never periodic")
@@ -959,6 +959,7 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 	if !a.stale {
 		// the socket events wait in the monitor for a real reading
 		a.sta.observe(f, a.staFeed(&c, f))
+		a.garageReading(ctx, &c) // garage.go
 	}
 	a.rateJoins(f)
 	a.mcastMerge(ctx, f, &c, info, time.Now())

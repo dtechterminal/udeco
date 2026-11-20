@@ -567,26 +567,6 @@ func TestWantACLsAllow(t *testing.T) {
 	}
 }
 
-func TestTxPower(t *testing.T) {
-	for _, c := range []struct {
-		r    bcmwifi.Radio
-		want int
-	}{
-		{bcmwifi.Radio{TxPowerMode: "auto"}, 100},
-		{bcmwifi.Radio{TxPowerMode: "medium"}, 50},
-		{bcmwifi.Radio{TxPowerMode: "custom", TxPower: 20}, 100},
-		{bcmwifi.Radio{TxPowerMode: "custom", TxPower: 17}, 50},
-		{bcmwifi.Radio{TxPowerMode: "custom", TxPower: 11}, 12},
-	} {
-		if got := txPct(c.r, 20); got != c.want {
-			t.Errorf("txPct(%+v) = %d, want %d", c.r, got, c.want)
-		}
-	}
-	if dbmOf(100, 20) != 20 || dbmOf(50, 20) != 17 || dbmOf(25, 20) != 14 {
-		t.Errorf("dbmOf: %d %d %d", dbmOf(100, 20), dbmOf(50, 20), dbmOf(25, 20))
-	}
-}
-
 func TestEssid(t *testing.T) {
 	for out, want := range map[string]string{
 		"ra0       RTWIFI SoftAP  ESSID:\"Example Network(2.4GHz)\"  \n          Mode:Master  Channel=1\n":         "Example Network(2.4GHz)",
