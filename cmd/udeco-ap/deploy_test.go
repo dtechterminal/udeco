@@ -173,6 +173,7 @@ func TestDeployLauncher(t *testing.T) {
 	// fake pidof (FAKE_RUNNING=1: an agent runs) and, where the host has
 	// none, md5sum
 	os.WriteFile(filepath.Join(bin, "pidof"), []byte("#!/bin/sh\n[ \"$FAKE_RUNNING\" = 1 ] && echo 42\n"), 0o755)
+	fakeIptables(t, bin, filepath.Join(root, "iptables.log")) // the login lock's removal never reaches the host's firewall
 	if _, err := exec.LookPath("md5sum"); err != nil {
 		os.WriteFile(filepath.Join(bin, "md5sum"), []byte("#!/bin/sh\nh=$(md5 -q \"$1\" 2>/dev/null) || exit 1\necho \"$h  $1\"\n"), 0o755)
 	}

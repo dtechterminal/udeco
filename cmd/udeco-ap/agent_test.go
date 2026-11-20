@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -360,6 +361,12 @@ type ctl struct {
 	key     string
 	informs []map[string]any
 	replies []string
+	// stamp, when not zero, is the next server_time_in_utc (ms) a reply
+	// carries, as a real controller's do; it grows by a second per reply
+	stamp int64
+	raw   [][]byte // frames sent as they are, ahead of replies
+	onRaw func()   // called as each raw frame is sent
+	sent  [][]byte // every frame sent
 }
 
 func newCtl(t *testing.T) *ctl {
@@ -386,9 +393,23 @@ func (c *ctl) inform(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	c.informs = append(c.informs, m)
+	if len(c.raw) > 0 {
+		var pkt []byte
+		pkt, c.raw = c.raw[0], c.raw[1:]
+		c.sent = append(c.sent, pkt)
+		if c.onRaw != nil {
+			c.onRaw()
+		}
+		w.Write(pkt)
+		return
+	}
 	reply := `{"_type":"noop"}`
 	if len(c.replies) > 0 {
 		reply, c.replies = c.replies[0], c.replies[1:]
+	}
+	if c.stamp != 0 {
+		reply = `{"server_time_in_utc":"` + strconv.FormatInt(c.stamp, 10) + `",` + strings.TrimPrefix(reply, "{")
+		c.stamp += 1000
 	}
 	pkt, err := inform.Encode(hdr.MAC, c.key, inform.CBC, []byte(reply), nil)
 	if err != nil {
@@ -398,7 +419,22 @@ func (c *ctl) inform(w http.ResponseWriter, req *http.Request) {
 	if k := authkeyRe.FindStringSubmatch(reply); k != nil {
 		c.key = k[1]
 	}
+	c.sent = append(c.sent, pkt)
 	w.Write(pkt)
+}
+
+// sendRaw queues frames sent as they are.
+func (c *ctl) sendRaw(frames ...[]byte) {
+	c.mu.Lock()
+	c.raw = append(c.raw, frames...)
+	c.mu.Unlock()
+}
+
+// sentFrames is every frame sent so far.
+func (c *ctl) sentFrames() [][]byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.sent)
 }
 
 func (c *ctl) queue(replies ...string) {

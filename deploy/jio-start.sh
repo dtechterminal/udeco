@@ -2,7 +2,8 @@
 # udeco-ap (UniFi agent) on the Garage AP, a JioFiber JCOW414 used as a
 # UAP-AC-Lite. Started at boot by one line in /flash2/pfrm2.0/etc/customInit
 # (backup: customInit.pre-udeco next to it). This loop restarts the agent if
-# it exits. Turn it off: rm /flash2/udeco/start.sh, then reboot (the unit's
+# it exits, and removes the agent's login lock (UDECO-LOCK) before every
+# start. Turn it off: rm /flash2/udeco/start.sh, then reboot (the unit's
 # own Wi-Fi comes back) or kill $(cat /tmp/udeco-bin/agent.pid).
 #
 # "start.sh guard" is the gateway guard, started from here. Every 10 s it
@@ -33,6 +34,19 @@
 D=${UDECO_D:-/flash2/udeco}
 R=${UDECO_R:-/tmp/udeco-bin}
 UP=${UDECO_UPTIME:-/proc/uptime}
+IPT=${UDECO_IPT:-/pfrm2.0/bin}
+
+# unlock removes the agent's login lock (docs/deco/features/login-lock.md)
+# before every start, so none outlives an agent that died without its
+# SIGTERM path; errors are ignored (no lock, no iptables).
+unlock() {
+	for T in $IPT/iptables $IPT/ip6tables; do
+		for i in 1 2 3; do $T -D INPUT -j UDECO-LOCK 2>/dev/null || break; done
+		$T -F UDECO-LOCK 2>/dev/null
+		$T -X UDECO-LOCK 2>/dev/null
+	done
+	return 0
+}
 
 guard() {
 	GW=192.168.0.1
@@ -151,6 +165,8 @@ nohup sh $D/start.sh guard >/dev/null 2>&1 </dev/null &
 exec 9>$R/loop.lock
 flock -n 9 || exit 0
 while [ -f $D/start.sh ]; do
+	# first: nothing below (a gunzip that waits and retries) skips it
+	unlock
 	if [ ! -x $R/udeco-ap ]; then
 		gunzip -c $D/udeco-ap.gz > $R/udeco-ap.tmp && chmod 755 $R/udeco-ap.tmp && mv $R/udeco-ap.tmp $R/udeco-ap || { sleep 60; continue; }
 	fi

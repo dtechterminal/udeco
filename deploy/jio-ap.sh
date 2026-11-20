@@ -48,6 +48,11 @@
 #   --force          install even when the unit already has this build
 #   --build-only     build dist/udeco-ap-linux-mipsle{,.gz} and stop
 #
+# Login lock: while the controller is healthy and its Device SSH
+# Authentication is off, the running agent drops new telnet connections
+# (docs/deco/features/login-lock.md). A refused or silent :23 prints how to
+# open it (Device SSH on in UniFi, wait ~1 min, retry; off again after).
+#
 # Environment: JIO_TELNET_PW, the unit's telnet root password (GPW is read
 # when it is unset). It is passed to the telnet helper through the
 # environment only: never on a command line, in a file or in the output.
@@ -73,7 +78,7 @@ WAIT_EXIT=330     # s: the old agent finishing its job (one Wi-Fi job is at most
 host=$ALLOWED_HOST ucg=192.168.0.1 port=18080
 force_host=0 force=0 preflight_only=0 build_only=0
 
-usage() { sed -n '3,62p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { sed -n '3,67p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 die() { echo "jio-ap: $*" >&2; exit 1; }
 
 is_ipv4() {
@@ -138,7 +143,15 @@ TELNET_PY=$(
 import os, random, re, socket, sys, time
 host, tmo = sys.argv[1], float(sys.argv[2])
 script = sys.stdin.read()
-s = socket.create_connection((host, 23), timeout=10)
+try:
+    s = socket.create_connection((host, 23), timeout=10)
+except OSError as e:
+    sys.stderr.write("jio-ap: telnet %s:23: %s\n" % (host, e))
+    if isinstance(e, (ConnectionRefusedError, TimeoutError, socket.timeout)):
+        # what the agent's login lock looks like from here
+        # (docs/deco/features/login-lock.md); never toggled from here
+        sys.stderr.write("jio-ap: login lock: turn on Device SSH in UniFi (Settings > System > Advanced > Device SSH Authentication), wait ~1 min, retry\n")
+    sys.exit(1)
 buf = b""
 def clean(d):
     out, i = bytearray(), 0

@@ -10,11 +10,11 @@ import (
 )
 
 // Restore is the best-effort undo for rollback or uninstall. It removes the
-// egress firewall and the inbound fence (TP-Link's mesh needs :20001 and
-// :20002 back; call Ingress(true) afterwards to keep the fence in observe
-// mode), stops the agent's ntpd and restarts TP-Link's, puts the TP-Link
-// cron jobs back (the persist_shell.sh line stays), restarts, in reverse stop
-// order, the services that Enforce recorded as stopped (the record lives in
+// login lock (UDECO-LOCK, loginlock.go), the egress firewall and the
+// inbound fence (TP-Link's mesh needs :20001 and :20002 back; call
+// Ingress(true) afterwards to keep the fence in observe mode), stops the
+// agent's ntpd and restarts TP-Link's, puts the TP-Link cron jobs back (the
+// persist_shell.sh line stays), restarts, in reverse stop order, the services that Enforce recorded as stopped (the record lives in
 // /etc/udeco, a ramfs, so it survives an agent restart but not a reboot),
 // replays TP-Link's br-lan QoS and puts TP-Link's reset-button script back.
 //
@@ -38,7 +38,7 @@ func (m *Manager) Restore(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	errs := []error{m.egress(ctx, false), m.ingress(ctx, false), m.restoreLoopGuard(ctx)}
+	errs := []error{m.loginLock(ctx, false), m.egress(ctx, false), m.ingress(ctx, false), m.restoreLoopGuard(ctx)}
 
 	procs, err := m.readProcs()
 	if err != nil {

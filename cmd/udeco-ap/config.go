@@ -190,6 +190,32 @@ type Config struct {
 	// default until the region check of docs/deco/features/garage-parity.md
 	// passed on the unit.
 	DFS bool `json:"dfs,omitempty"`
+	// LoginLock (takeover with apply, both platforms): absent or true
+	// drops new connections to the unit's root login ports (Deco :22;
+	// Garage :23 and :22) while the controller's Device SSH Authentication
+	// is off and the controller answers; anything else leaves them open
+	// (loginlock.go, docs/deco/features/login-lock.md). false never locks.
+	LoginLock *bool `json:"login_lock,omitempty"`
+	// LoginLockFailOpenS is how long the controller may stay silent (no
+	// reply that decodes with the device key) before the lock opens
+	// (60-3600 s; 0 = 600).
+	LoginLockFailOpenS int `json:"login_lock_failopen_s,omitempty"`
+}
+
+// defaultLoginLockFailOpen is the login lock's silence window.
+const defaultLoginLockFailOpen = 10 * time.Minute
+
+// loginLock: the login lock runs (takeover with apply, unless login_lock
+// is false).
+func (c *Config) loginLock() bool {
+	return c.Takeover && c.Apply && (c.LoginLock == nil || *c.LoginLock)
+}
+
+func (c *Config) loginLockFailOpen() time.Duration {
+	if c.LoginLockFailOpenS == 0 {
+		return defaultLoginLockFailOpen
+	}
+	return time.Duration(c.LoginLockFailOpenS) * time.Second
 }
 
 // uplinkLoss: the SSIDs are isolated on uplink loss (platform jio-mtk)
@@ -350,6 +376,17 @@ func (c *Config) validate() error {
 	}
 	if c.UplinkGatewayDown && !c.uplinkSSIDDown() {
 		return errors.New("config: uplink_gateway_down needs uplink_ssid_down")
+	}
+	if c.LoginLock != nil && *c.LoginLock && (!c.Takeover || !c.Apply) {
+		return errors.New("config: login_lock needs takeover and apply (observe mode never changes the unit)")
+	}
+	if c.LoginLockFailOpenS != 0 {
+		if c.LoginLockFailOpenS < 60 || c.LoginLockFailOpenS > 3600 {
+			return fmt.Errorf("config: login_lock_failopen_s %d: want 60-3600 seconds (default 600)", c.LoginLockFailOpenS)
+		}
+		if !c.loginLock() {
+			return errors.New("config: login_lock_failopen_s needs the login lock (takeover and apply, login_lock not false)")
+		}
 	}
 	if c.SiteSurvey && !c.Takeover {
 		return errors.New("config: site_survey needs takeover (observe mode runs no scans and claims no RF scan)")

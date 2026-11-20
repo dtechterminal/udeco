@@ -74,19 +74,8 @@ func controllerOffset(plain []byte, t1, t4 time.Time) (clockSample, bool) {
 	if rtt < 0 || rtt > clockMaxRTT {
 		return clockSample{}, false
 	}
-	var r struct {
-		T json.RawMessage `json:"server_time_in_utc"`
-	}
-	if json.Unmarshal(plain, &r) != nil || len(r.T) == 0 {
-		return clockSample{}, false
-	}
-	var str string
-	raw := string(r.T)
-	if json.Unmarshal(r.T, &str) == nil {
-		raw = str
-	}
-	ms, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil {
+	ms, ok := serverTimeMS(plain)
+	if !ok {
 		return clockSample{}, false
 	}
 	srv := time.UnixMilli(ms)
@@ -95,6 +84,27 @@ func controllerOffset(plain []byte, t1, t4 time.Time) (clockSample, bool) {
 	}
 	mid := t1.Add(rtt / 2)
 	return clockSample{off: srv.Sub(mid.Round(0)), at: t4}, true
+}
+
+// serverTimeMS reads a reply's server_time_in_utc (milliseconds, a
+// string or a number).
+func serverTimeMS(plain []byte) (int64, bool) {
+	var r struct {
+		T json.RawMessage `json:"server_time_in_utc"`
+	}
+	if json.Unmarshal(plain, &r) != nil || len(r.T) == 0 {
+		return 0, false
+	}
+	var str string
+	raw := string(r.T)
+	if json.Unmarshal(r.T, &str) == nil {
+		raw = str
+	}
+	ms, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return ms, true
 }
 
 // sntpOffset asks server (an IPv4 address, port 123) for the time once.

@@ -102,7 +102,7 @@ func (m *Manager) ingress(ctx context.Context, on bool) error {
 			errs = append(errs, err)
 			continue
 		}
-		moved, err := m.jumpFirst(ctx, f.bin, "INPUT", IngressChain)
+		moved, err := m.jumpFirst(ctx, f.bin, "INPUT", IngressChain, LockChain) // the login lock may lead
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -189,34 +189,49 @@ func mgmtSources(hosts []string, v6 bool) ([]string, error) {
 	return out, nil
 }
 
-// jumpFirst makes '-j chain' the first rule of parent, exactly once. A
-// missing or misplaced jump is inserted at 1 before any stale copy is
-// deleted (by number, bottom up), so the chain is never unhooked. It reports
-// whether anything changed.
-func (m *Manager) jumpFirst(ctx context.Context, bin, parent, chain string) (bool, error) {
-	out, err := m.o.Run.Run(ctx, bin, "-w", "-S", parent)
+// jumpFirst makes '-j chain' the first rule of parent, exactly once,
+// behind only the jumps to the ahead chains that lead parent (UDECO-IN
+// leaves the login lock ahead of it). A missing or misplaced jump is
+// inserted before any stale copy is deleted (by number, bottom up), so the
+// chain is never unhooked. It reports whether anything changed.
+func (m *Manager) jumpFirst(ctx context.Context, bin, parent, chain string, ahead ...string) (bool, error) {
+	return jumpFirst(ctx, m.o.Run, func(ctx context.Context, name string, args ...string) error {
+		return m.mutate(ctx, name, args...)
+	}, bin, []string{"-w"}, parent, chain, ahead...)
+}
+
+// jumpFirst is Manager.jumpFirst for any runner: pre goes before every
+// command's arguments (-w or nothing), mutate runs the changes.
+func jumpFirst(ctx context.Context, run Runner, mutate func(ctx context.Context, name string, args ...string) error,
+	bin string, pre []string, parent, chain string, ahead ...string) (bool, error) {
+	cmd := func(a ...string) []string { return append(slices.Clone(pre), a...) }
+	out, err := run.Run(ctx, bin, cmd("-S", parent)...)
 	if err != nil {
 		return false, fmt.Errorf("%s -S %s: %w", bin, parent, err)
 	}
 	var pos []int
-	n := 0
+	n, lead := 0, 0
 	for _, l := range strings.Split(string(out), "\n") {
 		f := strings.Fields(l)
 		if len(f) < 2 || f[0] != "-A" || f[1] != parent {
 			continue
 		}
 		n++
-		if canonRule(f[2:]) == "-j "+chain {
+		r := canonRule(f[2:])
+		if r == "-j "+chain {
 			pos = append(pos, n)
+		} else if n == lead+1 && slices.ContainsFunc(ahead, func(c string) bool { return r == "-j "+c }) {
+			lead++
 		}
 	}
-	if slices.Equal(pos, []int{1}) {
+	want := lead + 1
+	if slices.Equal(pos, []int{want}) {
 		return false, nil
 	}
-	if len(pos) > 0 && pos[0] == 1 {
+	if len(pos) > 0 && pos[0] == want {
 		pos = pos[1:]
 	} else {
-		if err := m.mutate(ctx, bin, "-w", "-I", parent, "1", "-j", chain); err != nil {
+		if err := mutate(ctx, bin, cmd("-I", parent, strconv.Itoa(want), "-j", chain)...); err != nil {
 			return true, err
 		}
 		for i := range pos {
@@ -224,7 +239,7 @@ func (m *Manager) jumpFirst(ctx context.Context, bin, parent, chain string) (boo
 		}
 	}
 	for i := len(pos) - 1; i >= 0; i-- {
-		if err := m.mutate(ctx, bin, "-w", "-D", parent, strconv.Itoa(pos[i])); err != nil {
+		if err := mutate(ctx, bin, cmd("-D", parent, strconv.Itoa(pos[i]))...); err != nil {
 			return true, err
 		}
 	}

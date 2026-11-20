@@ -29,7 +29,8 @@
 #      nothing can restart the old one), stops a running agent with SIGTERM
 #      (the agent leaves Wi-Fi as it is on SIGTERM) and waits for it to exit,
 #      uploads the new one, verifies its md5 on the unit, renames it into
-#      place and writes the launcher /tp_data/udeco/start.sh;
+#      place and writes the launcher /tp_data/udeco/start.sh (which removes
+#      the agent's login lock, UDECO-LOCK, before every start);
 #   4. writes /tp_data/udeco/udeco-ap.json in OBSERVE mode (takeover, apply
 #      and egress all false) if there is none; an existing config is never
 #      changed;
@@ -60,6 +61,11 @@
 #
 # Environment: DECO_KEY (default ~/.ssh/deco_x20).
 #
+# Login lock: while the controller is healthy and its Device SSH
+# Authentication is off, the running agent drops new connections to :22
+# (docs/deco/features/login-lock.md). A refused or silent :22 prints how to
+# open it (Device SSH on in UniFi, wait ~1 min, retry; off again after).
+#
 # Safety: nothing here touches TP-Link's software, Wi-Fi, nvram, port 22's
 # dropbear or the telnet line; a reboot still restores stock TP-Link (the
 # agent's own changes are volatile). The rollback command it prints deletes
@@ -89,8 +95,19 @@ console_ip=192.168.0.1
 udeco_config= preflight_file=
 ip=
 
-usage() { sed -n '3,63p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { sed -n '3,72p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 die() { echo "deco-ap: $*" >&2; exit 1; }
+
+# login_lock_hint SSH_STDERR: a refused or silent :22 is what the agent's
+# login lock looks like from here (docs/deco/features/login-lock.md); this
+# script never changes the controller's setting itself.
+login_lock_hint() {
+	case $1 in
+	*"Connection refused"* | *"timed out"*)
+		echo "deco-ap: login lock: turn on Device SSH in UniFi (Settings > System > Advanced > Device SSH Authentication), wait ~1 min, retry" >&2
+		;;
+	esac
+}
 
 is_ipv4() {
 	[[ $1 =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
@@ -321,7 +338,15 @@ build
 
 # --- 2. preflight (read-only) ------------------------------------------------
 echo "checking $HOST (read-only)"
-pre=$(preflight_script | remote) || die "preflight: ssh to $HOST failed"
+pf_err=$(mktemp)
+if ! pre=$(preflight_script | remote 2>"$pf_err"); then
+	cat "$pf_err" >&2
+	login_lock_hint "$(cat "$pf_err")"
+	rm -f "$pf_err"
+	die "preflight: ssh to $HOST failed"
+fi
+cat "$pf_err" >&2
+rm -f "$pf_err"
 new_kb=$((art_kb + 4)) # + launcher and md5 file
 if ! judge_preflight "$pre" "$new_kb"; then
 	checklist
@@ -396,6 +421,14 @@ cat >$START.tmp <<'LAUNCH'
 # runs. A gzip-shipped agent is unpacked to ramfs ($RAMDIR) and checked
 # against the md5 of the binary that was deployed before it is started.
 pidof udeco-ap >/dev/null 2>&1 && exit 0
+# no login lock outlives an agent that died without its SIGTERM path
+# (docs/deco/features/login-lock.md): removed first, before anything that
+# can end this run without a start, errors ignored (no lock, no iptables)
+for T in iptables ip6tables; do
+	for i in 1 2 3; do \$T -w -D INPUT -j UDECO-LOCK 2>/dev/null || break; done
+	\$T -w -F UDECO-LOCK 2>/dev/null
+	\$T -w -X UDECO-LOCK 2>/dev/null
+done
 B=$BIN
 if [ -f $GZ ]; then
 	B=$RAMDIR/udeco-ap

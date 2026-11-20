@@ -256,6 +256,7 @@ type agent struct {
 	acks     chan string                // cfgversions whose configuration is live (any goroutine -> loop)
 	creds    atomic.Pointer[sshCreds]   // what ssh-adopt checks once adopted
 	site     siteSSH                    // site SSH logins on sshd_port (sitessh.go)
+	login    loginLockState             // the login lock (loginlock.go)
 	policy   atomic.Pointer[wifiPolicy] // the live Wi-Fi's steering settings (worker -> loop)
 	cfgs     cfgTrack
 	topo     *topology
@@ -376,7 +377,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		}
 		if o.newSys == nil {
 			o.newSys = func(so decosys.Options) sysManager {
-				return jiosys.New(jiosys.Options{Root: so.Root, Logf: so.Logf, KeepOnly: jiosys.DefaultKeepOnly})
+				return jiosys.New(jiosys.Options{Root: so.Root, Run: so.Run, Logf: so.Logf, KeepOnly: jiosys.DefaultKeepOnly})
 			}
 		}
 		if o.newWifi == nil {
@@ -515,6 +516,9 @@ func (a *agent) run(parent context.Context) error {
 		a.provisionIfNew("startup")
 	}
 	a.loop(ctx)
+	// no login lock left behind (loginlock.go): released at once, not
+	// after the wait below, which a hung job can make endless
+	a.lockStop()
 	a.mdnsShutdown() // the vifs get their native mDNS back (mdnsbr.go)
 	a.bg.Wait()
 	a.releaseLED() // no uplink-loss blink left behind (uplink.go)
@@ -858,6 +862,7 @@ func (a *agent) loop(ctx context.Context) {
 			a.refreshCreds()
 		}
 		a.onReply(next)
+		a.lockEval(ctx, false) // the login lock follows the decision (loginlock.go)
 		a.expireGuests(time.Now())
 		if a.rebootReq {
 			a.reboot(ctx)
@@ -1112,6 +1117,9 @@ func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 		a.logf("%v", err)
 		return o, false
 	}
+	// the controller answers, if the reply is a new one (loginlock.go):
+	// only now, as a random CBC frame can decode but never be handled
+	a.lockReply(plain, a.o.now())
 	a.portsInformed(start)
 	for _, e := range o.Events {
 		if !strings.HasPrefix(e, "noop ") || o.Immediate {
