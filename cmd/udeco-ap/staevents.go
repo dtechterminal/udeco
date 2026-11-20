@@ -11,6 +11,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
+	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 )
 
 // Station events (STA_ASSOC_TRACKER), as a UniFi AP sends them.
@@ -109,6 +110,9 @@ type staEvents struct {
 	// hints: why a station is expected to leave (the agent asked it to or
 	// kicked it): its next sta_leave carries that assoc_status
 	hints map[string]staHint
+	// kicks: stations the agent disconnected (the Garage's minimum RSSI
+	// kick, garage.go), by MAC: their next leave carries kickStatus
+	kicks map[string]time.Time
 	at    time.Time        // this reading's time (the feed's, else clock)
 	clock func() time.Time // nil = time.Now
 }
@@ -152,6 +156,24 @@ func (e *staEvents) leaveStatus(mac string, now time.Time) int {
 	return h.status
 }
 
+// kickStatus is the assoc_status of a leave the minimum RSSI kick caused
+// (the U6's stamgr minrssi disconnect); kickHold is how long a kick waits
+// for its leave.
+const (
+	kickStatus = 16
+	kickHold   = time.Minute
+)
+
+// kicked marks stations the agent just disconnected.
+func (e *staEvents) kicked(macs []string) {
+	for _, m := range macs {
+		if e.kicks == nil {
+			e.kicks = map[string]time.Time{}
+		}
+		e.kicks[strings.ToLower(m)] = time.Now()
+	}
+}
+
 // staFeed is the hostapd socket's part of one reading (nil: none).
 type staFeed struct {
 	read  time.Time            // when the reading started: older events are in it
@@ -159,6 +181,10 @@ type staFeed struct {
 	since map[string]time.Time // BSS interface -> its socket attached since
 	vifs  map[string]string    // BSS interface -> vap_table name, this reading
 	evs   []hapdmon.Event      // new socket events, in the order received
+	// leaves: the events are driver leaves (the Garage, mtkwifi.Events)
+	// for BSSes with no socket: a Disconnected of a station the controller
+	// has on that BSS is its sta_leave (driverLeave); joins stay the diff's
+	leaves bool
 }
 
 // observe takes this reading's vap_table (and the socket events, when there
@@ -239,6 +265,10 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 	for _, ev := range evs {
 		vap := feed.vifs[ev.Vif]
 		if !covered[vap] || ev.Kind != hapdmon.Connected && ev.Kind != hapdmon.Disconnected {
+			if !covered[vap] && feed.leaves && ev.Kind == hapdmon.Disconnected {
+				// a Garage driver leave (driverLeave)
+				e.driverLeave(ev, feed, up-int64(feed.now.Sub(ev.At).Round(time.Second)/time.Second))
+			}
 			continue // the other kinds feed the connection timings (staconn.go)
 		}
 		touched[ev.MAC] = true
@@ -299,6 +329,32 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 			delete(e.prev, mac)
 		}
 	}
+}
+
+// driverLeave applies a driver Delete (mtkwifi.Events) released before
+// the reading started: the station's sta_leave when the controller has it
+// on that BSS (an authenticated-only station never was), at its own time.
+// A kernel log Del Sta names no BSS (mtkwifi.AnyNG): any 2.4 GHz one.
+func (e *staEvents) driverLeave(ev hapdmon.Event, feed *staFeed, at int64) {
+	p, ok := e.prev[ev.MAC]
+	if !ok {
+		return
+	}
+	if ev.Vif == mtkwifi.AnyNG {
+		match := false
+		for ifc, n := range feed.vifs {
+			if n == p.vap && strings.HasPrefix(ifc, "ra") && !strings.HasPrefix(ifc, "rai") {
+				match = true
+			}
+		}
+		if !match {
+			return
+		}
+	} else if n := feed.vifs[ev.Vif]; n == "" || n != p.vap {
+		return
+	}
+	e.leave(ev.MAC, p, at)
+	delete(e.prev, ev.MAC)
 }
 
 // live applies one socket event of a covered VAP; at is its time in the
@@ -385,11 +441,18 @@ func (e *staEvents) reconcile(cur map[string]staSeen, names, covered, touched ma
 }
 
 func (e *staEvents) leave(mac string, p staSeen, at int64) {
-	e.push(map[string]any{
+	ev := map[string]any{
 		"message_type": staTracker, "event_type": staEvLeave,
 		"mac": mac, "vap": p.vap, "avg_rssi": p.signal, "last_seen": at,
 		"assoc_status": e.leaveStatus(mac, e.at),
-	})
+	}
+	if t, ok := e.kicks[mac]; ok { // the Garage's minimum RSSI kick (garage.go)
+		delete(e.kicks, mac)
+		if time.Since(t) < kickHold {
+			ev["assoc_status"] = kickStatus
+		}
+	}
+	e.push(ev)
 }
 
 func (e *staEvents) assoc(mac string, c staSeen) {
@@ -469,9 +532,12 @@ type staSource interface {
 
 // startStaMonitor follows the station events on the control sockets of the
 // agent's hostapd (takeover on the Deco: bcmwifi.CtrlDir, one socket per
-// BSS it serves). The Garage runs no hostapd and keeps the reading diff.
+// BSS it serves). The Garage runs no hostapd: its drivers' own leave
+// events are followed instead (startDriverEvents), the joins stay the
+// reading diff's.
 func (a *agent) startStaMonitor(ctx context.Context) {
 	if a.cfg.jio() {
+		a.startDriverEvents(ctx) // garage.go
 		return
 	}
 	if a.o.staMon != nil {
@@ -488,6 +554,13 @@ func (a *agent) startStaMonitor(ctx context.Context) {
 // staFeed hands the socket events since the last reading to staEvents
 // (loop goroutine).
 func (a *agent) staFeed(s *apstate.Snapshot, f map[string]any) *staFeed {
+	if a.drv != nil {
+		evs, dropped := a.drv.Take()
+		if dropped > 0 {
+			a.logf("driver events: %d leaves dropped (more than the monitor keeps)", dropped)
+		}
+		return &staFeed{read: a.readAt, now: time.Now(), vifs: staVifNames(s, f), evs: evs, leaves: true}
+	}
 	if a.hapd == nil {
 		return nil
 	}

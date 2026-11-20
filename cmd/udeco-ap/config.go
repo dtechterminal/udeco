@@ -144,7 +144,47 @@ type Config struct {
 	// authorized and whose address is known, on the wired ports of its
 	// bridge, so the switches learn where it is at once (garp.go).
 	AssocGARP *bool `json:"assoc_garp,omitempty"`
+	// UplinkLoss (platform jio-mtk, takeover with apply) is the U6's
+	// uplink-loss behaviour: absent or true, after 15 s without carrier on
+	// the uplink port the user and guest SSIDs go down and one management
+	// SSID (UplinkLossSSID, else the first LAN SSID) stays up, so the GL
+	// KVM side door can still join; every SSID comes back after 30 s of
+	// carrier, never isolating again within 5 minutes of a restore. Each
+	// change restarts the radios whose SSIDs change. false keeps every
+	// SSID up whatever the uplink does (mtkwifi uplinkloss.go, garage.go).
+	UplinkLoss *bool `json:"uplink_loss,omitempty"`
+	// UplinkLossSSID is the SSID kept up while the uplink is down (an
+	// SSID name the controller serves on this unit); "" = the first SSID
+	// on the LAN (no VLAN, not a guest SSID). Not served: nothing is taken
+	// down.
+	UplinkLossSSID string `json:"uplink_loss_ssid,omitempty"`
+	// BSSPinning (platform jio-mtk) keeps each WLAN on its own driver
+	// profile slot (netdev and BSSID) while other WLANs come and go
+	// (schedules, disabled WLANs), as a U6 has one VAP per WLAN; slot 0
+	// always carries a WLAN, one without a schedule when there is one.
+	// Off by default until the single-BSS down/up test passed on the unit
+	// (mtkwifi slots.go, docs/deco/features/garage-parity.md).
+	BSSPinning bool `json:"bss_pinning,omitempty"`
+	// ProxyARP (platform jio-mtk) answers ARP requests for the stations
+	// of the WLANs the controller set proxy ARP on (mtkwifi proxyarp.go);
+	// false leaves the requests going out on the air. On by default.
+	ProxyARP *bool `json:"proxy_arp,omitempty"`
+	// DFS (platform jio-mtk) lets the 5 GHz radio serve the controller's
+	// DFS channels 52-64 (the driver's region goes from 10 to 0 live, a
+	// 65 s channel availability check, radar followed and reported as
+	// EVT_AP_RadarDetected; mtkwifi dfs.go) and claims has_dfs. Off by
+	// default until the region check of docs/deco/features/garage-parity.md
+	// passed on the unit.
+	DFS bool `json:"dfs,omitempty"`
 }
+
+// uplinkLoss: the SSIDs are isolated on uplink loss (platform jio-mtk)
+// unless uplink_loss is false.
+func (c *Config) uplinkLoss() bool { return c.jio() && (c.UplinkLoss == nil || *c.UplinkLoss) }
+
+// proxyARP: the controller's proxy ARP is served (platform jio-mtk; on
+// unless proxy_arp is false).
+func (c *Config) proxyARP() bool { return c.jio() && (c.ProxyARP == nil || *c.ProxyARP) }
 
 func (c *Config) portsConfirm() time.Duration {
 	if c.PortsConfirmS == 0 {
@@ -239,6 +279,9 @@ func (c *Config) validate() error {
 		}
 	default:
 		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
+	}
+	if (c.UplinkLoss != nil || c.UplinkLossSSID != "" || c.BSSPinning || c.ProxyARP != nil || c.DFS) && !c.jio() {
+		return errors.New("config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp and dfs are for platform " + PlatformJio + " only")
 	}
 	if (len(c.PortsUnlocked) > 0 || c.PortsConfirmS != 0 || c.PortsLossS != 0) && !c.jio() {
 		return errors.New("config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform " + PlatformJio + " only")

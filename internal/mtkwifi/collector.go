@@ -4,8 +4,10 @@ package mtkwifi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -25,6 +27,9 @@ type CollectorOptions struct {
 	Bridge string     // bdg2
 	Layout []RadioDef // nil = JCOW414
 	Model  string     // reported hardware model
+	// RunDir is the applier's (Options.RunDir): the power mode it applied
+	// per band is read from there; "" reports none
+	RunDir string
 	// FreshScan lets Scan (the controller's `cmd scan`, never a periodic
 	// job) start a driver site survey (`iwpriv <radio> set SiteSurvey=1`),
 	// which takes the radio off its channel for seconds. Off (the default),
@@ -32,6 +37,10 @@ type CollectorOptions struct {
 	// claim RF_SCAN; HomeScan still reports the driver's cached survey.
 	// Not to be turned on before the live impact test (clients' ping stall).
 	FreshScan bool
+	// DFS: the applier may take the 5 GHz radio to 52-64 (Options.DFS):
+	// Caps lists them, and Scan refuses 5 GHz while the radio is on one
+	// (dfs.go)
+	DFS bool
 	// CacheTTL: how long the driver readings (station table and counters
 	// from the kernel log, busy time, iwconfig) are reused (0 = 5 s), so a
 	// 1 s live view does not run iwpriv and fill the small kernel log every
@@ -164,15 +173,8 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 		main := rd.Ifaces[0]
 		r := apstate.Radio{Iface: main, Phy: main, Mode: "Master", Band: rd.Band,
 			NSS: 2, HWName: rd.HWName, VHT: rd.Band == "na", TxMin: 5, TxMax: rd.MaxTxDBm, Noise: noiseFloor}
-		dat, _ := os.ReadFile(c.path(rd.Dat))
 		r.Width = c.radioWidth(rd)
-		pct := 100
-		if v, ok := getKey(dat, "TxPower"); ok {
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				pct = n
-			}
-		}
-		r.TxPower = dbmOf(pct, rd.MaxTxDBm)
+		c.radioTx(&r, rd)
 		if !c.isUp(main) {
 			// kept, not dropped: a radio coming back from a restart is
 			// not read until the settle time is over (restartgate.go)
@@ -439,12 +441,43 @@ func (c *Collector) klogRead(ctx context.Context, main string, rr *radioReading,
 	}
 }
 
-func dbmOf(pct, maxDBm int) int {
-	d := maxDBm
-	for p := 100; p/2 >= pct && d > 3; p /= 2 {
-		d -= 3
+// radioTx reads rd's power from its profile (TxPower %, the drivers'
+// drop brackets: txDBm) and the controller's mode the applier recorded.
+func (c *Collector) radioTx(r *apstate.Radio, rd RadioDef) {
+	dat, _ := os.ReadFile(c.path(rd.Dat))
+	pct := 100
+	if v, ok := getKey(dat, "TxPower"); ok {
+		if n, err := strconv.Atoi(v); err == nil {
+			pct = n
+		}
 	}
-	return d
+	r.TxPower = txDBm(pct, rd)
+	if c.o.RunDir != "" {
+		r.TxPowerMode = readTxModes(c.o.Root, c.o.RunDir)[rd.Band]
+	}
+}
+
+// writeTxModes records each radio's power mode in dir (txModeFile).
+func writeTxModes(dir string, ps map[string]RadioPlan) {
+	m := map[string]string{}
+	for b, rp := range ps {
+		if rp.On && rp.TxMode != "" {
+			m[b] = rp.TxMode
+		}
+	}
+	j, _ := json.Marshal(m)
+	_ = writeFile(filepath.Join(dir, txModeFile), j, 0o644)
+}
+
+// readTxModes reads what writeTxModes recorded (nil when nothing).
+func readTxModes(root, runDir string) map[string]string {
+	b, err := os.ReadFile(filepath.Join(root, runDir, txModeFile))
+	if err != nil {
+		return nil
+	}
+	var m map[string]string
+	_ = json.Unmarshal(b, &m)
+	return m
 }
 
 var statNames = []string{"rx_bytes", "tx_bytes", "rx_packets", "tx_packets", "rx_errors", "tx_errors", "rx_dropped", "tx_dropped"}
@@ -492,9 +525,14 @@ func (c *Collector) Caps(context.Context) (wl.Caps, error) {
 			b.Channels[20], b.Channels[40] = chans24, chans24
 		} else {
 			b.VHT = true
-			b.Channels[20] = chans5
-			b.Channels[40] = chans5[:8]
-			b.Channels[80] = chans5[:8]
+			five := chans5
+			if c.o.DFS && rd.HSFlag {
+				five = append(append([]int(nil), chans5[:4]...), chansDFS...)
+				five = append(five, chans5[4:]...)
+			}
+			b.Channels[20] = five
+			b.Channels[40] = five[:len(five)-1] // not 165
+			b.Channels[80] = five[:len(five)-1]
 		}
 		cp.Bands[rd.Band] = b
 	}

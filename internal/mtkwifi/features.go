@@ -15,7 +15,7 @@ import (
 // Every one is written to the driver profile (profile()), so a change
 // restarts the radio: structural() keeps them. The drivers have them per
 // BSS (RRMEnable, WNMEnable, APSDCapable on the MT7663) or per radio only
-// (DtimPeriod, BasicRate, IgmpSnEnable); a per-SSID setting the driver has
+// (DtimPeriod, BasicRate; IgmpSnEnable on the MT7603); a per-SSID setting the driver has
 // per radio is folded (DTIM: the lowest; minimum rate: only when every SSID
 // of the radio has one, 2.4 GHz only) with a note. What the
 // controller asks for and this unit does not do is noted, never dropped
@@ -105,14 +105,6 @@ func radioFeatures(rp *RadioPlan, rd RadioDef, ri bcmwifi.Radio, served []bcmwif
 		note("%s: DTIM is one value per radio in this driver: %d for every SSID (asked: %v)", band, rp.DTIM, dtims)
 	}
 
-	// minimum RSSI: neither driver reads AssocReqRssiThres from the
-	// profile; in mt7603eap.ko and in the MT7663 kernel driver it is only
-	// an iwpriv set command (Set_AP_ASSOC_REQ_RSSI_THRESHOLD), so it waits
-	// for a live iwpriv path
-	if ri.MinRSSI != 0 {
-		note("%s: minimum RSSI %d dBm not applied (the driver takes it only through iwpriv, not from its profile)", band, ri.MinRSSI)
-	}
-
 	for _, b := range rp.BSS {
 		if b.RRM {
 			note("%s: 802.11k is advertised, but no neighbour list is configured (the driver has no command to add entries)", band)
@@ -120,8 +112,12 @@ func radioFeatures(rp *RadioPlan, rd RadioDef, ri bcmwifi.Radio, served []bcmwif
 		}
 	}
 
-	// IGMP snooping (the driver's multicast-to-unicast) is per radio and on
-	// in the vendor's profiles: turned on when an SSID asks, never off
+	// IGMP snooping (the driver's multicast-to-unicast). The MT7663 has
+	// it per BSS (IgmpSnEnable=a;b;c;d): each SSID follows the
+	// controller (BSS.M2U), as the U6's per-VAP mcastenhance. The MT7603
+	// has one value per radio, on in the vendor's profile: turned on when
+	// an SSID asks, never off (off sends multicast at the 1 Mb/s basic
+	// rate to every SSID of the radio)
 	var m2u, plain []string
 	for _, s := range served {
 		if s.MulticastToUnicast {
@@ -132,6 +128,7 @@ func radioFeatures(rp *RadioPlan, rd RadioDef, ri bcmwifi.Radio, served []bcmwif
 	}
 	rp.IgmpSn = len(m2u) > 0
 	switch {
+	case perBSSIgmp(rd):
 	case len(m2u) > 0 && len(plain) > 0:
 		note("%s: multicast enhancement (IGMP snooping) is per radio in this driver: on for every SSID (asked by %q)", band, m2u)
 	case len(m2u) == 0:
@@ -266,11 +263,11 @@ func profileFeatures(kv map[string]string, base []byte, rd RadioDef, rp RadioPla
 		rrm, wnm, apsd = append(rrm, b01(b.RRM)), append(wnm, b01(b.BTM)), append(apsd, b01(b.UAPSD))
 	}
 	// per BSS in both drivers ("bDot11kRRMEnable[%d]", "bDot11vWNMEnable[%d]")
-	kv["RRMEnable"] = listKey(base, "RRMEnable", n, rrm, "0")
-	kv["WNMEnable"] = listKey(base, "WNMEnable", n, wnm, "0")
+	kv["RRMEnable"] = slotKey(base, "RRMEnable", n, rp, rrm, "0")
+	kv["WNMEnable"] = slotKey(base, "WNMEnable", n, rp, wnm, "0")
 	if rd.UAPSD {
 		// per BSS on the MT7663 ("APSDCapable[%d]=%d"); the MT7603 has none
-		kv["APSDCapable"] = listKey(base, "APSDCapable", n, apsd, "0")
+		kv["APSDCapable"] = slotKey(base, "APSDCapable", n, rp, apsd, "0")
 	}
 	if rp.DTIM > 0 {
 		kv["DtimPeriod"] = strconv.Itoa(rp.DTIM)
@@ -278,12 +275,73 @@ func profileFeatures(kv map[string]string, base []byte, rd RadioDef, rp RadioPla
 	if rp.BasicRate > 0 {
 		kv["BasicRate"] = strconv.Itoa(rp.BasicRate)
 	}
-	if rp.IgmpSn {
-		// the vendor's form: a ;-list on the MT7663, one value on the MT7603
+	switch {
+	case perBSSIgmp(rd):
+		var m2u []string
+		for _, b := range rp.BSS {
+			m2u = append(m2u, b01(b.M2U))
+		}
+		kv["IgmpSnEnable"] = slotKey(base, "IgmpSnEnable", n, rp, m2u, "1")
+	case rp.IgmpSn:
+		// the vendor's form: one value on the MT7603
 		if cur, _ := getKey(base, "IgmpSnEnable"); strings.Contains(cur, ";") {
 			kv["IgmpSnEnable"] = listKey(nil, "IgmpSnEnable", n, nil, "1")
 		} else {
 			kv["IgmpSnEnable"] = "1"
 		}
+	}
+	u6Defaults(kv, base, rd, rp)
+}
+
+// perBSSIgmp: the radio's driver has IgmpSnEnable per BSS (the MT7663).
+func perBSSIgmp(rd RadioDef) bool { return rd.Band == "na" }
+
+// acsSkip24 are the 2.4 GHz channels automatic channel selection skips:
+// all but 1, 6 and 11, as the U6 (radio.conf `block_acs_channel -band 1
+// 2,3,4,5,7,8,9,10,...`; 12-14 are outside this unit's channel list).
+const acsSkip24 = "2;3;4;5;7;8;9;10"
+
+// pmkCacheMinutes is the 5 GHz PMK cache lifetime (PMKCachePeriod,
+// minutes): hostapd's default 12 h, so an idle SAE phone resumes with
+// its PMKSA instead of a new SAE after the vendor's 10 minutes.
+const pmkCacheMinutes = "720"
+
+// u6Defaults adds the settings a U6 applies whatever the controller says,
+// and the per-BSS group rekey the controller sends, to kv. Each is a
+// profile key (read when the radio comes up), so they ride the restart
+// the first deploy makes anyway (adopt compares the whole profile).
+func u6Defaults(kv map[string]string, base []byte, rd RadioDef, rp RadioPlan) {
+	n := len(rd.Ifaces)
+	all := func(v string) string { return listKey(nil, "", n, nil, v) }
+	// WPS: the U6 runs wps_state=disabled; the vendor's profiles have the
+	// registrar on (WscConfMode=4) for every slot
+	kv["WscConfMode"] = all("0")
+	// the vendor's band steering flag: inert without its daemon (stopped),
+	// and the agent claims no band steering
+	kv["BandSteering"] = all("0")
+	// GTK rekey as the controller asks, per served BSS; open never rekeys
+	var method, interval []string
+	for _, b := range rp.BSS {
+		if b.GroupRekey > 0 && b.Auth != "OPEN" {
+			method, interval = append(method, "TIME"), append(interval, strconv.Itoa(b.GroupRekey))
+		} else {
+			method, interval = append(method, "DISABLE"), append(interval, "0")
+		}
+	}
+	kv["RekeyMethod"] = slotKey(base, "RekeyMethod", n, rp, method, "TIME")
+	kv["RekeyInterval"] = slotKey(base, "RekeyInterval", n, rp, interval, "3600")
+	switch rd.Band {
+	case "ng":
+		// 20/40 coexistence off (U6 disablecoext 1, cwmenable 0)
+		kv["HT_BSSCoexistence"] = "0"
+		if rp.Channel == 0 {
+			kv["AutoChannelSkipList"] = acsSkip24
+		}
+	case "na":
+		// implicit beamforming off (U6 implicitbf 0); explicit stays
+		kv["ITxBfEn"] = "0"
+		// the driver's station events on rtnetlink (events_linux.go)
+		kv["WirelessEvent"] = "1"
+		kv["PMKCachePeriod"] = pmkCacheMinutes
 	}
 }

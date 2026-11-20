@@ -248,6 +248,30 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 - **Partial:** WPA3 on 5 GHz only (the 2.4 GHz driver has no SAE). The driver
   accepts the profile, but no SAE client has been seen yet.
 - **Not on this platform:** speed limits.
+- **U6 parity** ([docs/deco/features/garage-parity.md](docs/deco/features/garage-parity.md);
+  none of it run on the unit yet):
+
+  | Feature | What the Garage does | Config |
+  |---|---|---|
+  | Minimum RSSI | driver threshold per BSS, agent kick (status 16) | controller |
+  | WPS | off on every BSS | always |
+  | Group rekey, PMK cache | the WLAN's rekey per BSS; 12 h PMK cache on 5 GHz | controller |
+  | 2.4 GHz auto channel | 1/6/11 only | always |
+  | Band steering flag | off | always |
+  | Multicast enhancement | per SSID on 5 GHz | controller |
+  | Tx power | dB steps, live, reported in dBm with the mode | controller |
+  | Beamforming, 20/40 coexistence | implicit BF off, coexistence off | always |
+  | Uplink loss | SSIDs down except one management SSID | `uplink_loss` (on), `uplink_loss_ssid` |
+  | Station events | leaves at once from driver events | always |
+  | BSS slot pinning | each WLAN keeps its netdev and BSSID | `bss_pinning` (off) |
+  | Guest WLANs | the Deco's fail-closed ebtables rules, portal | controller |
+  | Proxy ARP | 5 GHz driver + responder; 2.4 GHz responder | controller, `proxy_arp` (on) |
+  | DFS | 52-64, CAC, radar followed and reported | `dfs` (off) |
+  | Station GARP | on association when the address is known | always |
+
+  Profile changes are batched into one restart per radio; live driver
+  settings wait for a restart's settle time; the hand-back restores the
+  vendor's values.
 - **RF scans (`"site_survey": true`, off by default; needs `takeover`):**
   the controller's scan commands run on the unit, and it claims RF scan.
   A scan from UniFi runs the driver's site survey of both bands (`iwpriv

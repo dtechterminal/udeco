@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,6 +41,21 @@ type Options struct {
 	WPA3     bool // serve SAE where the driver has it (5 GHz); the agent claims WPA3 on that radio only
 	Logf     func(string, ...any)
 	Layout   []RadioDef // nil = JCOW414
+	// KeepSSID is the SSID kept up while the uplink is down
+	// (uplinkloss.go); "" = the first LAN SSID
+	KeepSSID string
+	// DFS lets the 5 GHz radio (RadioDef.HSFlag: the MT7663) serve 52-64
+	// (dfs.go)
+	DFS bool
+	// PinSlots keeps each WLAN on its profile slot (netdev, BSSID) while
+	// others come and go (slots.go); off = the controller's order
+	PinSlots bool
+	// ProxyARP serves the controller's proxy ARP (proxyarp.go); off = the
+	// requests go out on the air as without it
+	ProxyARP bool
+	// sendFrame sends one Ethernet frame on a netdev (nil: an AF_PACKET
+	// socket; tests record them)
+	sendFrame func(dev string, frame []byte) error
 	// VerifyTimeout bounds the wait for the BSSes after an apply (20 s).
 	VerifyTimeout time.Duration
 	// Settle: how long after a radio restart the collector's driver reads
@@ -80,12 +96,36 @@ type Applier struct {
 	gate       sync.RWMutex
 	quietUntil atomic.Int64
 	onChange   atomic.Pointer[func(context.Context)] // OnChange
+	// live settings waiting for a restart's settle time to end, by band
+	// (live.go): the per-BSS ones, and the power
+	due, txDue map[string]bool
+	// weak: per station, the minimum RSSI kick's count and back-off
+	// (minrssi.go)
+	weak map[string]*weakSta
+	// uplinkDown: the uplink is down and the SSIDs are isolated
+	// (uplinkloss.go); want: the controller's plan a.live is made from
+	// (a.live is its isolated form meanwhile)
+	uplinkDown bool
+	want       map[string]RadioPlan
+	// pins: WLAN id -> profile slot per band (slots.go)
+	pins map[string]map[string]int
+	// proxy ARP (proxyarp.go): the responder, the event listener's health,
+	// the 5 GHz flags sent (per netdev; absent = unknown), the 2.4 GHz
+	// drop rules' vifs and state
+	parp      parpResponder
+	eventsOK  func() bool
+	parpFlag  map[string]bool
+	parpJumps []string
+	parpEb    string
+	// dfs: the 5 GHz region, the DFS channel, NOPs, radar (dfs.go)
+	dfs dfsState
 }
 
 const (
-	ownedFile    = "mtk-owned"    // RunDir: the agent's profiles are installed
-	appliedFile  = "mtk-applied"  // RunDir: hash of the plans live now
-	aclFile      = "mtk-acl.json" // RunDir: the station ACLs last written (lost with the driver's at reboot)
+	ownedFile    = "mtk-owned"       // RunDir: the agent's profiles are installed
+	appliedFile  = "mtk-applied"     // RunDir: hash of the plans live now
+	txModeFile   = "mtk-txmode.json" // RunDir: the controller's power mode per band (collector.go radioTx)
+	aclFile      = "mtk-acl.json"    // RunDir: the station ACLs last written (lost with the driver's at reboot)
 	baselineDir  = "mtk-baseline"
 	lastGoodFile = "last-good.json"
 )
@@ -103,6 +143,13 @@ func New(o Options) *Applier {
 	}
 	if o.Layout == nil {
 		o.Layout = JCOW414
+	}
+	if o.DFS {
+		l := append([]RadioDef(nil), o.Layout...)
+		for i := range l {
+			l[i].DFS = l[i].HSFlag // the MT7663
+		}
+		o.Layout = l
 	}
 	if o.VerifyTimeout <= 0 {
 		o.VerifyTimeout = 20 * time.Second
@@ -126,7 +173,14 @@ func New(o Options) *Applier {
 	if o.writeLED == nil {
 		o.writeLED = writeProc
 	}
-	return &Applier{o: o, uplink: o.Uplink, ledOn: true}
+	if o.sendFrame == nil {
+		o.sendFrame = sendFrame
+	}
+	a := &Applier{o: o, uplink: o.Uplink, ledOn: true}
+	if o.ProxyARP && !o.DryRun {
+		a.parp = newResponder(o.Logf, func() { a.ProxyARPDown(context.Background()) })
+	}
+	return a
 }
 
 func (a *Applier) dev(p string) string { return filepath.Join(a.o.Root, p) }
@@ -184,13 +238,18 @@ func (a *Applier) Owned() bool {
 func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	want, notes := plans(d, a.o.Layout, a.o.WPA3)
+	full, notes := plans(d, a.o.Layout, a.o.WPA3)
+	if a.o.ProxyARP {
+		notes = slices.DeleteFunc(notes, func(n string) bool { return strings.HasSuffix(n, "proxy ARP not applied") })
+	}
+	full, _ = a.pinned(full)
+	want := a.effective(full)
 	p := bcmwifi.Plan{Desired: d, Notes: notes}
 	cur := a.live
 	if cur == nil {
 		if h, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, appliedFile))); err == nil &&
 			strings.TrimSpace(string(h)) == plansHash(want) && a.check(ctx, want, true) == nil {
-			a.live = want
+			a.live, a.want = want, full
 			a.desired = d
 			a.planACL(&p, want)
 			return p, nil
@@ -200,7 +259,7 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 		cur = a.adopt(ctx, want)
 		a.adopted = cur
 		if len(cur) == len(a.o.Layout) {
-			a.live, a.adopted = cur, nil
+			a.live, a.adopted, a.want = cur, nil, full
 			a.desired = d
 			a.planACL(&p, want)
 			return p, nil
@@ -252,7 +311,7 @@ func (a *Applier) change(rd RadioDef, c RadioPlan, ok bool, w RadioPlan) radioCh
 		return radioKeep
 	}
 	if base, err := a.baseline(rd); err == nil {
-		if restartKey(base, rd, c) == restartKey(base, rd, w) {
+		if restartKey(base, rd, c) == restartKey(base, rd, w) || a.dfsLive(base, rd, c, w) {
 			return radioLive
 		}
 		return radioRestart
@@ -329,8 +388,10 @@ func chanText(c int) string {
 func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	want, _ := plans(p.Desired, a.o.Layout, a.o.WPA3)
-	h := plansHash(want)
+	full, _ := plans(p.Desired, a.o.Layout, a.o.WPA3)
+	full, pins := a.pinned(full)
+	want := a.effective(full)
+	h := plansHash(full)
 	if h == a.failed {
 		return bcmwifi.ErrDesiredFailed
 	}
@@ -347,6 +408,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 		cur = a.adopted // what Plan found already live
 	}
 	a.adopted = nil
+	a.desired = p.Desired
 	err := a.applyPlans(ctx, want, cur)
 	if err == nil {
 		err = a.waitLive(ctx, want)
@@ -359,8 +421,12 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 		}
 		return err
 	}
-	a.live = want
-	a.saveLastGood(want)
+	a.live, a.want = want, full
+	a.savePins(pins)
+	a.saveLastGood(full)
+	a.flushLive(ctx)
+	a.dfsStep(ctx)
+	a.syncProxyARP(ctx)
 	return nil
 }
 
@@ -369,6 +435,10 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 		return err
 	}
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, appliedFile)))
+	// guest chains before any guest SSID comes up (guest.go)
+	if err := a.syncGuest(ctx, &a.desired, want, false); err != nil {
+		return fmt.Errorf("guest isolation: %w", err)
+	}
 	for _, rd := range a.o.Layout {
 		w := want[rd.Band]
 		c, ok := cur[rd.Band]
@@ -385,12 +455,16 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 			return fmt.Errorf("%s: %w", rd.Band, err)
 		}
 	}
+	if err := a.syncGuest(ctx, &a.desired, want, true); err != nil {
+		return fmt.Errorf("guest isolation: %w", err)
+	}
 	if err := a.cleanVLANs(ctx, want); err != nil {
 		a.o.Logf("mtkwifi: removing unused VLAN bridges: %v", err)
 	}
 	if err := a.applyACL(ctx, want); err != nil {
 		a.o.Logf("mtkwifi: station ACLs: %v", err)
 	}
+	writeTxModes(a.dev(a.o.RunDir), want)
 	return os.WriteFile(a.dev(filepath.Join(a.o.RunDir, appliedFile)), []byte(plansHash(want)+"\n"), 0o644)
 }
 
@@ -402,6 +476,7 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 		return fmt.Errorf("baseline profile: %w", err)
 	}
 	defer a.restarted() // the collector leaves the driver alone a while longer
+	a.parpRestarted(rd)
 	for i := len(rd.Ifaces) - 1; i >= 0; i-- {
 		if err := a.run(ctx, "ifconfig", rd.Ifaces[i], "down"); err != nil {
 			return err
@@ -411,20 +486,33 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 		a.o.Logf("mtkwifi: %s: radio off", rd.Band)
 		return nil
 	}
-	if err := writeFile(a.dev(rd.Dat), profile(base, rd, rp), 0o600); err != nil {
+	pw := a.dfsProfilePlan(rd, rp)
+	if err := writeFile(a.dev(rd.Dat), profile(base, rd, pw), 0o600); err != nil {
 		return err
 	}
-	for i := range rp.BSS {
-		if err := a.run(ctx, "ifconfig", rd.Ifaces[i], "up"); err != nil {
+	if rd.DFS && isDFS(pw.Channel) {
+		defer a.quietFor(dfsQuiet) // the CAC after the restart
+	}
+	// slot 0 first: the radio's first BSS netdev up reads the profile
+	order := make([]int, len(rp.BSS))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(x, y int) bool { return rp.slot(order[x]) < rp.slot(order[y]) })
+	for _, i := range order {
+		if err := a.run(ctx, "ifconfig", a.ifaceOf(rd, rp, i), "up"); err != nil {
 			return err
 		}
 	}
 	for i, b := range rp.BSS {
-		if err := a.bridgeTo(ctx, rd.Ifaces[i], b.VLAN); err != nil {
+		if err := a.bridgeTo(ctx, a.ifaceOf(rd, rp, i), b.VLAN); err != nil {
 			return err
 		}
 	}
 	a.o.Logf("mtkwifi: %s: %d SSID(s) up (ch %s, %d MHz)", rd.Band, len(rp.BSS), chanText(rp.Channel), rp.Width)
+	// the per-BSS live settings, after the settle time (live.go); the
+	// power came from the profile
+	a.queueLive(rd.Band, false)
 	return nil
 }
 
@@ -435,18 +523,18 @@ func (a *Applier) applyLive(ctx context.Context, rd RadioDef, c, rp RadioPlan) e
 		if i < len(c.BSS) && c.BSS[i].Hidden == b.Hidden && c.BSS[i].Isolate == b.Isolate && c.BSS[i].MaxSta == b.MaxSta {
 			continue
 		}
-		ifc := rd.Ifaces[i]
+		ifc := a.ifaceOf(rd, rp, i)
 		for _, kv := range []string{"HideSSID=" + b01(b.Hidden), "NoForwarding=" + b01(b.Isolate), "MaxStaNum=" + strconv.Itoa(b.MaxSta)} {
 			if err := a.run(ctx, "iwpriv", ifc, "set", kv); err != nil {
 				return err
 			}
 		}
 	}
-	base, err := a.baseline(rd)
-	if err != nil {
-		return err
+	if c.TxPct != rp.TxPct || c.MinRSSI != rp.MinRSSI {
+		a.queueLive(rd.Band, c.TxPct != rp.TxPct)
 	}
-	return writeFile(a.dev(rd.Dat), profile(base, rd, rp), 0o600)
+	// a channel move into or out of 52-64 is dfsStep's, after the apply
+	return a.writeProfile(rd, rp)
 }
 
 func writeFile(p string, b []byte, mode os.FileMode) error {
@@ -626,8 +714,10 @@ func (a *Applier) check(ctx context.Context, want map[string]RadioPlan, ssids bo
 // checkRadio is check for one radio.
 func (a *Applier) checkRadio(ctx context.Context, rd RadioDef, rp RadioPlan, ssids bool) error {
 	var bad []string
-	for i, ifc := range rd.Ifaces {
-		if i >= len(rp.BSS) {
+	served := bssOf(rd, rp)
+	for _, ifc := range rd.Ifaces {
+		i, ok := served[ifc]
+		if !ok {
 			if a.isUp(ifc) {
 				bad = append(bad, ifc+" is up but serves nothing")
 			}
@@ -676,7 +766,8 @@ func (a *Applier) Verify(ctx context.Context, d bcmwifi.Desired) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	want, _ := plans(d, a.o.Layout, a.o.WPA3)
-	return a.check(ctx, want, !a.settling())
+	want, _ = a.pinned(want)
+	return a.check(ctx, a.effective(want), !a.settling())
 }
 
 // ------------------------------------------------------- baseline, rollback
@@ -734,7 +825,7 @@ func (a *Applier) rollback(ctx context.Context) error {
 			err = a.waitLive(ctx, lg)
 		}
 		if err == nil {
-			a.live = lg
+			a.live, a.want = lg, lg
 			a.o.Logf("mtkwifi: rolled back to last-good")
 			return nil
 		}
@@ -753,6 +844,8 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 	if err := json.Unmarshal(j, &st); err != nil {
 		return err
 	}
+	a.clearLive(ctx)    // what only the agent sets live (live.go)
+	a.parpOff(ctx)      // proxy ARP (proxyarp.go)
 	defer a.restarted() // the collector leaves the driver alone a while longer
 	for _, rd := range a.o.Layout {
 		for i := len(rd.Ifaces) - 1; i >= 0; i-- {
@@ -784,7 +877,8 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 		}
 	}
 	_ = a.cleanVLANs(ctx, nil)
-	a.live = nil
+	_ = a.syncGuest(ctx, nil, nil, true)
+	a.live, a.want = nil, nil
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, ownedFile)))
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, appliedFile)))
 	a.o.Logf("mtkwifi: the vendor's Wi-Fi of this boot is back")
@@ -828,11 +922,20 @@ func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 	if a.live == nil {
 		return r, nil
 	}
+	a.flushLive(ctx)
+	// the guest chains (an ebtables flush by something else is rebuilt)
+	if err := a.syncGuest(ctx, &a.desired, a.live, true); err != nil {
+		r.Problems = append(r.Problems, err.Error())
+	}
+	a.dfsStep(ctx)
+	a.syncProxyARP(ctx)
 	ssids := !a.settling()
 	for _, rd := range a.o.Layout {
 		rp := a.live[rd.Band]
-		for i, ifc := range rd.Ifaces {
-			if i >= len(rp.BSS) {
+		served := bssOf(rd, rp)
+		for _, ifc := range rd.Ifaces {
+			i, ok := served[ifc]
+			if !ok {
 				if a.isUp(ifc) {
 					r.Foreign = append(r.Foreign, ifc+" is up but serves nothing")
 					r.NeedsApply = true
@@ -946,8 +1049,9 @@ func wantACLs(d bcmwifi.Desired, want map[string]RadioPlan, layout []RadioDef, b
 	}
 	out := map[string]ifaceACL{}
 	for _, rd := range layout {
-		for i, b := range want[rd.Band].BSS {
-			if i >= len(rd.Ifaces) {
+		rp := want[rd.Band]
+		for i, b := range rp.BSS {
+			if rp.slot(i) >= len(rd.Ifaces) {
 				break
 			}
 			deny := map[string]bool{}
@@ -980,7 +1084,7 @@ func wantACLs(d bcmwifi.Desired, want map[string]RadioPlan, layout []RadioDef, b
 				}
 			}
 			sort.Strings(acl.MACs)
-			out[rd.Ifaces[i]] = acl
+			out[rd.Ifaces[rp.slot(i)]] = acl
 		}
 	}
 	return out
@@ -1091,8 +1195,3 @@ func (a *Applier) SetUplink(port string) {
 	a.uplink = port
 	a.mu.Unlock()
 }
-
-var errNoGuest = errors.New("mtkwifi: guest networks are not served on this unit")
-
-func (a *Applier) AuthorizeGuest(context.Context, string) error   { return errNoGuest }
-func (a *Applier) UnauthorizeGuest(context.Context, string) error { return errNoGuest }
