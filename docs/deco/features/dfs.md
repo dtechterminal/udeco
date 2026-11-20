@@ -128,3 +128,24 @@ untouched, and the camera went back to 72 Mbps at once.
 `"driver_country_bands": {"ng": "US"}` makes this the agent's plan
 (bcmwifi `Desired.BandCountry`): full power on both bands, with DFS on 5 GHz.
 Keep 5 GHz on 100-144 under IN/288: 36-48 is the low-power block there.
+
+## IN/288 has no Wi-Fi 6 rates: run US on both bands (2026-11-20)
+
+`wl -i wl1 curppr` on Bedroom (IN/288, 132/80) showed every HE row as `-`
+(rate disabled) at 20, 40 and 80 MHz, and VHT MCS 10-11 missing. The same
+command on Hallway (US/0, 40/80) filled every HE row. The agent still turns
+`wl he 1` on, so the radio advertises Wi-Fi 6 but may not send it: Wi-Fi 6
+phones set up an HE link and the downlink collapses. An iPhone 17 Pro Max on
+Bedroom at -65 to -70 dBm took 19,379 retries for 3,329 frames and fell to
+8.6 Mbps (HE MCS0 at 20 MHz); its uploads still reached the AP at 432 Mbps.
+A Wi-Fi 5 laptop on the same radio got 433 Mbps with 4 % retries. With
+`wl he 0` on that radio (down, set, up), the iPhone got 585-650 Mbps with
+0-17 % retries. This is also why a Galaxy S20 FE lost its downlink on 116/80.
+
+Wi-Fi 6 matters more than DFS here, so every Deco runs US/0 on both bands
+(`"driver_country_bands": {"ng": "US", "na": "US"}`). Under US/0 this board's
+5 GHz has no DFS: `wl chanspecs -c US -b 5 -w 80` lists only 36-48 and
+149-161 (165 at 20 MHz), with HE rows filled on 149/80 at 23.5 dBm. Plan
+since 19:07 IST: Hallway 40/80; Bedroom and Owner's Room 149/80, which hear
+each other at -76 dBm and so share air time; the Garage 149/80, which none
+of the Decos hear. Do not set a band to IN/288 while Wi-Fi 6 is wanted.
