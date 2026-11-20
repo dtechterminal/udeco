@@ -63,7 +63,10 @@ type Config struct {
 	// 2.4 GHz at 14 dBm (US/0: 24) and 5 GHz 36-48 at 16.5 dBm (US/0:
 	// 23.5), but only it has the DFS channels, at 23.5-25 dBm: {"ng": "US"}
 	// gives full power on both bands with DFS on 5 GHz (read on .232
-	// 2026-11-20). Takeover only.
+	// 2026-11-20). But IN/288 (and every real country here except US/0)
+	// disables Wi-Fi 6 rates, and US/0 has no DFS. "#a", Broadcom's
+	// all-channels table, has both but runs no radar detection; under it
+	// the agent refuses channels 120-128 (weather radar). Takeover only.
 	DriverCountryBands map[string]string `json:"driver_country_bands,omitempty"`
 	// FTSAE is the kill switch for FT-SAE (802.11r for WPA3 clients) on top
 	// of wpa3: absent or true serves it (bcmwifi.Options.FTSAE, the agents
@@ -429,13 +432,17 @@ func (c *Config) controllerIP() string {
 	return u.Hostname()
 }
 
-// validDriverCountryBands: keys "ng"/"na", values two-letter country codes.
+// validDriverCountryBands: keys "ng"/"na", values two-letter country codes
+// or "#a".
 func validDriverCountryBands(m map[string]string) error {
 	for b, c := range m {
 		if b != "ng" && b != "na" {
 			return fmt.Errorf("config: driver_country_bands: band %q is not ng or na", b)
 		}
 		c = strings.TrimSpace(c)
+		if c == "#a" {
+			continue // Broadcom's all-channels table: no radar detection, Wi-Fi 6 on 52-144 (bcmwifi.NoRadarCountry)
+		}
 		if len(c) != 2 || strings.IndexFunc(c, func(r rune) bool { return (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') }) >= 0 {
 			return fmt.Errorf("config: driver_country_bands: %s country %q is not a two-letter code", b, c)
 		}

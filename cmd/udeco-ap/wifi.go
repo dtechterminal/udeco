@@ -756,7 +756,7 @@ var bandNames = map[string]string{"ng": "2.4 GHz", "na": "5 GHz"}
 func withDriverCountryBands(d bcmwifi.Desired, bands map[string]string) (bcmwifi.Desired, []string) {
 	var notes []string
 	for _, b := range []string{"ng", "na"} {
-		cc := strings.ToUpper(strings.TrimSpace(bands[b]))
+		cc := bcmwifi.NormCountry(bands[b])
 		if cc == "" || strings.EqualFold(cc, d.Country) {
 			continue
 		}

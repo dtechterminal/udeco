@@ -666,3 +666,44 @@ func TestBandCountry(t *testing.T) {
 		}
 	}
 }
+
+func TestNoRadarCountry(t *testing.T) {
+	if NormCountry(" #a ") != "#a" || NormCountry("in") != "IN" {
+		t.Fatalf("NormCountry: %q %q", NormCountry(" #a "), NormCountry("in"))
+	}
+	if arg, same := countryArg("#a", parseCountry("#a (#a/0) <unknown>")); arg != "#a" || !same {
+		t.Fatalf("countryArg #a: %q %v", arg, same)
+	}
+	for cs, want := range map[chanspec]bool{
+		{Ctrl: 100, Width: 80}: false, {Ctrl: 132, Width: 80}: false, {Ctrl: 116, Width: 80}: true,
+		{Ctrl: 116, Width: 20}: false, {Ctrl: 116, Width: 40}: true, {Ctrl: 128, Width: 20}: true,
+	} {
+		if weatherRadar(cs) != want {
+			t.Errorf("weatherRadar(%s) = %v", cs, !want)
+		}
+	}
+	f := newFakeDev(t)
+	a := newTestApplier(f, false)
+	d := twoSSIDs()
+	d.Country = "US"
+	d.BandCountry = map[string]string{"na": "#a"}
+	d.Radios["na"] = Radio{Enabled: true, Channel: 100, Width: 80}
+	p, err := a.Plan(context.Background(), d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stepIndex(t, p, "wl -i wl1 country #a")
+	stepIndex(t, p, "wl -i wl1 chanspec 100/80")
+	d.Radios["na"] = Radio{Enabled: true, Channel: 116, Width: 80}
+	if p, err = a.Plan(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range p.Steps {
+		if a := strings.Join(s.Argv, " "); strings.HasPrefix(a, "wl -i wl1 chanspec") {
+			t.Errorf("weather-band chanspec planned under #a: %s", a)
+		}
+	}
+	if !strings.Contains(strings.Join(p.Notes, "\n"), "weather-radar") {
+		t.Errorf("no weather-radar note: %v", p.Notes)
+	}
+}

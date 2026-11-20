@@ -479,7 +479,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	cc := lr.Country.Code
 	if wantCountry != "" {
 		arg, same := countryArg(wantCountry, lr.Country)
-		cc = strings.ToUpper(wantCountry)
+		cc = NormCountry(wantCountry)
 		fb := countryFallback[cc]
 		if fb != "" && a.refused["wl -i "+p+" country "+arg] {
 			note(fmt.Sprintf("country %s refused by the driver: running %s (the driver's own rev)", arg, fb))
@@ -512,6 +512,10 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 		want, change, n := desiredChanspec(rl.Band, rl.Radio, lr.Chanspec, bc)
 		rp.Notes = append(rp.Notes, n...)
+		if rl.Band == "na" && change && NoRadarCountry(cc) && weatherRadar(want) {
+			note(fmt.Sprintf("%s covers the weather-radar band (5600-5650 MHz) and country %s runs no radar detection: keeping %s", want, cc, lr.Chanspec))
+			want, change = lr.Chanspec, false
+		}
 		if rl.Band == "na" && want != lr.Chanspec && want.dfs() {
 			// radar: follow the driver's move (dfs.go)
 			if moved, n := a.followRadar(ctx, p, want, lr.Chanspec); moved {
