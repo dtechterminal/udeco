@@ -268,7 +268,9 @@ const (
 // conn state), so whatever state it set last stays: after a reboot that is
 // often "ap-lost" (red blink, the mesh master not yet seen) or "offline".
 // "on" therefore also sets conn to "online" (verified on .232, 2026-11-19:
-// event [1,2] red blink -> [1,0] steady green).
+// event [1,2] red blink -> [1,0] steady green), or to "ap-lost" while the
+// uplink-loss hold stands (uplinkled.go): LED on must not hide it. Locate
+// leaves conn alone, so the red blink is back once the green one ends.
 //
 // The daemon has no white or blue pattern (green, red, a cyan WPS blink), so
 // UniFi's LED colour is not carried. `leds switch` changes nothing visible on
@@ -282,12 +284,19 @@ func (a *Applier) LED(ctx context.Context, mode string) error {
 	}
 	dark := ev("off", "off")
 	lit := ev("off", "done")
-	online := ev("conn", "online")
+	// during the uplink-loss hold conn stays "ap-lost" (uplinkled.go)
+	conn := connCall(connStateOnline)
+	if a.ssidsDown {
+		conn = connCall(connStateLost)
+	}
 	var calls [][]string
 	switch strings.ToLower(mode) {
 	case LEDOn:
 		a.ledOn = true
-		calls = [][]string{online, lit}
+		calls = [][]string{conn, lit}
+		if a.ssidsDown && !a.o.DryRun {
+			a.connRed = true
+		}
 	case LEDOff:
 		a.ledOn = false
 		calls = [][]string{dark}
@@ -308,6 +317,9 @@ func (a *Applier) LED(ctx context.Context, mode string) error {
 		}
 		if err := a.run(ctx, append([]string{"ubus"}, c...)...); err != nil {
 			return fmt.Errorf("bcmwifi: LED %s: %w", mode, err)
+		}
+		if c[2] == "conn" && !a.ssidsDown {
+			a.connRed = false
 		}
 	}
 	return nil

@@ -188,8 +188,10 @@ type Applier struct {
 	liveCh   map[string]int // band -> live control channel (LiveChannel)
 	// tempDeny: vif -> station -> end of its ban (tempdeny.go)
 	tempDeny map[string]map[string]time.Time
-	// ssidsDown: the uplink-loss hold (ssidhold.go)
+	// ssidsDown: the uplink-loss hold (ssidhold.go); connRed: the LED may
+	// show its red blink (uplinkled.go)
 	ssidsDown bool
+	connRed   bool
 
 	sleep func(time.Duration)
 	poll  time.Duration
