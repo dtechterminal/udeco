@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sort"
 	"strings"
@@ -37,6 +38,18 @@ func (a *agent) garageReading(ctx context.Context, s *apstate.Snapshot) {
 	if g, ok := a.wifi.(garageNet); ok {
 		a.garageStations(ctx, g, s)
 	}
+	if r, ok := a.wifi.(radarSource); ok {
+		for _, e := range r.TakeRadar() {
+			a.event(fmt.Sprintf("RADAR on 5 GHz channel %d: the radio moved to %d; back after the 30 min non-occupancy period", e.Channel, e.MovedTo))
+			a.sta.push(map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": "na", "radio_name": "wifi1",
+				"channel": e.Channel, "freq": e.Freq})
+		}
+	}
+}
+
+// radarSource is the applier's DFS radar detections (mtkwifi dfs.go).
+type radarSource interface {
+	TakeRadar() []mtkwifi.RadarEvent
 }
 
 // garageNet is the applier's proxy ARP responder and station

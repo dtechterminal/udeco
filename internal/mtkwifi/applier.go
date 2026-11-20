@@ -44,6 +44,9 @@ type Options struct {
 	// KeepSSID is the SSID kept up while the uplink is down
 	// (uplinkloss.go); "" = the first LAN SSID
 	KeepSSID string
+	// DFS lets the 5 GHz radio (RadioDef.HSFlag: the MT7663) serve 52-64
+	// (dfs.go)
+	DFS bool
 	// PinSlots keeps each WLAN on its profile slot (netdev, BSSID) while
 	// others come and go (slots.go); off = the controller's order
 	PinSlots bool
@@ -114,6 +117,8 @@ type Applier struct {
 	parpFlag  map[string]bool
 	parpJumps []string
 	parpEb    string
+	// dfs: the 5 GHz region, the DFS channel, NOPs, radar (dfs.go)
+	dfs dfsState
 }
 
 const (
@@ -138,6 +143,13 @@ func New(o Options) *Applier {
 	}
 	if o.Layout == nil {
 		o.Layout = JCOW414
+	}
+	if o.DFS {
+		l := append([]RadioDef(nil), o.Layout...)
+		for i := range l {
+			l[i].DFS = l[i].HSFlag // the MT7663
+		}
+		o.Layout = l
 	}
 	if o.VerifyTimeout <= 0 {
 		o.VerifyTimeout = 20 * time.Second
@@ -299,7 +311,7 @@ func (a *Applier) change(rd RadioDef, c RadioPlan, ok bool, w RadioPlan) radioCh
 		return radioKeep
 	}
 	if base, err := a.baseline(rd); err == nil {
-		if restartKey(base, rd, c) == restartKey(base, rd, w) {
+		if restartKey(base, rd, c) == restartKey(base, rd, w) || a.dfsLive(base, rd, c, w) {
 			return radioLive
 		}
 		return radioRestart
@@ -413,6 +425,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	a.savePins(pins)
 	a.saveLastGood(full)
 	a.flushLive(ctx)
+	a.dfsStep(ctx)
 	a.syncProxyARP(ctx)
 	return nil
 }
@@ -473,8 +486,12 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 		a.o.Logf("mtkwifi: %s: radio off", rd.Band)
 		return nil
 	}
-	if err := writeFile(a.dev(rd.Dat), profile(base, rd, rp), 0o600); err != nil {
+	pw := a.dfsProfilePlan(rd, rp)
+	if err := writeFile(a.dev(rd.Dat), profile(base, rd, pw), 0o600); err != nil {
 		return err
+	}
+	if rd.DFS && isDFS(pw.Channel) {
+		defer a.quietFor(dfsQuiet) // the CAC after the restart
 	}
 	// slot 0 first: the radio's first BSS netdev up reads the profile
 	order := make([]int, len(rp.BSS))
@@ -516,11 +533,8 @@ func (a *Applier) applyLive(ctx context.Context, rd RadioDef, c, rp RadioPlan) e
 	if c.TxPct != rp.TxPct || c.MinRSSI != rp.MinRSSI {
 		a.queueLive(rd.Band, c.TxPct != rp.TxPct)
 	}
-	base, err := a.baseline(rd)
-	if err != nil {
-		return err
-	}
-	return writeFile(a.dev(rd.Dat), profile(base, rd, rp), 0o600)
+	// a channel move into or out of 52-64 is dfsStep's, after the apply
+	return a.writeProfile(rd, rp)
 }
 
 func writeFile(p string, b []byte, mode os.FileMode) error {
@@ -913,6 +927,7 @@ func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 	if err := a.syncGuest(ctx, &a.desired, a.live, true); err != nil {
 		r.Problems = append(r.Problems, err.Error())
 	}
+	a.dfsStep(ctx)
 	a.syncProxyARP(ctx)
 	ssids := !a.settling()
 	for _, rd := range a.o.Layout {

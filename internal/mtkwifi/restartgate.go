@@ -73,5 +73,5 @@ func (a *Applier) changingRadios() func() {
 
 // restarted starts the settle time of a radio restart that just ended.
 func (a *Applier) restarted() {
-	a.quietUntil.Store(int64(a.o.mono() + a.o.Settle))
+	a.quietFor(a.o.Settle) // a longer quiet time (a CAC: dfs.go) is kept
 }

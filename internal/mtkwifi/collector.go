@@ -37,6 +37,10 @@ type CollectorOptions struct {
 	// claim RF_SCAN; HomeScan still reports the driver's cached survey.
 	// Not to be turned on before the live impact test (clients' ping stall).
 	FreshScan bool
+	// DFS: the applier may take the 5 GHz radio to 52-64 (Options.DFS):
+	// Caps lists them, and Scan refuses 5 GHz while the radio is on one
+	// (dfs.go)
+	DFS bool
 	// CacheTTL: how long the driver readings (station table and counters
 	// from the kernel log, busy time, iwconfig) are reused (0 = 5 s), so a
 	// 1 s live view does not run iwpriv and fill the small kernel log every
@@ -521,9 +525,14 @@ func (c *Collector) Caps(context.Context) (wl.Caps, error) {
 			b.Channels[20], b.Channels[40] = chans24, chans24
 		} else {
 			b.VHT = true
-			b.Channels[20] = chans5
-			b.Channels[40] = chans5[:8]
-			b.Channels[80] = chans5[:8]
+			five := chans5
+			if c.o.DFS && rd.HSFlag {
+				five = append(append([]int(nil), chans5[:4]...), chansDFS...)
+				five = append(five, chans5[4:]...)
+			}
+			b.Channels[20] = five
+			b.Channels[40] = five[:len(five)-1] // not 165
+			b.Channels[80] = five[:len(five)-1]
 		}
 		cp.Bands[rd.Band] = b
 	}

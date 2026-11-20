@@ -49,6 +49,8 @@ type RadioDef struct {
 	HWName string
 	SAE    bool // the driver serves WPA3-Personal (SAE)
 	UAPSD  bool // the driver has U-APSD (APSDCapable, per BSS)
+	// DFS: the agent may serve 52-64 on this radio (Options.DFS; dfs.go)
+	DFS bool
 	// HSFlag: the driver does proxy ARP itself (hs_flag bit 1, the
 	// MT7663; proxyarp.go)
 	HSFlag bool
@@ -230,6 +232,9 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 		allowed := chans24
 		if rd.Band == "na" {
 			allowed = chans5
+			if rd.DFS {
+				allowed = append(append([]int(nil), chans5...), chansDFS...)
+			}
 		}
 		if ri.Channel != 0 {
 			if contains(allowed, ri.Channel) {
@@ -533,6 +538,9 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 		}
 	}
 	kv["TxPower"] = strconv.Itoa(rp.TxPct)
+	if rd.Band == "na" && isDFS(rp.Channel) {
+		kv["CountryRegionABand"] = "0" // the only region with 52-64 (dfs.go)
+	}
 	var auth, encr, hide, nofw, maxsta, mfpc, mfpr []string
 	for i, b := range rp.BSS {
 		kv[fmt.Sprintf("SSID%d", rp.slot(i)+1)] = b.SSID

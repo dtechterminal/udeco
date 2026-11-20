@@ -347,7 +347,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		// firewall of the agent's own
 		if o.col == nil {
 			o.col = mtkwifi.NewCollector(mtkwifi.CollectorOptions{Root: o.root, Run: o.run, Model: "JCOW414",
-				FreshScan: cfg.SiteSurvey, RunDir: o.runDir})
+				FreshScan: cfg.SiteSurvey, RunDir: o.runDir, DFS: cfg.DFS})
 		}
 		if cfg.SiteSurvey {
 			o.logf("site_survey: on: the controller's scan, spectrum-scan and quick-scan commands run a driver site survey (the radio leaves its channel for a few seconds); never periodic")
@@ -361,7 +361,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 			o.newWifi = func(bo bcmwifi.Options) wifiApplier {
 				return mtkwifi.New(mtkwifi.Options{Root: bo.Root, Run: bo.Run, StateDir: bo.StateDir, RunDir: bo.RunDir,
 					Uplink: bo.Uplink, DryRun: bo.DryRun, WPA3: bo.WPA3, Logf: bo.Logf, KeepSSID: cfg.UplinkLossSSID,
-					PinSlots: cfg.BSSPinning, ProxyARP: cfg.proxyARP()})
+					PinSlots: cfg.BSSPinning, ProxyARP: cfg.proxyARP(), DFS: cfg.DFS})
 			}
 		}
 	}
@@ -637,8 +637,12 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 		if !ok {
 			continue
 		}
-		a.radioCaps[band] = apstate.RadioCaps{IEEEModes: rp.IEEEModes, RadioCaps: rp.RadioCaps,
+		rc := apstate.RadioCaps{IEEEModes: rp.IEEEModes, RadioCaps: rp.RadioCaps,
 			RadioCaps2: rp.RadioCaps2, HasDFS: rp.HasDFS, HasFCCDFS: rp.HasFCCDFS}
+		if band == "na" && a.cfg.jio() && a.cfg.DFS {
+			rc.HasDFS = true // 52-64 (mtkwifi dfs.go); has_fccdfs is the US rules', not IN's
+		}
+		a.radioCaps[band] = rc
 		radios = append(radios, inform.Radio{Name: fmt.Sprintf("wifi%d", i), Radio: band, Channel: "auto",
 			MinTxpower: rp.MinTx, MaxTxpower: rp.MaxTx, NSS: rp.NSS, BuiltinAnt: true})
 	}

@@ -198,6 +198,10 @@ type fakeDev struct {
 	root string
 	log  []string
 	fail map[string]bool // command prefixes that fail
+	// na: the 5 GHz channel iwconfig shows (0: 157); `iwpriv rai0 set
+	// Channel=N` moves it unless noMove
+	na     int
+	noMove bool
 }
 
 func newFakeDev(t *testing.T) *fakeDev {
@@ -288,6 +292,10 @@ func (f *fakeDev) Run(_ context.Context, name string, args ...string) ([]byte, e
 		case args[0] == "link" && args[1] == "del":
 			os.RemoveAll(filepath.Join(f.root, "sys/class/net", args[2]))
 		}
+	case "iwpriv":
+		if len(args) == 3 && args[0] == "rai0" && args[1] == "set" && strings.HasPrefix(args[2], "Channel=") && !f.noMove {
+			f.na, _ = strconv.Atoi(strings.TrimPrefix(args[2], "Channel="))
+		}
 	case "iwconfig":
 		// the BSS serves its profile slot's SSID (the driver read the
 		// profile when the radio's first BSS came up)
@@ -297,7 +305,11 @@ func (f *fakeDev) Run(_ context.Context, name string, args ...string) ([]byte, e
 					b, _ := os.ReadFile(filepath.Join(f.root, rd.Dat))
 					s, _ := getKey(b, "SSID"+strconv.Itoa(i+1))
 					if rd.Band == "na" { // the MT7663's line goes on
-						return []byte(ifc + `  RTWIFI SoftAP  ESSID:"` + s + `"  Nickname:""` + "\n  NWID:off/any  Mode:Master  Channel=157\n"), nil
+						ch := 157
+						if f.na != 0 {
+							ch = f.na
+						}
+						return []byte(ifc + `  RTWIFI SoftAP  ESSID:"` + s + `"  Nickname:""` + "\n  NWID:off/any  Mode:Master  Channel=" + strconv.Itoa(ch) + "\n"), nil
 					}
 					return []byte(ifc + `  RTWIFI SoftAP  ESSID:"` + s + `"  ` + "\n  Mode:Master  Channel=6\n"), nil
 				}

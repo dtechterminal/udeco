@@ -5,9 +5,12 @@ package main
 import (
 	"context"
 	"net"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 )
 
 type netWifi struct {
@@ -81,5 +84,40 @@ func TestProxyARPConfig(t *testing.T) {
 	}
 	if _, err := parseConfig([]byte(`{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","takeover":true,"proxy_arp":false}`)); err == nil {
 		t.Error("Deco accepted proxy_arp")
+	}
+}
+
+type radarWifi struct {
+	wifiApplier
+	ev []mtkwifi.RadarEvent
+}
+
+func (r *radarWifi) TakeRadar() []mtkwifi.RadarEvent { ev := r.ev; r.ev = nil; return ev }
+
+// TestGarageRadar: a radar detection the applier saw goes to the
+// controller as EVT_AP_RadarDetected (a custom alert, as a U6's).
+func TestGarageRadar(t *testing.T) {
+	a := &agent{cfg: &Config{Platform: "jio-mtk", Takeover: true, DFS: true}}
+	a.takeover.Store(true)
+	a.wifi = &radarWifi{ev: []mtkwifi.RadarEvent{{Channel: 52, MovedTo: 149, Freq: 5260}}}
+	root := t.TempDir()
+	a.events = &eventLog{path: filepath.Join(root, "events.log"), root: root, clock: time.Now, logf: func(string, ...any) {}}
+	a.garageReading(context.Background(), &apstate.Snapshot{})
+	if len(a.sta.queue) != 1 {
+		t.Fatalf("queue %v", a.sta.queue)
+	}
+	e := a.sta.queue[0]
+	if e["event_string"] != "EVT_AP_RadarDetected" || e["radio"] != "na" || e["channel"] != 52 || e["freq"] != 5260 {
+		t.Errorf("event %v", e)
+	}
+}
+
+func TestDFSConfig(t *testing.T) {
+	base := `{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","platform":"jio-mtk","model":"U7LT","takeover":true`
+	if c, err := parseConfig([]byte(base + `,"dfs":true}`)); err != nil || !c.DFS {
+		t.Errorf("jio: %v", err)
+	}
+	if _, err := parseConfig([]byte(`{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","takeover":true,"dfs":true}`)); err == nil {
+		t.Error("Deco accepted dfs")
 	}
 }

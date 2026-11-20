@@ -145,6 +145,13 @@ type Config struct {
 	// of the WLANs the controller set proxy ARP on (mtkwifi proxyarp.go);
 	// false leaves the requests going out on the air. On by default.
 	ProxyARP *bool `json:"proxy_arp,omitempty"`
+	// DFS (platform jio-mtk) lets the 5 GHz radio serve the controller's
+	// DFS channels 52-64 (the driver's region goes from 10 to 0 live, a
+	// 65 s channel availability check, radar followed and reported as
+	// EVT_AP_RadarDetected; mtkwifi dfs.go) and claims has_dfs. Off by
+	// default until the region check of docs/deco/features/garage-parity.md
+	// passed on the unit.
+	DFS bool `json:"dfs,omitempty"`
 }
 
 // uplinkLoss: the SSIDs are isolated on uplink loss (platform jio-mtk)
@@ -246,8 +253,8 @@ func (c *Config) validate() error {
 	default:
 		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
 	}
-	if (c.UplinkLoss != nil || c.UplinkLossSSID != "" || c.BSSPinning || c.ProxyARP != nil) && !c.jio() {
-		return errors.New("config: uplink_loss, uplink_loss_ssid, bss_pinning and proxy_arp are for platform " + PlatformJio + " only")
+	if (c.UplinkLoss != nil || c.UplinkLossSSID != "" || c.BSSPinning || c.ProxyARP != nil || c.DFS) && !c.jio() {
+		return errors.New("config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp and dfs are for platform " + PlatformJio + " only")
 	}
 	if (len(c.PortsUnlocked) > 0 || c.PortsConfirmS != 0 || c.PortsLossS != 0) && !c.jio() {
 		return errors.New("config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform " + PlatformJio + " only")

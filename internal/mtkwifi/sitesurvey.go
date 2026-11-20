@@ -160,6 +160,16 @@ func (c *Collector) Scan(ctx context.Context, band string) (*apstate.ScanResult,
 	if err != nil {
 		return nil, err
 	}
+	if c.o.DFS && band == "na" {
+		// never off a DFS channel: its CAC would have to run again
+		if out, err := c.o.Run.Run(ctx, "iwconfig", main); err == nil {
+			if m := chanLineRE.FindSubmatch(out); m != nil {
+				if ch, _ := strconv.Atoi(string(m[1])); isDFS(ch) {
+					return nil, fmt.Errorf("mtkwifi: %s is on DFS channel %d: no off-channel scan", main, ch)
+				}
+			}
+		}
+	}
 	if err := c.lockScan(ctx); err != nil {
 		return nil, err
 	}
