@@ -184,6 +184,7 @@ type Applier struct {
 	txMu     sync.Mutex
 	txCeil   map[string]float64
 	txRep    map[string]txReport
+	liveCh   map[string]int // band -> live control channel (LiveChannel)
 
 	sleep func(time.Duration)
 	poll  time.Duration

@@ -733,7 +733,7 @@ func TestIntentRadios(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			in, notes := IntentFromCfg(tc.cfg)
-			if got := in.Radios[tc.band]; got != tc.want {
+			if got := in.Radios[tc.band]; !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("got %+v, want %+v (notes %q)", got, tc.want, notes)
 			}
 			if tc.note != "" && !hasNote(notes, tc.note) {

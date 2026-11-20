@@ -46,6 +46,10 @@ type RadioIntent struct {
 	MinRSSI     int    // dBm (negative); 0 = off
 	MaxClients  int    // per radio (stamgr load balance); 0 = no limit
 	BandSteer   string // "prefer_5g", "equal"; "" = off for this radio's WLANs
+	// Blocked: radio.N.blklst, the channels the radio's automatic channel
+	// must not take (comma or space separated, as the U6 Pro's
+	// block_acs_channel takes them)
+	Blocked []int
 }
 
 // WLANIntent is one controller WLAN across the bands it is on (the
@@ -238,6 +242,13 @@ func intentRadios(cfg Cfg, in *Intent, nb *noteList) map[string]string {
 			r.Width, _ = strconv.Atoi(m[1])
 		} else if mode != "" {
 			nb.addf("radio.%s (%s): ieee_mode %q has no channel width: width left to the backend", n, band, mode)
+		}
+		for _, f := range strings.FieldsFunc(cfg[p+"blklst"], func(c rune) bool { return c == ',' || c == ' ' }) {
+			if v, err := strconv.Atoi(f); err == nil && v > 0 {
+				r.Blocked = append(r.Blocked, v)
+			} else {
+				nb.addf("radio.%s (%s): blklst entry %q is not a channel: ignored", n, band, f)
+			}
 		}
 		r.TxPowerMode, r.TxPower = txPower(cfg[p+"txpower_mode"], cfg[p+"txpower"], func(s string) {
 			nb.addf("radio.%s (%s): %s", n, band, s)
@@ -1127,7 +1138,7 @@ var aaaRules = map[string]rule{
 
 var radioRules = map[string]rule{
 	"phyname": rRead, "ieee_mode": rRead, "channel": rRead, "txpower": rRead, "txpower_mode": rRead,
-	"countrycode": rRead, "status": rRead,
+	"countrycode": rRead, "status": rRead, "blklst": rRead,
 
 	// Ubiquiti driver tuning, or settings the backend derives from its own caps
 	"ack.auto": rQuiet, "acktimeout": rQuiet, "ampdu.status": rQuiet, "clksel": rQuiet,

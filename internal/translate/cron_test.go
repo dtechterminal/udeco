@@ -37,3 +37,22 @@ func TestIntentDFSReset(t *testing.T) {
 		}
 	}
 }
+
+// radio.N.blklst: the channels the controller keeps the radio's automatic
+// channel off.
+func TestIntentBlockedChannels(t *testing.T) {
+	cfg := "radio.1.phyname=wifi0\nradio.1.ieee_mode=11nght20\nradio.1.blklst=12,13\n" +
+		"radio.2.phyname=wifi1\nradio.2.ieee_mode=11naht80\nradio.2.blklst=52 56 bogus\n"
+	in, notes := IntentFromCfg(cfg)
+	if got := in.Radios["ng"].Blocked; len(got) != 2 || got[0] != 12 || got[1] != 13 {
+		t.Errorf("ng blocked %v", got)
+	}
+	if got := in.Radios["na"].Blocked; len(got) != 2 || got[0] != 52 || got[1] != 56 {
+		t.Errorf("na blocked %v", got)
+	}
+	for _, n := range notes {
+		if strings.Contains(n, "blklst") && !strings.Contains(n, "bogus") {
+			t.Errorf("note %q", n)
+		}
+	}
+}

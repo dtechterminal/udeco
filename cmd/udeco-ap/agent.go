@@ -296,8 +296,11 @@ type agent struct {
 	sta   staEvents // station events for the controller (staevents.go); loop goroutine
 	// radarQ: radar moves from the Wi-Fi worker for the controller
 	// (dfs.go)
-	radarMu sync.Mutex
-	radarQ  []bcmwifi.RadarEvent
+	// autoPick: band -> the auto channel picked this run (autochan.go,
+	// worker goroutine)
+	autoPick map[string]int
+	radarMu  sync.Mutex
+	radarQ   []bcmwifi.RadarEvent
 	// hapd follows the hostapd control sockets' station events (nil: not
 	// running; staevents.go); readAt: when the reading in use started
 	hapd   staSource

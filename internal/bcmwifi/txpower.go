@@ -108,6 +108,23 @@ func (a *Applier) TxPower(band string) (mode string, dbm int, ok bool) {
 	return r.Mode, r.DBm, ok && r.DBm > 0
 }
 
+// LiveChannel is band's control channel as the last plan read it (0
+// before a plan).
+func (a *Applier) LiveChannel(band string) int {
+	a.txMu.Lock()
+	defer a.txMu.Unlock()
+	return a.liveCh[band]
+}
+
+func (a *Applier) setLiveChannel(band string, ch int) {
+	a.txMu.Lock()
+	defer a.txMu.Unlock()
+	if a.liveCh == nil {
+		a.liveCh = map[string]int{}
+	}
+	a.liveCh[band] = ch
+}
+
 func (a *Applier) setTxReport(band string, r txReport) {
 	a.txMu.Lock()
 	defer a.txMu.Unlock()

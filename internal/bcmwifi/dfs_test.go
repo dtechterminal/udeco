@@ -191,3 +191,23 @@ func TestRadarMove(t *testing.T) {
 		t.Errorf("radar re-reported after dfs-reset: %+v", r3.Radar)
 	}
 }
+
+// RadioRestart: the plan takes a radio down (a full takeover, a channel
+// change); a live repair does not.
+func TestPlanRadioRestart(t *testing.T) {
+	ctx := context.Background()
+	f := newFakeDev(t)
+	a := newTestApplier(f, false)
+	d := twoSSIDs()
+	p, _ := a.Plan(ctx, d)
+	if !p.RadioRestart() {
+		t.Error("takeover plan does not restart a radio")
+	}
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	f.state["wl1 bssload"] = "0"
+	if p2, _ := a.Plan(ctx, d); p2.Empty() || p2.RadioRestart() {
+		t.Errorf("live repair:\n%s", p2)
+	}
+}

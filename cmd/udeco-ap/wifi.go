@@ -36,6 +36,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -369,6 +370,21 @@ func (a *agent) provision(ctx context.Context, pv provision) {
 	}
 	for _, n := range p.Notes {
 		a.logf("wifi: note: %s", n)
+	}
+	// the auto channel rides a radio restart the plan makes anyway
+	// (autochan.go)
+	if p.RadioRestart() {
+		if pd, notes := a.autoChannels(ctx, d, in); !reflect.DeepEqual(pd.Radios, d.Radios) {
+			for _, n := range notes {
+				a.logf("wifi: %s", n)
+			}
+			if pp, err := a.wifi.Plan(ctx, pd); err == nil {
+				pf, _ := a.autoChannels(ctx, full, in) // the same picks (autoPick)
+				d, full, p = pd, pf, pp
+			} else {
+				a.logf("wifi: auto channel: plan: %v (the live channels kept)", err)
+			}
+		}
 	}
 	if p.Empty() {
 		a.logf("wifi: system_cfg %s (%s) is already live", pv.hash, pv.why)

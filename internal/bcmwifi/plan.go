@@ -137,6 +137,20 @@ type Plan struct {
 // Empty reports whether the plan changes nothing.
 func (p Plan) Empty() bool { return len(p.Steps) == 0 }
 
+// RadioRestart: the plan takes a radio down (a full reconcile, a PHY
+// change, a dwds repair), so a channel change in it costs no extra outage.
+func (p Plan) RadioRestart() bool {
+	if p.disruptive {
+		return true
+	}
+	for _, s := range p.Steps {
+		if s.Kind == StepCmd && len(s.Argv) == 4 && s.Argv[0] == "wl" && s.Argv[3] == "down" {
+			return true
+		}
+	}
+	return false
+}
+
 // String lists the notes and steps, one per line, without secrets.
 func (p Plan) String() string {
 	var b strings.Builder
@@ -431,6 +445,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		return cmdStep(desc, append([]string{"wl", "-i", p}, args...)...)
 	}
 	cs := lr.Chanspec
+	a.setLiveChannel(rl.Band, cs.Ctrl)
 	cc := lr.Country.Code
 	if wantCountry != "" {
 		arg, same := countryArg(wantCountry, lr.Country)
