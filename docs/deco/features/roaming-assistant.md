@@ -25,7 +25,7 @@
   comes from that AP's own template, not from this factory). `status` uses the enabled/disabled
   boolean helper (`OhAbgZpGPkrXsqI`).
 - A UAP applies it in its QCA driver: `btm_disassoc 1` and `btm_dis_thld <rssi>` (ubntbox strings,
-  docs/reference/u6pro/actions-scans/strings-ubntbox.txt). The real U6 Pro claims wifi_caps2
+  U6 Pro ubntbox strings). The real U6 Pro claims wifi_caps2
   0x4030F0, which includes 0x20.
 
 ### What the agent does

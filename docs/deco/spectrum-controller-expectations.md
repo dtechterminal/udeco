@@ -39,29 +39,29 @@ Paths are relative to `~/udeco/docs/reference/u6pro/` unless stated otherwise. `
   ```
   - Each band took 12-14 s on 5 GHz (6 blocks at 80 MHz) and 25-27 s on 2.4 GHz (13 channels).
   - On both nights, the next band was requested 1 s after `reportok`.
-- VERIFIED, mcad strings `AS/strings-mcad.txt:1769-1774`: `quick-scan`, `[quick-scan] skipped: already in progress`, `scan-band`, `scan-bw`, `[quick-scan] band/bw: %d %d`, `airtime-scan`.
+- VERIFIED, mcad strings `U6 Pro mcad strings`: `quick-scan`, `[quick-scan] skipped: already in progress`, `scan-band`, `scan-bw`, `[quick-scan] band/bw: %d %d`, `airtime-scan`.
 - VERIFIED, the AP side: `AS/fw/usr/bin/syswrapper.sh:2679-2686` (`airtime-scan`) runs `mtk_quick_airtime_scan` on MediaTek and `ath_quick_airtime_scan` otherwise. The QCA version (`AS/fw/usr/etc/platdep_funcs.sh:502-597`):
   - touches `/var/run/quickscan.start`;
   - maps band 0/1/2 to radios by `2g/5g/6g_maxchwidth`;
   - keeps the existing `/var/run/rftable_<radio>` (writes `{}` only when the file is empty, `:574-575`);
   - runs `ubntquickscan -i <radio> -j <vap> -y <bw>`, with bw 240 rewritten to 320 on band 1 (`:589-593`).
 - **`scan-bw` is the controller's choice, not the radio's operating width.** The 5 GHz VAP ran at 160 MHz (`wifi1ap1 bw 160`), yet the controller asked for 80, and the 2.4 GHz VAP ran at 20 and the controller asked for 20. (VERIFIED from one site.) That the controller caps 5 GHz quick-scan at 80 MHz is INFERENCE.
-- **Sequencing.** mcad logs `complete spectral scan` only when the inform carrying the new rftable is acknowledged (`AS/strings-mcad.txt:1637-1639`, `:1680` for the failure case). The controller then sends the next band.
+- **Sequencing.** mcad logs `complete spectral scan` only when the inform carrying the new rftable is acknowledged (`U6 Pro mcad strings`, `:1680` for the failure case). The controller then sends the next band.
   - INFERENCE: the controller waits for the finished report before sending the next band. An agent that never reports a fresh table probably stalls the run after the first band.
   - No controller-side timeout value is known.
 
 ### 2.2 `cmd spectrum-scan` (manual "RF scan" button)
 
-- VERIFIED: the payload is `spectrum-cfg` plus `infinite` (`AS/strings-mcad.txt:1775-1782`). mcad writes it to `/tmp/spectrum.cfg`.
-- VERIFIED: `spectrum_scan` (`platdep_funcs.sh:416-470`) resets every radio's rftable to `{}` and runs `ubntquickscan -i wifiN -j vap -a`, where `-a` means "Scan all supported bandwidths" (`AS/strings-ubntquickscan.txt:195`).
+- VERIFIED: the payload is `spectrum-cfg` plus `infinite` (`U6 Pro mcad strings`). mcad writes it to `/tmp/spectrum.cfg`.
+- VERIFIED: `spectrum_scan` (`platdep_funcs.sh:416-470`) resets every radio's rftable to `{}` and runs `ubntquickscan -i wifiN -j vap -a`, where `-a` means "Scan all supported bandwidths" (`U6 Pro ubntquickscan strings`).
   - So a manual scan legitimately returns rows at **several widths** (20/40/80/160).
   - A nightly quick-scan returns rows at **one width**.
-- VERIFIED: mca-monitor resets on `spectral scan timed out` / `abnormal end` (`AS/strings-mcad.txt:748-755`).
+- VERIFIED: mca-monitor resets on `spectral scan timed out` / `abnormal end` (`U6 Pro mcad strings`).
 
 ### 2.3 `cmd scan` / `scan_band` (neighbour scan)
 
 - These feed scan_table, not spectrum_table: `ath_scan` uses `iwlist` (active) or `ubntrfclient -f` (passive, `platdep_funcs.sh:270-300`).
-- VERIFIED: mcad skips scan cmds on a mesh downlink (`skip scan cmd due to AP is downlink`, `AS/strings-mcad.txt:1767`).
+- VERIFIED: mcad skips scan cmds on a mesh downlink (`skip scan cmd due to AP is downlink`, `U6 Pro mcad strings`).
 
 ---
 
@@ -75,23 +75,23 @@ Real rows: `AS/rftable_wifi0.txt`, `AS/rftable_wifi1.json`, `AS/mca-dump.redacte
 | `width` | int, MHz | 20 on ng, 80 on na | Equals the `scan-bw` asked for | VERIFIED |
 | `center_freq` | int, MHz | 2412..2472, then 5210, 5290, 5530, 5610, 5690, 5775 | Centre of the whole block, not of the primary channel | VERIFIED |
 | `utilization` | int, % | ng 26..54. na 2..48 (36: 11, 149: 48, 132: 6) | Share of the dwell on that channel or block during which the medium was busy | VERIFIED as %. INFERENCE: busy means CCA-busy from any source (other BSSes plus non-Wi-Fi energy). How a block is summed (mean or max of its 20 MHz parts) is unknown. |
-| `interference` | int, dBm (negative) | ng -50..-64. na -59 (36), -81, -80, -89, **-96** (132), -86 (149) | Received power measured on that channel during the dwell. On a quiet block it falls to the noise floor (-96 equals scan_table `noise` -96). | Values VERIFIED. Definition INFERENCE: it comes from the QCA CBS survey `quick_scan_interf` (`AS/strings-ubntquickscan.txt:138, 142, 160`, `Interference = %d dBm`). It is **not** the noise floor: the same radio reports noise -96 and athstats `noise_floor` -95/-94. |
-| `interference_type` | array of strings | `[]` on every row | The non-Wi-Fi interferer classes found. The only producer seen is the QCA spectral classifier in `ubntrfclient`, whose name strings are `None, Microwave, Bluetooth, DECT phone, Tone, Other` (`AS/strings-ubntrfclient.txt:616-621`), with detector messages for MWO/CW/WiFi/FHSS/BT (`:521-549`). | `[]` VERIFIED. The vocabulary that would go in the array is INFERENCE. |
+| `interference` | int, dBm (negative) | ng -50..-64. na -59 (36), -81, -80, -89, **-96** (132), -86 (149) | Received power measured on that channel during the dwell. On a quiet block it falls to the noise floor (-96 equals scan_table `noise` -96). | Values VERIFIED. Definition INFERENCE: it comes from the QCA CBS survey `quick_scan_interf` (`U6 Pro ubntquickscan strings`, `Interference = %d dBm`). It is **not** the noise floor: the same radio reports noise -96 and athstats `noise_floor` -95/-94. |
+| `interference_type` | array of strings | `[]` on every row | The non-Wi-Fi interferer classes found. The only producer seen is the QCA spectral classifier in `ubntrfclient`, whose name strings are `None, Microwave, Bluetooth, DECT phone, Tone, Other` (`U6 Pro ubntrfclient strings`), with detector messages for MWO/CW/WiFi/FHSS/BT (`:521-549`). | `[]` VERIFIED. The vocabulary that would go in the array is INFERENCE. |
 | `other_bss_count` | int | 0 on every row | Probably the number of other BSSes on the channel. `ubntrfclient` has `ubnt_get_acs_nbss_number` and `acs_nbss_list` (`:350, 567, 577`). | 0 VERIFIED. Meaning INFERENCE. |
 | `perf_index` | int | 0 on every row | Unknown. Probably a per-channel score from the full spectral or ACS path. | 0 VERIFIED. Meaning unknown. |
-| `total_samples` | int | 0 on every row | Probably the number of spectral FFT samples behind the classification (`Spectral Classifier: Number of samples captured %zu`, `AS/strings-ubntrfclient.txt:420`). | 0 VERIFIED. Meaning INFERENCE. |
+| `total_samples` | int | 0 on every row | Probably the number of spectral FFT samples behind the classification (`Spectral Classifier: Number of samples captured %zu`, `U6 Pro ubntrfclient strings`). | 0 VERIFIED. Meaning INFERENCE. |
 
 **Notes on the real numbers.**
 - The 2.4 GHz `interference` values repeat across neighbouring channels: 1-3 read -52, 4-5 read -64, 6-9 read -53, 10-12 read -50, and 13 reads -57. The QCA survey seems to measure power over spans wider than 20 MHz (INFERENCE).
 - Interference values are **stronger** than any neighbour BSS in scan_table (the strongest was -72 on channel 13 against interference -57). So `interference` is not "the strongest BSS RSSI in scan_table". scan_table holds only own-channel beacons, and part of the measured power may be non-beacon traffic or non-Wi-Fi energy. Without the driver source I cannot say which.
-- The row schema seems to come from a shared libubnt routine, `prepare_spectrum_table_usi`. It appears in both `ubntquickscan` (`AS/strings-ubntquickscan.txt:73`) and `ubntrfclient` (`AS/strings-ubntrfclient.txt:88`), so every scanner writes the same 9 keys (INFERENCE).
+- The row schema seems to come from a shared libubnt routine, `prepare_spectrum_table_usi`. It appears in both `ubntquickscan` (`U6 Pro ubntquickscan strings`) and `ubntrfclient` (`U6 Pro ubntrfclient strings`), so every scanner writes the same 9 keys (INFERENCE).
 - `ubntquickscan` also has a `%d_%d` format (`:212`). This is probably a `channel_width` key for merging rows into an existing rftable (INFERENCE).
 - **What the controller reads (SECONDARY).** `docs/internals.md:761-764` lists `spectrum_table: [{channel, width, center_freq, utilization, interference}]` plus `spectrum_table_time`, served to the UI as `stat/spectrum-scan/<mac>`. No local note shows the controller reading `interference_type`, `other_bss_count`, `perf_index` or `total_samples`.
   - Because a real AP sends them as 0/`[]` on the nightly path, sending the same values is safe either way.
   - Send all 9 keys so that a parser expecting them does not fail. Whether the controller would fail without them is unknown.
 
 ### 3.1 The custom alert sent with the scan
-VERIFIED: `ubntquickscan` builds a `mca-custom-alert.sh` call with `event_string`, `radio`, `radio_name`, `channel`, `width`, `center_freq`, `interference` and `utilization` (`AS/strings-ubntquickscan.txt:213`), and the string `EVT_AP_QuickScanEvent` sits next to `ubnt_send_event_to_net` (`:240-241`).
+VERIFIED: `ubntquickscan` builds a `mca-custom-alert.sh` call with `event_string`, `radio`, `radio_name`, `channel`, `width`, `center_freq`, `interference` and `utilization` (`U6 Pro ubntquickscan strings`), and the string `EVT_AP_QuickScanEvent` sits next to `ubnt_send_event_to_net` (`:240-241`).
 - INFERENCE: after a scan the AP pushes one event with the figures for its current channel. The controller may log it or show it as an event.
 - Whether the optimiser needs it is unknown. It is optional for a first version.
 
@@ -133,9 +133,9 @@ VERIFIED: `ubntquickscan` builds a `mca-custom-alert.sh` call with `event_string
 | `spectrum_table_time` | each `radio_table[]` row | 66142 / 66155 at rest | **Age in seconds** of that radio's table: uptime minus `/var/run/rftable_<radio>.timestamp` (816096 − 749298 = 66798 matched the dump's 66799). Each radio has its own value, and it keeps growing until the next scan of that band. | VERIFIED (`study-actions-scans.md:128, 257`; `AS/rftable_wifi0.txt` tail `749298` / `815849.55`) |
 | `spectrum_table` | each `radio_table[]` row | present at rest | Present while the rftable file exists. It is not cleared after reporting. | VERIFIED at rest. Behaviour right after a reboot (empty `/var/run`) is unknown. |
 | `spectrum_scanning` | top level | `false` | `true` while an RF scan runs (SECONDARY, `docs/internals.md:763-764`). INFERENCE: it is tied to the manual `spectrum-scan` (`/var/run/spectrum-scan.start`). | |
-| `quickscan_scanning` | top level | **absent** | The string sits next to `spectrum_scanning` (`AS/strings-mcad.txt:2425-2426`), and the marker `/var/run/quickscan.start` exists (`:1912`). INFERENCE: sent (true) only while a quick-scan runs. | |
-| `spectrum_scanning_abnormal` | each `radio_table[]` row | `false` | INFERENCE: true after an abnormal or timed-out scan (`rftable_%s.abnormal` / `.pre_abnormal` markers, `AS/strings-mcad.txt:752-754`; `ubntrfclient` writes `.abnormal`). | |
-| `rssi_histograms`, `suggested_channels` | each `radio_table[]` row | absent | Conditional. `suggested_channels` comes from `ubntrfclient` (`/var/run/rftable_best_channel_%s`, `AS/strings-ubntrfclient.txt:382-383`), meaning the AP's own suggestion from the full spectral path. Not sent on the nightly path. | VERIFIED absent. Meaning INFERENCE. |
+| `quickscan_scanning` | top level | **absent** | The string sits next to `spectrum_scanning` (`U6 Pro mcad strings`), and the marker `/var/run/quickscan.start` exists (`:1912`). INFERENCE: sent (true) only while a quick-scan runs. | |
+| `spectrum_scanning_abnormal` | each `radio_table[]` row | `false` | INFERENCE: true after an abnormal or timed-out scan (`rftable_%s.abnormal` / `.pre_abnormal` markers, `U6 Pro mcad strings`; `ubntrfclient` writes `.abnormal`). | |
+| `rssi_histograms`, `suggested_channels` | each `radio_table[]` row | absent | Conditional. `suggested_channels` comes from `ubntrfclient` (`/var/run/rftable_best_channel_%s`, `U6 Pro ubntrfclient strings`), meaning the AP's own suggestion from the full spectral path. Not sent on the nightly path. | VERIFIED absent. Meaning INFERENCE. |
 | `scan_radio_table` | top level | `[]` | Leave it empty. | VERIFIED |
 
 **Completion handshake.** This is what the agent must do so that the second band gets requested:
@@ -186,7 +186,7 @@ VERIFIED: `ubntquickscan` builds a `mca-custom-alert.sh` call with `event_string
 - A non-UniFi row on a site SSID raises a rogue-AP alarm.
 - `is_unifi` + `serialno` mark a sibling UniFi AP.
 
-**Both key sets exist in firmware.** mcad has `is_ubnt` next to `scan_table` (`AS/strings-mcad.txt:1919-1920`) and also `is_adhoc, is_unifi, anonymous_network_application_id, serialno, fw_version` right after the scan-row keys (`:2264-2268`). INFERENCE: mcad adds `is_unifi`, `serialno` and related keys only for beacons that carry a UniFi vendor IE, and sends `is_ubnt` on every row.
+**Both key sets exist in firmware.** mcad has `is_ubnt` next to `scan_table` (`U6 Pro mcad strings`) and also `is_adhoc, is_unifi, anonymous_network_application_id, serialno, fw_version` right after the scan-row keys (`:2264-2268`). INFERENCE: mcad adds `is_unifi`, `serialno` and related keys only for beacons that carry a UniFi vendor IE, and sends `is_ubnt` on every row.
 
 **Does it matter for the optimiser?** INFERENCE: hardly.
 - Since a real AP's scan_table covers only its own channel, the optimiser cannot use it to rank other channels. Per-channel information comes from spectrum_table.
@@ -204,7 +204,7 @@ VERIFIED: `ubntquickscan` builds a `mca-custom-alert.sh` call with `event_string
 ## 8. MediaTek path (what a real U6-Lite runs)
 
 - VERIFIED: `syswrapper.sh` picks `mtk_quick_airtime_scan` when `MTK_UAP=1` (`:22`, `:2682-2683`), and `spectrum_scan_clean` only on MT7615 (`:2693-2697`). **Neither function is defined in any local file.** They live in the MediaTek build of `platdep_funcs.sh`, which we do not have. `config-apply/scripts/` holds the same QCA copy.
-- VERIFIED: the same mcad binary knows MT7603/MT7992/MT7981/MT7622/MT7615/MT7915 and keeps the markers `/var/run/rftable.start` and `/var/run/rftable_%s.complete` next to `/var/run/quickscan.start` (`AS/strings-mcad.txt:1904-1912`). It reads `/var/run/rftable_%s` with one code path for every platform (`:2174-2179`).
+- VERIFIED: the same mcad binary knows MT7603/MT7992/MT7981/MT7622/MT7615/MT7915 and keeps the markers `/var/run/rftable.start` and `/var/run/rftable_%s.complete` next to `/var/run/quickscan.start` (`U6 Pro mcad strings`). It reads `/var/run/rftable_%s` with one code path for every platform (`:2174-2179`).
 - INFERENCE: a U6-Lite receives the same `quick-scan` / `spectrum-scan` cmds and reports through the same rftable file and the same `spectrum_table` keys. What its MTK scanner puts in `interference` (power or noise) and `utilization` cannot be checked here.
   - This matters because we report as UAL6. If MTK units send noise-floor-like `interference`, the controller must cope with that too.
   - Settling it needs a U6-Lite firmware image (its `platdep_funcs.sh` and scanner binary) or a U6-Lite mca-dump.

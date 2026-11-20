@@ -121,8 +121,8 @@ no other key material are sent.
 
 ## How a UniFi AP builds it
 
-ubntbox format strings (docs/reference/u6pro/actions-scans/strings-ubntbox.txt around
-`aaa.%d.iapp_key`; config-apply/ubntbox-config-strings.txt):
+ubntbox format strings (U6 Pro ubntbox strings around
+`aaa.%d.iapp_key`; U6 Pro ubntbox config strings):
 
 ```
 nas_identifier=$bssid            (default; Ubiquiti's hostapd expands it)

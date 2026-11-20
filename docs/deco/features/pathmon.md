@@ -25,7 +25,7 @@ Syslog (syslogfwd.go) and RADIUS filter (radiusfilter.go) point here too.
   ```
 
   The U6 Pro's ubntbox also knows `target.N.type=host` with `target.N.addr`
-  (`strings-ubntbox.txt`).
+  (`U6 Pro ubntbox strings`).
 - The inform reply's `include_blocks` lists `"pathmon"`
   (`devmgr.l.PfwtrEhZ`). The agent sends the object whenever monitoring is
   on, so the request needs no answer of its own.

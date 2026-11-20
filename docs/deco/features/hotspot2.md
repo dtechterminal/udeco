@@ -50,7 +50,7 @@ wireless.N.dgaf_disable=enabled|disabled               (default: on for a guest 
 
 Booleans are `enabled`/`disabled`. The field schema is
 `api/fields/Hotspot2Conf.json`. A UAP's ubntbox turns these into hostapd
-lines (`docs/reference/u6pro/actions-scans/strings-ubntbox.txt`).
+lines (`U6 Pro ubntbox strings`).
 
 ## What the agent writes
 

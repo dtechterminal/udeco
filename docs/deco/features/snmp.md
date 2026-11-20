@@ -30,7 +30,7 @@ snmp.user.1.password=<x_password>
 
 ## What a real UAP does with it
 
-ubntbox `ubntconf` (U6 Pro 8.8.14 strings, `docs/reference/u6pro/actions-scans/strings-ubntbox.txt`
+ubntbox `ubntconf` (U6 Pro 8.8.14 strings, `U6 Pro ubntbox strings`
 around line 5800):
 
 - It writes `/etc/snmp.conf` and an inittab line

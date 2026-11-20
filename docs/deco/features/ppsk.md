@@ -28,7 +28,7 @@ and `com.ubnt.service.aF.QdjEeOBh` (key-to-VLAN mapping).
   A key is listed only if its network is a local layer-2 network.
 - A UAP's ubntbox also reads `.mac` and `.keyid` and writes a hostapd
   `wpa_psk_file` with lines of the form `keyid=%s vlanid=%s <mac> <psk>`
-  (docs/reference/u6pro/actions-scans/strings-ubntbox.txt). The agent reads
+  (U6 Pro ubntbox strings). The agent reads
   both fields too.
 - UniFi Identity IoT WLANs send `aaa.N.wpa.psk_radius` instead. This is not
   supported: such a WLAN stays off unless it also has a key file or a

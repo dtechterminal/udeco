@@ -4,7 +4,7 @@
 
 - The controller sends a radio's minimum RSSI as `stamgr.N.minrssi.status=true` and
   `stamgr.N.minrssi.rssi=<dBm>` (per radio, with `stamgr.N.radio`). On the U6 Pro the station
-  manager daemon `stamgr` acts on it (strings-ubntbox.txt:5602-5610): a client that stays below
+  manager daemon `stamgr` acts on it (U6 Pro ubntbox strings): a client that stays below
   the minimum is disconnected, and its `sta_leave` STA_ASSOC_TRACKER event carries
   `assoc_status` 16 (KICKED_DUE_TO_MIN_RSSI). The controller reads that as
   `triggeredByMinimalRssi` on the client's roaming record.

@@ -12,7 +12,7 @@ package translate
 // com.ubnt.i.b.W.vFiJoQiuQjMZUx: mac-acl, uid-vpn, uid-wifi, wpa-eap, vpn).
 // The U6 Pro's ubntbox turns it into hostapd's
 // radius_auth_req_attr=11:s:<filter_id> (docs/reference/u6pro/actions-scans/
-// strings-ubntbox.txt): RADIUS attribute 11 (Filter-Id) in every
+// U6 Pro ubntbox strings): RADIUS attribute 11 (Filter-Id) in every
 // Access-Request, which tells the console's RADIUS server which policy the
 // request is for.
 

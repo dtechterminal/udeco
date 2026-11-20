@@ -3,17 +3,20 @@
 package inform
 
 import (
+	"strings"
 	"testing"
-
-	"github.com/dtechterminal/udeco/internal/repotest"
 )
 
 // The inform POST's headers are the ones a real UniFi AP sends: the
-// strings of the U6 Pro's mcad (docs/reference/u6pro) have both lines.
+// strings of a U6 Pro's mcad (firmware 8.8.14) have both lines, as below.
+// The strings dump itself is Ubiquiti's and is not in this repository.
 func TestPostHeadersAsARealAP(t *testing.T) {
-	const capture = "docs/reference/u6pro/actions-scans/strings-mcad.txt"
-	repotest.MustContain(t, capture, "User-Agent: "+UserAgent+"\n")
-	repotest.MustContain(t, capture, "Content-Type: "+ContentType+"\n")
+	const mcadLines = "User-Agent: AirControl Agent v1.0\nContent-Type: application/x-binary\n"
+	for _, want := range []string{"User-Agent: " + UserAgent + "\n", "Content-Type: " + ContentType + "\n"} {
+		if !strings.Contains(mcadLines, want) {
+			t.Errorf("mcad sends no line %q", want)
+		}
+	}
 	if UserAgent != "AirControl Agent v1.0" || ContentType != "application/x-binary" || MaxReply != 4<<20 {
 		t.Errorf("%q %q %d", UserAgent, ContentType, MaxReply)
 	}

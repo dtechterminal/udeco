@@ -24,7 +24,7 @@ Not system_cfg. A devmgr command, queued for the AP the client is on
 - `dl_max`/`ul_max` are the user group's `qos_rate_max_down`/`_up` in kbit/s,
   `-1` when the group has no limit that way (`group.getInt(.., -1)`).
 - `dl_min`/`ul_min` are always 64. A U6 Pro's mcad reads all four
-  (`strings-mcad.txt:1756-1763`: `rate-update: %s ul: (%d, %d), dl: (%d, %d)`).
+  (`U6 Pro mcad strings`: `rate-update: %s ul: (%d, %d), dl: (%d, %d)`).
 
 When it is sent:
 

@@ -47,7 +47,7 @@ the per-WLAN TLS certificates) and `com.ubnt.service.config.ubntconf.aoUDgXMlCqE
 
 ## What a real UAP does
 
-From the U6 Pro ubntbox strings (docs/reference/u6pro/actions-scans/strings-ubntbox.txt):
+From the U6 Pro ubntbox strings (U6 Pro ubntbox strings):
 
 - `do_certs` base64-decodes each `certs.<i>.key` to `/etc/certs/<outfile>`
   ("base64 decode: writing %i/%s").
