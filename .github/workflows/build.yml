@@ -3,8 +3,8 @@
 # Tests the repository, then builds the on-device agent once per supported
 # device. Each device builds through its own deploy script's --build-only,
 # so the binary here is the one a deploy of the same commit ships (same Go
-# toolchain from go.mod: -trimpath, empty build id and gzip -n make the
-# build reproducible). Download them from the run's Artifacts.
+# toolchain from go.mod and the same tags: -trimpath, empty build id and
+# gzip -n make the build reproducible). Download them from the run's Artifacts.
 #
 # A new device gets its own deploy script (deploy/<device>-ap.sh with
 # --build-only) and its own entry in the matrix below;
@@ -13,7 +13,9 @@ name: build
 
 on:
   push:
-    branches: [deco, main]
+    # main always gets the same commit as deco, so building it too would
+    # only repeat this run
+    branches: [deco]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -47,7 +49,11 @@ jobs:
             out: dist/udeco-ap-linux-mipsle
     name: build (${{ matrix.device }})
     steps:
+      # full history and tags: Go stamps the module's version, from the
+      # nearest tag, into the binary, and a shallow clone has no tags
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
