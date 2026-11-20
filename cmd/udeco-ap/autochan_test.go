@@ -3,10 +3,13 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 func nb(ch, freq, width, center, signal int) apstate.BSS {
@@ -88,4 +91,20 @@ func autoNG(cfg string) string {
 		out = append(out, l)
 	}
 	return strings.Join(out, "\n")
+}
+
+// The auto pick rides only a restart of the same radio: a plan that
+// restarts the 2.4 GHz radio alone leaves the 5 GHz auto radio on its live
+// channel (no restart made for the pick).
+func TestAutoChannelsOnlyRestartingRadios(t *testing.T) {
+	a := &agent{cfg: &Config{}, o: options{col: &fakeCol{rec: &recorder{}}}, scans: newScanner()}
+	d := bcmwifi.Desired{Country: "IN", Radios: map[string]bcmwifi.Radio{
+		"ng": {Enabled: true, Width: 20}, "na": {Enabled: true, Width: 80}}}
+	out, _ := a.autoChannels(context.Background(), d, translate.Intent{}, func(band string) bool { return band == "ng" })
+	if out.Radios["na"].Channel != 0 {
+		t.Errorf("5 GHz auto radio picked %d although only 2.4 GHz restarts", out.Radios["na"].Channel)
+	}
+	if out.Radios["ng"].Channel == 0 {
+		t.Error("2.4 GHz auto radio got no pick")
+	}
 }

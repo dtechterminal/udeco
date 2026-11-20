@@ -374,12 +374,12 @@ func (a *agent) provision(ctx context.Context, pv provision) {
 	// the auto channel rides a radio restart the plan makes anyway
 	// (autochan.go)
 	if p.RadioRestart() {
-		if pd, notes := a.autoChannels(ctx, d, in); !reflect.DeepEqual(pd.Radios, d.Radios) {
+		if pd, notes := a.autoChannels(ctx, d, in, p.RadioRestartBand); !reflect.DeepEqual(pd.Radios, d.Radios) {
 			for _, n := range notes {
 				a.logf("wifi: %s", n)
 			}
 			if pp, err := a.wifi.Plan(ctx, pd); err == nil {
-				pf, _ := a.autoChannels(ctx, full, in) // the same picks (autoPick)
+				pf, _ := a.autoChannels(ctx, full, in, p.RadioRestartBand) // the same picks (autoPick)
 				d, full, p = pd, pf, pp
 			} else {
 				a.logf("wifi: auto channel: plan: %v (the live channels kept)", err)
@@ -588,10 +588,9 @@ func (a *agent) logIntent(pv provision) (bcmwifi.Desired, translate.Intent) {
 		d, mn = jioMinRates(d, a.cfg.MinRates)
 		dn = append(dn, mn...)
 	}
-	if dc := strings.ToUpper(strings.TrimSpace(a.cfg.DriverCountry)); dc != "" && !strings.EqualFold(dc, d.Country) {
-		dn = append(dn, fmt.Sprintf("country %s: the radios run as %s (driver_country)", d.Country, dc))
-		d.Country = dc
-	}
+	var cn []string
+	d, cn = withDriverCountry(d, a.cfg.DriverCountry)
+	dn = append(dn, cn...)
 	gw, _ := a.topo.gwIP.Load().(string)
 	gwMAC, _ := a.topo.gwMAC.Load().(string)
 	var gn []string
@@ -720,5 +719,23 @@ func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 	if in.LED != nil {
 		notes = append(notes, "ledbar.status: the LED follows mgmt_cfg led_enabled")
 	}
+	return d, notes
+}
+
+// withDriverCountry applies the driver_country override. A 5 GHz DFS
+// channel (52-144) under the override is likely outside its table (the
+// X20's US/0 allows 36-48 and 149-165 only, live-facts 2026-11-20), so the
+// controller's channel would be refused and the radio left on auto: the
+// note says to drop the override (India runs as IN/288, which has them).
+func withDriverCountry(d bcmwifi.Desired, override string) (bcmwifi.Desired, []string) {
+	dc := strings.ToUpper(strings.TrimSpace(override))
+	if dc == "" || strings.EqualFold(dc, d.Country) {
+		return d, nil
+	}
+	notes := []string{fmt.Sprintf("country %s: the radios run as %s (driver_country)", d.Country, dc)}
+	if r, ok := d.Radios["na"]; ok && r.Enabled && r.Channel >= 52 && r.Channel <= 144 {
+		notes = append(notes, fmt.Sprintf("5 GHz DFS channel %d under driver_country %s: refused unless that table has it; remove driver_country to serve it in %s", r.Channel, dc, d.Country))
+	}
+	d.Country = dc
 	return d, notes
 }

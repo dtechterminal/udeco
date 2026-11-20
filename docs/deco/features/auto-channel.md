@@ -13,10 +13,11 @@ TP-Link's `acsd2` is stopped, and bcmwifi keeps an auto radio's live
 channel. On top of that, the agent makes one pick
 (`cmd/udeco-ap/autochan.go`):
 
-- **When.** Only when a provision's plan restarts a radio anyway
-  (`Plan.RadioRestart`): the takeover at boot, or a channel, width, country
-  or hostapd change. A pick never causes a restart of its own and is never
-  repeated periodically. It holds for the agent's run, unless it stops
+- **When.** Only for a radio the provision's plan restarts anyway
+  (`Plan.RadioRestartBand`): the takeover at boot, or a channel, width,
+  country or hostapd change of that radio. A 2.4 GHz restart does not give
+  the 5 GHz radio a pick, and the other way round. A pick never causes a
+  restart of its own and is never repeated periodically. It holds for the agent's run, unless it stops
   qualifying (blocked, or no longer allowed).
 - **Candidates.** The driver's channel list for the radio's width in the
   country (`wl.Caps`; the static list 1/6/11 and 36–48/149–161 when the caps

@@ -148,9 +148,12 @@ func (sc *scanner) channelData(band string) ([]apstate.BSS, map[int]int) {
 	return bss, util
 }
 
-// autoChannels gives each enabled auto radio of d its picked channel
-// (kept from an earlier pick while it still qualifies). Worker goroutine.
-func (a *agent) autoChannels(ctx context.Context, d bcmwifi.Desired, in translate.Intent) (bcmwifi.Desired, []string) {
+// autoChannels gives each enabled auto radio of d that restarts anyway
+// (restarts(band): the plan takes that radio down) its picked channel
+// (kept from an earlier pick while it still qualifies). A radio the plan
+// leaves up keeps its live channel: a pick there would be a restart of its
+// own. Worker goroutine.
+func (a *agent) autoChannels(ctx context.Context, d bcmwifi.Desired, in translate.Intent, restarts func(band string) bool) (bcmwifi.Desired, []string) {
 	if a.cfg.jio() {
 		return d, nil
 	}
@@ -161,7 +164,7 @@ func (a *agent) autoChannels(ctx context.Context, d bcmwifi.Desired, in translat
 	out.Radios = map[string]bcmwifi.Radio{}
 	for band, r := range d.Radios {
 		out.Radios[band] = r
-		if !r.Enabled || r.Channel != 0 {
+		if !r.Enabled || r.Channel != 0 || !restarts(band) {
 			continue
 		}
 		width := r.Width
