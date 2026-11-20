@@ -570,7 +570,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 		d := driverFor(u, mac, maxSta, blocked, a.o.MinRates)
 		drv = append(drv, d)
-		drvOf[u.Vif] = d
+		drvOf[u.Vif] = a.withTempDeny(d) // the live filter carries the bans (tempdeny.go); the stored state does not
 		hr.BSS = append(hr.BSS, hapdBSS{Vif: u.Vif, BSSID: mac, Bridge: u.Bridge, SSID: u.SSID, Accept: d.Allow,
 			FTPeers: a.peersFor(u.SSID, rl.Band, u.Bridge)}) // ftpeers.go
 		files = append(files, aclSteps(a.o.RunDir, d)...)
@@ -661,8 +661,12 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 				if want := proxyARPWanted(u.SSID); lv.Bridge != u.Bridge && want || a.proxyARPDiffers(v, want) {
 					st = append(st, proxyARPStep(v, want))
 				}
-				if !lv.Up {
+				switch {
+				case !lv.Up && !a.ssidsDown:
 					st = append(st, cmdStep("raise "+v, "wl", "-i", v, "bss", "up"))
+				case lv.Up && a.ssidsDown:
+					// the uplink-loss hold (ssidhold.go): not foreign
+					st = append(st, onVif(v, cmdStep("uplink lost: lower "+v, "wl", "-i", v, "bss", "down")))
 				}
 				if lv.DHCPUnicast == 0 { // live-settable: re-asserted in place
 					st = append(st, dhcpUnicastStep(v))
@@ -817,9 +821,10 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		if proxyARPWanted(u.SSID) {
 			st = append(st, proxyARPStep(u.Vif, true))
 		}
-		st = append(st,
-			cmdStep("netdev up "+u.Vif, "ifconfig", u.Vif, "up"),
-			cmdStep("raise "+u.Vif, "wl", "-i", u.Vif, "bss", "up"))
+		st = append(st, cmdStep("netdev up "+u.Vif, "ifconfig", u.Vif, "up"))
+		if !a.ssidsDown { // else the uplink-loss hold keeps it down (ssidhold.go)
+			st = append(st, cmdStep("raise "+u.Vif, "wl", "-i", u.Vif, "bss", "up"))
+		}
 	}
 	rp.Steps = append(st, liveDrv(len(phy) > 0)...)
 	rp.Driver = driverStatus(dp, rp.TWTSet)

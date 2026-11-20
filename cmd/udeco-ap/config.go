@@ -127,6 +127,23 @@ type Config struct {
 	// is there because desense also protects against adjacent-channel
 	// interference, and which way edge clients fare is not measured.
 	RxDesense bool `json:"rx_desense,omitempty"`
+	// UplinkSSIDDown (takeover, Deco only): absent or true takes every SSID
+	// down while the uplink port has no carrier (5 s), as a U6 does, and
+	// back up after 10 s of carrier; false leaves them up (uplink.go).
+	UplinkSSIDDown *bool `json:"uplink_ssid_down,omitempty"`
+	// UplinkGatewayDown (default off; needs uplink_ssid_down) also counts a
+	// gateway that answers no ICMP echo for 60 s as a lost uplink.
+	UplinkGatewayDown bool `json:"uplink_gateway_down,omitempty"`
+	// StaSnoop (takeover, Deco only): absent or true sends the controller
+	// the connection-timing events (success, failure, soft failure, fixup)
+	// from hostapd's log and control sockets and a read-only AF_PACKET tap
+	// per served BSS (ARP, DHCP, DNS; staconn.go); false sends none.
+	StaSnoop *bool `json:"sta_snoop,omitempty"`
+	// AssocGARP (takeover, Deco only; needs sta_snoop for the addresses):
+	// absent or true sends a gratuitous ARP for a station that is
+	// authorized and whose address is known, on the wired ports of its
+	// bridge, so the switches learn where it is at once (garp.go).
+	AssocGARP *bool `json:"assoc_garp,omitempty"`
 }
 
 func (c *Config) portsConfirm() time.Duration {
@@ -212,7 +229,10 @@ func (c *Config) validate() error {
 		// wpa3: SAE on the 5 GHz radio only (the MT7663 driver has it);
 		// min_rates: the 2.4 GHz radio's BasicRate (mtkwifi minRate)
 		for name, on := range map[string]bool{"mdns_bridge": c.MdnsBridge,
-			"hotspot2": c.Hotspot2, "egress": c.Egress, "twt": c.TWT != nil, "rx_desense": c.RxDesense} {
+			"hotspot2": c.Hotspot2, "egress": c.Egress, "twt": c.TWT != nil,
+			"uplink_ssid_down": c.UplinkSSIDDown != nil, "uplink_gateway_down": c.UplinkGatewayDown,
+			"sta_snoop": c.StaSnoop != nil, "assoc_garp": c.AssocGARP != nil,
+			"rx_desense": c.RxDesense} {
 			if on {
 				return fmt.Errorf("config: %s is not supported on platform %s", name, c.Platform)
 			}
@@ -252,6 +272,18 @@ func (c *Config) validate() error {
 	}
 	if c.RxDesense && !c.Takeover {
 		return errors.New("config: rx_desense needs takeover (observe mode never changes the unit)")
+	}
+	if (c.UplinkSSIDDown != nil || c.UplinkGatewayDown) && !c.Takeover {
+		return errors.New("config: uplink_ssid_down and uplink_gateway_down need takeover (observe mode never changes the unit)")
+	}
+	if (c.StaSnoop != nil || c.AssocGARP != nil) && !c.Takeover {
+		return errors.New("config: sta_snoop and assoc_garp need takeover (the BSSes are the agent's only then)")
+	}
+	if c.AssocGARP != nil && *c.AssocGARP && !c.staSnoopOn() {
+		return errors.New("config: assoc_garp needs sta_snoop (the stations' addresses come from it)")
+	}
+	if c.UplinkGatewayDown && !c.uplinkSSIDDown() {
+		return errors.New("config: uplink_gateway_down needs uplink_ssid_down")
 	}
 	if c.SiteSurvey && !c.Takeover {
 		return errors.New("config: site_survey needs takeover (observe mode runs no scans and claims no RF scan)")

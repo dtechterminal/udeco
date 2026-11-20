@@ -71,7 +71,9 @@ Status key:
 | BSS Load element | Built | On by default, as a U6 Pro. Off only where the controller sends `qbssload=disabled` for every SSID on the radio, because the element is radio-wide in this driver ([radio-parity](docs/deco/features/radio-parity.md)). |
 | BPDU filter (bridge group address) | Built | Frames to 01:80:c2:00:00:00 are dropped into and out of every served SSID, in an ebtables chain of the agent's own. The controller's `bga_filter` decides per WLAN ([bga-filter](docs/deco/features/bga-filter.md)). |
 | IGMP/MLD snooping | Built | The agent's VLAN bridges snoop as a U6 Pro's bridges do. `br-lan` keeps TP-Link's snooping ([igmp-snooping](docs/deco/features/igmp-snooping.md)). |
-| Band steering, minimum RSSI, max clients | Built | Band steering uses 802.11v nudges. |
+| Band steering, max clients | Built | Band steering uses 802.11v nudges. |
+| Restrict to 5 GHz | Built | Dual-band clients seen on the SSID's 5 GHz BSS within the hour with a usable signal are asked (802.11v) to leave 2.4 GHz; one that ignores it is kept off 2.4 GHz for a minute, at most once an hour. Clients never seen on 5 GHz are never refused. [no2ghz](docs/deco/features/no2ghz.md) |
+| Minimum RSSI | Built | A client below the controller's minimum for 3 readings is asked to leave (802.11v, disassociation imminent), then disconnected with a 30 s ban on that BSS; its leave event says why. [min-rssi](docs/deco/features/min-rssi.md) |
 | Minimum data rates | Built | Off by default (`"min_rates": true`). `wl rateset` runs inside a radio down/up, which drops that radio's clients. |
 | Target Wake Time (TWT) | Built | On by default (`"twt": false` turns it off), as a U6 Pro. Turned on by hand on one unit (`wl twt enab 1` after `wl down`): a Pixel's station info then shows TWT capable; an iPhone showed no TWT. |
 
@@ -94,7 +96,8 @@ Status key:
 |---|---|---|
 | Client list with signal, rates, traffic, Wi-Fi generation | Verified | Only stations the driver reports as associated are listed, so clients don't flap between APs. |
 | Connect and leave events | Verified | A departed client leaves UniFi at once, not after about 5 minutes. |
-| Connection-timing events | Not yet | |
+| Connection-timing events | Built | Success, failure, soft failure and fixup per connection attempt, with the controller's timings and counters, from hostapd's log and sockets and a read-only tap of each client's ARP, DHCP and DNS. `"sta_snoop": false` turns it off. [connection-events](docs/deco/features/connection-events.md) |
+| Gratuitous ARP on association | Built | Once a client is authorized and its address is known, the unit announces it on the wired ports so switches learn it at once. `"assoc_garp": false` turns it off. [assoc-garp](docs/deco/features/assoc-garp.md) |
 | Per-client TX retries | Verified | Attempts, retries and retry % on each client's page. |
 | Reconnect, block, unblock | Verified | |
 | Lock client to AP | Verified | Every other unit denies a locked client. Its deny lists are updated live, without a hostapd restart. |
@@ -122,6 +125,7 @@ while it has any limit, and back on when none are left. Details are in
 | Channel utilisation, CPU, memory, uptime, load | Verified | |
 | Wi-Fi Experience (AP and client) | Verified | |
 | Wired uplink and uplink traffic | Verified | With a UniFi gateway, the controller credits the AP with its clients' traffic. |
+| SSIDs down on uplink loss | Built | No carrier on the uplink port for 5 s takes every SSID down (no radio restart); 10 s of carrier brings them back. Never during an apply. `"uplink_ssid_down": false` turns it off; `"uplink_gateway_down": true` also counts a gateway unanswered for 60 s. [uplink-loss](docs/deco/features/uplink-loss.md) |
 | Wireless mesh uplink | Not planned | TP-Link's mesh is switched off at takeover; every unit is wired. |
 
 ## Hardware
@@ -180,11 +184,15 @@ You need root SSH on each unit; how to get it is out of scope here.
    With `"takeover": false` the agent only reports to UniFi and changes
    nothing. With `"apply": false` it logs its plans without applying them.
    Optional keys, all off by default: `wpa3`, `min_rates`, `mdns_bridge`,
-   `hotspot2`, `mgmt_sources`, `rx_desense` (keep TP-Link's glitch-based
-   receiver desense, which a U6 Pro runs off) and `driver_country`.
-   `driver_country` runs the radios in another country's table than the
-   site's. It was needed while India ran as IN/0, which has no 80 MHz. The
-   agent now runs India as IN/288, so the override is no longer recommended. One optional key is on by default: `twt`
+   `hotspot2`, `mgmt_sources`, `uplink_gateway_down`, `rx_desense` (keep
+   TP-Link's glitch-based receiver desense, which a U6 Pro runs off) and
+   `driver_country`. `driver_country` runs the radios in another country's
+   table than the site's. It was needed while India ran as IN/0, which has
+   no 80 MHz. The agent now runs India as IN/288, so the override is no
+   longer recommended. On by default:
+   `uplink_ssid_down` (SSIDs down while the uplink has no carrier, as a U6;
+   `false` keeps them up), `sta_snoop` (connection-timing events),
+   `assoc_garp` (gratuitous ARP for a client once authorized), and `twt`
    (802.11ax Target Wake Time on both radios, as a real U6 Pro runs it;
    `"twt": false` keeps TP-Link's off). The driver takes it only while the
    radio is down, so the agent sets it inside a radio restart it makes

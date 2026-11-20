@@ -522,13 +522,13 @@ func (a *Applier) verify(ctx context.Context, d Desired) error {
 				}
 				continue
 			}
-			if err != nil || bss != "up" {
-				if rl.Band == "na" && a.inCAC(ctx, p) {
+			if want := map[bool]string{false: "up", true: "down"}[a.ssidsDown]; err != nil || bss != want {
+				if !a.ssidsDown && rl.Band == "na" && a.inCAC(ctx, p) {
 					// the DFS channel availability check (dfs.go): no
 					// beacons for about a minute
 					a.o.Logf("bcmwifi: %s bss is %q during the DFS channel availability check", v, bss)
 				} else {
-					bad("%s bss is %q, want up", v, bss)
+					bad("%s bss is %q, want %s", v, bss, want) // down: the uplink-loss hold (ssidhold.go)
 				}
 			}
 			if out, err := a.wlGet(ctx, v, "ssid"); err != nil || !ssidMatches(out, u.SSID.SSID) {

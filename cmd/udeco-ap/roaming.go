@@ -164,7 +164,7 @@ func (a *agent) roamReading(s *apstate.Snapshot, now time.Time) {
 	if st.c == nil {
 		st.c = map[string]*roamClient{}
 	}
-	a.roamOutcomes()
+	a.roamOutcomes()             // clientsReading has applied them already; the tests call this directly
 	where := map[string]string{} // client MAC -> the BSS it is on now
 	for _, r := range s.Radios {
 		for _, v := range r.VAPs {
@@ -251,6 +251,7 @@ func (a *agent) roamReading(s *apstate.Snapshot, now time.Time) {
 			to = append(to, h.n)
 		}
 		req := bcmwifi.RoamRequest{Vif: c.vif, MAC: c.mac, Candidates: to, DisassocTBTT: roamDisassocTBTT}
+		a.sta.hint(c.mac, staLeaveRoamAssist, now.Add(staHintFor)) // dropped again if the request is refused
 		a.submit("roam "+c.mac, func(ctx context.Context) {
 			err := rr.RoamAssist(ctx, req)
 			st.mu.Lock()
@@ -268,6 +269,9 @@ func (a *agent) roamOutcomes() {
 	done := st.done
 	st.done = nil
 	st.mu.Unlock()
+	if st.c == nil {
+		st.c = map[string]*roamClient{}
+	}
 	for _, d := range done {
 		c := d.c
 		rc := st.c[c.mac]
@@ -278,19 +282,22 @@ func (a *agent) roamOutcomes() {
 		switch {
 		case d.err == nil:
 			rc.asked, rc.vif, rc.left, rc.judged, rc.noBTM = d.at, c.vif, false, false, false
-			if a.steer.last != nil {
-				// no band steering back onto the band it is leaving for a while
-				a.steer.last[c.mac] = d.at
+			if a.steer.last == nil {
+				a.steer.seen5, a.steer.last = map[string]time.Time{}, map[string]time.Time{}
 			}
+			// no band steering back onto the band it is leaving for a while
+			a.steer.last[c.mac] = d.at
 			a.logf("roaming assistant: asked %s (%d dBm < %d dBm on %s %s for %s) to move to %s",
 				c.mac, c.signal, c.thresh, c.band, c.vif, c.weak.Round(time.Second), heardList(c.to))
 		case errors.Is(d.err, bcmwifi.ErrNoBTM):
+			a.sta.unhint(c.mac) // never sent: its leave is no Roaming Assistant move
 			rc.hold = d.at.Add(roamNoBTMHold)
 			if !rc.noBTM {
 				rc.noBTM = true
 				a.logf("roaming assistant: %s at %d dBm on %s does not support BSS transition: left alone", c.mac, c.signal, c.vif)
 			}
 		case errors.Is(d.err, bcmwifi.ErrNoCandidate):
+			a.sta.unhint(c.mac)
 			rc.hold = time.Time{}
 			if rc.noCand.IsZero() || d.at.Sub(rc.noCand) >= roamNoCandLog {
 				rc.noCand = d.at
@@ -298,6 +305,7 @@ func (a *agent) roamOutcomes() {
 			}
 		default:
 			// not sent: tried again after roamHold, not judged
+			a.sta.unhint(c.mac)
 			a.logf("roaming assistant %s: %v", c.mac, d.err)
 		}
 	}

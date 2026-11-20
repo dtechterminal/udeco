@@ -680,6 +680,7 @@ func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 			}
 		}
 		s.RoamAssist = wl.RoamAssist // agent-side (roaming.go)
+		s.No2GHz = wl.No2GHz         // agent-side (no2ghz.go)
 		if wl.MACFilter != nil {
 			s.MACFilter = &bcmwifi.MACFilter{Policy: wl.MACFilter.Policy, MACs: append([]string{}, wl.MACFilter.MACs...)}
 		}

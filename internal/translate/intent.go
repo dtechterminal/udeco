@@ -107,6 +107,11 @@ type WLANIntent struct {
 	// RoamAssist: the Roaming Assistant's RSSI threshold (dBm) by band
 	// (wireless.N.btm_disassoc, roaming.go); absent = off on that band.
 	RoamAssist map[string]int
+	// No2GHz: "restrict high-performance clients to 5 GHz"
+	// (wireless.N.no2ghz_oui=enabled on the WLAN's 2.4 GHz VAP; a UAP acts
+	// on it only there). The agent steers dual-band clients off the 2.4 GHz
+	// twin (cmd/udeco-ap no2ghz.go).
+	No2GHz bool
 
 	MACFilter *MACFilter
 	Radius    *Radius   // enterprise WLANs and RADIUS MAC authentication
@@ -556,6 +561,7 @@ func intentVAP(cfg Cfg, n, w, a, band, ssid string, vlanNet map[string]string, l
 	if t, ok := roamAssist(cfg, w, band, x.BSSTransition, note); ok {
 		x.RoamAssist = map[string]int{band: t}
 	}
+	x.No2GHz = band == "ng" && cfg[w+"no2ghz_oui"] == "enabled"
 	x.MACFilter = wlanMACFilter(cfg, w, dev, note)
 	if s := wlanSchedule(cfg, w, ""); s != nil {
 		// A UAP (unifi_util_funcs.sh within_schedule; ubntbox touches
@@ -901,6 +907,7 @@ func mergeVAPs(vaps []WLANIntent, nb *noteList) WLANIntent {
 		x.RoamAssist = mergeBandInts(x.RoamAssist, v.RoamAssist)
 		x.NoBSSLoad = x.NoBSSLoad || v.NoBSSLoad       // the backend's element is per radio anyway
 		x.NoBGAFilter = x.NoBGAFilter && v.NoBGAFilter // filtered unless every VAP turns it off
+		x.No2GHz = x.No2GHz || v.No2GHz
 		diff := differing(vaps[0], v)
 		var other []string
 		perBand := false
@@ -935,7 +942,7 @@ func differing(a, b WLANIntent) []string {
 	var out []string
 	for i := 0; i < t.NumField(); i++ {
 		switch name := t.Field(i).Name; name {
-		case "Bands", "Enabled", "DTIM", "MinRateKbps", "MinRateOpts", "Devnames", "RoamAssist", "PerBand", "NoBSSLoad", "NoBGAFilter":
+		case "Bands", "Enabled", "DTIM", "MinRateKbps", "MinRateOpts", "Devnames", "RoamAssist", "PerBand", "NoBSSLoad", "NoBGAFilter", "No2GHz":
 		default:
 			if !reflect.DeepEqual(va.Field(i).Interface(), vb.Field(i).Interface()) {
 				out = append(out, strings.ToLower(name))
@@ -1104,7 +1111,7 @@ var wirelessRules = map[string]rule{
 
 	"mode": rNeutral("master"), "wmm": rNeutral("enabled"), "wds": rOff, "autowds": rOff,
 	"authmode": rNeutral("1"), "puren": rNeutral("0"), "pureg": rNeutral("0"),
-	"addmtikie": rOff, "no2ghz_oui": rOff, "qbssload": rRead, "advertise_ap_name": rOff,
+	"addmtikie": rOff, "no2ghz_oui": rRead, "qbssload": rRead, "advertise_ap_name": rOff,
 	"mcastrate": rNeutral("auto"), "bga_filter": rRead,
 	"multicast.suppressor": rOff, "iot": rOff, "btm_disassoc.status": rRead, "btm_disassoc.threshold": rRead,
 
@@ -1446,6 +1453,7 @@ func (w WLANIntent) String() string {
 	opt(len(w.DTIM) > 0, fmt.Sprintf("dtim=%v", w.DTIM))
 	opt(len(w.MinRateKbps) > 0, fmt.Sprintf("minrate=%v", w.MinRateKbps))
 	opt(len(w.RoamAssist) > 0, fmt.Sprintf("roam-assist=%v", w.RoamAssist))
+	opt(w.No2GHz, "no2ghz")
 	opt(w.Hotspot2 != nil, "hotspot2("+w.Hotspot2.String()+")")
 	if w.MACFilter != nil {
 		fmt.Fprintf(&b, " macfilter=%s(%d)", w.MACFilter.Policy, len(w.MACFilter.MACs))

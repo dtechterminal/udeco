@@ -101,6 +101,10 @@ type SSID struct {
 	// (absent = off). Nothing is configured for it here: the agent asks
 	// weak stations to move with RoamAssist (roaming.go).
 	RoamAssist map[string]int
+	// No2GHz: "restrict high-performance clients to 5 GHz". Nothing is
+	// configured for it here: the agent steers dual-band stations off the
+	// SSID's 2.4 GHz BSS (SteerToBand, TempDeny; cmd/udeco-ap no2ghz.go).
+	No2GHz bool `json:",omitempty"`
 	// Hotspot2 is the Hotspot 2.0 / Passpoint advertisement (hs20.go); nil = off.
 	Hotspot2 *Hotspot2 `json:",omitempty"`
 	// NoBSSLoad: the controller turned this WLAN's BSS Load element off

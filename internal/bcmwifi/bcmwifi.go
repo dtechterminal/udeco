@@ -185,6 +185,10 @@ type Applier struct {
 	txCeil   map[string]float64
 	txRep    map[string]txReport
 	liveCh   map[string]int // band -> live control channel (LiveChannel)
+	// tempDeny: vif -> station -> end of its ban (tempdeny.go)
+	tempDeny map[string]map[string]time.Time
+	// ssidsDown: the uplink-loss hold (ssidhold.go)
+	ssidsDown bool
 
 	sleep func(time.Duration)
 	poll  time.Duration

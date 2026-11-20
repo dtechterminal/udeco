@@ -10,7 +10,15 @@
 //
 //	<3>AP-STA-CONNECTED <mac> [keyid=..]   the station is authorized (after the 4-way handshake)
 //	<3>AP-STA-DISCONNECTED <mac>           it is not any more (disassociation, deauthentication, timeout)
+//	<3>AP-STA-POSSIBLE-PSK-MISMATCH <mac>  its 4-way handshake message 2 failed the MIC (wrong passphrase)
+//	<3>CTRL-EVENT-EAP-STARTED <mac>        802.1X: EAP authentication started
+//	<3>CTRL-EVENT-EAP-SUCCESS[2] <mac>     802.1X: the RADIUS server accepted it
+//	<3>CTRL-EVENT-EAP-FAILURE[2] <mac>     802.1X: rejected
+//	<3>CTRL-EVENT-EAP-TIMEOUT-FAILURE[2] <mac>  802.1X: no answer in time
+//	<3>AP-REJECTED-MAX-STA <mac>           refused: the BSS is full
 //
+// Only the first two change where a station is; the others feed the
+// connection-timing events (cmd/udeco-ap staconn.go).
 // hostapd sends them from ap_sta_set_authorized on every change, so a
 // station that disassociates and associates again within a second gives
 // both, unlike two readings of the association list.
@@ -39,8 +47,14 @@ import (
 type Kind int
 
 const (
-	Connected    Kind = iota + 1 // AP-STA-CONNECTED
-	Disconnected                 // AP-STA-DISCONNECTED
+	Connected      Kind = iota + 1 // AP-STA-CONNECTED
+	Disconnected                   // AP-STA-DISCONNECTED
+	PSKMismatch                    // AP-STA-POSSIBLE-PSK-MISMATCH
+	EAPStarted                     // CTRL-EVENT-EAP-STARTED
+	EAPSuccess                     // CTRL-EVENT-EAP-SUCCESS, -SUCCESS2
+	EAPFailure                     // CTRL-EVENT-EAP-FAILURE, -FAILURE2
+	EAPTimeout                     // CTRL-EVENT-EAP-TIMEOUT-FAILURE, -FAILURE2
+	RejectedMaxSta                 // AP-REJECTED-MAX-STA
 )
 
 func (k Kind) String() string {
@@ -49,6 +63,18 @@ func (k Kind) String() string {
 		return "connected"
 	case Disconnected:
 		return "disconnected"
+	case PSKMismatch:
+		return "psk-mismatch"
+	case EAPStarted:
+		return "eap-started"
+	case EAPSuccess:
+		return "eap-success"
+	case EAPFailure:
+		return "eap-failure"
+	case EAPTimeout:
+		return "eap-timeout"
+	case RejectedMaxSta:
+		return "rejected-max-sta"
 	}
 	return "?"
 }
@@ -392,6 +418,18 @@ func parse(msg string) (Event, bool) {
 		k = Connected
 	case "AP-STA-DISCONNECTED":
 		k = Disconnected
+	case "AP-STA-POSSIBLE-PSK-MISMATCH":
+		k = PSKMismatch
+	case "CTRL-EVENT-EAP-STARTED":
+		k = EAPStarted
+	case "CTRL-EVENT-EAP-SUCCESS", "CTRL-EVENT-EAP-SUCCESS2":
+		k = EAPSuccess
+	case "CTRL-EVENT-EAP-FAILURE", "CTRL-EVENT-EAP-FAILURE2":
+		k = EAPFailure
+	case "CTRL-EVENT-EAP-TIMEOUT-FAILURE", "CTRL-EVENT-EAP-TIMEOUT-FAILURE2":
+		k = EAPTimeout
+	case "AP-REJECTED-MAX-STA":
+		k = RejectedMaxSta
 	default:
 		return Event{}, false
 	}

@@ -33,8 +33,8 @@ import (
 //     fast transition), assoc_status. A leave on one AP and an association
 //     on another make a roam in the client's history.
 //
-// success/failure carry connection timings (assoc/auth/wpa/ip deltas) the
-// agent does not measure; they are not sent rather than sent as zeros.
+// success/failure/soft failure/fixup carry the connection timings; they
+// come from staconn.go (sta_snoop), not from here.
 //
 // A notification inform's stats are not processed (devmgr.l.mMObEXELV
 // returns after the notification), so each event goes in an extra inform
@@ -66,6 +66,10 @@ import (
 //     the reading before it, which used the diff: that reading was taken
 //     after it started, so a station it already shows on the BSS is no
 //     association again for a CONNECTED from while it was taken.
+//   - likewise a station whose place the previous reading's diff set or
+//     removed (it moved to or from a BSS that is not covered): that
+//     reading's outcome holds, and a covered BSS's events from its
+//     collection window are not replayed after it.
 //
 // A BSS that is not covered (no socket, just attached, the Garage) keeps
 // the reading diff below.
@@ -98,6 +102,54 @@ type staEvents struct {
 	taken   time.Time       // when the last reading had been taken (its feed's now)
 	cov     map[string]bool // the VAPs the last reading covered
 	odd     map[string]int  // "mac|vap|+/-": readings in a row a covered VAP disagreed
+	// moved: the stations whose place the last reading's diff set or
+	// removed (an uncovered BSS): their covered events from that reading's
+	// collection window are in its outcome already
+	moved map[string]bool
+	// hints: why a station is expected to leave (the agent asked it to or
+	// kicked it): its next sta_leave carries that assoc_status
+	hints map[string]staHint
+	at    time.Time        // this reading's time (the feed's, else clock)
+	clock func() time.Time // nil = time.Now
+}
+
+// staHint is a sta_leave's assoc_status for a while.
+type staHint struct {
+	status int
+	until  time.Time
+}
+
+// assoc_status of a sta_leave, as a U6 sends them and the controller reads
+// them (WifiConnectivity triggeredByMinimalRssi / triggeredByRoamingAssistant).
+const (
+	staLeaveMinRSSI    = 16   // KICKED_DUE_TO_MIN_RSSI: the minimum RSSI kick (minrssi.go)
+	staLeaveRoamAssist = 8192 // left after a Roaming Assistant request (roaming.go)
+	staHintFor         = 2 * time.Minute
+)
+
+// hint makes mac's next sta_leave until until carry status.
+func (e *staEvents) hint(mac string, status int, until time.Time) {
+	if e.hints == nil {
+		e.hints = map[string]staHint{}
+	}
+	e.hints[strings.ToLower(mac)] = staHint{status, until}
+}
+
+// unhint drops mac's hint (the request it was for was never sent).
+func (e *staEvents) unhint(mac string) { delete(e.hints, strings.ToLower(mac)) }
+
+// leaveStatus is the assoc_status of mac's sta_leave at now (the hint is
+// used once).
+func (e *staEvents) leaveStatus(mac string, now time.Time) int {
+	h, ok := e.hints[mac]
+	if !ok {
+		return 0
+	}
+	delete(e.hints, mac)
+	if now.After(h.until) {
+		return 0
+	}
+	return h.status
 }
 
 // staFeed is the hostapd socket's part of one reading (nil: none).
@@ -113,6 +165,18 @@ type staFeed struct {
 // is a feed) and queues the events. The first reading only seeds (clients
 // already associated when the agent starts get no association event).
 func (e *staEvents) observe(f map[string]any, feed *staFeed) {
+	if feed != nil {
+		e.at = feed.now
+	} else if e.clock != nil {
+		e.at = e.clock()
+	} else {
+		e.at = time.Now()
+	}
+	for m, h := range e.hints {
+		if e.at.After(h.until) {
+			delete(e.hints, m)
+		}
+	}
 	up, _ := toInt64(f["uptime"])
 	cur := map[string]staSeen{}
 	names := map[string]bool{}
@@ -174,12 +238,15 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 	touched := map[string]bool{}
 	for _, ev := range evs {
 		vap := feed.vifs[ev.Vif]
-		if !covered[vap] {
-			continue
+		if !covered[vap] || ev.Kind != hapdmon.Connected && ev.Kind != hapdmon.Disconnected {
+			continue // the other kinds feed the connection timings (staconn.go)
 		}
 		touched[ev.MAC] = true
 		if p, ok := e.prev[ev.MAC]; ok && p.vap == vap && ev.Kind == hapdmon.Connected && fresh[vap] && ev.At.Before(taken) {
 			continue // the last reading (the diff's) had it there already
+		}
+		if e.moved[ev.MAC] && ev.At.Before(taken) {
+			continue // the last reading's diff told where it ended up
 		}
 		e.live(ev, vap, names, cur, up-int64(feed.now.Sub(ev.At).Round(time.Second)/time.Second))
 	}
@@ -196,10 +263,12 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 		}
 	}
 	sort.Strings(gone)
+	moved := map[string]bool{}
 	for _, mac := range gone {
 		p := e.prev[mac]
 		e.leave(mac, p, p.lastSeen)
 		delete(e.prev, mac)
+		moved[mac] = true
 	}
 	for mac, c := range cur {
 		if covered[c.vap] {
@@ -219,7 +288,9 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 		}
 		e.assoc(mac, c)
 		e.prev[mac] = c
+		moved[mac] = true
 	}
+	e.moved = moved
 	e.reconcile(cur, names, covered, touched)
 	// clients of a VAP missing from this reading stay on record for a
 	// while, so the VAP's return is no wave of associations
@@ -317,6 +388,7 @@ func (e *staEvents) leave(mac string, p staSeen, at int64) {
 	e.push(map[string]any{
 		"message_type": staTracker, "event_type": staEvLeave,
 		"mac": mac, "vap": p.vap, "avg_rssi": p.signal, "last_seen": at,
+		"assoc_status": e.leaveStatus(mac, e.at),
 	})
 }
 
