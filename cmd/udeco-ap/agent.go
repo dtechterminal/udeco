@@ -252,6 +252,7 @@ type agent struct {
 	steer    steerState   // loop goroutine only
 	roam     roamState    // loop goroutine only (roaming.go)
 	minr     minRSSIState // loop goroutine only (minrssi.go)
+	no2      no2ghzState  // loop goroutine only (no2ghz.go)
 	lldp     *lldp.Service
 	res      atomic.Pointer[resources] // the last R4 reading (self-check)
 	pm       *pathmonState             // path monitoring (pathmon.go)

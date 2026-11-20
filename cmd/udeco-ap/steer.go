@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"time"
 
@@ -32,10 +33,18 @@ type wifiPolicy struct {
 	roam  map[string]int    // "SSID|band" -> Roaming Assistant threshold, dBm (roaming.go)
 	// minRSSI: band -> the controller's minimum RSSI, dBm (minrssi.go)
 	minRSSI map[string]int
+	// no2ghz: the SSIDs with "restrict to 5 GHz" that broadcast on both
+	// bands (no2ghz.go)
+	no2ghz map[string]bool
 }
 
 func policyFrom(d bcmwifi.Desired) *wifiPolicy {
-	p := &wifiPolicy{steer: map[string]string{}, roam: roamPolicy(d), minRSSI: map[string]int{}}
+	p := &wifiPolicy{steer: map[string]string{}, roam: roamPolicy(d), minRSSI: map[string]int{}, no2ghz: map[string]bool{}}
+	for _, s := range d.SSIDs {
+		if s.Enabled && s.No2GHz && s.SSID != "" && slices.Contains(s.Bands, "ng") && slices.Contains(s.Bands, "na") {
+			p.no2ghz[s.SSID] = true
+		}
+	}
 	for band, r := range d.Radios {
 		if r.Enabled && r.BandSteer != "" && r.BandSteer != "off" {
 			p.steer[band] = r.BandSteer

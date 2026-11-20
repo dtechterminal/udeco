@@ -68,6 +68,7 @@ Status key:
 | 802.11r for WPA3 (FT-SAE) | Off | Advertising FT-SAE stopped WPA3 phones (iPhone, Apple Watch, Pixel, Samsung) from joining at all. Keep `"ft_sae": false`. |
 | Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | |
 | Band steering, max clients | Built | Band steering uses 802.11v nudges. |
+| Restrict to 5 GHz | Built | Dual-band clients seen on the SSID's 5 GHz BSS within the hour with a usable signal are asked (802.11v) to leave 2.4 GHz; one that ignores it is kept off 2.4 GHz for a minute, at most once an hour. Clients never seen on 5 GHz are never refused. [no2ghz](docs/deco/features/no2ghz.md) |
 | Minimum RSSI | Built | A client below the controller's minimum for 3 readings is asked to leave (802.11v, disassociation imminent), then disconnected with a 30 s ban on that BSS; its leave event says why. [min-rssi](docs/deco/features/min-rssi.md) |
 | Minimum data rates | Built | Off by default (`"min_rates": true`). `wl rateset` runs inside a radio down/up, which drops that radio's clients. |
 | Target Wake Time (TWT) | Built | On by default (`"twt": false` turns it off), as a U6 Pro. Turned on by hand on one unit (`wl twt enab 1` after `wl down`): a Pixel's station info then shows TWT capable; an iPhone showed no TWT. |

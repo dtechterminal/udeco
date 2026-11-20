@@ -241,6 +241,7 @@ func (a *agent) observeReading(s *apstate.Snapshot, f map[string]any) {
 // back to 5 GHz.
 func (a *agent) clientsReading(s *apstate.Snapshot, now time.Time) {
 	a.roamOutcomes()
+	a.no2ghzReading(s, now) // before band steering, which then leaves its clients alone
 	a.steerReading(s, now)
 	if !a.stale {
 		a.roamReading(s, now)
