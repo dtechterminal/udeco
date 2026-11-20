@@ -133,6 +133,9 @@ const (
 	aclFile      = "mtk-acl.json"    // RunDir: the station ACLs last written (lost with the driver's at reboot)
 	baselineDir  = "mtk-baseline"
 	lastGoodFile = "last-good.json"
+	// lastGoodDesired: the Desired last-good came from (its guest policy
+	// and ACLs; a rollback must not take them from the failed Desired)
+	lastGoodDesired = "last-good-desired.json"
 )
 
 // New returns an Applier; nothing changes until Apply.
@@ -428,7 +431,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	}
 	a.live, a.want = want, full
 	a.savePins(pins)
-	a.saveLastGood(full)
+	a.saveLastGood(full, p.Desired)
 	a.flushLive(ctx)
 	a.dfsStep(ctx)
 	a.syncProxyARP(ctx)
@@ -823,14 +826,29 @@ func (a *Applier) Rollback(ctx context.Context) error {
 	return a.rollback(ctx)
 }
 
+// rollback brings back last-good with the Desired it came from (the guest
+// chains and ACLs follow a.desired: the failed Desired's guest policy
+// would leave last-good's guest SSID open), isolated while the uplink is
+// down (what Verify checks: otherwise every health check fails and rolls
+// back again, two radio restarts each time).
 func (a *Applier) rollback(ctx context.Context) error {
 	if lg, err := a.loadLastGood(); err == nil {
-		err := a.applyPlans(ctx, lg, nil)
+		gd, ok := a.loadLastGoodDesired()
+		switch {
+		case ok:
+			a.desired = gd
+		case len(guestVifs(a.o.Layout, lg)) > 0:
+			// an older build's last-good: its guest policy is unknown
+			a.o.Logf("mtkwifi: last-good has a guest SSID but no saved guest policy: restoring the vendor's Wi-Fi")
+			return a.restoreBaseline(ctx)
+		}
+		eff := a.effective(lg)
+		err := a.applyPlans(ctx, eff, nil)
 		if err == nil {
-			err = a.waitLive(ctx, lg)
+			err = a.waitLive(ctx, eff)
 		}
 		if err == nil {
-			a.live, a.want = lg, lg
+			a.live, a.want = eff, lg
 			a.o.Logf("mtkwifi: rolled back to last-good")
 			return nil
 		}
@@ -890,17 +908,36 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 	return nil
 }
 
-func (a *Applier) saveLastGood(ps map[string]RadioPlan) {
+func (a *Applier) saveLastGood(ps map[string]RadioPlan, d bcmwifi.Desired) {
 	if a.o.StateDir == "" {
 		return
 	}
 	j, _ := json.Marshal(ps)
+	jd, _ := json.Marshal(d)
 	p := a.dev(filepath.Join(a.o.StateDir, lastGoodFile))
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err == nil {
+		// the Desired first: a last-good never pairs with a newer Desired
+		if err := writeFile(a.dev(filepath.Join(a.o.StateDir, lastGoodDesired)), jd, 0o600); err != nil {
+			a.o.Logf("mtkwifi: saving last-good: %v", err)
+		}
 		if err := writeFile(p, j, 0o600); err != nil {
 			a.o.Logf("mtkwifi: saving last-good: %v", err)
 		}
 	}
+}
+
+// loadLastGoodDesired is the Desired last-good came from (an older build
+// did not save it: false).
+func (a *Applier) loadLastGoodDesired() (bcmwifi.Desired, bool) {
+	var d bcmwifi.Desired
+	if a.o.StateDir == "" {
+		return d, false
+	}
+	j, err := os.ReadFile(a.dev(filepath.Join(a.o.StateDir, lastGoodDesired)))
+	if err != nil || json.Unmarshal(j, &d) != nil {
+		return d, false
+	}
+	return d, true
 }
 
 func (a *Applier) loadLastGood() (map[string]RadioPlan, error) {

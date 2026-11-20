@@ -108,6 +108,11 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   side door). `uplink_loss: false` turns it off
   (`internal/mtkwifi/uplinkloss.go`, `cmd/udeco-ap/garage.go`). Events
   `UPLINK LOST`/`UPLINK BACK` go to `events.log`.
+- A rollback while isolated (a failed apply, or the health check after a
+  failed isolation) brings last-good back isolated, which is what Verify
+  checks. It used to bring back every SSID while Verify checked the
+  isolated plan, so each health check failed and rolled back again: two
+  radio restarts per check for the whole outage.
 - **Unverified:** the carrier reading of `jioports` during a real WAN
   cable pull; client behaviour.
 
@@ -160,6 +165,14 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   guest's RETURN rule (kept in the run dir for rebuilds); unauthorising
   disconnects the guest. Tick rebuilds chains something else removed; the
   hand-back removes them (`internal/mtkwifi/guest.go`).
+- Rollback: last-good is saved with the Desired it came from
+  (`last-good-desired.json` in the state dir), and a rollback restores
+  that Desired's guest policy and ACLs before last-good comes up. It used
+  to keep the failed apply's Desired, so a failed apply without a usable
+  guest policy brought last-good's guest SSID back with its chains
+  removed (open) until the next successful apply. A last-good from an older
+  build (no saved Desired) with a guest SSID is not brought back: the
+  vendor's Wi-Fi is restored instead (fail closed).
 - **Unverified:** the ebtables binary's behaviour on the unit beyond the
   match list checked on 2026-11-20 (filter table; ip, ip6, arp, mark).
 
