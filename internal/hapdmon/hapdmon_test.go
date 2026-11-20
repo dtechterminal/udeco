@@ -150,14 +150,15 @@ func TestMonitorEvents(t *testing.T) {
 	h12.send("<3>CTRL-EVENT-EAP-STARTED d2:f7:e5:58:6f:89")
 	h12.send("<3>AP-STA-CONNECTED d2:f7:e5:58:6f:89 keyid=x")
 	var evs []Event
-	waitFor(t, "two events", func() bool {
+	h12.send("<3>CTRL-EVENT-EAP-PROPOSED-METHOD vendor=0 method=25")
+	waitFor(t, "three events", func() bool {
 		e, _ := m.Take()
 		evs = append(evs, e...)
-		return len(evs) >= 2
+		return len(evs) >= 3
 	})
-	if len(evs) != 2 || evs[0].Kind != Disconnected || evs[1].Kind != Connected ||
-		evs[0].MAC != "d2:f7:e5:58:6f:89" || evs[1].MAC != "d2:f7:e5:58:6f:89" || evs[0].Vif != "wl12" ||
-		evs[0].At.IsZero() || evs[1].At.Before(evs[0].At) {
+	if len(evs) != 3 || evs[0].Kind != Disconnected || evs[1].Kind != EAPStarted || evs[2].Kind != Connected ||
+		evs[0].MAC != "d2:f7:e5:58:6f:89" || evs[2].MAC != "d2:f7:e5:58:6f:89" || evs[0].Vif != "wl12" ||
+		evs[0].At.IsZero() || evs[2].At.Before(evs[0].At) {
 		t.Fatalf("events %+v", evs)
 	}
 	stop()
@@ -230,8 +231,16 @@ func TestParse(t *testing.T) {
 		"<3>AP-STA-DISCONNECTED 02:11:22:33:44:55\n":                {MAC: "02:11:22:33:44:55", Kind: Disconnected},
 		"<2>AP-STA-DISCONNECTED 02:11:22:33:44:55":                  {MAC: "02:11:22:33:44:55", Kind: Disconnected},
 		"<3>AP-STA-CONNECTED 02:11:22:33:44":                        {},
-		"<3>AP-STA-POSSIBLE-PSK-MISMATCH 02:11:22:33:44:55":         {},
-		"<3>CTRL-EVENT-EAP-STARTED 02:11:22:33:44:55":               {},
+		"<3>AP-STA-POSSIBLE-PSK-MISMATCH 02:11:22:33:44:55":         {MAC: "02:11:22:33:44:55", Kind: PSKMismatch},
+		"<3>CTRL-EVENT-EAP-STARTED 02:11:22:33:44:55":               {MAC: "02:11:22:33:44:55", Kind: EAPStarted},
+		"<3>CTRL-EVENT-EAP-SUCCESS 02:11:22:33:44:55":               {MAC: "02:11:22:33:44:55", Kind: EAPSuccess},
+		"<3>CTRL-EVENT-EAP-SUCCESS2 02:11:22:33:44:55":              {MAC: "02:11:22:33:44:55", Kind: EAPSuccess},
+		"<3>CTRL-EVENT-EAP-FAILURE 02:11:22:33:44:55":               {MAC: "02:11:22:33:44:55", Kind: EAPFailure},
+		"<3>CTRL-EVENT-EAP-FAILURE2 02:11:22:33:44:55":              {MAC: "02:11:22:33:44:55", Kind: EAPFailure},
+		"<3>CTRL-EVENT-EAP-TIMEOUT-FAILURE 02:11:22:33:44:55":       {MAC: "02:11:22:33:44:55", Kind: EAPTimeout},
+		"<3>CTRL-EVENT-EAP-TIMEOUT-FAILURE2 02:11:22:33:44:55":      {MAC: "02:11:22:33:44:55", Kind: EAPTimeout},
+		"<3>AP-REJECTED-MAX-STA 02:11:22:33:44:55":                  {MAC: "02:11:22:33:44:55", Kind: RejectedMaxSta},
+		"<3>CTRL-EVENT-EAP-PROPOSED-METHOD vendor=0 method=25":      {},
 		"AP-STA-CONNECTED 02:11:22:33:44:55":                        {},
 		"<3>AP-STA-CONNECTEDX 02:11:22:33:44:55":                    {},
 		"<3>" + strings.Repeat("A", 40):                             {},

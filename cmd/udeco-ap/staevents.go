@@ -238,8 +238,8 @@ func (e *staEvents) observe(f map[string]any, feed *staFeed) {
 	touched := map[string]bool{}
 	for _, ev := range evs {
 		vap := feed.vifs[ev.Vif]
-		if !covered[vap] {
-			continue
+		if !covered[vap] || ev.Kind != hapdmon.Connected && ev.Kind != hapdmon.Disconnected {
+			continue // the other kinds feed the connection timings (staconn.go)
 		}
 		touched[ev.MAC] = true
 		if p, ok := e.prev[ev.MAC]; ok && p.vap == vap && ev.Kind == hapdmon.Connected && fresh[vap] && ev.At.Before(taken) {

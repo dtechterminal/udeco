@@ -517,3 +517,28 @@ func TestStaEventsCrossVapWindow(t *testing.T) {
 		t.Fatalf("events %v, want [association wifi0ap1]", got)
 	}
 }
+
+// The socket's other events (a PSK mismatch, EAP progress, a full BSS) say
+// nothing about where a station is: they make no association or leave,
+// and they do not keep the reading from catching up a station the socket
+// missed.
+func TestStaEventsOtherKinds(t *testing.T) {
+	const a1, a2 = "aa:bb:cc:00:00:1a", "aa:bb:cc:00:00:1b"
+	t0 := time.Date(2026, 11, 20, 9, 0, 0, 0, time.UTC)
+	vifs := map[string]string{"wl12": "wifi1ap1"}
+	since := map[string]time.Time{"wl12": t0.Add(-time.Minute)}
+	var e staEvents
+	e.observe(staReading(100, map[string][][2]any{"wifi1ap1": {{a1, -60}}}), &staFeed{read: t0, now: t0, since: since, vifs: vifs})
+	for i := 1; i <= staSettle; i++ {
+		ti := t0.Add(time.Duration(i) * 10 * time.Second)
+		e.observe(staReading(100+int64(i)*10, map[string][][2]any{"wifi1ap1": {}}), &staFeed{read: ti, now: ti, since: since, vifs: vifs,
+			evs: []hapdmon.Event{
+				staLive("wl12", a1, hapdmon.EAPStarted, ti.Add(-5*time.Second)),
+				staLive("wl12", a2, hapdmon.PSKMismatch, ti.Add(-5*time.Second)),
+				staLive("wl12", a2, hapdmon.RejectedMaxSta, ti.Add(-4*time.Second)),
+			}})
+	}
+	if len(e.queue) != 1 || e.queue[0]["event_type"] != "sta_leave" || e.queue[0]["mac"] != a1 {
+		t.Fatalf("queue %v", e.queue)
+	}
+}
