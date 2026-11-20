@@ -66,7 +66,7 @@ Status key:
 |---|---|---|
 | 802.11k, 802.11v | Verified | Neighbour reports list the other units. 802.11k (RRM) is on for every SSID as on a U6 Pro, and 802.11v (WNM) is turned off in the driver where the controller turns BSS transition off. The driver bits are built, not checked on a unit ([radio-parity](docs/deco/features/radio-parity.md)). |
 | 802.11r (FT-PSK) | Built | On for every SSID. The units exchange FT key holders over signed announcements on the LAN. A client doing a fast transition has not been observed yet. |
-| 802.11r for WPA3 (FT-SAE) | Off | Advertising FT-SAE stopped WPA3 phones (iPhone, Apple Watch, Pixel, Samsung) from joining at all. Keep `"ft_sae": false`. |
+| 802.11r for WPA3 (FT-SAE) | Built | On with `wpa3` (`"ft_sae": false` turns it off). On 2026-11-19 it stopped WPA3 phones joining: the driver beacons the mobility domain byte-swapped, so hostapd refused every FT-SAE association (status 54). Fixed 2026-11-20; since then all three units run it, and an iPhone, an Apple Watch and a Pixel join (seen 2026-11-21). An FT-SAE roam between units has not been observed yet ([ft-sae](docs/deco/features/ft-sae.md)). |
 | Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | Proxy ARP is now applied on SSIDs without client isolation too, as a U6 Pro does it (Built: [proxy-arp](docs/deco/features/proxy-arp.md)). |
 | Intelligent DHCP (unicast DHCP replies) | Verified | `wl dhcp_unicast 1` on every served SSID, live, as a U6 Pro. The hand-back puts back 0 ([radio-parity](docs/deco/features/radio-parity.md)). Read live 2026-11-20 (`wl dhcp_unicast` = 1 on the served SSIDs); clients (Galaxy S20 FE, the KVM) get their leases with it on. |
 | BSS Load element | Built | On by default, as a U6 Pro. Off on a radio where the controller sends `qbssload=disabled` for any SSID, with a note when other SSIDs share that radio, because the element is radio-wide in this driver ([radio-parity](docs/deco/features/radio-parity.md)). |
@@ -176,8 +176,7 @@ You need root SSH on each unit; how to get it is out of scope here.
      "sshd_port": 2222,
      "takeover": true,
      "apply": true,
-     "egress": true,
-     "ft_sae": false
+     "egress": true
    }
    ```
 
@@ -197,8 +196,8 @@ You need root SSH on each unit; how to get it is out of scope here.
    `driver_country_bands` as in the Country row above; the tables, their
    measurements and the choice are in [dfs](docs/deco/features/dfs.md).
    On by default:
-   `ft_sae` (with `wpa3`: 802.11r for WPA3 clients; the example turns it
-   off, see the FT-SAE row above),
+   `ft_sae` (with `wpa3`: 802.11r for WPA3 clients, see the FT-SAE row
+   above),
    `uplink_ssid_down` (SSIDs down while the uplink has no carrier, as a U6;
    `false` keeps them up), `login_lock` (with takeover and apply: root
    logins closed while UniFi's Device SSH is off and the controller
@@ -270,7 +269,10 @@ Run `go test ./... && go vet ./...` before deploying a change.
 tests every push and builds one agent per device: `udeco-ap-deco-x20`
 (`udeco-ap-linux-armv7`, with its gzip) and `udeco-ap-jio-jcow414`
 (`udeco-ap-linux-mipsle`, with its gzip), each with `SHA256SUMS` and `MD5SUMS`.
-Download them from the run's Artifacts. Each is built by its device's
+Download them from the run's Artifacts, or, for a release, from the
+GitHub release of its tag: there they are named
+`udeco-ap-<device>-linux-<arch>`, with the release's notes from
+[CHANGELOG.md](CHANGELOG.md). Each is built by its device's
 `--build-only`, with the Go toolchain go.mod names, so its md5 matches what a
 deploy of the same commit installs.
 
@@ -407,7 +409,8 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 | `internal/atomicfile` | the one write-a-temporary-file-and-rename used for the state files |
 | `internal/repotest` | test helpers that hold the shell scripts and the docs to the Go code |
 | `deploy/` | `deco-ap.sh` (Deco deploy; it writes the unit's launcher), `jio-ap.sh` (JioFiber deploy), `jio-start.sh` (JioFiber supervisor with the gateway guard), `unraid.sh` (the off-device `udeco` on an Unraid host), `lib.sh` (what those scripts share), `udeco.example.json` (example config for `udeco`) |
-| `.github/workflows/build.yml` | CI: tests, then one agent build per device (a new device needs its deploy script and a matrix entry) |
+| `.github/workflows/build.yml` | CI: tests, then one agent build per device (a new device needs its deploy script and a matrix entry); a `v*` tag publishes a release |
+| `CHANGELOG.md`, `.github/release-notes.sh` | release notes, one section per tag; the script prints a tag's section for its release |
 | `packaging/deco` | what a persistent install on a Deco consists of |
 | `tools/wifi-inet-monitor` | per-client internet monitor that runs on the gateway |
 | `docs/deco/` | [design](docs/deco/agent-design.md), [device capabilities](docs/deco/device-capabilities.md), [interference audit](docs/deco/interference-audit.md), [feature notes](docs/deco/features/) |

@@ -6,6 +6,11 @@
 # toolchain from go.mod and the same tags: -trimpath, empty build id and
 # gzip -n make the build reproducible). Download them from the run's Artifacts.
 #
+# A tag vX.Y.Z also publishes a GitHub release: every device's build,
+# renamed udeco-ap-<device>-<arch>, with SHA256SUMS and CHANGELOG.md's
+# section for the tag as its notes (.github/release-notes.sh; no section,
+# no release).
+#
 # A new device gets its own deploy script (deploy/<device>-ap.sh with
 # --build-only) and its own entry in the matrix below;
 # TestCIBuildsEveryDevice (cmd/udeco-ap) fails until both exist.
@@ -79,3 +84,38 @@ jobs:
             dist/SHA256SUMS
             dist/MD5SUMS
           if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: sh .github/release-notes.sh "$TAG" > "$RUNNER_TEMP/notes.md"
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: udeco-ap-*
+      # artifacts/udeco-ap-<device>/udeco-ap-linux-<arch>[.gz] becomes
+      # release/udeco-ap-<device>-linux-<arch>[.gz]: one name per device, the
+      # bytes unchanged
+      - name: assets
+        run: |
+          mkdir release
+          for dir in artifacts/udeco-ap-*/; do
+            device=$(basename "$dir"); device=${device#udeco-ap-}
+            for f in "$dir"udeco-ap-linux-*; do
+              cp "$f" "release/udeco-ap-$device-${f##*/udeco-ap-}"
+            done
+          done
+          cd release && sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" release/* --verify-tag --title "udeco $TAG" --notes-file "$RUNNER_TEMP/notes.md"

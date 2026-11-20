@@ -738,7 +738,12 @@ func TestApplyWaitsForEnforce(t *testing.T) {
 	h.sys.enforceErr = errors.New("stop awn: exit 1")
 	h.ctl.queue(adoptReply, provisionReply(testCfg))
 	h.start()
-	eventually(t, "a few failed enforces", func() bool { return h.rec.count("enforce") >= 3 && h.ctl.pending() == 0 })
+	// The provision is taken off the controller before the worker gets to
+	// it: wait for the worker's own log of it waiting, or an enforce that
+	// succeeds first would apply it at once (a race seen in CI).
+	eventually(t, "a few failed enforces, the provision waiting", func() bool {
+		return h.rec.count("enforce") >= 3 && h.ctl.pending() == 0 && strings.Contains(h.logs.all(), "waits for decosys.Enforce")
+	})
 	if h.rec.index("plan") >= 0 || h.rec.index("apply") >= 0 {
 		t.Fatalf("Wi-Fi planned before Enforce succeeded: %v", h.rec.list())
 	}

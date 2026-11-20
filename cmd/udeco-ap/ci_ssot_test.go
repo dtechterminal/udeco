@@ -4,7 +4,9 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -78,5 +80,33 @@ func TestCIBuildsEveryDevice(t *testing.T) {
 		if !slices.ContainsFunc(ds, func(d ciDevice) bool { return d.script == rel }) {
 			t.Errorf("%s is a device deploy script with no build in %s: add a matrix entry for it", rel, ciWorkflow)
 		}
+	}
+}
+
+// The newest CHANGELOG.md section is one .github/release-notes.sh prints,
+// and its downloads name the asset the release job makes of every CI build:
+// udeco-ap-<device>-<the deploy script's OUT name less "udeco-ap-">.
+func TestChangelogNamesEveryRelease(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no sh")
+	}
+	head := regexp.MustCompile(`(?m)^## (v\d+\.\d+\.\d+) \(\d{4}-\d{2}-\d{2}\)$`).FindStringSubmatch(repotest.Read(t, "CHANGELOG.md"))
+	if head == nil {
+		t.Fatal(`CHANGELOG.md has no "## vX.Y.Z (YYYY-MM-DD)" section`)
+	}
+	out, err := exec.Command(sh, filepath.Join(repotest.Root(t), ".github/release-notes.sh"), head[1]).Output()
+	if err != nil {
+		t.Fatalf("release-notes.sh %s: %v", head[1], err)
+	}
+	notes := string(out)
+	for _, d := range ciDevices(t) {
+		asset := "udeco-ap-" + d.device + "-" + strings.TrimPrefix(filepath.Base(d.out), "udeco-ap-")
+		if !strings.Contains(notes, "`"+asset+"`") {
+			t.Errorf("CHANGELOG.md %s does not list the release asset %s", head[1], asset)
+		}
+	}
+	if _, err := exec.Command(sh, filepath.Join(repotest.Root(t), ".github/release-notes.sh"), "v0.0.0-none").Output(); err == nil {
+		t.Error("release-notes.sh printed notes for a tag with no section")
 	}
 }
