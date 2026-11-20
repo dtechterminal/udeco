@@ -316,7 +316,7 @@ apply to both platforms.
   Established sessions and the loopback are let through. It opens after
   10 min without a controller reply, on Device SSH on, at the agent's
   stop and at the hand-back. `deploy/jio-start.sh` removes the lock
-  before each start of the agent, and `deploy/jio-ap.sh` says what to do
+  first thing in each round of its supervisor loop, and `deploy/jio-ap.sh` says what to do
   when telnet does not answer. The details:
   [login-lock](login-lock.md).
 - **Unverified:** `-m conntrack` and `ip6tables` on this kernel; an open

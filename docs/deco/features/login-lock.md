@@ -18,12 +18,37 @@ LOCKED exactly when all of these hold. Anything else is OPEN.
 | Takeover with `"apply": true`, and `"login_lock"` is not `false` | config, the agent's mode (a hand-back to TP-Link means observe mode) |
 | The unit is adopted | the session state |
 | The saved `system_cfg` has an `sshd` section and Device SSH is off in it | `translate.SSHD(...).LANLogins()` is false: `sshd.status=disabled`, or only `lo` listeners, or no password and no key |
-| The controller's last reply that decoded with the device key is under `login_lock_failopen_s` old (600 s) | `informOnce`: replies are AES-GCM sealed with the per-device key, and an unencrypted reply is refused, so only the real controller can produce one |
+| The controller's last reply that counts is under `login_lock_failopen_s` old (600 s) | `informOnce`, see below |
 
 OPEN when there is no `sshd` section, Device SSH is on, the unit is not
 adopted, the agent observes (configured, forced or after a hand-back),
-no reply has decoded since the agent started, or the controller has been
+no reply has counted since the agent started, or the controller has been
 silent for the whole window (fail-open).
+
+### Which replies count
+
+Inform is plain HTTP, so someone on the path can answer in the
+controller's place. A reply counts as the controller answering only when
+all of these hold (`lockReply`):
+
+- It decoded with the device key and is encrypted (an unencrypted reply
+  is refused).
+- The agent then handled it (`device.Session.Handle` accepted it). A CBC
+  frame has no authentication: about 1 random frame in 256 passes the
+  padding check and "decodes", but random bytes are never a reply the
+  agent can handle.
+- Its `server_time_in_utc` is later than that of every reply counted
+  before in this run. The real controller puts its time in every reply.
+  A sealed reply sent again (a replay) carries its old time, so it does
+  not keep the controller "answering" after the controller has died.
+  A reply without the field never counts.
+
+A Device SSH change that arrives with a reply that does not count is not
+taken: the lock keeps the view it had, and the log says
+"a Device SSH change from a reply that is not newer than the last one ...
+is not taken". A replay of an old Device SSH on therefore does not open
+the lock. The rest of what such a reply carries is handled as before
+(see Residual risks).
 
 The decision is in `cmd/udeco-ap/loginlock.go` (`lockDecision`). The 10th
 minute of silence opens it: 9 min 59 s after the last reply is still
@@ -38,14 +63,17 @@ login ports from every source except the loopback:
 ```
 -A INPUT -j UDECO-LOCK                      (inserted at position 1)
 -A UDECO-LOCK -i lo -j RETURN
--A UDECO-LOCK -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
+-A UDECO-LOCK -m conntrack --ctstate ESTABLISHED -j RETURN
 -A UDECO-LOCK -p tcp -m tcp --dport 22 -j DROP     (Deco)
 -A UDECO-LOCK -p tcp -m tcp --dport 23 -j DROP     (Garage)
 -A UDECO-LOCK -p tcp -m tcp --dport 22 -j DROP     (Garage)
 ```
 
 - **Established sessions are kept.** A session open before the lock
-  carries on: its packets RETURN before the DROP.
+  carries on: its packets RETURN before the DROP. Only ESTABLISHED
+  RETURNs, not RELATED: an open session needs nothing more, and RELATED
+  would let in a new connection to a login port that a conntrack helper
+  expects (an FTP helper fed a PASV reply naming the unit's :23, say).
 - **RETURN, not ACCEPT.** A RETURNed packet goes on through the rest of
   `INPUT`, so the lock adds drops and nothing else. On the Deco, the
   inbound fence `UDECO-IN` (sitting right behind the lock) still drops
@@ -75,8 +103,12 @@ login ports from every source except the loopback:
   window, and the failed informs back off to at most 1 min.
 - **The tick** (every 60 s in takeover) re-asserts a lock in place:
   rules can be lost.
-- **The agent's stop** (SIGTERM; `run` after the worker has finished and
-  the LED is released) removes it, with its own 10 s context.
+- **The agent's stop** (SIGTERM; `run` as soon as the inform loop has
+  ended, before it waits for the background jobs) removes it, with its
+  own 10 s context. From then on nothing locks again, not even a tick
+  still running (`lockStop`). Released before the wait because a job
+  that hangs would otherwise keep the lock with nothing left to fail it
+  open: the process is alive, so no launcher steps in.
 - **The hand-back to TP-Link** (`dropToObserve`) removes it before
   `Restore`. Both `decosys.Restore` and `jiosys.Restore` remove it too.
 - **The first look** after the start removes any leftover, in case the
@@ -109,6 +141,13 @@ Nothing secret is logged: the reasons, iptables errors and ports only.
   works.
 - **A failed re-assert of a lock in place** counts as open:
   `LOGIN OPEN: lock failed`.
+- **An error before any change** (a read that fails, say because another
+  process holds the xtables lock while the Garage runs iptables without
+  `-w`, and `-N` then finds the chain there) leaves the unit exactly as
+  it was (`decosys.ErrLockUnchanged`): a complete lock stays, nothing is
+  removed, no event, and the next tick checks again. Taking a complete
+  lock down over a failed read would open it for nothing, and anyone who
+  could make another process churn iptables could keep it open.
 
 ## Crash safety (launchers)
 
@@ -117,10 +156,13 @@ Before every (re)start of the agent, both launchers remove the lock
 themselves (busybox sh, errors ignored):
 
 - **The Deco**: the launcher `/tp_data/udeco/start.sh` is written by
-  `deploy/deco-ap.sh` (the `LAUNCH` template). It removes the lock only
-  when it is about to start the agent, never while one runs.
-- **The Garage**: `deploy/jio-start.sh`, the supervisor loop's `unlock`
-  before each `udeco-ap` start. `UDECO_IPT` overrides the default
+  `deploy/deco-ap.sh` (the `LAUNCH` template). It removes the lock right
+  after its check that no agent runs (never while one runs), before
+  anything that can end the run without a start (a missing binary, a gz
+  that does not unpack to the deployed md5).
+- **The Garage**: `deploy/jio-start.sh`, `unlock` as the first statement
+  of the supervisor loop, so a gunzip that fails and retries every
+  minute still removes it. `UDECO_IPT` overrides the default
   `/pfrm2.0/bin`.
 
 ```sh
@@ -135,7 +177,7 @@ On the Garage the same lines run without `-w`, with
 `/pfrm2.0/bin/iptables` and `ip6tables`.
 
 A reboot clears iptables on both platforms (nothing persists), and the
-agent always starts OPEN: it locks only after a reply has decoded.
+agent always starts OPEN: it locks only after a reply has counted.
 
 `deploy/jio-ap.sh` replaces only the agent, not
 `/flash2/udeco/start.sh`. Until the Garage's `start.sh` is replaced by
@@ -187,6 +229,20 @@ port 2222 (`cmd/udeco-ap/sitessh.go`), as on a UniFi AP.
   Garage's gateway guard restarts the supervisor loop. With both gone,
   the way back in is a power cycle (UniFi's Restart needs a running
   agent).
+- **Replayed replies.** A replay cannot keep the controller "answering"
+  or change the lock's view of Device SSH (see Which replies count), but
+  it is otherwise handled like any reply, as before the lock existed: an
+  old `system_cfg` is saved and applied (and the site users' :2222 logins
+  follow its Device SSH) until the controller provisions its current
+  `cfgversion` again. Limits of the time check: the first reply after the
+  agent starts has nothing to compare with, so a replay sent right then
+  counts (and its Device SSH view is taken); a sealed reply that an
+  attacker held back and never let through counts once when it is
+  finally sent, which can stretch the fail-open by about as long as
+  replies were held back (the unit was open while they were). If the
+  controller's clock steps back, its replies stop counting until it has
+  passed the last time seen (or the agent restarts): the lock fails open
+  meanwhile.
 - **Other ports.** Only :22 (and the Garage's :23) are locked. The agent's
   own :2222 is fenced to the console and the site users already
   (`UDECO-IN`, Deco). TP-Link's :20001 is dropped by `UDECO-IN`.
