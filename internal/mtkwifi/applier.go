@@ -95,6 +95,8 @@ type Applier struct {
 	ledMu    sync.Mutex
 	ledOn    bool // led_enabled; the controller's last word
 	locating bool
+	// ledUplink: the uplink-loss hold is on (uplinkLED): red fast blink
+	ledUplink bool
 	// the collector's driver reads against radio restarts (restartgate.go):
 	// gate's write side is held through Apply and Rollback; quietUntil
 	// (Options.mono, ns) is the end of the last restart's settle time

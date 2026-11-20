@@ -451,7 +451,8 @@ func (a *agent) mode() string {
 
 // run is the agent until ctx ends (SIGTERM): informs stop, the Wi-Fi
 // worker finishes the job it is in, and the unit's Wi-Fi is left as it is
-// (tc limits and the flow cache state included: flowcache.go).
+// (tc limits and the flow cache state included: flowcache.go); only the
+// uplink-loss LED blink goes (uplink.go).
 //
 // Order: phase 1 (takeover only: the inbound fence, nothing else), the
 // boot gate (R1/R2: no inform, no Enforce, no apply until TP-Link's boot
@@ -516,6 +517,7 @@ func (a *agent) run(parent context.Context) error {
 	a.loop(ctx)
 	a.mdnsShutdown() // the vifs get their native mDNS back (mdnsbr.go)
 	a.bg.Wait()
+	a.releaseLED() // no uplink-loss blink left behind (uplink.go)
 	a.logf("udeco-ap: stopped (Wi-Fi left as it is)")
 	if c := context.Cause(ctx); errors.Is(c, errResources) {
 		return c

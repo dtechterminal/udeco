@@ -10,6 +10,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 )
 
 // holdWifi has bcmwifi's uplink-loss hold.
@@ -240,5 +243,41 @@ func TestUplinkConfig(t *testing.T) {
 	c.UplinkGatewayDown = true
 	if err := c.validate(); err == nil || !strings.Contains(err.Error(), "uplink_gateway_down") {
 		t.Errorf("jio: %v", err)
+	}
+}
+
+// releaseWifi has bcmwifi's ReleaseLED.
+type releaseWifi struct{ *fakeWifi }
+
+func (w releaseWifi) ReleaseLED(ctx context.Context) {
+	if ctx.Err() != nil {
+		w.rec.add("led-release:cancelled")
+		return
+	}
+	w.rec.add("led-release")
+}
+
+// The agent's stop leaves no uplink-loss blink behind (bcmwifi ReleaseLED,
+// with a context SIGTERM did not cancel), after the worker has finished;
+// the Garage's backend has no such LED and nothing changes there.
+func TestUplinkLEDReleasedAtStop(t *testing.T) {
+	var h *harness
+	h = newHarness(t, func(c *Config, o *options) {
+		c.Takeover = true
+		o.newWifi = func(bo bcmwifi.Options) wifiApplier { h.built++; return releaseWifi{h.wifi} }
+	})
+	h.start()
+	eventually(t, "enforce", func() bool { return h.rec.count("enforce") > 0 })
+	if h.rec.index("led-release") >= 0 {
+		t.Fatal("released while running")
+	}
+	h.stop()
+	if h.rec.index("led-release") < 0 {
+		t.Fatalf("not released at the stop: %v", h.rec.list())
+	}
+	// the Garage's uplink-loss hold blinks its LED red too (mtkwifi
+	// uplinkLED): the stop releases it the same way
+	if _, ok := any((*mtkwifi.Applier)(nil)).(ledReleaser); !ok {
+		t.Error("the jio-mtk backend has no release: its red blink would outlive the agent")
 	}
 }

@@ -32,7 +32,11 @@ import (
 //   - off (led_enabled=false): all three colours dark;
 //   - locate: blue fast blink (a colour and pattern the unit shows in no
 //     other state the agent leaves it in), also when the LED is off, as a
-//     UniFi AP does; locate-off goes back to green or dark.
+//     UniFi AP does; locate-off goes back to green or dark;
+//   - uplink lost (the uplink-loss hold, uplinkloss.go): red fast blink,
+//     the firmware's own "no WAN" pattern (row 102 27 2 0 above), where a
+//     U6 blinks its LED for a lost uplink. Locate and the LED off win over
+//     it; the agent's stop (ReleaseLED) puts green back.
 const (
 	ledDefFile = "proc/tc3162/led_def"
 	ledRow     = "102"
@@ -63,21 +67,54 @@ func (a *Applier) LED(ctx context.Context, mode string) error {
 	// the controller's last word, even if this write fails: the next call
 	// shows it
 	a.ledOn, a.locating = on, locating
-	// "ledctl1 ALL off", then one colour.
-	lines := []string{ledLine(ledRed, "0 0"), ledLine(ledGreen, "0 0"), ledLine(ledBlue, "0 0")}
-	show := "dark"
-	switch {
-	case locating:
-		lines, show = append(lines, ledLine(ledBlue, "2 0")), "blue fast blink"
-	case on:
-		lines, show = append(lines, ledLine(ledGreen, "1 0")), "steady green"
-	}
-	if err := a.writeLED(ctx, lines); err != nil {
+	show, err := a.drawLED(ctx)
+	if err != nil {
 		return fmt.Errorf("mtkwifi: LED %s: %w", mode, err)
 	}
 	a.o.Logf("mtkwifi: LED %s: %s", mode, show)
 	return nil
 }
+
+// drawLED shows the LED state (ledMu held): "ledctl1 ALL off", then one
+// colour.
+func (a *Applier) drawLED(ctx context.Context) (string, error) {
+	lines := []string{ledLine(ledRed, "0 0"), ledLine(ledGreen, "0 0"), ledLine(ledBlue, "0 0")}
+	show := "dark"
+	switch {
+	case a.locating:
+		lines, show = append(lines, ledLine(ledBlue, "2 0")), "blue fast blink"
+	case a.ledOn && a.ledUplink:
+		lines, show = append(lines, ledLine(ledRed, "2 0")), "red fast blink (uplink lost)"
+	case a.ledOn:
+		lines, show = append(lines, ledLine(ledGreen, "1 0")), "steady green"
+	}
+	return show, a.writeLED(ctx, lines)
+}
+
+// uplinkLED shows the uplink-loss hold (red fast blink) or its end. Only
+// a change is drawn, and nothing shows over locate or a dark LED; a
+// failed write is logged, never returned: the LED must not hold up the
+// SSIDs.
+func (a *Applier) uplinkLED(ctx context.Context, down bool) {
+	a.ledMu.Lock()
+	defer a.ledMu.Unlock()
+	if a.ledUplink == down {
+		return
+	}
+	a.ledUplink = down
+	if a.locating || !a.ledOn {
+		return
+	}
+	if show, err := a.drawLED(ctx); err != nil {
+		a.o.Logf("mtkwifi: LED for the uplink: %v", err)
+	} else {
+		a.o.Logf("mtkwifi: LED: %s", show)
+	}
+}
+
+// ReleaseLED ends the uplink-loss blink at the agent's stop (the SSIDs
+// are left as they are, the LED goes back to the controller's setting).
+func (a *Applier) ReleaseLED(ctx context.Context) { a.uplinkLED(ctx, false) }
 
 func ledLine(gpio, action string) string { return ledRow + " " + gpio + " " + action + " 0" }
 

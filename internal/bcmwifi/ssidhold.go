@@ -17,9 +17,11 @@ import (
 // bridges. While the hold lasts, Plan (and so Tick and every apply) leaves
 // them down instead of raising them, takes one that came up down again
 // without reporting it as foreign, and Verify wants them down. SSIDsDown
-// (false) raises them. The hold lives only in this Applier: a new agent
-// process starts without it, and a hand-back to TP-Link forgets it (the
-// baseline's own BSS states are restored).
+// (false) raises them. The LED follows once the SSIDs have changed: TP-Link's
+// conn "ap-lost" red blink while held, "online" when lifted (uplinkled.go).
+// The hold lives only in this Applier: a new agent process starts without
+// it, and a hand-back to TP-Link forgets it (the baseline's own BSS states
+// are restored, and conn goes back to "online").
 
 // SSIDsDown sets or lifts the hold. It returns ErrNotOwned when the agent
 // serves no BSS.
@@ -49,14 +51,18 @@ func (a *Applier) SSIDsDown(ctx context.Context, down bool) error {
 			}
 		}
 	}
+	led := map[bool]string{true: connStateLost, false: connStateOnline}[down]
 	if a.o.DryRun {
 		a.logPlan(fmt.Sprintf("dry-run SSIDs down=%t", down), Plan{Steps: st})
+		a.setConn(ctx, led)
 		return nil
 	}
 	if err := a.executeAll(ctx, st); err != nil {
 		a.ssidsDown = prev
 		return fmt.Errorf("bcmwifi: SSIDs down=%t: %w", down, err)
 	}
+	// the LED follows the SSIDs, never the other way round (uplinkled.go)
+	a.setConn(ctx, led)
 	return nil
 }
 

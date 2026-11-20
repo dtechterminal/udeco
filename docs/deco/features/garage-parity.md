@@ -111,13 +111,18 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   nothing is taken down (the unit must stay reachable through the GL KVM
   side door). `uplink_loss: false` turns it off
   (`internal/mtkwifi/uplinkloss.go`, `cmd/udeco-ap/garage.go`). Events
-  `UPLINK LOST`/`UPLINK BACK` go to `events.log`.
+  `UPLINK LOST`/`UPLINK BACK` go to `events.log`. The status LED blinks red
+  fast meanwhile, the firmware's own "no WAN" pattern (row `102 27 2 0`),
+  where a U6 blinks its LED for a lost uplink; locate (blue) and the LED off
+  (dark) win over it, and the agent's stop puts green back
+  (`internal/mtkwifi/led.go` uplinkLED/ReleaseLED). Not yet seen on the unit
+  with a real cable pull.
 - A rollback while isolated (a failed apply, or the health check after a
   failed isolation) brings last-good back isolated, which is what Verify
   checks. It used to bring back every SSID while Verify checked the
   isolated plan, so each health check failed and rolled back again: two
   radio restarts per check for the whole outage.
-- **Default (owner decision pending):** on, as a U6's uplink monitor is
+- **Default (owner decision 2026-11-20: on, like a U6):** on, as a U6's uplink monitor is
   (design principle a). gaps.json garage item 5 asked for off by default
   because each isolation and each restore is a restart per radio (hang
   exposure). The rollback loop that made an outage cost repeated restarts

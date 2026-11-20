@@ -124,3 +124,47 @@ func TestLEDDryRun(t *testing.T) {
 		t.Error("dry run wrote the LED table")
 	}
 }
+
+// The uplink-loss hold shows the firmware's own "no WAN" pattern, the red
+// fast blink (row 102 27 2 0, read on the unit 2026-11-19), under the
+// controller's LED setting and locate; the agent's stop puts green back.
+func TestLEDUplinkDown(t *testing.T) {
+	f, a := newLEDFake(t, true)
+	ctx := context.Background()
+	allOff := []string{"102 27 0 0 0", "102 25 0 0 0", "102 23 0 0 0"}
+	green := append(append([]string{}, allOff...), "102 25 1 0 0")
+	blue := append(append([]string{}, allOff...), "102 23 2 0 0")
+	red := append(append([]string{}, allOff...), "102 27 2 0 0")
+	check := func(step string, want []string) {
+		t.Helper()
+		if got := f.take(); strings.Join(got, "|") != strings.Join(want, "|") {
+			t.Errorf("%s wrote %q, want %q", step, got, want)
+		}
+	}
+	if err := a.LED(ctx, bcmwifi.LEDOn); err != nil {
+		t.Fatal(err)
+	}
+	check("on", green)
+	a.uplinkLED(ctx, true)
+	check("uplink down", red)
+	a.uplinkLED(ctx, true)
+	check("uplink down again", nil)
+	_ = a.LED(ctx, bcmwifi.LEDLocate)
+	check("locate in the hold", blue)
+	_ = a.LED(ctx, bcmwifi.LEDLocateOff)
+	check("locate-off in the hold", red)
+	_ = a.LED(ctx, bcmwifi.LEDOff)
+	check("off in the hold", allOff)
+	a.uplinkLED(ctx, false)
+	check("uplink back, LED off", nil) // dark stays dark: nothing to write
+	a.uplinkLED(ctx, true)
+	check("uplink down, LED off", nil)
+	_ = a.LED(ctx, bcmwifi.LEDOn)
+	check("on in the hold", red)
+	a.ReleaseLED(ctx)
+	check("release", green)
+	a.ReleaseLED(ctx)
+	check("release again", nil)
+	a.uplinkLED(ctx, false)
+	check("uplink back after release", nil)
+}
