@@ -117,6 +117,12 @@ New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
   checks. It used to bring back every SSID while Verify checked the
   isolated plan, so each health check failed and rolled back again: two
   radio restarts per check for the whole outage.
+- **Default (owner decision pending):** on, as a U6's uplink monitor is
+  (design principle a). gaps.json garage item 5 asked for off by default
+  because each isolation and each restore is a restart per radio (hang
+  exposure). The rollback loop that made an outage cost repeated restarts
+  is fixed (above); what remains is two restarts per radio per outage of
+  15 s or more. `uplink_loss: false` is the opt-out.
 - **Unverified:** the carrier reading of `jioports` during a real WAN
   cable pull; client behaviour.
 
