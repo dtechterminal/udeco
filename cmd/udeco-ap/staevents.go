@@ -33,8 +33,8 @@ import (
 //     fast transition), assoc_status. A leave on one AP and an association
 //     on another make a roam in the client's history.
 //
-// success/failure carry connection timings (assoc/auth/wpa/ip deltas) the
-// agent does not measure; they are not sent rather than sent as zeros.
+// success/failure/soft failure/fixup carry the connection timings; they
+// come from staconn.go (sta_snoop), not from here.
 //
 // A notification inform's stats are not processed (devmgr.l.mMObEXELV
 // returns after the notification), so each event goes in an extra inform

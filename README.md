@@ -90,7 +90,8 @@ Status key:
 |---|---|---|
 | Client list with signal, rates, traffic, Wi-Fi generation | Verified | Only stations the driver reports as associated are listed, so clients don't flap between APs. |
 | Connect and leave events | Verified | A departed client leaves UniFi at once, not after about 5 minutes. |
-| Connection-timing events | Not yet | |
+| Connection-timing events | Built | Success, failure, soft failure and fixup per connection attempt, with the controller's timings and counters, from hostapd's log and sockets and a read-only tap of each client's ARP, DHCP and DNS. `"sta_snoop": false` turns it off. [connection-events](docs/deco/features/connection-events.md) |
+| Gratuitous ARP on association | Built | Once a client is authorized and its address is known, the unit announces it on the wired ports so switches learn it at once. `"assoc_garp": false` turns it off. [assoc-garp](docs/deco/features/assoc-garp.md) |
 | Per-client TX retries | Verified | Attempts, retries and retry % on each client's page. |
 | Reconnect, block, unblock | Verified | |
 | Lock client to AP | Verified | Every other unit denies a locked client. Its deny lists are updated live, without a hostapd restart. |
@@ -180,7 +181,8 @@ You need root SSH on each unit; how to get it is out of scope here.
    Optional keys, all off by default: `wpa3`, `min_rates`, `mdns_bridge`,
    `hotspot2`, `mgmt_sources`, `uplink_gateway_down`. On by default:
    `uplink_ssid_down` (SSIDs down while the uplink has no carrier, as a U6;
-   `false` keeps them up), and `twt`
+   `false` keeps them up), `sta_snoop` (connection-timing events),
+   `assoc_garp` (gratuitous ARP for a client once authorized), and `twt`
    (802.11ax Target Wake Time on both radios, as a real U6 Pro runs it;
    `"twt": false` keeps TP-Link's off). The driver takes it only while the
    radio is down, so the agent sets it inside a radio restart it makes

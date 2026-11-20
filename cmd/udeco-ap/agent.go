@@ -35,6 +35,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
 	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/pathmon"
+	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
@@ -210,12 +211,14 @@ type options struct {
 	siteShell    string   // site SSH users' shell; "" = /bin/ash (sitessh.go)
 	logf         func(string, ...any)
 	t            timing
-	now          func() time.Time               // wall clock (WLAN schedules, events); nil = time.Now
-	lldpOpen     lldp.Opener                    // LLDP sockets; nil = AF_PACKET (Linux)
-	noLLDP       bool                           // run no LLDP agent at all
-	spectrumPlan *wl.ScanPlan                   // spectrum runner plan; nil = wl.DefaultScanPlan (tests shorten it)
-	pmProber     pathmon.Prober                 // path monitoring probes; nil = ICMP echo (pathmon.go)
-	carrier      func(dev string) (up, ok bool) // an Ethernet port's carrier; nil = sysfs (uplink.go)
+	now          func() time.Time                        // wall clock (WLAN schedules, events); nil = time.Now
+	lldpOpen     lldp.Opener                             // LLDP sockets; nil = AF_PACKET (Linux)
+	noLLDP       bool                                    // run no LLDP agent at all
+	spectrumPlan *wl.ScanPlan                            // spectrum runner plan; nil = wl.DefaultScanPlan (tests shorten it)
+	pmProber     pathmon.Prober                          // path monitoring probes; nil = ICMP echo (pathmon.go)
+	carrier      func(dev string) (up, ok bool)          // an Ethernet port's carrier; nil = sysfs (uplink.go)
+	snoopOpen    stasnoop.Opener                         // the connection-event taps; nil = AF_PACKET (staconn.go)
+	garpSend     func(ifname string, frame []byte) error // nil = AF_PACKET (garp.go)
 	// logFollow streams the unit's log for remote syslog; nil = logread -f (syslogfwd.go)
 	logFollow func(context.Context) (io.ReadCloser, error)
 	// snmpListen opens the SNMP agent's socket; nil = UDP 0.0.0.0:161 (snmp.go)
@@ -258,6 +261,8 @@ type agent struct {
 	roam     roamState    // loop goroutine only (roaming.go)
 	minr     minRSSIState // loop goroutine only (minrssi.go)
 	upl      uplinkGuard  // the uplink watcher's (uplink.go)
+	conn     *connState   // connection-timing events (staconn.go); loop goroutine; nil = off
+	garp     garpState    // gratuitous ARP on association (garp.go); loop goroutine
 	no2      no2ghzState  // loop goroutine only (no2ghz.go)
 	lldp     *lldp.Service
 	res      atomic.Pointer[resources] // the last R4 reading (self-check)
@@ -487,6 +492,7 @@ func (a *agent) run(parent context.Context) error {
 		a.startHomeListen(ctx)
 		a.startStaMonitor(ctx)  // staevents.go
 		a.startUplinkWatch(ctx) // uplink.go
+		a.startConnEvents(ctx)  // staconn.go
 		a.startupJobs()
 	} else if a.x.S.Adopted {
 		a.provisionIfNew("startup")
@@ -970,7 +976,9 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 	}
 	if !a.stale {
 		// the socket events wait in the monitor for a real reading
-		a.sta.observe(f, a.staFeed(&c, f))
+		feed := a.staFeed(&c, f)
+		a.sta.observe(f, feed)
+		a.connReading(ctx, &c, f, feed) // connection timings, GARP (staconn.go, garp.go)
 	}
 	a.rateJoins(f)
 	a.mcastMerge(ctx, f, &c, info, time.Now())
