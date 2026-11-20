@@ -169,3 +169,32 @@ func TestNo2GHzPolicy(t *testing.T) {
 		t.Fatalf("%v", p.no2ghz)
 	}
 }
+
+// The spec's usable signal (-70 dBm or better on 2.4 GHz), and a ban only
+// with a 5 GHz sighting minutes old: a client at the cell edge, or one
+// seen on 5 GHz long ago, is never kept off 2.4 GHz.
+func TestNo2GHzSpecFloors(t *testing.T) {
+	t.Run("-72 on 2.4 GHz", func(t *testing.T) {
+		u := newNo2Unit(t, nil)
+		u.reading(false, "wl12", -55)
+		for i := 0; i < 30; i++ {
+			if got := u.reading(false, "wl02", -72); len(got) != 0 {
+				t.Fatalf("reading %d: %v", i, got)
+			}
+		}
+	})
+	t.Run("5 GHz 40 minutes ago: request, no ban", func(t *testing.T) {
+		u := newNo2Unit(t, nil)
+		u.reading(false, "wl12", -55)
+		u.now = u.now.Add(40 * time.Minute)
+		var got []string
+		for i := 0; i < 12; i++ {
+			got = append(got, u.reading(false, "wl02", -60)...)
+		}
+		for _, c := range got {
+			if strings.HasPrefix(c, "ban:") {
+				t.Fatalf("banned on a 40-minute-old 5 GHz sighting: %v", got)
+			}
+		}
+	})
+}

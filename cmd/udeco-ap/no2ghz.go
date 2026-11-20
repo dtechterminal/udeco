@@ -13,14 +13,15 @@ package main
 //   - a client of such an SSID on the 2.4 GHz BSS qualifies when this unit
 //     saw it on the SSID's 5 GHz BSS within no2ghzRecent at no2ghzMin5 or
 //     better (the 5 GHz minimum RSSI plus 5 dB when one is set), and its
-//     2.4 GHz signal is at least no2ghzMin24 (a client far away on 2.4 GHz
-//     would not hold 5 GHz);
+//     2.4 GHz signal is at least no2ghzMin24, the spec's usable -70 dBm (a
+//     client far away on 2.4 GHz would not hold 5 GHz);
 //   - it gets an 802.11v BSS transition request naming the 5 GHz BSS
 //     (SteerToBand), at most once per no2ghzEvery, whatever the band
 //     steering mode;
 //   - still on the 2.4 GHz BSS no2ghzJudge later, never having moved
 //     meanwhile: it ignored the request, and it is kept off the 2.4 GHz BSS
-//     for no2ghzDeny (bcmwifi.TempDeny: the driver MAC filter, which also
+//     for no2ghzDeny, but only with a 5 GHz sighting within no2ghzBanRecent
+//     (an hour-old one says little about now) (bcmwifi.TempDeny: the driver MAC filter, which also
 //     hides that BSS from its probes, and a deauth), at most once per
 //     no2ghzDenyEvery, so a client for which 5 GHz does not work in
 //     practice is let back and left there; an allow-list SSID cannot take
@@ -44,7 +45,8 @@ import (
 const (
 	no2ghzRecent    = time.Hour        // a 5 GHz sighting this recent counts
 	no2ghzMin5      = -65              // dBm on 5 GHz at least (UniFi's default 30 - 95)
-	no2ghzMin24     = -79              // dBm on 2.4 GHz at least (UniFi's default 16 - 95)
+	no2ghzMin24     = -70              // dBm on 2.4 GHz at least (gaps.json no2ghz: a usable signal, -70 dBm or better)
+	no2ghzBanRecent = 5 * time.Minute  // a ban needs a 5 GHz sighting this recent
 	no2ghzEvery     = 10 * time.Minute // one request per client at most this often
 	no2ghzJudge     = time.Minute      // still on 2.4 GHz this long after a request: ignored
 	no2ghzDeny      = time.Minute      // how long an ignoring client is kept off 2.4 GHz
@@ -167,7 +169,7 @@ func (a *agent) no2ghzReading(s *apstate.Snapshot, now time.Time) {
 				switch {
 				case !c.asked.IsZero() && !c.judged && c.vif == v.Iface && now.Sub(c.asked) >= no2ghzJudge:
 					c.judged = true
-					if !c.moved && now.Sub(c.denied) >= no2ghzDenyEvery && canBan {
+					if !c.moved && now.Sub(c.denied) >= no2ghzDenyEvery && canBan && now.Sub(c.at5) < no2ghzBanRecent {
 						cs = append(cs, cand{v.Iface, m, sta.Signal, to, true})
 					}
 				case c.asked.IsZero() || now.Sub(c.asked) >= no2ghzEvery:
