@@ -363,6 +363,10 @@ func (f *fakeDev) Run(ctx context.Context, name string, args ...string) ([]byte,
 		case "addbr":
 			f.mkNetdev(args[1])
 			f.write("/sys/class/net/"+args[1]+"/flags", "0x1002\n")
+			// Linux 4.1's defaults for a new bridge
+			for k, v := range map[string]string{"multicast_snooping": "1", "multicast_querier": "0", "hash_max": "512"} {
+				f.write("/sys/class/net/"+args[1]+"/bridge/"+k, v+"\n")
+			}
 		case "delbr":
 			ents, _ := os.ReadDir(f.path("/sys/class/net/" + args[1] + "/brif"))
 			for _, e := range ents {
