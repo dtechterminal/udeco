@@ -125,7 +125,7 @@ while it has any limit, and back on when none are left. Details are in
 | Channel utilisation, CPU, memory, uptime, load | Verified | |
 | Wi-Fi Experience (AP and client) | Verified | |
 | Wired uplink and uplink traffic | Verified | With a UniFi gateway, the controller credits the AP with its clients' traffic. |
-| SSIDs down on uplink loss | Built | No carrier on the uplink port for 5 s takes every SSID down (no radio restart); 10 s of carrier brings them back. Never during an apply. `"uplink_ssid_down": false` turns it off; `"uplink_gateway_down": true` also counts a gateway unanswered for 60 s. [uplink-loss](docs/deco/features/uplink-loss.md) |
+| SSIDs down on uplink loss | Built | No carrier on the uplink port for 5 s takes every SSID down (no radio restart); 10 s of carrier brings them back. Never during an apply. `"uplink_ssid_down": false` turns it off; `"uplink_gateway_down": true` also counts a gateway unanswered for 60 s. The LED blinks red meanwhile (TP-Link's "ap-lost"), dark if the LED is off. [uplink-loss](docs/deco/features/uplink-loss.md) |
 | Wireless mesh uplink | Not planned | TP-Link's mesh is switched off at takeover; every unit is wired. |
 
 ## Hardware

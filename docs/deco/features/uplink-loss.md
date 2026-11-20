@@ -30,9 +30,31 @@
     another port (its MAC in the bridge FDB, or LLDP). The lost port's carrier drop flushes the
     gateway's FDB entry, and a lone other port with carrier (a wired PC or TV) is no path to the
     network: without this rule topology would elect it, and the hold would lift on a dead AP.
-  - The LED is not changed: a U6 shows uplink down as pattern 11111110@160, but the Deco's TP-Link
-    LED states for it (`ubus call leds ...`) have not been read on a unit, so none is written.
   - Takeover with the Wi-Fi live only; a drop to observe mode forgets the hold.
+- LED (`internal/bcmwifi/uplinkled.go`): a U6 shows uplink down as a fast blink (pattern
+  11111110@160). The Deco's LED daemon has TP-Link's own "lost the uplink" signal in its `conn`
+  event, read with `ubus call leds status {"verbose":true}` after each call on the Hallway X20
+  (2026-11-20):
+
+  | `ubus call leds conn {"state":...}` | Daemon event | LED |
+  | --- | --- | --- |
+  | `online` | [1,0] | green, steady |
+  | `offline` | [1,1] | red, steady (on 4000 ms, off 0) |
+  | `ap-lost` | [1,2] | red, blink (747 ms on, 463 ms off) |
+
+  - SSIDs down sets `ap-lost`, the blink being the closest to the U6; SSIDs up sets `online`. Each
+    call runs after the BSSes changed; a failed change of the SSIDs leaves the LED alone.
+  - LED off (the `off` event, higher priority than `conn`): `conn` still changes underneath and the
+    LED stays dark; nothing here clears `off`.
+  - LED on during the hold sets `conn` to `ap-lost`, not `online`, so it does not hide the blink.
+  - Locate (`zigbee` `identifying`, green blink) works during the hold and leaves `conn` alone: the
+    red blink is back after Unlocate while the hold still stands.
+  - The hand-back to TP-Link and the agent's stop put `conn` back to `online` (the stop leaves the
+    SSIDs as they are, as every stop leaves the Wi-Fi).
+  - A failed `ubus` call is logged and never fails the hold, nor stands in the way of raising the
+    SSIDs; an `online` that failed at the lifting is put right by the next LED on, the hand-back or
+    the stop.
+  - Deco only: the Garage (jio-mtk) has no hold and its LED is not touched.
 - `uplink_gateway_down` (default off; needs `uplink_ssid_down`): the agent's own ICMP echo to the
   gateway every 5 s (1 s timeout); unanswered for 60 s counts as a lost uplink with the carrier up,
   and an answer (plus 10 s of carrier) brings the SSIDs back. Off by default because a gateway that
@@ -50,3 +72,6 @@
 - That hostapd 2.9 leaves a BSS down that `wl bss down` lowered (no re-raise of its own) and that
   `wl bss up` afterwards serves clients without a hostapd reload.
 - Client roaming behaviour when the SSIDs disappear.
+- The LED under a real uplink loss: the `conn` states were read on the Hallway X20 by calling them
+  by hand, not through the agent's hold, and the LED-off, locate and LED-on-during-the-hold
+  combinations were not watched on a unit.
