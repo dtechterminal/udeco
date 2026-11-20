@@ -542,8 +542,12 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 				if want := proxyARPWanted(u.SSID); lv.Bridge != u.Bridge && want || a.proxyARPDiffers(v, want) {
 					st = append(st, proxyARPStep(v, want))
 				}
-				if !lv.Up {
+				switch {
+				case !lv.Up && !a.ssidsDown:
 					st = append(st, cmdStep("raise "+v, "wl", "-i", v, "bss", "up"))
+				case lv.Up && a.ssidsDown:
+					// the uplink-loss hold (ssidhold.go): not foreign
+					st = append(st, onVif(v, cmdStep("uplink lost: lower "+v, "wl", "-i", v, "bss", "down")))
 				}
 			default:
 				// The placeholder wlN1 (or a vif no hostapd serves) stays
@@ -693,9 +697,10 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		if proxyARPWanted(u.SSID) {
 			st = append(st, proxyARPStep(u.Vif, true))
 		}
-		st = append(st,
-			cmdStep("netdev up "+u.Vif, "ifconfig", u.Vif, "up"),
-			cmdStep("raise "+u.Vif, "wl", "-i", u.Vif, "bss", "up"))
+		st = append(st, cmdStep("netdev up "+u.Vif, "ifconfig", u.Vif, "up"))
+		if !a.ssidsDown { // else the uplink-loss hold keeps it down (ssidhold.go)
+			st = append(st, cmdStep("raise "+u.Vif, "wl", "-i", u.Vif, "bss", "up"))
+		}
 	}
 	rp.Steps = st
 	return rp, nil

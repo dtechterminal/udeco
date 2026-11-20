@@ -156,6 +156,8 @@ type timing struct {
 	logPoll       time.Duration // remote syslog on jio-mtk: log file poll (1 s; logfollow.go)
 	portsRetry    time.Duration // the longest inform wait while a port change waits for confirmation (15 s)
 	roamSustain   time.Duration // a client below the Roaming Assistant threshold this long, at least (roaming.go)
+	uplinkPoll    time.Duration // the uplink carrier check (1 s; uplink.go)
+	gwProbe       time.Duration // the uplink-loss gateway probe (5 s; uplink.go)
 }
 
 func (t *timing) fill() {
@@ -165,6 +167,8 @@ func (t *timing) fill() {
 		}
 	}
 	def(&t.interval, 10*time.Second)
+	def(&t.uplinkPoll, time.Second)
+	def(&t.gwProbe, gwProbeEvery)
 	def(&t.minWait, time.Second)
 	def(&t.immediateWait, 500*time.Millisecond)
 	def(&t.retryWait, 5*time.Second)
@@ -206,11 +210,12 @@ type options struct {
 	siteShell    string   // site SSH users' shell; "" = /bin/ash (sitessh.go)
 	logf         func(string, ...any)
 	t            timing
-	now          func() time.Time // wall clock (WLAN schedules, events); nil = time.Now
-	lldpOpen     lldp.Opener      // LLDP sockets; nil = AF_PACKET (Linux)
-	noLLDP       bool             // run no LLDP agent at all
-	spectrumPlan *wl.ScanPlan     // spectrum runner plan; nil = wl.DefaultScanPlan (tests shorten it)
-	pmProber     pathmon.Prober   // path monitoring probes; nil = ICMP echo (pathmon.go)
+	now          func() time.Time               // wall clock (WLAN schedules, events); nil = time.Now
+	lldpOpen     lldp.Opener                    // LLDP sockets; nil = AF_PACKET (Linux)
+	noLLDP       bool                           // run no LLDP agent at all
+	spectrumPlan *wl.ScanPlan                   // spectrum runner plan; nil = wl.DefaultScanPlan (tests shorten it)
+	pmProber     pathmon.Prober                 // path monitoring probes; nil = ICMP echo (pathmon.go)
+	carrier      func(dev string) (up, ok bool) // an Ethernet port's carrier; nil = sysfs (uplink.go)
 	// logFollow streams the unit's log for remote syslog; nil = logread -f (syslogfwd.go)
 	logFollow func(context.Context) (io.ReadCloser, error)
 	// snmpListen opens the SNMP agent's socket; nil = UDP 0.0.0.0:161 (snmp.go)
@@ -252,6 +257,7 @@ type agent struct {
 	steer    steerState   // loop goroutine only
 	roam     roamState    // loop goroutine only (roaming.go)
 	minr     minRSSIState // loop goroutine only (minrssi.go)
+	upl      uplinkGuard  // the uplink watcher's (uplink.go)
 	no2      no2ghzState  // loop goroutine only (no2ghz.go)
 	lldp     *lldp.Service
 	res      atomic.Pointer[resources] // the last R4 reading (self-check)
@@ -383,6 +389,9 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 	a := &agent{cfg: cfg, o: o, t: o.t, scans: newScanner(), wake: make(chan struct{}, 1),
 		jobs: make(chan job, 32), adopt: make(chan device.AdoptRequest, 4), acks: make(chan string, 8)}
 	a.events = &eventLog{path: a.dev(filepath.Join(o.base, eventsFile)), root: o.root, clock: o.now, logf: a.logf}
+	if a.o.carrier == nil {
+		a.o.carrier = a.readCarrier // uplink.go
+	}
 	a.topo = newTopology()
 	// ports an earlier run took out of br-lan (loop guard; ramfs record)
 	a.topo.removed = loadLoopGuard(a.loopFilePath())
@@ -476,7 +485,8 @@ func (a *agent) run(parent context.Context) error {
 			go func() { defer a.bg.Done(); a.portsWatchLoop(ctx) }() // ports.go
 		}
 		a.startHomeListen(ctx)
-		a.startStaMonitor(ctx) // staevents.go
+		a.startStaMonitor(ctx)  // staevents.go
+		a.startUplinkWatch(ctx) // uplink.go
 		a.startupJobs()
 	} else if a.x.S.Adopted {
 		a.provisionIfNew("startup")

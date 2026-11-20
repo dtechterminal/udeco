@@ -118,6 +118,7 @@ while it has any limit, and back on when none are left. Details are in
 | Channel utilisation, CPU, memory, uptime, load | Verified | |
 | Wi-Fi Experience (AP and client) | Verified | |
 | Wired uplink and uplink traffic | Verified | With a UniFi gateway, the controller credits the AP with its clients' traffic. |
+| SSIDs down on uplink loss | Built | No carrier on the uplink port for 5 s takes every SSID down (no radio restart); 10 s of carrier brings them back. Never during an apply. `"uplink_ssid_down": false` turns it off; `"uplink_gateway_down": true` also counts a gateway unanswered for 60 s. [uplink-loss](docs/deco/features/uplink-loss.md) |
 | Wireless mesh uplink | Not planned | TP-Link's mesh is switched off at takeover; every unit is wired. |
 
 ## Hardware
@@ -177,7 +178,9 @@ You need root SSH on each unit; how to get it is out of scope here.
    With `"takeover": false` the agent only reports to UniFi and changes
    nothing. With `"apply": false` it logs its plans without applying them.
    Optional keys, all off by default: `wpa3`, `min_rates`, `mdns_bridge`,
-   `hotspot2`, `mgmt_sources`. One optional key is on by default: `twt`
+   `hotspot2`, `mgmt_sources`, `uplink_gateway_down`. On by default:
+   `uplink_ssid_down` (SSIDs down while the uplink has no carrier, as a U6;
+   `false` keeps them up), and `twt`
    (802.11ax Target Wake Time on both radios, as a real U6 Pro runs it;
    `"twt": false` keeps TP-Link's off). The driver takes it only while the
    radio is down, so the agent sets it inside a radio restart it makes

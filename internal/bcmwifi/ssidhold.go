@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package bcmwifi
+
+import (
+	"context"
+	"fmt"
+)
+
+// The uplink-loss hold (cmd/udeco-ap uplink.go; docs/deco/features/
+// uplink-loss.md). A U6 takes its user and guest SSIDs down while its wired
+// uplink is gone, so clients roam to an AP that still reaches the network
+// instead of sitting on one that does not.
+//
+// SSIDsDown(true) takes every BSS the agent serves down with `wl bss down`:
+// no radio restart, hostapd keeps running and the vifs stay in their
+// bridges. While the hold lasts, Plan (and so Tick and every apply) leaves
+// them down instead of raising them, takes one that came up down again
+// without reporting it as foreign, and Verify wants them down. SSIDsDown
+// (false) raises them. The hold lives only in this Applier: a new agent
+// process starts without it, and a hand-back to TP-Link forgets it (the
+// baseline's own BSS states are restored).
+
+// SSIDsDown sets or lifts the hold. It returns ErrNotOwned when the agent
+// serves no BSS.
+func (a *Applier) SSIDsDown(ctx context.Context, down bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	d := a.current()
+	if d == nil || len(a.ourVifs()) == 0 {
+		return ErrNotOwned
+	}
+	a.ssidsDown = down
+	var st []Step
+	for _, rl := range a.layout(*d).Radios {
+		if !a.netdevExists(rl.Primary) {
+			continue
+		}
+		for _, u := range rl.Used {
+			if down {
+				st = append(st, onVif(u.Vif, cmdStep("uplink lost: lower "+u.Vif, "wl", "-i", u.Vif, "bss", "down")))
+			} else {
+				st = append(st, cmdStep("uplink back: raise "+u.Vif, "wl", "-i", u.Vif, "bss", "up"))
+			}
+		}
+	}
+	if a.o.DryRun {
+		a.logPlan(fmt.Sprintf("dry-run SSIDs down=%t", down), Plan{Steps: st})
+		return nil
+	}
+	if err := a.executeAll(ctx, st); err != nil {
+		return fmt.Errorf("bcmwifi: SSIDs down=%t: %w", down, err)
+	}
+	return nil
+}
+
+// SSIDsHeld reports whether the hold is on.
+func (a *Applier) SSIDsHeld() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.ssidsDown
+}

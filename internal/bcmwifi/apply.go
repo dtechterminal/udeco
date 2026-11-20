@@ -508,8 +508,8 @@ func (a *Applier) verify(ctx context.Context, d Desired) error {
 				}
 				continue
 			}
-			if err != nil || bss != "up" {
-				bad("%s bss is %q, want up", v, bss)
+			if want := map[bool]string{false: "up", true: "down"}[a.ssidsDown]; err != nil || bss != want {
+				bad("%s bss is %q, want %s", v, bss, want) // down: the uplink-loss hold (ssidhold.go)
 			}
 			if out, err := a.wlGet(ctx, v, "ssid"); err != nil || !ssidMatches(out, u.SSID.SSID) {
 				bad("%s does not carry SSID %q", v, u.SSID.SSID)

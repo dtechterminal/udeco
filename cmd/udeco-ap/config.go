@@ -120,6 +120,13 @@ type Config struct {
 	// change), never by a restart of its own; the hand-back restores
 	// TP-Link's state (internal/bcmwifi/twt.go).
 	TWT *bool `json:"twt,omitempty"`
+	// UplinkSSIDDown (takeover, Deco only): absent or true takes every SSID
+	// down while the uplink port has no carrier (5 s), as a U6 does, and
+	// back up after 10 s of carrier; false leaves them up (uplink.go).
+	UplinkSSIDDown *bool `json:"uplink_ssid_down,omitempty"`
+	// UplinkGatewayDown (default off; needs uplink_ssid_down) also counts a
+	// gateway that answers no ICMP echo for 60 s as a lost uplink.
+	UplinkGatewayDown bool `json:"uplink_gateway_down,omitempty"`
 }
 
 func (c *Config) portsConfirm() time.Duration {
@@ -205,7 +212,8 @@ func (c *Config) validate() error {
 		// wpa3: SAE on the 5 GHz radio only (the MT7663 driver has it);
 		// min_rates: the 2.4 GHz radio's BasicRate (mtkwifi minRate)
 		for name, on := range map[string]bool{"mdns_bridge": c.MdnsBridge,
-			"hotspot2": c.Hotspot2, "egress": c.Egress, "twt": c.TWT != nil} {
+			"hotspot2": c.Hotspot2, "egress": c.Egress, "twt": c.TWT != nil,
+			"uplink_ssid_down": c.UplinkSSIDDown != nil, "uplink_gateway_down": c.UplinkGatewayDown} {
 			if on {
 				return fmt.Errorf("config: %s is not supported on platform %s", name, c.Platform)
 			}
@@ -242,6 +250,12 @@ func (c *Config) validate() error {
 	}
 	if c.TWT != nil && !c.Takeover {
 		return errors.New("config: twt needs takeover (observe mode never changes the unit)")
+	}
+	if (c.UplinkSSIDDown != nil || c.UplinkGatewayDown) && !c.Takeover {
+		return errors.New("config: uplink_ssid_down and uplink_gateway_down need takeover (observe mode never changes the unit)")
+	}
+	if c.UplinkGatewayDown && !c.uplinkSSIDDown() {
+		return errors.New("config: uplink_gateway_down needs uplink_ssid_down")
 	}
 	if c.SiteSurvey && !c.Takeover {
 		return errors.New("config: site_survey needs takeover (observe mode runs no scans and claims no RF scan)")
