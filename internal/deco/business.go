@@ -689,7 +689,7 @@ func negotiateTolerated(err error) bool {
 // Config describes how to reach one Deco. Build it from a TDP DecoInfo.
 type Config struct {
 	Host          string
-	Port          int    // TDP tmp_port[0]; 20001 on the X20s (LIVE)
+	Port          int    // TDP tmp_port[0]; DefaultSSHPort (20001) on the X20s (LIVE)
 	SSHUser       string // DecoInfo.SSHUsername(CloudUserName)
 	CloudUserName string // exact stored TP-Link ID string (md5 must equal TDP owner)
 	CloudPassword Secret // never printed: Secret formats as [redacted]
@@ -699,7 +699,7 @@ type Config struct {
 	// Heartbeat: 0 => DefaultHeartbeat; negative disables (t.java:180-182).
 	Heartbeat time.Duration
 	// RequestTimeout bounds one Call. The app uses timeout+15 s = 45 s around the whole
-	// request (apps/network/tmp/i0.java:581) and no per-frame timeout. 0 => 45 s.
+	// request (apps/network/tmp/i0.java:581) and no per-frame timeout. 0 => DefaultRequestTimeout.
 	// Opcodes the app gives a longer budget get at least that (AppRequestTimeout).
 	RequestTimeout time.Duration
 	// OpTimeouts overrides the budget of single opcodes (tests, live diagnosis).
@@ -755,13 +755,13 @@ type Client struct {
 // q1.f0()/l0(), q1.java:387-397,717-737; token alloc precedes it via o.N()).
 func Connect(ctx context.Context, cfg Config) (*Client, error) {
 	if cfg.Port == 0 {
-		cfg.Port = 20001
+		cfg.Port = DefaultSSHPort
 	}
 	if cfg.Heartbeat == 0 {
 		cfg.Heartbeat = DefaultHeartbeat
 	}
 	if cfg.RequestTimeout == 0 {
-		cfg.RequestTimeout = 45 * time.Second
+		cfg.RequestTimeout = DefaultRequestTimeout
 	}
 	c := &Client{cfg: cfg}
 	c.sess = &Session{RT: c, ResetTransport: c.dropTransport, Trace: cfg.Trace}

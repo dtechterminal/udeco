@@ -21,7 +21,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // Runner executes commands on the device.
@@ -155,7 +157,7 @@ func New(o Options) *Applier {
 		o.Root = "/"
 	}
 	if o.Bridge == "" {
-		o.Bridge = "bdg2"
+		o.Bridge = unit.JioLANBridge
 	}
 	if o.Logf == nil {
 		o.Logf = func(string, ...any) {}
@@ -560,17 +562,14 @@ func (a *Applier) applyLive(ctx context.Context, rd RadioDef, c, rp RadioPlan) e
 	return a.writeProfile(rd, rp)
 }
 
+// writeFile replaces p through "<p>.udeco" beside it.
 func writeFile(p string, b []byte, mode os.FileMode) error {
-	tmp := p + ".udeco"
-	if err := os.WriteFile(tmp, b, mode); err != nil {
-		return err
-	}
-	return os.Rename(tmp, p)
+	return atomicfile.Write(p, p+".udeco", b, mode)
 }
 
 // ------------------------------------------------------------- bridging
 
-func vlanBridge(vid int) string { return "br-v" + strconv.Itoa(vid) }
+func vlanBridge(vid int) string { return unit.VLANBridge(vid) }
 
 // vlanParent is the switch port device of the uplink: eth0.4 for eth0.4.1.
 func (a *Applier) vlanParent() (string, error) {
@@ -589,13 +588,7 @@ func (a *Applier) exists(dev string) bool {
 	return err == nil
 }
 
-func (a *Applier) bridgeOf(dev string) string {
-	l, err := os.Readlink(a.dev("/sys/class/net/" + dev + "/brport/bridge"))
-	if err != nil {
-		return ""
-	}
-	return filepath.Base(l)
-}
+func (a *Applier) bridgeOf(dev string) string { return bcmwifi.BridgeOf(a.o.Root, dev) }
 
 // bridgeTo puts ifc into the LAN bridge (vid 0) or the VLAN's bridge.
 func (a *Applier) bridgeTo(ctx context.Context, ifc string, vid int) error {
@@ -647,7 +640,8 @@ func (a *Applier) ensureVLAN(ctx context.Context, vid int) (string, error) {
 	return br, nil
 }
 
-var vlanBr = regexp.MustCompile(`^br-v([0-9]+)$`)
+// vlanBr: a VLAN bridge's name (vlanBridge).
+var vlanBr = regexp.MustCompile(`^` + regexp.QuoteMeta(unit.VLANBridgePrefix) + `([0-9]+)$`)
 
 // cleanVLANs removes the agent's VLAN bridges neither a BSS nor a LAN port
 // (SetPortVLANs) uses any more. A LAN port's device still in a bridge being

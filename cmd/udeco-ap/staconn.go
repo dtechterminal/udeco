@@ -157,7 +157,9 @@ func replayedLine(line string, started time.Time) bool {
 	return err == nil && started.Sub(t) > time.Second
 }
 
-// normMAC is a MAC address in lower case ("" when it is none).
+// normMAC is a MAC address in lower case ("" when it is none): the colon
+// form only, as hostapd and the kernel print it (wl.NormMAC also takes
+// net.ParseMAC's other spellings).
 func normMAC(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 	if len(s) != 17 {

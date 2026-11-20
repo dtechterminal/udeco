@@ -7,6 +7,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 )
 
 // Stable vif slots. An SSID keeps the vif it is on when the SSID set of its
@@ -31,7 +33,7 @@ func (a *Applier) priorSlots() map[string]string {
 		}
 	}
 	live := map[string]string{} // vif -> id, from the driver-state files
-	for _, prim := range radioOrderPrimaries() {
+	for _, prim := range Primaries() {
 		b, err := a.readFile(drvPath(a.o.RunDir, prim))
 		if err != nil {
 			continue
@@ -77,7 +79,9 @@ func radioOf(v string) string {
 	return v[:3]
 }
 
-func radioOrderPrimaries() []string {
+// Primaries are the radios' primary interfaces (wl0, wl1), in the order
+// radios are planned in.
+func Primaries() []string {
 	var out []string
 	for _, b := range radioOrder {
 		out = append(out, bandPrimary[b])
@@ -104,13 +108,9 @@ func (a *Applier) saveSlots(l *layout) {
 		return
 	}
 	p := a.fsPath(a.slotsPath())
-	tmp := p + ".tmp"
 	err := os.MkdirAll(filepath.Dir(p), 0o700)
 	if err == nil {
-		err = os.WriteFile(tmp, b, 0o600)
-	}
-	if err == nil {
-		err = os.Rename(tmp, p)
+		err = atomicfile.Write(p, p+".tmp", b, 0o600)
 	}
 	if err != nil {
 		a.o.Logf("bcmwifi: recording vif slots: %v (an SSID that is off may get another vif when it returns)", err)

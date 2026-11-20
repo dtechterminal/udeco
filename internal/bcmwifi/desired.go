@@ -10,11 +10,19 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
+	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
 // Desired is the complete Wi-Fi state the agent wants. It mirrors
 // translate.Intent (Country, Radios, WLANs) field for field so the agent can
-// map it 1:1.
+// map it 1:1 (cmd/udeco-ap desiredFrom; its test lists the Intent fields
+// that are not carried). The words in it (security, PMF, tx power and band
+// steering modes) are translate's, and the two small per-band types are
+// translate's own (BandSettings, RateOpts).
 type Desired struct {
 	Country string           // ISO 3166 alpha-2 ("US"); "" keeps the live country
 	Radios  map[string]Radio // "ng" (2.4 GHz, wl0) and "na" (5 GHz, wl1)
@@ -35,7 +43,7 @@ type Radio struct {
 	Enabled     bool
 	Channel     int    // control channel; 0 = auto (keep the live channel; acsd2 is stopped)
 	Width       int    // 20, 40, 80 (160 is clamped to 80); 0 = band default
-	TxPowerMode string // auto, high, medium, low, custom
+	TxPowerMode string // translate.TxAuto ... TxCustom; "" is auto, and "middle" is read as medium
 	TxPower     int    // dBm, for custom
 	MinRSSI     int    // dBm (negative); 0 = off
 	MaxClients  int    // per BSS on this radio (bss_maxassoc, max_num_sta); 0 = 128
@@ -52,9 +60,9 @@ type SSID struct {
 	Enabled    bool
 	Hidden     bool
 	Guest      bool
-	Security   string // open, wpa2, wpa3, wpa2wpa3, wpa2-enterprise, wpa3-enterprise, owe
+	Security   string // one of the Sec* modes below
 	Passphrase string
-	PMF        string // disabled, optional, required ("" = per security default)
+	PMF        string // translate.PMFDisabled, PMFOptional or PMFRequired ("" = per security default)
 	GroupRekey int    // seconds; 0 = never
 
 	VLAN      int
@@ -204,27 +212,35 @@ func maskSecret(v string) string {
 var bandPrimary = map[string]string{"ng": "wl0", "na": "wl1"}
 
 // radioOrder is the order radios are planned in.
-var radioOrder = []string{"ng", "na"}
+var radioOrder = rf.Bands()
 
-func normBand(b string) string {
-	switch strings.ToLower(strings.TrimSpace(b)) {
-	case "ng", "2g", "2.4g", "2ghz", "2.4ghz":
-		return "ng"
-	case "na", "5g", "5ghz":
-		return "na"
+// bandAlias is the other name of one of this unit's bands (ng <-> 2g,
+// na <-> 5g); "" for any other name.
+func bandAlias(band string) string {
+	for _, b := range radioOrder {
+		switch band {
+		case b:
+			return rf.Legacy(b)
+		case rf.Legacy(b):
+			return b
+		}
 	}
 	return ""
 }
 
-// Security mode names accepted in SSID.Security.
+// Security mode names accepted in SSID.Security: translate's, which
+// produces them (normalizeSSID also takes a few other spellings).
 const (
-	SecOpen       = "open"
-	SecWPA2       = "wpa2"
-	SecWPA3       = "wpa3"
-	SecWPA2WPA3   = "wpa2wpa3"
-	SecWPA2Ent    = "wpa2-enterprise"
-	SecWPA3Ent    = "wpa3-enterprise"
-	SecOWE        = "owe"
+	SecOpen     = translate.SecOpen
+	SecWPA2     = translate.SecWPA2
+	SecWPA3     = translate.SecWPA3
+	SecWPA2WPA3 = translate.SecWPA2WPA3
+	SecWPA2Ent  = translate.SecWPA2Ent
+	SecWPA3Ent  = translate.SecWPA3Ent
+	SecOWE      = translate.SecOWE
+)
+
+const (
 	maxVifIndex   = 7 // wlN1..wlN7 (the driver's mbss8 minus the primary)
 	firstVifIndex = 2
 	defaultMaxSta = 128
@@ -341,9 +357,9 @@ func (l *layout) usedVif(vif string) (vifAssign, bool) {
 // vlanBridge names the bridge an SSID on vid joins.
 func vlanBridge(vid int) string {
 	if vid == 0 {
-		return "br-lan"
+		return unit.LANBridge
 	}
-	return fmt.Sprintf("br-v%d", vid)
+	return unit.VLANBridge(vid)
 }
 
 // planLayout validates d and places its SSIDs on vifs. exists reports whether
@@ -419,13 +435,13 @@ func planLayout(d Desired, exists func(string) bool, o layoutOpts) *layout {
 			}
 			if !o.minRates {
 				l.Notes = append(l.Notes, fmt.Sprintf("ssid %s: minimum rate %s=%d kbps not applied (Options.MinRates is off; untested on hardware)", s.ID, b, k))
-			} else if _, n := ssidRateset(ns, normBand(b)); n != "" {
+			} else if _, n := ssidRateset(ns, rf.Norm(b)); n != "" {
 				l.Notes = append(l.Notes, fmt.Sprintf("ssid %s: %s", s.ID, n))
 			}
 		}
 		var bands []string
 		for _, b := range s.Bands {
-			if nb := normBand(b); nb != "" && !contains(bands, nb) {
+			if nb := rf.Norm(b); nb != "" && !contains(bands, nb) {
 				bands = append(bands, nb)
 			} else if nb == "" {
 				l.Notes = append(l.Notes, fmt.Sprintf("ssid %s: band %q not supported on this unit", s.ID, b))
@@ -562,11 +578,11 @@ func planLayout(d Desired, exists func(string) bool, o layoutOpts) *layout {
 
 func radioNotes(band string, r Radio) []string {
 	var n []string
-	if r.BandSteer != "" && r.BandSteer != "off" {
+	if r.BandSteer != "" && r.BandSteer != translate.BandSteerOff {
 		n = append(n, fmt.Sprintf("radio %s: band steering %q not implemented", band, r.BandSteer))
 	}
-	if r.Width > 80 {
-		n = append(n, fmt.Sprintf("radio %s: width %d not available, using 80", band, r.Width))
+	if r.Width > maxWidth {
+		n = append(n, fmt.Sprintf("radio %s: width %d not available, using %d", band, r.Width, maxWidth))
 	}
 	return n
 }
@@ -652,19 +668,11 @@ func normalizeSSID(s SSID) (SSID, []string, bool) {
 	return s, notes, true
 }
 
+// validPSK is translate.ValidWPAPassphrase (8..63 printable ASCII, or 64
+// hex digits); without hexOK (SAE takes no raw PSK) the 64 hex digits are
+// refused too.
 func validPSK(p string, hexOK bool) bool {
-	if hexOK && len(p) == 64 && isHex(p) {
-		return true
-	}
-	if len(p) < 8 || len(p) > 63 {
-		return false
-	}
-	for i := 0; i < len(p); i++ {
-		if p[i] < 0x20 || p[i] > 0x7e {
-			return false
-		}
-	}
-	return true
+	return translate.ValidWPAPassphrase(p) && (hexOK || len(p) != 64)
 }
 
 func isHex(s string) bool {
@@ -710,13 +718,11 @@ func validRadius(r *Radius) error {
 	return nil
 }
 
-// normMAC returns mac as lower-case aa:bb:cc:dd:ee:ff, or "" if invalid.
+// normMAC returns mac as lower-case aa:bb:cc:dd:ee:ff, or "" if invalid
+// (wl.NormMAC, after trimming).
 func normMAC(mac string) string {
-	hw, err := net.ParseMAC(strings.TrimSpace(mac))
-	if err != nil || len(hw) != 6 {
-		return ""
-	}
-	return hw.String()
+	m, _ := wl.NormMAC(strings.TrimSpace(mac))
+	return m
 }
 
 // normMACs normalizes, de-duplicates and sorts macs; bad counts the
@@ -853,27 +859,17 @@ func joinSecrets(pub *Desired, sec secretSet) {
 }
 
 // BandSettings is one band's own security and roaming settings of an SSID
-// (SSID.PerBand).
-type BandSettings struct {
-	Security           string
-	PMF                string
-	FT, FTSAE          bool
-	FTOverDS           bool
-	MobilityDomain     string
-	BSSTransition, RRM bool
-	UAPSD, ProxyARP    bool
-	MulticastToUnicast bool
-	Hidden, Isolation  bool
-	GroupRekey         int
-}
+// (SSID.PerBand): translate's type, so a field added there is carried here.
+// ForBand and bandSettings below name each field; a test holds them to the
+// type.
+type BandSettings = translate.BandWLAN
 
 // ForBand is s as the controller sent it for band ("ng"/"na", or
 // "2g"/"5g"): the band's own settings from PerBand when it has them.
 func (s SSID) ForBand(band string) SSID {
 	b, ok := s.PerBand[band]
 	if !ok {
-		alias := map[string]string{"ng": "2g", "na": "5g", "2g": "ng", "5g": "na"}[band]
-		if b, ok = s.PerBand[alias]; !ok {
+		if b, ok = s.PerBand[bandAlias(band)]; !ok {
 			return s
 		}
 	}

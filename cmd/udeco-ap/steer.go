@@ -8,7 +8,8 @@ package main
 // 2.4 GHz SSID with a strong signal, has been seen on 5 GHz before (so it is
 // dual-band), and whose SSID is also broadcast on 5 GHz, gets an 802.11v
 // BSS transition request naming the 5 GHz BSS. Rate-limited per client;
-// "equal" mode only steers while 5 GHz has fewer clients than 2.4 GHz.
+// "equal" mode (translate.BandSteerEqual) only steers while 5 GHz has fewer
+// clients than 2.4 GHz.
 
 import (
 	"context"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 const (
@@ -29,7 +31,7 @@ const (
 
 // wifiPolicy is what the inform loop needs of the live Wi-Fi.
 type wifiPolicy struct {
-	steer map[string]string // band -> band steering mode ("prefer_5g", "equal")
+	steer map[string]string // band -> band steering mode (translate.BandSteerPrefer5G, BandSteerEqual)
 	roam  map[string]int    // "SSID|band" -> Roaming Assistant threshold, dBm (roaming.go)
 	// minRSSI: band -> the controller's minimum RSSI, dBm (minrssi.go)
 	minRSSI map[string]int
@@ -52,7 +54,7 @@ func policyFrom(d bcmwifi.Desired) *wifiPolicy {
 		}
 	}
 	for band, r := range d.Radios {
-		if r.Enabled && r.BandSteer != "" && r.BandSteer != "off" {
+		if r.Enabled && r.BandSteer != "" && r.BandSteer != translate.BandSteerOff {
 			p.steer[band] = r.BandSteer
 		}
 		if r.Enabled && r.MinRSSI < 0 {
@@ -119,7 +121,7 @@ func (a *agent) steerReading(s *apstate.Snapshot, now time.Time) {
 	if !ok {
 		return
 	}
-	if pol.steer["ng"] == "equal" && n5 >= n2 {
+	if pol.steer["ng"] == translate.BandSteerEqual && n5 >= n2 {
 		return
 	}
 	type cand struct {

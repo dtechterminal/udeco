@@ -47,7 +47,7 @@ func (p PSK) GoString() string { return p.String() }
 // be used are dropped with a note naming only their index (never the
 // passphrase). It returns a reason when the WLAN must stay off.
 func wlanPSKFile(cfg Cfg, a string, x *WLANIntent, note func(string, ...any)) string {
-	if x.Security != "wpa2" && x.Security != "wpa2wpa3" {
+	if x.Security != SecWPA2 && x.Security != SecWPA2WPA3 {
 		// SAE has no key list in hostapd 2.9 (wpa_psk_file is WPA-PSK only):
 		// a WPA3-only WLAN cannot use the keys.
 		return fmt.Sprintf("private pre-shared keys with %s: hostapd's key file is WPA2-PSK only", x.Security)
@@ -64,7 +64,7 @@ func wlanPSKFile(cfg Cfg, a string, x *WLANIntent, note func(string, ...any)) st
 		case k.Passphrase == "":
 			note("private pre-shared key %s has no passphrase: dropped", m)
 			continue
-		case !validWPAPassphrase(k.Passphrase):
+		case !ValidWPAPassphrase(k.Passphrase):
 			note("private pre-shared key %s is not 8-63 characters (or 64 hex digits): dropped", m)
 			continue
 		}

@@ -28,10 +28,14 @@ import ipaddress, json, os, socket, struct, subprocess, sys, time, urllib.reques
 BASE = "/data/wifi-inet-monitor"
 STATE = BASE + "/state.json"
 LOG = BASE + "/monitor.log"
-API = "http://127.0.0.1:8081/api/s/default/"
+CONTROLLER = "http://127.0.0.1:8081"  # the Network application, from the gateway itself
+SITE = "default"
+API = CONTROLLER + "/api/s/" + SITE + "/"
+POLICIES = CONTROLLER + "/v2/api/site/" + SITE + "/firewall-policies"
 MQTT = ("192.168.0.4", 1883)
 TOPIC = "wifi_inet_monitor"
 DECO_OUI = "b0:a7:b9"
+NO_IP_AFTER = 300  # s associated without an IP before a client counts as no_ip
 FAIL_RUNS = 3
 KICK_EVERY = 3600
 KICK_MAX = 5
@@ -104,7 +108,7 @@ def policy_blocked():
     nets, macs = [], set()
     try:
         groups = {g["_id"]: g.get("group_members", []) for g in api("rest/firewallgroup")}
-        req = urllib.request.Request("http://127.0.0.1:8081/v2/api/site/default/firewall-policies", headers={"X-UserId": uid()})
+        req = urllib.request.Request(POLICIES, headers={"X-UserId": uid()})
         with urllib.request.urlopen(req, timeout=15) as r:
             pols = json.load(r)
     except Exception as e:
@@ -263,7 +267,7 @@ def main():
         if blocked(c):
             s = "blocked"
         elif not c.get("ip"):
-            s = "no_ip" if c.get("uptime", 0) >= 300 else "idle"
+            s = "no_ip" if c.get("uptime", 0) >= NO_IP_AFTER else "idle"
         elif r:
             s = "ok"
         elif u >= 2:

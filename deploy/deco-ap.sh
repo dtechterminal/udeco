@@ -72,6 +72,11 @@
 # the supervise line, stops the agent and reboots.
 set -euo pipefail
 
+# is_ipv4, md5_local, size_local, kb_local, build_agent, header_text,
+# SITE_GATEWAY and WAIT_EXIT, shared with deploy/jio-ap.sh (read here,
+# before the cd below: $0 may be a relative path)
+. "$(dirname "$0")/lib.sh"
+
 ALLOWED_HOST=192.168.0.205
 KEY=${DECO_KEY:-$HOME/.ssh/deco_x20}
 DIR=/tp_data/udeco
@@ -90,12 +95,12 @@ GZ_ABOVE=$((6 << 20)) # ship gzip only when the stripped binary is larger
 MIN_FREE_KB=1024      # /tp_data free after the install (R28)
 
 force_host=0 no_start=0 build_only=0 edit_persist=0 preflight_only=0
-inform_url=http://192.168.0.1:8080/inform
-console_ip=192.168.0.1
+inform_url=http://$SITE_GATEWAY:8080/inform
+console_ip=$SITE_GATEWAY
 udeco_config= preflight_file=
 ip=
 
-usage() { sed -n '3,72p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { header_text "$0" >&2; exit 2; }
 die() { echo "deco-ap: $*" >&2; exit 1; }
 
 # login_lock_hint SSH_STDERR: a refused or silent :22 is what the agent's
@@ -109,10 +114,16 @@ login_lock_hint() {
 	esac
 }
 
-is_ipv4() {
-	[[ $1 =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
-	local o
-	for o in "${BASH_REMATCH[@]:1}"; do ((10#$o <= 255)) || return 1; done
+# is_port ":N" or "": no port, or one from 1 to 65535.
+is_port() {
+	local p=${1#:}
+	[ -z "$p" ] || ((10#$p >= 1 && 10#$p <= 65535))
+}
+
+# is_agent_ipv4: an IPv4 address the agent takes in its inform URL (Go
+# reads it): is_ipv4, with no octet written with a leading zero.
+is_agent_ipv4() {
+	is_ipv4 "$1" && [[ ! $1 =~ (^|\.)0[0-9] ]]
 }
 
 while [ $# -gt 0 ]; do
@@ -134,8 +145,12 @@ while [ $# -gt 0 ]; do
 done
 
 # The values below end up in remote shell commands and in the agent's JSON
-# config: accept only strict forms.
-[[ $inform_url =~ ^http://([0-9.]+)(:[0-9]{1,5})?/inform$ ]] && is_ipv4 "${BASH_REMATCH[1]}" ||
+# config: accept only strict forms. The agent checks the URL again when it
+# starts (device.CheckInformURL) and exits on one it refuses, so nothing
+# may pass here that fails there: cmd/udeco-ap TestDeployInformURL runs
+# both over one list of URLs. (is_port comes first: is_ipv4 has a match of
+# its own, which replaces BASH_REMATCH.)
+[[ $inform_url =~ ^http://([0-9.]+)(:[0-9]{1,5})?/inform$ ]] && is_port "${BASH_REMATCH[2]:-}" && is_agent_ipv4 "${BASH_REMATCH[1]}" ||
 	die "--inform-url $inform_url: want http://<IPv4>[:port]/inform (the agent blocks DNS outside the LAN)"
 is_ipv4 "$console_ip" || die "--console-ip $console_ip: want an IPv4 address"
 [ -z "$udeco_config" ] || [ -r "$udeco_config" ] || die "--udeco-config $udeco_config: not readable"
@@ -211,7 +226,7 @@ judge_preflight() { # $1: the unit's answer; $2: new artifact size (kB)
 				*"$g"*) ;;
 				*)
 					echo "  REFUSED: $PERSIST guards with grep '$g' but appends '$a', which does not contain it:"
-					echo "           every run adds another cron line (audit B2). Change the guard to grep '/data/persist_shell'"
+					echo "           every run adds another cron line (audit B2). Change the guard to grep '${PERSIST%.sh}'"
 					echo "           yourself; this script does not edit that logic"
 					bad=1
 					;;
@@ -269,7 +284,7 @@ checklist() {
 	cat <<EOF
 
 Your part (audit R29; this script does none of it):
-  - keep persist_shell.sh's cron guard grepping '/data/persist_shell' (it must match the line it adds);
+  - keep persist_shell.sh's cron guard grepping '${PERSIST%.sh}' (it must match the line it adds);
   - optionally test dropbear by its listener (netstat -ltn | grep -q ':22 ') instead of pgrep -f /data/dropbear;
   - turn off Auto Update in the Deco app, and make no Deco-app changes (no 'Remove Deco') while a unit is taken over;
   - reserve the Decos' IPs on the UCG;
@@ -290,24 +305,18 @@ fi
 
 cd "$(dirname "$0")/.."
 
-md5_local() {
-	if command -v md5sum >/dev/null 2>&1; then md5sum "$1" | cut -d' ' -f1; else md5 -q "$1"; fi
-}
-kb_local() { echo $((($(wc -c <"$1" | tr -d ' ') + 1023) / 1024)); }
-
 build() {
 	echo "building $OUT (linux/arm GOARM=7, static, stripped)"
 	mkdir -p dist
-	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 \
-		go build -trimpath -ldflags '-s -w -buildid=' -o "$OUT" ./cmd/udeco-ap
-	size=$(wc -c <"$OUT" | tr -d ' ')
+	build_agent "$OUT" GOARCH=arm GOARM=7
+	size=$(size_local "$OUT")
 	bin_md5=$(md5_local "$OUT")
 	echo "  $size bytes, md5 $bin_md5"
 	rm -f "$OUT.gz"
 	if [ "$size" -gt "$GZ_ABOVE" ]; then
 		gzip -9 -n -c "$OUT" >"$OUT.gz"
 		form=gz art=$OUT.gz
-		echo "  over $GZ_ABOVE bytes: shipping $OUT.gz ($(wc -c <"$OUT.gz" | tr -d ' ') bytes), unpacked to $RAMDIR at start"
+		echo "  over $GZ_ABOVE bytes: shipping $OUT.gz ($(size_local "$OUT.gz") bytes), unpacked to $RAMDIR at start"
 	else
 		form=bin art=$OUT
 		echo "  shipping the plain binary"
@@ -382,7 +391,7 @@ if pidof udeco-ap >/dev/null 2>&1; then
 	i=0
 	while pidof udeco-ap >/dev/null 2>&1; do
 		i=\$((i + 1))
-		[ \$i -le 330 ] || { echo "deco-ap: the agent did not exit within 330 s; not killing it" >&2; exit 1; }
+		[ \$i -le $WAIT_EXIT ] || { echo "deco-ap: the agent did not exit within $WAIT_EXIT s; not killing it" >&2; exit 1; }
 		sleep 1
 	done
 fi
@@ -540,7 +549,12 @@ else
 fi
 
 # --- 6. start ----------------------------------------------------------------
-rollback="ssh -i $KEY root@$ip \"sed -i '/udeco-ap supervise (deploy\\/deco-ap.sh)/d' $PERSIST; rm -f $START; kill \\\$(pidof udeco-ap) 2>/dev/null; reboot\""
+# the rollback deletes the supervise line by its marker ($MARK, as the
+# preflight finds it): here as a sed /pattern/, so without the "# " and
+# with each "/" escaped
+mark_re=${MARK#\# }
+mark_re=${mark_re//\//\\/}
+rollback="ssh -i $KEY root@$ip \"sed -i '/$mark_re/d' $PERSIST; rm -f $START; kill \\\$(pidof udeco-ap) 2>/dev/null; reboot\""
 if [ "$no_start" = 1 ]; then
 	if [ "$supervised" = 1 ]; then
 		echo "not starting (--no-start); the supervise line starts it within a minute"

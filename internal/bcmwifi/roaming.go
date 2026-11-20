@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // Roaming Assistant primitive (docs/deco/features/roaming-assistant.md).
@@ -111,7 +113,7 @@ func (a *Applier) RoamAssist(ctx context.Context, r RoamRequest) error {
 	var nbs []string
 	seen := map[string]bool{}
 	for _, c := range r.Candidates {
-		b, band := normMAC(c.BSSID), normBand(c.Band)
+		b, band := normMAC(c.BSSID), rf.Norm(c.Band)
 		if b == "" || band == "" || c.Channel <= 0 || c.Channel > 196 || seen[b] || mine[b[2:]] {
 			continue
 		}

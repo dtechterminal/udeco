@@ -88,7 +88,8 @@ type message struct {
 func (m *message) response() bool { return m.flags&0x8000 != 0 }
 
 // readName decodes the name at off; it returns the offset after it in the
-// original stream.
+// original stream. It is the stricter of the two name readers (backward
+// pointers only, 255 octets): internal/mcinspect's readName takes more.
 func readName(b []byte, off int) (name, int, error) {
 	var n name
 	end := -1

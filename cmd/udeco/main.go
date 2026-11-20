@@ -40,17 +40,26 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/deco"
+	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/inform"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
 )
 
+const (
+	// defaultConfigPath is where the image keeps its config: the Dockerfile's
+	// CMD and deploy/unraid.sh pass the same path (TestContainerContract).
+	defaultConfigPath = "/data/udeco.json"
+	// defaultPrintTimeout is -print's overall deadline, login included.
+	defaultPrintTimeout = 90 * time.Second
+)
+
 func main() {
-	cfgPath := flag.String("config", "/data/udeco.json", "JSON config")
+	cfgPath := flag.String("config", defaultConfigPath, "JSON config")
 	doPrint := flag.Bool("print", false, "one login and one read-only poll of the mesh, printed as JSON (secrets removed); no UniFi traffic")
 	doDiscover := flag.Bool("discover", false, "TDP discovery of the configured units and the login precheck; no login")
 	doTrace := flag.Bool("trace", false, "log every TMP frame, business packet and request (headers, lengths, timings; never payloads or credentials)")
 	only := flag.String("only", "", "with -print: poll only these, in this order (comma list of "+onlyNames+" or opcodes like 0x4014)")
-	printTimeout := flag.Duration("print-timeout", 90*time.Second, "with -print: overall deadline, login included (one login at most, whatever the value)")
+	printTimeout := flag.Duration("print-timeout", defaultPrintTimeout, "with -print: overall deadline, login included (one login at most, whatever the value)")
 	flag.Parse()
 	log.SetFlags(log.Ldate | log.Ltime)
 	h := hooks{printTimeout: *printTimeout}
@@ -78,7 +87,7 @@ func main() {
 		log.Fatalf("credentials: %v", err)
 	}
 	// Keep the password out of anything that inherits or dumps the environment.
-	os.Unsetenv("TPLINK_PASSWORD")
+	os.Unsetenv(envTPLinkPassword)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -107,12 +116,12 @@ type hooks struct {
 	heartbeat     time.Duration                                                // TMP heartbeat
 	sshListenHost string                                                       // SSH-adopt bind host; "" = all
 	httpClient    *http.Client
-	minWait       time.Duration            // floor of the inform interval; default 1s
-	immediateWait time.Duration            // after an "inform now" reply; default 500ms
+	minWait       time.Duration            // floor of the inform interval; default device.MinInformWait
+	immediateWait time.Duration            // after an "inform now" reply; default device.ImmediateInformWait
 	gatedWait     time.Duration            // re-check while not informing; default 5s
 	offlineGrace  time.Duration            // a unit offline this long stops informing; default 60s
 	masterDownMax time.Duration            // master session down this long stops all; default 120s
-	printTimeout  time.Duration            // -print deadline; default 90s
+	printTimeout  time.Duration            // -print deadline; default defaultPrintTimeout
 	trace         func(string, ...any)     // -trace: frame/packet/request lines; nil = off
 	only          []uint16                 // -print -only: the Gets to poll, in order
 	maxLogins     int                      // 0 = unlimited; -print sets 1
@@ -126,12 +135,12 @@ func (h *hooks) fill() {
 			*d = v
 		}
 	}
-	def(&h.minWait, time.Second)
-	def(&h.immediateWait, 500*time.Millisecond)
+	def(&h.minWait, device.MinInformWait)
+	def(&h.immediateWait, device.ImmediateInformWait)
 	def(&h.gatedWait, 5*time.Second)
 	def(&h.offlineGrace, 60*time.Second)
 	def(&h.masterDownMax, 120*time.Second)
-	def(&h.printTimeout, 90*time.Second)
+	def(&h.printTimeout, defaultPrintTimeout)
 	if h.httpClient == nil {
 		h.httpClient = &http.Client{Timeout: 10 * time.Second}
 	}
@@ -140,7 +149,7 @@ func (h *hooks) fill() {
 // newMesh builds the Mesh for cfg. apply=false makes every write a logged plan.
 func newMesh(cfg *Config, sec Secrets, h hooks, apply bool) (*deco.Mesh, error) {
 	if sec.Password == "" {
-		return nil, errors.New("no TP-Link password: set TPLINK_PASSWORD_FILE, password_file or TPLINK_PASSWORD in credentials.env")
+		return nil, errors.New("no TP-Link password: set " + envTPLinkPasswordFile + ", password_file or " + envTPLinkPassword + " in " + credentialsFileName)
 	}
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		return nil, err
@@ -188,11 +197,11 @@ type daemon struct {
 // maxAge is how old device_list and the client list may be and still count
 // as current: three polls.
 func (d *daemon) maxAge() time.Duration {
-	p := 15 * time.Second
-	if d.cfg != nil && d.cfg.Poll > 0 {
-		p = time.Duration(d.cfg.Poll)
+	var poll time.Duration // 0: the default poll
+	if d.cfg != nil {
+		poll = time.Duration(d.cfg.Poll)
 	}
-	return 3 * p
+	return deco.MaxAge(poll)
 }
 
 func newDaemon(cfg *Config, sec Secrets, h hooks) (*daemon, error) {
@@ -200,7 +209,7 @@ func newDaemon(cfg *Config, sec Secrets, h hooks) (*daemon, error) {
 	model, _ := models.Lookup(cfg.Model)
 	d := &daemon{cfg: cfg, h: h, profile: models.Profile(model), daemonIP: cfg.DaemonIP}
 	if d.daemonIP == "" {
-		ip, err := localIPToward(cfg.InformURL)
+		ip, err := inform.LocalIPToward(cfg.InformURL)
 		if err != nil {
 			return nil, fmt.Errorf("daemon_ip: %w", err)
 		}

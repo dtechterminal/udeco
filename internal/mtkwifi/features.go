@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // The controller's per-SSID and per-radio features beyond the BSS list.
@@ -66,21 +68,12 @@ func bssNotes(s bcmwifi.SSID, b BSS, rd RadioDef, note func(string, ...any)) {
 		note("%s: SSID %q: U-APSD is not supported by the %s driver", rd.Band, s.SSID, rd.HWName)
 	}
 	if want := pmfLevel(s.PMF); b.Auth != "OPEN" && want > b.PMF {
-		note("%s: SSID %q: PMF %s not applied: served with PMF %s", rd.Band, s.SSID, s.PMF, pmfName(b.PMF))
+		note("%s: SSID %q: PMF %s not applied: served with PMF %s", rd.Band, s.SSID, s.PMF, translate.PMFWord(b.PMF))
 	}
 }
 
-func pmfLevel(p string) int {
-	switch p {
-	case "required":
-		return 2
-	case "optional":
-		return 1
-	}
-	return 0
-}
-
-func pmfName(l int) string { return []string{"disabled", "optional", "required"}[l] }
+// pmfLevel is translate.PMFLevel, with any other word (and "") as off.
+func pmfLevel(p string) int { return max(translate.PMFLevel(p), 0) }
 
 // radioFeatures sets rp's per-radio settings from the radio and the SSIDs
 // it serves (served is parallel to rp.BSS).
@@ -239,7 +232,7 @@ func mbps(kbps int) string { return strconv.FormatFloat(float64(kbps)/1000, 'f',
 // bandValue is m's value for band; the controller's keys may be "2g"/"5g".
 func bandValue(m map[string]int, band string) int {
 	for k, v := range m {
-		if normBand(k) == band {
+		if rf.Norm(k) == band {
 			return v
 		}
 	}
@@ -248,7 +241,7 @@ func bandValue(m map[string]int, band string) int {
 
 func bandRateOpts(m map[string]bcmwifi.RateOpts, band string) bcmwifi.RateOpts {
 	for k, v := range m {
-		if normBand(k) == band {
+		if rf.Norm(k) == band {
 			return v
 		}
 	}
@@ -297,9 +290,21 @@ func profileFeatures(kv map[string]string, base []byte, rd RadioDef, rp RadioPla
 func perBSSIgmp(rd RadioDef) bool { return rd.Band == "na" }
 
 // acsSkip24 are the 2.4 GHz channels automatic channel selection skips:
-// all but 1, 6 and 11, as the U6 (radio.conf `block_acs_channel -band 1
-// 2,3,4,5,7,8,9,10,...`; 12-14 are outside this unit's channel list).
-const acsSkip24 = "2;3;4;5;7;8;9;10"
+// all of the unit's (chans24) but 1, 6 and 11 (rf.NonOverlap24), as the U6
+// (radio.conf `block_acs_channel -band 1 2,3,4,5,7,8,9,10,...`; 12-14 are
+// outside this unit's channel list). In the profile's form: "2;3;4;...".
+var acsSkip24 = skipList(chans24, rf.NonOverlap24())
+
+// skipList is all without keep as an AutoChannelSkipList value.
+func skipList(all, keep []int) string {
+	var skip []string
+	for _, ch := range all {
+		if !slices.Contains(keep, ch) {
+			skip = append(skip, strconv.Itoa(ch))
+		}
+	}
+	return strings.Join(skip, ";")
+}
 
 // pmkCacheMinutes is the 5 GHz PMK cache lifetime (PMKCachePeriod,
 // minutes): hostapd's default 12 h, so an idle SAE phone resumes with

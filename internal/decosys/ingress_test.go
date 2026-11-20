@@ -30,7 +30,7 @@ var ingressHead = []string{
 	"-A UDECO-IN -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT",
 }
 
-func ingressManager(u *unit, r Runner, mgmt ...string) *Manager {
+func ingressManager(u *fakeUnit, r Runner, mgmt ...string) *Manager {
 	return New(Options{Root: u.root, Run: r, ControllerIP: "192.168.0.1", GatewayIP: "192.168.0.1",
 		LANCIDR: "192.168.0.0/24", ConsoleIP: "192.168.0.1", MgmtSources: mgmt})
 }
@@ -251,7 +251,7 @@ func TestEgressReinsertCounted(t *testing.T) {
 }
 
 // rm deletes a file from the fake root.
-func (u *unit) rm(p string) {
+func (u *fakeUnit) rm(p string) {
 	u.t.Helper()
 	if err := os.Remove(filepath.Join(u.root, p)); err != nil {
 		u.t.Fatal(err)

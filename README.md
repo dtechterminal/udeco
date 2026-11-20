@@ -15,9 +15,9 @@ The same agent also runs a JioFiber JCOW414 router as a plain UniFi AP
 > **Tested setup.** Three Deco X20 V2 units on wired backhaul (TP-Link firmware
 > 1.3.0 Build 20250912, kernel 4.1, Broadcom `wl`, hostapd 2.9), one mesh
 > master and two satellites. They are adopted into UniFi Network 11.1.50 on a
-> UniFi Cloud Gateway. All three run release `d9dd8fe` (19 Nov 2026), and the
-> tables below were checked against that build. Other Deco models and firmware
-> versions are untested.
+> UniFi Cloud Gateway. The tables below were first checked on all three against
+> release `d9dd8fe` (19 Nov 2026); a row checked later, or on a later build,
+> carries its own date. Other Deco models and firmware versions are untested.
 
 ## What works
 
@@ -40,7 +40,7 @@ Status key:
 | Locate, LED on/off | Verified | LED on is steady green, also right after a reboot. Off goes dark. Locate blinks green until Unlocate. UniFi's LED colour can't be carried. |
 | Topology (LLDP) | Verified | UniFi shows the parent switch port. |
 | Device SSH keys and site logins | Verified | Site SSH keys pushed from UniFi let the site user log in; root login stays key-only. |
-| Login lock (root logins) | Verified | While Device SSH Authentication is off and the controller answers, new connections to the unit's root login (Deco :22, Garage :23 and :22) are dropped; open sessions stay. 10 min without a controller reply, Device SSH on, observe mode or the agent's stop opens it again. `"login_lock": false` turns it off. Not yet run on a unit ([login-lock](docs/deco/features/login-lock.md)). Live 2026-11-20 on all four APs: locked within 30 s of Device SSH off, an open session kept working, Bedroom opened after 10 min of controller silence and relocked when it answered again, Device SSH on opened them in seconds. The crash path and the Garage launcher removal are not yet seen on a unit. |
+| Login lock (root logins) | Verified | While Device SSH Authentication is off and the controller answers, new connections to the unit's root login (Deco :22, Garage :23 and :22) are dropped; open sessions stay. 10 min without a controller reply, Device SSH on, observe mode or the agent's stop opens it again. `"login_lock": false` turns it off ([login-lock](docs/deco/features/login-lock.md)). Live 2026-11-20 on all four APs: locked within 30 s of Device SSH off, an open session kept working, Bedroom opened after 10 min of controller silence and relocked when it answered again, Device SSH on opened them in seconds. The crash path and the Garage launcher removal are not yet seen on a unit. |
 | Encrypted remote syslog | Verified | The controller's AES-GCM syslog format. |
 | Firmware upgrade | Not possible | By design: upgrade offers are answered and ignored. Ubiquiti firmware is never flashed. |
 | SNMP, mDNS bridge | Built | Off by default (`mdns_bridge` config key for the bridge). |
@@ -84,12 +84,12 @@ Status key:
 |---|---|---|
 | Channel, width, transmit power | Verified | Includes 80 MHz on 5 GHz. |
 | Auto channel | Built | A radio left on auto gets one channel when a provision restarts that radio anyway, for example the takeover at boot. 2.4 GHz uses only 1, 6 or 11. 5 GHz never uses DFS. Channels in the controller's blocked list are never taken. The pick favours the quietest channel by neighbours and spectrum use. It is never re-picked periodically ([auto-channel](docs/deco/features/auto-channel.md)). |
-| Country | Verified | 2.4 GHz runs US/0 (24 dBm). 5 GHz runs Broadcom's `#a` table by the user's choice (`driver_country_bands` {"ng":"US","na":"#a"}, verified live 2026-11-20): Wi-Fi 6 at 23.5 dBm on 36-144 and 149-161, but no radar detection, so the agent refuses 120-128 (weather radar; refusal seen live). Every real country but US/0 disables Wi-Fi 6 on this board, and US/0 has no DFS. See [dfs](docs/deco/features/dfs.md). | IN/288 caps 2.4 GHz at 14 dBm and 5 GHz 36–48 at 16.5 dBm, so `"driver_country_bands": {"ng": "US"}` runs 2.4 GHz as US (24 dBm) beside 5 GHz in IN/288 with DFS (23.5–25 dBm on 100–144), verified on Bedroom 2026-11-20.
+| Country | Verified | 2.4 GHz runs US/0 (24 dBm). 5 GHz runs Broadcom's `#a` table by the user's choice (`driver_country_bands` {"ng":"US","na":"#a"}, verified live 2026-11-20): Wi-Fi 6 at 23.5 dBm on 36-144 and 149-161, but no radar detection, so the agent refuses 120-128 (weather radar; refusal seen live). Every real country but US/0 disables Wi-Fi 6 on this board, and US/0 has no DFS. See [dfs](docs/deco/features/dfs.md). |
 | Power presets (low/medium/high) | Verified (custom) / Built (presets) | These match the U6 Pro: Low is the 5 dBm floor, Medium is halfway, and High and Auto are the radio's ceiling. Custom is clamped to that range. All of them apply without a radio restart. UniFi shows the real preset and dBm, not "custom". The earlier fixed 6 dB / 3 dB steps were Verified ([tx-power](docs/deco/features/tx-power.md)). Custom power verified live 2026-11-20 (17 and 14 dBm on 2.4 GHz through `txpwr_degrade`, no client dropped); the low/medium/high presets have not been set on a unit. |
 | Radio driver defaults | Verified | U6 Pro values are used. Implicit beamforming is off (live), 2.4 GHz has no vendor VHT, power save is off, and the glitch-based receiver desense is off. `"rx_desense": true` keeps TP-Link's desense, and puts it back where an earlier run cleared it. The radio-down settings (rrm and wnm included) ride a restart the agent makes anyway ([radio-parity](docs/deco/features/radio-parity.md)). Read on all three units 2026-11-20: `wl interference` mode 360 (desense off), `txbf_imp` 0, 2.4 GHz `vht_features` 6. |
 | Neighbour and rogue-AP list | Verified | Refreshed every minute by a passive listen on the AP's own channel. A full scan from UniFi adds the other channels. |
 | Spectrum scan | Partial | 2.4 GHz is complete; 5 GHz covers 36–48. Channels 149–165 are reported as unmeasured, not as clean. |
-| DFS channels | Verified | The controller's DFS channel gets 802.11h and the driver's CAC, and Tick and the health check leave the radio alone during the CAC. On radar the driver's move is followed and reported as `EVT_AP_RadarDetected`, with hostapd's conf unchanged. A DFS channel needs `driver_country` removed. The controller's nightly dfs-reset goes back once the non-occupancy period is over. `has_dfs` is reported. Not yet run on a unit ([dfs](docs/deco/features/dfs.md)). Live 2026-11-20: CAC timed (60 s on 100 and 132, about 10 min on 116/80), ISM entered, clients served on 100/80 and 132/80. A radar move has not been observed. |
+| DFS channels | Verified | The controller's DFS channel gets 802.11h and the driver's CAC, and Tick and the health check leave the radio alone during the CAC. On radar the driver's move is followed and reported as `EVT_AP_RadarDetected`, with hostapd's conf unchanged. A DFS channel needs a country table that has it: US/0 has none, IN/288 runs the CAC and radar detection, and under `#a` (the Country row above) the channels are served without either. The controller's nightly dfs-reset goes back once the non-occupancy period is over. `has_dfs` is reported ([dfs](docs/deco/features/dfs.md)). Live 2026-11-20 under IN/288: CAC timed (60 s on 100 and 132, about 10 min on 116/80), ISM entered, clients served on 100/80 and 132/80. A radar move has not been observed. |
 
 ### Clients
 
@@ -137,7 +137,7 @@ while it has any limit, and back on when none are left. Details are in
 | Streams | 2×2 on each band | 2×2 on each band |
 | Widest channel | 80 MHz on 5 GHz | 80 MHz on 5 GHz, 40 MHz on 2.4 GHz |
 | Transmit power | 20 dBm (2.4 GHz), 25 dBm (5 GHz) | 24 dBm (2.4 GHz), 23.5 dBm (5 GHz) target |
-| 5 GHz channels | All for the country, DFS included | All the driver allows for the country, DFS included (not yet run on a unit; verified so far: 36–48 and 149–165) |
+| 5 GHz channels | All for the country, DFS included | All the driver allows for the country table in force, DFS included (the Country and DFS channels rows above say which tables and channels have run) |
 | SSIDs per band | 8 | 5 (one driver slot is hostapd's hidden anchor) |
 | Ethernet | 1 × GbE | 2 × GbE |
 | Power | PoE | DC adapter |
@@ -184,13 +184,21 @@ You need root SSH on each unit; how to get it is out of scope here.
    Unknown keys are an error, so a typo can't silently flip a safety switch.
    With `"takeover": false` the agent only reports to UniFi and changes
    nothing. With `"apply": false` it logs its plans without applying them.
+   `log` is `syslog` (the default) or `stderr`.
    Optional keys, all off by default: `wpa3`, `min_rates`, `mdns_bridge`,
    `hotspot2`, `mgmt_sources`, `uplink_gateway_down`, `rx_desense` (keep
-   TP-Link's glitch-based receiver desense, which a U6 Pro runs off) and
-   `driver_country`. `driver_country` runs the radios in another country's
-   table than the site's. It was needed while India ran as IN/0, which has
-   no 80 MHz. The agent now runs India as IN/288, so the override is no
-   longer recommended. On by default:
+   TP-Link's glitch-based receiver desense, which a U6 Pro runs off),
+   `driver_country` and `driver_country_bands`. `driver_country` runs the
+   radios in another country's table than the site's, and
+   `driver_country_bands` sets the country of one radio (`ng` for 2.4 GHz,
+   `na` for 5 GHz) over it. With neither, a site in India runs IN/288
+   (IN/0 has no 80 MHz), which has DFS but, on this board, no Wi-Fi 6
+   rates and low power on 2.4 GHz and on 36-48. The tested units set
+   `driver_country_bands` as in the Country row above; the tables, their
+   measurements and the choice are in [dfs](docs/deco/features/dfs.md).
+   On by default:
+   `ft_sae` (with `wpa3`: 802.11r for WPA3 clients; the example turns it
+   off, see the FT-SAE row above),
    `uplink_ssid_down` (SSIDs down while the uplink has no carrier, as a U6;
    `false` keeps them up), `login_lock` (with takeover and apply: root
    logins closed while UniFi's Device SSH is off and the controller
@@ -205,6 +213,10 @@ You need root SSH on each unit; how to get it is out of scope here.
    it up at its next such restart; until then the log says
    `radio na: TWT enab 0, config wants 1: set at the next radio down/up`.
    Handing Wi-Fi back to TP-Link restores its TWT state.
+   On the Garage (`platform` jio-mtk), `driver_dtim_bands` sets one radio's
+   DTIM period over the controller's (`{"ng": 2}` there), and
+   `downlink_watchdog` (default true) disconnects a 2.4 GHz station that
+   stops answering the unit's ARP probes while dozing, so it re-associates.
 
 2. **Deploy.** From a machine with Go and SSH access to the unit:
 
@@ -214,31 +226,38 @@ You need root SSH on each unit; how to get it is out of scope here.
    ```
 
    The script builds the armv7 binary, checks the unit (read-only), installs
-   the gzipped agent to `/tp_data/udeco` with an md5 check and starts it. It
-   prints a one-line rollback command at the end. Do satellites first, then
-   the master. While the login lock holds, :22 does not answer: turn on
-   Device SSH in UniFi, wait about a minute, deploy, then turn it off again
-   ([login-lock](docs/deco/features/login-lock.md)).
+   the agent in `/tp_data/udeco` with an md5 check (the plain binary, or its
+   gzip when the binary is large), writes the launcher `start.sh` and starts
+   it. It prints a one-line rollback command at the end.
+   `deploy/deco-ap.sh --help` lists every step, check and size. Do satellites
+   first, then the master. While the login lock holds, :22 does not answer:
+   turn on Device SSH in UniFi, wait about a minute, deploy, then turn it off
+   again ([login-lock](docs/deco/features/login-lock.md)).
 
-3. **Supervise.** One line at the end of the unit's `/data/persist_shell.sh`,
-   which cron runs every minute:
+3. **Supervise.** One line in the unit's `/data/persist_shell.sh`, which
+   cron runs every minute, runs the launcher. The file is yours, so the
+   deploy only prints the exact line to add; it ends in a marker the script
+   finds it by at the next deploy. To have the script write it:
 
    ```sh
-   [ -f /tp_data/udeco/start.sh ] && sh /tp_data/udeco/start.sh
+   deploy/deco-ap.sh --edit-persist <unit-ip>
    ```
 
 4. **Adopt** the unit in UniFi. It appears as a U6-Lite.
 
-The agent logs to `/tmp/udeco-bin/agent.log` (RAM, capped at 2 MB);
-`/tp_data/udeco/events.log` keeps the important events across reboots.
+The launcher `/tp_data/udeco/start.sh` is written by `deploy/deco-ap.sh` on
+every deploy. It sends the agent's log to `/tmp/udeco-bin/agent.log` (RAM,
+capped at 2 MB); `/tp_data/udeco/events.log` keeps the important events
+across reboots.
 
 **Undo:** `rm /tp_data/udeco/start.sh` and reboot. The unit comes back as stock
-TP-Link. More in [packaging/deco](packaging/deco/README.md).
+TP-Link. The files on the unit are listed in
+[packaging/deco](packaging/deco/README.md).
 
-To build by hand:
+To build without a unit (the deploy's own build, so the same binary):
 
 ```sh
-GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o udeco-ap ./cmd/udeco-ap
+deploy/deco-ap.sh --build-only   # writes dist/udeco-ap-linux-armv7
 ```
 
 Run `go test ./... && go vet ./...` before deploying a change.
@@ -255,7 +274,8 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   accepts the profile, but no SAE client has been seen yet.
 - **Not on this platform:** speed limits.
 - **U6 parity** ([docs/deco/features/garage-parity.md](docs/deco/features/garage-parity.md);
-  none of it run on the unit yet):
+  none of it run on the unit yet except the login lock, whose live run is
+  in the Login lock row above):
 
   | Feature | What the Garage does | Config |
   |---|---|---|
@@ -371,8 +391,11 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 | `internal/mtkwifi`, `internal/jiosys` | the JioFiber platform |
 | `internal/inform`, `internal/device`, `internal/translate` | UniFi inform protocol and the controller's settings |
 | `internal/ftpeer`, `internal/pathmon`, `internal/lldp`, `internal/snmpagent`, `internal/mdnsbr`, `internal/hs20`, `internal/radsec` | fast-roaming key exchange, uplink monitor, LLDP, SNMP, mDNS bridge, Hotspot 2.0, RadSec |
-| `deploy/` | `deco-ap.sh` (Deco deploy), `jio-start.sh` (JioFiber supervisor with the gateway guard) |
-| `packaging/deco` | persistent install on a Deco |
+| `internal/rf`, `internal/unit` | facts every package shares, each written once: band names, channel and frequency arithmetic, bridge names, the agent's directories on a unit |
+| `internal/atomicfile` | the one write-a-temporary-file-and-rename used for the state files |
+| `internal/repotest` | test helpers that hold the shell scripts and the docs to the Go code |
+| `deploy/` | `deco-ap.sh` (Deco deploy; it writes the unit's launcher), `jio-ap.sh` (JioFiber deploy), `jio-start.sh` (JioFiber supervisor with the gateway guard), `unraid.sh` (the off-device `udeco` on an Unraid host), `lib.sh` (what those scripts share), `udeco.example.json` (example config for `udeco`) |
+| `packaging/deco` | what a persistent install on a Deco consists of |
 | `tools/wifi-inet-monitor` | per-client internet monitor that runs on the gateway |
 | `docs/deco/` | [design](docs/deco/agent-design.md), [device capabilities](docs/deco/device-capabilities.md), [interference audit](docs/deco/interference-audit.md), [feature notes](docs/deco/features/) |
 

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // RF scan and neighbour list (docs/internals.md). A UAP reports, per radio
@@ -269,7 +271,7 @@ func Spectrum(sv []ChanSurvey, band string) []SpectrumEntry {
 	sort.Ints(chans)
 	// no noise reading (0 dBm: ath10k off-channel on 2.4 GHz) -> the noise
 	// floor measured on the channel in use, else a typical -95
-	floor := -95
+	floor := rf.NoiseFloorDBm
 	for _, c := range byCh {
 		if c.InUse && c.Noise < 0 {
 			floor = c.Noise
@@ -307,11 +309,10 @@ func Spectrum(sv []ChanSurvey, band string) []SpectrumEntry {
 		res = append(res, SpectrumEntry{Channel: first, Width: width, CenterFreq: ChannelFreq(first, 5000) + (width-20)/2,
 			Utilization: pct(busy, act), Interference: noise})
 	}
-	for _, first := range []int{36, 44, 52, 60, 100, 108, 116, 124, 132, 140, 149, 157, 165, 173} {
-		block(40, first)
-	}
-	for _, first := range []int{36, 52, 100, 116, 132, 149, 165} {
-		block(80, first)
+	for _, width := range []int{40, 80} {
+		for _, first := range rf.Blocks5G(width) {
+			block(width, first)
+		}
 	}
 	return res
 }
@@ -331,12 +332,9 @@ func FreqChannel(f int) int {
 // ChannelFreq: channel number -> MHz, in the band of ref (a MHz value).
 func ChannelFreq(ch, ref int) int {
 	if ref < 3000 {
-		if ch == 14 {
-			return 2484
-		}
-		return 2407 + 5*ch
+		return rf.ChanFreq(rf.Band2G, ch)
 	}
-	return 5000 + 5*ch
+	return rf.ChanFreq(rf.Band5G, ch)
 }
 
 // ScanTable builds radio_table[].scan_table rows. own: this AP's BSSIDs
@@ -366,7 +364,7 @@ func ScanTable(r ScanResult, now time.Time, own map[string]bool, siteSSIDs map[s
 		if b.AgeMs > 0 {
 			age += b.AgeMs / 1000
 		}
-		rssi := b.Signal + 95
+		rssi := b.Signal - rf.NoiseFloorDBm
 		if rssi < 0 {
 			rssi = 0
 		}
@@ -397,7 +395,7 @@ func SpectrumRows(sp []SpectrumEntry) []map[string]any {
 // SplitBands sorts scan results by band (ng: 2.4 GHz, na: 5 GHz).
 func SplitBands(bss []BSS, sv []ChanSurvey, now time.Time) map[string]ScanResult {
 	res := map[string]ScanResult{}
-	for _, band := range []string{"ng", "na"} {
+	for _, band := range rf.Bands() {
 		r := ScanResult{Band: band, Time: now}
 		for _, b := range bss {
 			if (b.Freq < 3000) == (band == "ng") && b.Freq > 0 && b.Freq < 5900 {

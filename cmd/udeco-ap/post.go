@@ -22,17 +22,18 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/inform"
 )
 
 // postFunc sends body to rawURL and returns the HTTP status and the answer's
 // body. A status other than 200 is not an error.
 type postFunc func(ctx context.Context, rawURL string, body []byte) (status int, resp []byte, err error)
 
-const (
-	informUA       = "AirControl Agent v1.0" // what UniFi APs send
-	informMaxReply = 4 << 20                 // as the agent read net/http answers before
-	informMaxHead  = 16 << 10                // status line plus headers
-)
+// informMaxHead bounds the answer's status line plus headers. The body's
+// bound is inform.MaxReply (as the agent read net/http answers before),
+// and the request goes out as inform.UserAgent and inform.ContentType.
+const informMaxHead = 16 << 10
 
 // httpPoster returns the inform client with an overall timeout per request.
 func httpPoster(timeout time.Duration) postFunc {
@@ -41,24 +42,38 @@ func httpPoster(timeout time.Duration) postFunc {
 	}
 }
 
-func httpPost(ctx context.Context, rawURL string, body []byte, timeout time.Duration) (int, []byte, error) {
+// informTarget splits an inform URL into what the POST needs: the
+// address to dial, the Host header and the request path. It is this
+// client's own guard, not the rule for an inform URL (that is
+// device.CheckInformURL, which the config's URL and every later change
+// of it pass): it refuses what it cannot speak (TLS, user info). It reads
+// the host as inform.URLHost does (TestInformURLHosts).
+func informTarget(rawURL string) (addr, hostHdr, path string, err error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return 0, nil, err
+		return "", "", "", err
 	}
 	if u.Scheme != "http" || u.Hostname() == "" || u.User != nil {
-		return 0, nil, fmt.Errorf("inform url %q: only http://host[:port]/path is supported", rawURL)
+		return "", "", "", fmt.Errorf("inform url %q: only http://host[:port]/path is supported", rawURL)
 	}
-	host := u.Host
+	addr = u.Host
 	if u.Port() == "" {
-		host = net.JoinHostPort(u.Hostname(), "80")
+		addr = net.JoinHostPort(u.Hostname(), "80")
 	}
-	path := u.EscapedPath()
+	path = u.EscapedPath()
 	if path == "" {
 		path = "/"
 	}
 	if u.RawQuery != "" {
 		path += "?" + u.RawQuery
+	}
+	return addr, u.Host, path, nil
+}
+
+func httpPost(ctx context.Context, rawURL string, body []byte, timeout time.Duration) (int, []byte, error) {
+	host, hostHdr, path, err := informTarget(rawURL)
+	if err != nil {
+		return 0, nil, err
 	}
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -79,9 +94,9 @@ func httpPost(ctx context.Context, rawURL string, body []byte, timeout time.Dura
 	defer stop()
 
 	head := "POST " + path + " HTTP/1.1\r\n" +
-		"Host: " + u.Host + "\r\n" +
-		"User-Agent: " + informUA + "\r\n" +
-		"Content-Type: application/x-binary\r\n" +
+		"Host: " + hostHdr + "\r\n" +
+		"User-Agent: " + inform.UserAgent + "\r\n" +
+		"Content-Type: " + inform.ContentType + "\r\n" +
 		"Content-Length: " + strconv.Itoa(len(body)) + "\r\n" +
 		"Connection: close\r\n\r\n"
 	if _, err := conn.Write(append([]byte(head), body...)); err != nil {
@@ -108,7 +123,7 @@ func ctxErr(ctx context.Context, err error) error {
 	return err
 }
 
-var errReplyTooLarge = fmt.Errorf("inform reply larger than %d bytes", informMaxReply)
+var errReplyTooLarge = fmt.Errorf("inform reply larger than %d bytes", inform.MaxReply)
 
 // readResponse reads one HTTP/1.x response to a POST.
 func readResponse(r *bufio.Reader) (int, []byte, error) {
@@ -169,14 +184,14 @@ func readResponse(r *bufio.Reader) (int, []byte, error) {
 		case chunked:
 			body, err = readChunked(r)
 		case length >= 0:
-			if length > informMaxReply {
+			if length > inform.MaxReply {
 				return status, nil, errReplyTooLarge
 			}
 			body = make([]byte, length)
 			_, err = io.ReadFull(r, body)
 		default: // no length: the server closes the connection at the end
-			body, err = io.ReadAll(io.LimitReader(r, informMaxReply+1))
-			if err == nil && len(body) > informMaxReply {
+			body, err = io.ReadAll(io.LimitReader(r, inform.MaxReply+1))
+			if err == nil && len(body) > inform.MaxReply {
 				err = errReplyTooLarge
 			}
 		}
@@ -230,7 +245,7 @@ func readChunked(r *bufio.Reader) ([]byte, error) {
 		if err != nil || n < 0 {
 			return nil, fmt.Errorf("inform reply: bad chunk size %q", strings.TrimSpace(s))
 		}
-		if int64(len(body))+n > informMaxReply {
+		if int64(len(body))+n > inform.MaxReply {
 			return nil, errReplyTooLarge
 		}
 		if n == 0 {

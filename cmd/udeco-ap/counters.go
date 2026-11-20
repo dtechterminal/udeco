@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 )
 
 // Monotonic inform counters (apstate.Counters, agent-design §3.9). The state
@@ -45,15 +46,11 @@ func (a *agent) saveCounters(now time.Time, force bool) {
 	}
 	b, err := a.ctr.Marshal()
 	path := a.counterPath()
-	tmp := path + ".tmp"
 	if err == nil {
 		err = os.MkdirAll(filepath.Dir(path), 0o700)
 	}
 	if err == nil {
-		err = os.WriteFile(tmp, b, 0o600)
-	}
-	if err == nil {
-		err = os.Rename(tmp, path)
+		err = atomicfile.Write(path, path+".tmp", b, 0o600)
 	}
 	if err != nil {
 		if a.ctrErr == "" {

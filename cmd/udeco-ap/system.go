@@ -15,15 +15,20 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 )
 
 // agentPATH is set explicitly: persist_shell.sh runs the agent from cron,
-// whose PATH lacks /usr/sbin (wl, hostapd, brctl, iptables live there).
-const agentPATH = "/usr/sbin:/usr/bin:/sbin:/bin"
+// whose PATH lacks /usr/sbin (wl, hostapd, brctl, iptables live there). It
+// is the firmware's binary directories in the order decosys searches them
+// (decosys.BinDirs), and the PATH of a site login's session on both
+// platforms (siteSSHOptions).
+var agentPATH = strings.Join(decosys.BinDirs, ":")
 
 // jioPATH: the JCOW414 keeps iwpriv/iwconfig in /userfs/bin and ip in
 // /pfrm2.0/bin.
-const jioPATH = "/userfs/bin:/pfrm2.0/bin:" + agentPATH
+var jioPATH = "/userfs/bin:/pfrm2.0/bin:" + agentPATH
 
 // execRunner runs device commands (wl, hostapd_cli, ubus, iptables, ...).
 // It is the Runner of internal/wl, internal/decosys and internal/bcmwifi.
@@ -62,10 +67,10 @@ func firstLine(s string) string {
 func setupLog(dest string, stderr io.Writer) {
 	log.SetFlags(log.Ldate | log.Ltime)
 	log.SetOutput(stderr)
-	if dest != "syslog" {
+	if dest != logSyslog {
 		return
 	}
-	w, err := syslog.New(syslog.LOG_DAEMON|syslog.LOG_INFO, "udeco-ap")
+	w, err := syslog.New(syslog.LOG_DAEMON|syslog.LOG_INFO, decosys.SyslogTag)
 	if err != nil {
 		log.Printf("udeco-ap: syslog unavailable (%v): logging to stderr", err)
 		return

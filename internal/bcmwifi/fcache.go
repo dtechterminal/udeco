@@ -9,6 +9,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 )
 
 // Broadcom flow cache (interference audit D1, requirement R21).
@@ -138,19 +140,8 @@ func (a *Applier) cachedFlows(s FlowScope) int {
 }
 
 // ifnameOK accepts a Linux interface name (also used for tc and ebtables
-// arguments, which go to argv, never a shell).
-func ifnameOK(s string) bool {
-	if s == "" || len(s) > 15 {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '-' || c == '_') {
-			return false
-		}
-	}
-	return true
-}
+// arguments, which go to argv, never a shell): apstate.IfNameChars.
+func ifnameOK(s string) bool { return apstate.IfNameChars(s) }
 
 // Flow cache on/off while tc shapes (docs/deco/features/client-rate-limit.md).
 //

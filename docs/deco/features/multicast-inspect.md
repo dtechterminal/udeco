@@ -1,8 +1,9 @@
 # Multicast inspect, DNS assistance, mDNS service bridge, Multicast Suppressor
 
 Status 2026-11-19: multicast inspect is implemented (takeover only). DNS
-assistance, the mDNS service bridge and the Multicast Suppressor are not; the
-reasons are below. Sources: the Network 11.1.50 controller (decompiled device
+assistance and the Multicast Suppressor are not; the reasons are below. The
+mDNS service bridge was not either when this was written, and has been built
+since (its section below). Sources: the Network 11.1.50 controller (decompiled device
 class `XCfthFC`, the AP system.cfg generator `config/XHjguBsIf`, the mDNS-SD
 config factory `config/ubntconf/jfhrAUVHPMhBVsMer`, the inform-scope service
 `devmgr/l/PfwtrEhZ`, the multicast stats collector `stat/f/QdjEeOBh`) and the
@@ -74,10 +75,11 @@ How the agent does it (`internal/mcinspect`, `cmd/udeco-ap/mcinspect.go`):
   drop to observe mode or R4 memory shedding stops every reader at the next
   inform and the block is no longer sent.
 
-Bit to claim: fw3_caps 0x80, takeover only. The agent sends no `fw3_caps`
-word today: `inform.Profile`, `device.Session.Payload` and
-`models.DecoAgentProfileWith` need a fw3 word (a uint32 like fw2_caps), and the
-claim should follow takeover the way RF_SCAN does.
+Bit: fw3_caps 0x80, claimed in takeover only
+(`models.FW3CapMulticastInspect`, one of `models.DecoAgentTakeoverFW3Caps`).
+When this was written the agent sent no `fw3_caps` word; it does now
+(`inform.Profile.FW3Caps`, a uint32 like fw2_caps), and the claim follows
+takeover the way RF_SCAN does.
 
 Untested on the unit (live test plan in the integration report): whether the
 Broadcom datapath (archer/fc/WFD, WMF) hands multicast to the ETH_P_ALL taps
@@ -119,5 +121,6 @@ The controller writes `wireless.N.multicast.suppressor=enabled` when the WLAN's
 key, so the AP has a single behaviour) and the AP claims wifi_caps2 0x400000.
 On the U6 Pro it is `/proc/ui_multicast/mc_suppressor/enable` in a closed
 kernel module; what it suppresses is not stated anywhere in the controller or
-the captures. Not claimed (the agent sends no wifi_caps2); translate keeps
-noting `multicast.suppressor` when it is on.
+the captures. Not claimed (the agent's wifi_caps2 word, sent for the Roaming
+Assistant in takeover, never has this bit); translate keeps noting
+`multicast.suppressor` when it is on.

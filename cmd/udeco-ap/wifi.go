@@ -33,6 +33,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
@@ -44,6 +45,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
@@ -506,16 +508,17 @@ func (a *agent) wifiFailed(ctx context.Context, op string, err error) {
 }
 
 // wifiOwned reports whether the agent's hostapd confs exist: bcmwifi
-// writes RunDir/hapd-wlN.conf when it takes a radio and removes them when
-// it hands Wi-Fi back.
+// writes one per radio (bcmwifi.ConfPath) when it takes the radio and
+// removes them when it hands Wi-Fi back.
 // TODO(bcmwifi-owned): use an exported bcmwifi ownership query once there
-// is one; this reads bcmwifi's documented file layout.
+// is one; until then the files are found through bcmwifi's own names
+// (ConfPath, Primaries), not rebuilt here.
 func (a *agent) wifiOwned() bool {
 	if o, ok := a.wifi.(interface{ Owned() bool }); ok {
 		return o.Owned()
 	}
-	for _, p := range []string{"wl0", "wl1"} {
-		if _, err := os.Stat(a.dev(filepath.Join(a.o.runDir, "hapd-"+p+".conf"))); err == nil {
+	for _, p := range bcmwifi.Primaries() {
+		if _, err := os.Stat(a.dev(bcmwifi.ConfPath(a.o.runDir, p))); err == nil {
 			return true
 		}
 	}
@@ -647,7 +650,10 @@ func guestPolicy(d bcmwifi.Desired, g translate.Guest, gwMAC, gwIP string) (*bcm
 }
 
 // desiredFrom maps the controller's intent onto bcmwifi's Desired. The notes
-// list what bcmwifi cannot take (never secrets).
+// list what bcmwifi cannot take (never secrets). The radio and WLAN fields
+// are named one by one below: TestDesiredFromCarriesEveryField fails for a
+// translate.RadioIntent or WLANIntent field that is neither mapped here nor
+// on its list of fields that are not carried.
 func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 	var notes []string
 	d := bcmwifi.Desired{Country: in.Country, Radios: map[string]bcmwifi.Radio{}}
@@ -674,14 +680,10 @@ func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 			NoBSSLoad:   wl.NoBSSLoad,   // per radio in bcmwifi (parity.go)
 			NoBGAFilter: wl.NoBGAFilter} // bcmwifi bga.go
 		s.MinRateOpts = minRateOpts(wl.MinRateOpts)
-		for band, b := range wl.PerBand {
-			if s.PerBand == nil {
-				s.PerBand = map[string]bcmwifi.BandSettings{}
-			}
-			s.PerBand[band] = bcmwifi.BandSettings{Security: b.Security, PMF: b.PMF, FT: b.FT, FTSAE: b.FTSAE,
-				FTOverDS: b.FTOverDS, MobilityDomain: b.MobilityDomain, BSSTransition: b.BSSTransition, RRM: b.RRM,
-				UAPSD: b.UAPSD, ProxyARP: b.ProxyARP, MulticastToUnicast: b.MulticastToUnicast, Hidden: b.Hidden,
-				Isolation: b.Isolation, GroupRekey: b.GroupRekey}
+		// each band's own settings: bcmwifi's type is translate's
+		// (BandSettings = translate.BandWLAN), so every field comes along
+		if len(wl.PerBand) > 0 {
+			s.PerBand = maps.Clone(wl.PerBand)
 		}
 		for _, b := range wl.Bands {
 			if b == "ng" || b == "na" {
@@ -743,7 +745,7 @@ func withDriverCountry(d bcmwifi.Desired, override string) (bcmwifi.Desired, []s
 		return d, nil
 	}
 	notes := []string{fmt.Sprintf("country %s: the radios run as %s (driver_country)", d.Country, dc)}
-	if r, ok := d.Radios["na"]; ok && r.Enabled && r.Channel >= 52 && r.Channel <= 144 {
+	if r, ok := d.Radios["na"]; ok && r.Enabled && rf.IsDFS("na", r.Channel) {
 		notes = append(notes, fmt.Sprintf("5 GHz DFS channel %d under driver_country %s: refused unless that table has it; remove driver_country to serve it in %s", r.Channel, dc, d.Country))
 	}
 	d.Country = dc
@@ -774,7 +776,7 @@ func withDriverDTIMBands(d bcmwifi.Desired, bands map[string]int) (bcmwifi.Desir
 			}
 			m := map[string]int{}
 			for k, p := range s.DTIM {
-				if bandKey(k) != b {
+				if rf.Norm(k) != b {
 					m[k] = p
 				}
 			}
@@ -790,21 +792,10 @@ func withDriverDTIMBands(d bcmwifi.Desired, bands map[string]int) (bcmwifi.Desir
 	return d, notes
 }
 
-// bandKey is a band key as "ng"/"na" (the controller's may be "2g"/"5g").
-func bandKey(k string) string {
-	switch strings.ToLower(k) {
-	case "2g", "ng":
-		return "ng"
-	case "5g", "na":
-		return "na"
-	}
-	return strings.ToLower(k)
-}
-
 // ssidServes: s is on band b.
 func ssidServes(s bcmwifi.SSID, b string) bool {
 	for _, x := range s.Bands {
-		if bandKey(x) == b {
+		if rf.Norm(x) == b {
 			return true
 		}
 	}
@@ -816,7 +807,7 @@ func ssidServes(s bcmwifi.SSID, b string) bool {
 // the country already in force is no override.
 func withDriverCountryBands(d bcmwifi.Desired, bands map[string]string) (bcmwifi.Desired, []string) {
 	var notes []string
-	for _, b := range []string{"ng", "na"} {
+	for _, b := range rf.Bands() {
 		cc := bcmwifi.NormCountry(bands[b])
 		if cc == "" || strings.EqualFold(cc, d.Country) {
 			continue

@@ -1,0 +1,26 @@
+package sample
+
+import "time"
+
+const (
+	OpA uint16 = 0x4001
+	OpB uint16 = 0x43b0 // a comment
+	Bit        = 1 << 24
+	Mask       = Bit | Low | (1 << 2)
+	Low        = 0x20
+	Clear      = Mask &^ Low
+	Sum        = 2*3 + 4 - 1
+	Name       = "text"
+	Wait       = 5 * time.Second
+	Other      = pkg.Value | Low
+	Big        = 1 << 62 << 1
+)
+
+const (
+	First = iota
+	Second
+)
+
+const Lone = 161
+
+var notConst = 7

@@ -20,6 +20,8 @@ import (
 
 	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // stamped is a noop reply with the controller's time (ms).
@@ -251,13 +253,12 @@ func TestDeployLauncherUnlocksBeforeEarlyExits(t *testing.T) {
 	if err != nil {
 		t.Skip("no sh")
 	}
-	unlock := "iptables -w -D INPUT -j UDECO-LOCK\niptables -w -F UDECO-LOCK\niptables -w -X UDECO-LOCK\n" +
-		"ip6tables -w -D INPUT -j UDECO-LOCK\nip6tables -w -F UDECO-LOCK\nip6tables -w -X UDECO-LOCK\n"
+	unlock := lockRemoval(true)
 	for _, c := range []string{"no binary", "gz without its md5"} {
 		root := t.TempDir()
-		dir := filepath.Join(root, "tp_data/udeco")
+		dir := filepath.Join(root, unit.DecoDir)
 		bin := filepath.Join(root, "bin")
-		for _, d := range []string{dir, filepath.Join(root, "tmp"), bin} {
+		for _, d := range []string{dir, filepath.Dir(filepath.Join(root, unit.RAMDir)), bin} {
 			os.MkdirAll(d, 0o755)
 		}
 		log := filepath.Join(root, "calls")
@@ -281,7 +282,7 @@ func TestDeployLauncherUnlocksBeforeEarlyExits(t *testing.T) {
 // The Garage launcher's loop removes the lock first, before anything that
 // can skip the start (the gunzip that waits and retries).
 func TestJioStartUnlocksFirst(t *testing.T) {
-	b := string(readFixture(t, "../../deploy", "jio-start.sh"))
+	b := repotest.Read(t, jioStart)
 	i := strings.LastIndex(b, "while [ -f $D/start.sh ]; do\n")
 	if i < 0 {
 		t.Fatal("no supervisor loop in deploy/jio-start.sh")

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // WLAN is one UniFi WLAN on one radio: a wireless.N section and its aaa.N
@@ -115,8 +117,9 @@ func WLANs(cfg Cfg) []WLAN {
 			continue
 		}
 		band := "5g"
+		byName, _ := qcaRadioBand(phy)
 		switch {
-		case strings.Contains(mode, "ng") || phy == "wifi0" && !strings.Contains(mode, "na"):
+		case strings.Contains(mode, "ng") || byName == "ng" && !strings.Contains(mode, "na"):
 			band = "2g"
 		case strings.Contains(mode, "6e"):
 			band = "6g"
@@ -150,7 +153,8 @@ func WLANs(cfg Cfg) []WLAN {
 		if b, ok := phyBand[x.Radio]; ok {
 			x.Band = b
 		} else {
-			x.Band = map[string]string{"wifi0": "2g", "wifi1": "5g", "wifi2": "6g"}[x.Radio]
+			byName, _ := qcaRadioBand(x.Radio)
+			x.Band = rf.Legacy(byName)
 		}
 		x.Encryption, x.EncNote = encryption(cfg, a)
 		x.Features = wlanFeatures(cfg, w, a, x, vlanNet)

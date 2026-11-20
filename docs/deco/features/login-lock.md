@@ -249,7 +249,13 @@ port 2222 (`cmd/udeco-ap/sitessh.go`), as on a UniFi AP.
 
 ## Unverified on hardware
 
-Built and tested against fake runners only. Not yet seen on a unit:
+This list is the note's state on its date (2026-11-20), before the lock ran
+on a unit. The current status is the "Login lock" row of the
+[README](../../../README.md), which has the live run of the same day and
+names what is still open; where the two differ, the row is right.
+
+Built and tested against fake runners. Not seen on a unit when this was
+written:
 
 - the rules on the units' kernels: `-m conntrack` on the Garage (its
   `INPUT` has an ESTABLISHED rule, but which match it uses is not known; a

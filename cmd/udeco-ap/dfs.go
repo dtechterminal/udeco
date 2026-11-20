@@ -41,10 +41,13 @@ func (a *agent) radarOut() []bcmwifi.RadarEvent {
 	return q
 }
 
-// radarPayload is the EVT_AP_RadarDetected notification payload.
-func radarPayload(ev bcmwifi.RadarEvent, radioName string) map[string]any {
-	return map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": ev.Band, "radio_name": radioName,
-		"channel": ev.Channel, "freq": ev.FreqMHz}
+// radarPayload is the EVT_AP_RadarDetected notification payload, of
+// either platform (bcmwifi's radar moves here, mtkwifi's in garage.go):
+// the radio's band and radio_table name, the channel the radar was on and
+// its MHz.
+func radarPayload(band string, channel, freqMHz int, radioName string) map[string]any {
+	return map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": band, "radio_name": radioName,
+		"channel": channel, "freq": freqMHz}
 }
 
 // radarEvents puts the queued radar moves on the station-event queue
@@ -57,7 +60,7 @@ func (a *agent) radarEvents() {
 				name = r.Name
 			}
 		}
-		a.sta.push(radarPayload(ev, name))
+		a.sta.push(radarPayload(ev.Band, ev.Channel, ev.FreqMHz, name))
 	}
 }
 

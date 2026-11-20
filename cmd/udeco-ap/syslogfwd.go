@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/antoniocosta/unifi-openwrt/internal/snmpagent"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
@@ -85,9 +86,9 @@ func (a *agent) syslogFollow(ctx context.Context) {
 		in, _ := translate.IntentFromCfg(string(b))
 		if s := in.Syslog; s != nil {
 			want = syslogTarget{addr: net.JoinHostPort(s.Host, strconv.Itoa(s.Port)), encrypted: s.Encrypted, key: s.Key, level: s.Level,
-				host: a.x.Dev.Hostname, tag: fmt.Sprintf("%s,%s,%s:", a.x.Dev.Model, strings.ReplaceAll(strings.ToLower(a.x.Dev.MAC.String()), ":", ""), a.x.S.Version)}
+				host: a.x.Dev.Hostname, tag: device.SyslogTag(a.x.Dev.Model, a.x.Dev.MAC, a.x.S.Version)}
 			if want.host == "" {
-				want.host = "U6-Lite"
+				want.host = snmpagent.DefaultDescr
 			}
 			if s.Encrypted {
 				want.hashID = a.x.S.HashID
@@ -121,7 +122,7 @@ func (a *agent) logFollow(ctx context.Context) (io.ReadCloser, error) {
 	}
 	if a.cfg.jio() {
 		var own <-chan string
-		if a.cfg.Log != "syslog" {
+		if a.cfg.Log != logSyslog {
 			own = a.selfLog.attach()
 		}
 		rc := followFile(ctx, a.dev(jioLogPath), a.t.logPoll, own)
@@ -210,21 +211,17 @@ func (a *agent) forwardSyslogOnce(ctx context.Context, t syslogTarget) error {
 	stop := context.AfterFunc(ctx, func() { rc.Close() })
 	defer stop()
 	sc := bufio.NewScanner(rc)
-	sc.Buffer(make([]byte, 8192), 8192)
-	tokens, last := 100.0, time.Now()
+	sc.Buffer(make([]byte, device.SyslogLineMax), device.SyslogLineMax)
+	limit := device.NewSyslogLimiter(time.Now()) // device.SyslogRate lines/s, bursts of device.SyslogBurst
 	failed := false
 	for sc.Scan() {
 		line, sev, ok := uafSyslog(sc.Text(), t.host, t.tag)
 		if !ok || t.level > 0 && sev >= t.level {
 			continue
 		}
-		now := time.Now()
-		tokens = min(100, tokens+now.Sub(last).Seconds()*50) // 50 lines/s, bursts of 100
-		last = now
-		if tokens < 1 {
+		if !limit.Allow(time.Now()) {
 			continue
 		}
-		tokens--
 		b := []byte(line)
 		if t.encrypted {
 			if b, err = device.SealSyslog(t.key, t.hashID, b); err != nil {
@@ -264,8 +261,8 @@ func uafSyslog(line, host, tag string) (string, int, bool) {
 			continue
 		}
 		if fac, lvl, ok := strings.Cut(f[l.pri], "."); ok {
-			fv, fok := syslogFacilities[fac]
-			lv, lok := syslogSeverities[lvl]
+			fv, fok := device.SyslogFacility(fac)
+			lv, lok := device.SyslogSeverity(lvl)
 			if fok && lok {
 				rest := line
 				for i := 0; i < l.n; i++ { // drop the leading fields, keep the message's own spacing
@@ -282,10 +279,3 @@ func uafSyslog(line, host, tag string) (string, int, bool) {
 
 var syslogMonths = map[string]bool{"Jan": true, "Feb": true, "Mar": true, "Apr": true, "May": true, "Jun": true,
 	"Jul": true, "Aug": true, "Sep": true, "Oct": true, "Nov": true, "Dec": true}
-
-var syslogFacilities = map[string]int{"kern": 0, "user": 1, "mail": 2, "daemon": 3, "auth": 4, "syslog": 5,
-	"lpr": 6, "news": 7, "uucp": 8, "cron": 9, "authpriv": 10, "ftp": 11, "local0": 16, "local1": 17,
-	"local2": 18, "local3": 19, "local4": 20, "local5": 21, "local6": 22, "local7": 23}
-
-var syslogSeverities = map[string]int{"emerg": 0, "alert": 1, "crit": 2, "err": 3, "warn": 4, "warning": 4,
-	"notice": 5, "info": 6, "debug": 7}

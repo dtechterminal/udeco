@@ -43,6 +43,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // Runner executes a command and returns its stdout. Implementations apply
@@ -83,7 +85,7 @@ type Options struct {
 	// ConsoleIP is the only source allowed to reach SSHDPort (the agent's
 	// SSH-adopt listener). Empty leaves SSHDPort unfenced.
 	ConsoleIP string
-	// SSHDPort is the agent's SSH-adopt port; 0 means 2222.
+	// SSHDPort is the agent's SSH-adopt port; 0 means DefaultSSHDPort.
 	SSHDPort int
 	// LoopGuardFile is the agent's record (a device path, on ramfs) of the
 	// Ethernet ports its loop guard took out of LANDev, one "<port> <why>"
@@ -243,7 +245,7 @@ func New(o Options) *Manager {
 		o.Logf = func(string, ...any) {}
 	}
 	if o.LANDev == "" {
-		o.LANDev = "br-lan"
+		o.LANDev = unit.LANBridge
 	}
 	if o.SSHDPort == 0 {
 		o.SSHDPort = DefaultSSHDPort

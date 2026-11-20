@@ -1,0 +1,1 @@
+rm -f /etc/unifi-openwrt/mesh.conf; [ "$(uci -q get wireless.unifi_mesh)" = wifi-iface ] && { uci delete wireless.unifi_mesh; uci commit wireless; wifi reload; }; true

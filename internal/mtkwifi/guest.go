@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
 // Guest WLANs. The JCOW414 has ebtables with the filter table and the ip,
@@ -24,7 +24,8 @@ import (
 // guest reach DHCP, DNS, the gateway and the internet, never a LAN host,
 // and, with the portal on, only the allow-list and the portal until the
 // controller authorises it (UDECO-GAUTH). A guest SSID is served only with
-// a usable policy (the gateway's MAC and IP known).
+// a usable policy (the gateway's MAC and IP known). The chain names and the
+// jumps are bcmwifi's (GuestChainIn/Out/Auth, GuestJumps), as the rules are.
 //
 // The chains are built, policy DROP first, and the jumps added before a
 // guest SSID's netdev comes up; jumps of vifs that no longer carry a guest
@@ -77,20 +78,6 @@ func (a *Applier) loadGuestBuilt() guestBuilt {
 	return guestBuilt{vifs: strings.Fields(strings.TrimPrefix(first, "vifs")), rules: rest}
 }
 
-func guestJumps(vif string) [][]string {
-	return [][]string{
-		{"FORWARD", "-i", vif, "-j", chainGIn},
-		{"FORWARD", "-o", vif, "-j", chainGOut},
-		{"INPUT", "-i", vif, "-j", chainGIn},
-	}
-}
-
-const (
-	chainGIn   = "UDECO-GIN"
-	chainGOut  = "UDECO-GOUT"
-	chainGAuth = "UDECO-GAUTH"
-)
-
 func (a *Applier) eb(ctx context.Context, args ...string) error {
 	return a.run(ctx, "ebtables", args...)
 }
@@ -135,9 +122,9 @@ func (a *Applier) syncGuest(ctx context.Context, d *bcmwifi.Desired, want map[st
 		}
 		sort.Strings(keep)
 	}
-	chains := []string{chainGIn, chainGOut}
+	chains := []string{bcmwifi.GuestChainIn, bcmwifi.GuestChainOut}
 	if rules.Portal {
-		chains = append(chains, chainGAuth)
+		chains = append(chains, bcmwifi.GuestChainAuth)
 	}
 	ok := true
 	for _, c := range chains {
@@ -161,7 +148,7 @@ func (a *Applier) syncGuest(ctx context.Context, d *bcmwifi.Desired, want map[st
 		if ok && slices.Contains(cur.vifs, v) {
 			continue
 		}
-		for _, j := range guestJumps(v) {
+		for _, j := range bcmwifi.GuestJumps(v) {
 			_ = a.eb(ctx, append([]string{"-D"}, j...)...) // never twice
 			if err := a.eb(ctx, append([]string{"-I", j[0], "1"}, j[1:]...)...); err != nil {
 				return err
@@ -176,29 +163,29 @@ func (a *Applier) syncGuest(ctx context.Context, d *bcmwifi.Desired, want map[st
 		}
 		if rules.Portal {
 			for _, m := range a.loadGuestAuth() {
-				if err := a.eb(ctx, "-A", chainGAuth, "-s", m, "-j", "RETURN"); err != nil {
+				if err := a.eb(ctx, "-A", bcmwifi.GuestChainAuth, "-s", m, "-j", "RETURN"); err != nil {
 					return err
 				}
 			}
 		}
 		for _, x := range rules.In {
-			if err := a.eb(ctx, append([]string{"-A", chainGIn}, x...)...); err != nil {
+			if err := a.eb(ctx, append([]string{"-A", bcmwifi.GuestChainIn}, x...)...); err != nil {
 				return err
 			}
 		}
 		for _, x := range rules.Out {
-			if err := a.eb(ctx, append([]string{"-A", chainGOut}, x...)...); err != nil {
+			if err := a.eb(ctx, append([]string{"-A", bcmwifi.GuestChainOut}, x...)...); err != nil {
 				return err
 			}
 		}
 		if !rules.Portal && strings.HasPrefix(cur.rules, "portal true") {
-			_ = a.eb(ctx, "-F", chainGAuth)
-			_ = a.eb(ctx, "-X", chainGAuth)
+			_ = a.eb(ctx, "-F", bcmwifi.GuestChainAuth)
+			_ = a.eb(ctx, "-X", bcmwifi.GuestChainAuth)
 		}
 	}
 	for _, v := range cur.vifs {
 		if !slices.Contains(keep, v) {
-			for _, j := range guestJumps(v) {
+			for _, j := range bcmwifi.GuestJumps(v) {
 				_ = a.eb(ctx, append([]string{"-D"}, j...)...)
 			}
 		}
@@ -209,14 +196,14 @@ func (a *Applier) syncGuest(ctx context.Context, d *bcmwifi.Desired, want map[st
 // removeGuest takes the guest jumps and chains away.
 func (a *Applier) removeGuest(ctx context.Context, cur guestBuilt) error {
 	for _, v := range cur.vifs {
-		for _, j := range guestJumps(v) {
+		for _, j := range bcmwifi.GuestJumps(v) {
 			_ = a.eb(ctx, append([]string{"-D"}, j...)...)
 		}
 	}
-	for _, c := range []string{chainGIn, chainGOut, chainGAuth} {
+	for _, c := range []string{bcmwifi.GuestChainIn, bcmwifi.GuestChainOut, bcmwifi.GuestChainAuth} {
 		_ = a.eb(ctx, "-F", c)
 	}
-	for _, c := range []string{chainGIn, chainGOut, chainGAuth} {
+	for _, c := range []string{bcmwifi.GuestChainIn, bcmwifi.GuestChainOut, bcmwifi.GuestChainAuth} {
 		_ = a.eb(ctx, "-X", c)
 	}
 	err := os.Remove(a.dev(filepath.Join(a.o.RunDir, guestFile)))
@@ -247,11 +234,10 @@ func (a *Applier) UnauthorizeGuest(ctx context.Context, mac string) error {
 }
 
 func (a *Applier) setGuestAuth(ctx context.Context, mac string, on bool) error {
-	hw, err := net.ParseMAC(strings.TrimSpace(mac))
-	if err != nil || len(hw) != 6 {
+	m, err := wl.NormMAC(strings.TrimSpace(mac))
+	if err != nil {
 		return fmt.Errorf("mtkwifi: guest authorisation: bad MAC %q", mac)
 	}
-	m := hw.String()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	list := a.loadGuestAuth()
@@ -266,13 +252,13 @@ func (a *Applier) setGuestAuth(ctx context.Context, mac string, on bool) error {
 	if err := writeFile(a.dev(filepath.Join(a.o.RunDir, guestAuthFile)), []byte(strings.Join(list, "\n")), 0o600); err != nil {
 		return err
 	}
-	if strings.HasPrefix(a.loadGuestBuilt().rules, "portal true") && a.chainExists(ctx, chainGAuth) {
+	if strings.HasPrefix(a.loadGuestBuilt().rules, "portal true") && a.chainExists(ctx, bcmwifi.GuestChainAuth) {
 		op := "-A"
 		if !on {
 			op = "-D"
 		}
 		if on != had {
-			if err := a.eb(ctx, op, chainGAuth, "-s", m, "-j", "RETURN"); err != nil {
+			if err := a.eb(ctx, op, bcmwifi.GuestChainAuth, "-s", m, "-j", "RETURN"); err != nil {
 				return fmt.Errorf("mtkwifi: guest authorisation: %w", err)
 			}
 		}

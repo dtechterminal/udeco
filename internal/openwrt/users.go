@@ -9,13 +9,16 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
+// usersFile lists the logins the daemon added to the AP.
+const usersFile = ConfDir + "/users"
+
 // usersScript keeps /etc/passwd and /etc/shadow in line with the controller's
 // device logins. stdin: one "name:hash" per line. It only touches the users
-// it added itself (listed in /etc/unifi-openwrt/users); an existing account
+// it added itself (listed in usersFile); an existing account
 // it does not manage is never changed. Logins are uid 0 (UniFi's device
 // login is an admin login), shell /bin/ash.
 const usersScript = `set -e
-M=/etc/unifi-openwrt/users; mkdir -p /etc/unifi-openwrt; touch $M; chmod 600 $M
+M=` + usersFile + `; mkdir -p ` + ConfDir + `; touch $M; chmod 600 $M
 want=" "
 while IFS=: read -r n h; do
   [ -n "$n" ] || continue

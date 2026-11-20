@@ -35,8 +35,10 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
 	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/pathmon"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -122,22 +124,28 @@ type runner interface {
 	Run(ctx context.Context, name string, args ...string) ([]byte, error)
 }
 
-// Locations (device paths; Root is prepended).
+// Locations (device paths; Root is prepended). The run directory (ramfs:
+// lock, PID file, start log, the Wi-Fi backend's run files) is unit.RunDir.
 const (
-	defaultRunDir = "/tmp/udeco" // ramfs: lock, PID file, start log, bcmwifi run files
-	sessionSub    = "session"    // under the config's directory: state.json, system_cfg, keys (0700)
-	wifiStateSub  = "state"      // under the config's directory: bcmwifi last-good
-	eventsFile    = "events.log" // under the config's directory: rare-event ring (R13)
+	sessionSub   = "session"     // under the config's directory: state.json, system_cfg, keys (0700)
+	wifiStateSub = unit.StateSub // under the config's directory: bcmwifi last-good
+	eventsFile   = "events.log"  // under the config's directory: rare-event ring (R13)
 )
+
+// defaultJobTimeout bounds one Wi-Fi job, an apply with its rollback
+// included. The deploy scripts wait this long, and a margin, for a stopping
+// agent to finish the job it is in (WAIT_EXIT in deploy/lib.sh, held to
+// this by TestDeployWaitsForAJob).
+const defaultJobTimeout = 5 * time.Minute
 
 // timing holds the agent's waits; zero values take the defaults.
 type timing struct {
-	interval      time.Duration // inform interval until the controller sets one (10 s)
-	minWait       time.Duration // floor of the inform interval (1 s)
-	immediateWait time.Duration // after an "inform now" reply (500 ms)
+	interval      time.Duration // inform interval until the controller sets one (device.DefaultInformInterval)
+	minWait       time.Duration // floor of the inform interval (device.MinInformWait)
+	immediateWait time.Duration // after an "inform now" reply (device.ImmediateInformWait)
 	retryWait     time.Duration // no reading of the unit yet (5 s)
 	enforceEvery  time.Duration // decosys.Enforce, egress, Wi-Fi health (60 s)
-	jobTimeout    time.Duration // one Wi-Fi job, an apply with its rollback included (5 min)
+	jobTimeout    time.Duration // one Wi-Fi job, an apply with its rollback included (defaultJobTimeout)
 	collectTO     time.Duration // one collection (20 s)
 	scanTO        time.Duration // one band of a neighbour scan (60 s)
 	spectrumTO    time.Duration // one spectrum band: airtime gate (60 s) + Budget (45 s) + margin (2 min)
@@ -167,14 +175,14 @@ func (t *timing) fill() {
 			*d = v
 		}
 	}
-	def(&t.interval, 10*time.Second)
+	def(&t.interval, device.DefaultInformInterval)
 	def(&t.uplinkPoll, time.Second)
 	def(&t.gwProbe, gwProbeEvery)
-	def(&t.minWait, time.Second)
-	def(&t.immediateWait, 500*time.Millisecond)
+	def(&t.minWait, device.MinInformWait)
+	def(&t.immediateWait, device.ImmediateInformWait)
 	def(&t.retryWait, 5*time.Second)
 	def(&t.enforceEvery, 60*time.Second)
-	def(&t.jobTimeout, 5*time.Minute)
+	def(&t.jobTimeout, defaultJobTimeout)
 	def(&t.collectTO, 20*time.Second)
 	def(&t.scanTO, 60*time.Second)
 	def(&t.spectrumTO, 2*time.Minute)
@@ -221,7 +229,7 @@ type options struct {
 	garpSend     func(ifname string, frame []byte) error // nil = AF_PACKET (garp.go)
 	// logFollow streams the unit's log for remote syslog; nil = logread -f (syslogfwd.go)
 	logFollow func(context.Context) (io.ReadCloser, error)
-	// snmpListen opens the SNMP agent's socket; nil = UDP 0.0.0.0:161 (snmp.go)
+	// snmpListen opens the SNMP agent's socket; nil = UDP snmpagent.DefaultAddr (snmp.go)
 	snmpListen func(context.Context) (net.PacketConn, error)
 	// ftOpen opens the FT-SAE peer announcement sockets; nil = AF_PACKET (ftsae.go)
 	ftOpen ftpeer.Opener
@@ -357,7 +365,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		o.root = "/"
 	}
 	if o.runDir == "" {
-		o.runDir = defaultRunDir
+		o.runDir = unit.RunDir
 	}
 	if o.logf == nil {
 		o.logf = func(string, ...any) {}
@@ -427,8 +435,8 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 		return nil, err
 	}
 	os.Chmod(a.sessDir, 0o700)
-	a.statePath = filepath.Join(a.sessDir, "state.json")
-	a.sysCfgPath = filepath.Join(a.sessDir, "system_cfg.txt")
+	a.statePath = filepath.Join(a.sessDir, device.StateFile)
+	a.sysCfgPath = filepath.Join(a.sessDir, device.SystemCfgFile)
 	// the session directory is on flash (ubifs, mounted sync): keep few
 	// system_cfg versions
 	device.HistoryKeep = 5
@@ -666,7 +674,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	a.profile = p
 	a.radioCaps = map[string]apstate.RadioCaps{}
 	var radios []inform.Radio
-	for i, band := range []string{"ng", "na"} {
+	for i, band := range rf.Bands() {
 		rp, ok := p.Radios[band]
 		if !ok {
 			continue
@@ -677,7 +685,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 			rc.HasDFS = true // 52-64 (mtkwifi dfs.go); has_fccdfs is the US rules', not IN's
 		}
 		a.radioCaps[band] = rc
-		radios = append(radios, inform.Radio{Name: fmt.Sprintf("wifi%d", i), Radio: band, Channel: "auto",
+		radios = append(radios, inform.Radio{Name: translate.PositionalRadioName(i), Radio: band, Channel: "auto",
 			MinTxpower: rp.MinTx, MaxTxpower: rp.MaxTx, NSS: rp.NSS, BuiltinAnt: true})
 	}
 
@@ -696,7 +704,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 		Dev: inform.Device{MAC: mac, IP: s.IP, Netmask: s.Netmask, Gateway: s.Gateway, Hostname: s.Hostname,
 			Model: p.Model, ModelDisplay: p.Display, Radios: radios},
 	}
-	a.x.Unhandled, a.x.KnownSection = device.OpenLedger(filepath.Join(a.sessDir, "unhandled.json")), translate.Handled
+	a.x.Unhandled, a.x.KnownSection = device.OpenLedger(filepath.Join(a.sessDir, device.UnhandledFile)), translate.Handled
 	// radio names: ra0/rai0, or wifi0/wifi1 kept for an earlier adoption
 	// (radionames.go)
 	if chooseRadioNames(&a.x.S, found) {
@@ -814,7 +822,7 @@ func (a *agent) startSSH() error {
 	a.sa = &device.SSHAdopt{
 		Listen:    net.JoinHostPort(host, strconv.Itoa(a.cfg.SSHDPort)),
 		AllowFrom: []string{a.cfg.ConsoleIP},
-		HostKey:   filepath.Join(a.sessDir, "ssh_host_ed25519.pem"),
+		HostKey:   filepath.Join(a.sessDir, device.SSHHostKeyFile),
 		Requests:  a.adopt,
 		Auth:      a.sshAuth,
 		Site:      a.siteSSHOptions(),
@@ -884,7 +892,7 @@ func (a *agent) loop(ctx context.Context) {
 		}
 		if errs > 0 {
 			// like a real AP: keep informing, further and further apart
-			wait = min(max(interval, 5*time.Second)*time.Duration(1<<min(errs-1, 4)), time.Minute)
+			wait = device.InformBackoff(interval, errs)
 		}
 		// a port change waits for an answered inform (ports.go): no
 		// backing off past portsRetry until it has one
@@ -1056,8 +1064,17 @@ func (a *agent) guestAuthorized(s *apstate.Snapshot, now time.Time) map[string]b
 	return m
 }
 
-// informOnce sends one inform and handles the answer (cmd/udeco/runner.go
-// informOnce). ok=false counts as a bad answer.
+// informOnce sends one inform and handles the answer. ok=false counts as
+// a bad answer.
+//
+// It follows device.InformOnce (the inform of cmd/udeco and cmd/uow) step
+// by step, with the same log lines, and is kept apart from it because the
+// agent runs on the unit itself and is stricter: a reply must decode with
+// the key the inform was sealed with (no second try with the factory
+// key), an unencrypted reply is refused, the POST is the agent's own
+// client under ctx (post.go), and the reply feeds the agent's hooks (the
+// controller's clock, the login lock, the port monitor). A change of the
+// status or reply handling there is one to make here too.
 func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 	x := a.x
 	start := a.o.now() // a port change finished before this is confirmed by its reply (ports.go)

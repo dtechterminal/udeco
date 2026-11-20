@@ -250,7 +250,8 @@ func (h *host) load() ([3]float64, bool) {
 	return l, true
 }
 
-// meminfo is /proc/meminfo in kB.
+// meminfo is /proc/meminfo in kB (internal/wl's parseMeminfo reads the same
+// file in bytes for the inform; this package does not link the collectors).
 func (h *host) meminfo() map[string]int64 {
 	m := map[string]int64{}
 	for _, line := range strings.Split(h.readString("/proc/meminfo"), "\n") {

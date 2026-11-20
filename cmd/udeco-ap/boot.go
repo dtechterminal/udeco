@@ -24,6 +24,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 )
@@ -65,10 +67,7 @@ func acquireLock(runDir string) (*instanceLock, error) {
 	f.Truncate(0)
 	f.WriteAt(pid, 0)
 	l := &instanceLock{f: f, pidPath: filepath.Join(runDir, "udeco-ap.pid")}
-	tmp := l.pidPath + ".tmp"
-	if os.WriteFile(tmp, pid, 0o644) == nil {
-		os.Rename(tmp, l.pidPath)
-	}
+	atomicfile.Write(l.pidPath, l.pidPath+".tmp", pid, 0o644) // for scripts: the lock does not depend on it
 	return l, nil
 }
 
@@ -129,11 +128,7 @@ func readUptime(root string) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	f := strings.Fields(string(b))
-	if len(f) == 0 {
-		return 0, errors.New("empty /proc/uptime")
-	}
-	return strconv.ParseFloat(f[0], 64)
+	return apstate.ParseUptime(string(b))
 }
 
 // Crash-loop guard (agent-design.md §3.6): persist_shell.sh restarts the
@@ -459,11 +454,7 @@ func (e *eventLog) add(msg string) {
 		}
 	}
 	os.MkdirAll(filepath.Dir(e.path), 0o700)
-	tmp := e.path + ".tmp"
-	err := os.WriteFile(tmp, b, 0o600)
-	if err == nil {
-		err = os.Rename(tmp, e.path)
-	}
+	err := atomicfile.Write(e.path, e.path+".tmp", b, 0o600)
 	if err != nil && !e.failed {
 		e.logf("event log %s: %v", e.path, err)
 		e.failed = true

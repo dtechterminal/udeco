@@ -2,7 +2,11 @@
 
 package models
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+)
 
 func TestCatalog(t *testing.T) {
 	m, ok := Lookup("u7pg2")
@@ -132,8 +136,10 @@ func TestDecoAgentProfile(t *testing.T) {
 	if all.Radios["ng"].RadioCaps2 != RadioCap2WPA3 || all.Radios["na"].RadioCaps2 != RadioCap2WPA3 {
 		t.Errorf("WPA3 feature: radios %+v", all.Radios)
 	}
-	if p, _ := DecoAgentProfile(m, map[string]bool{"ng": false, "na": false}); p.Radios["ng"].IEEEModes != 10 || p.Radios["na"].IEEEModes != 21 {
-		t.Errorf("non-ax radios: %+v", p.Radios)
+	// a radio that is not 802.11ax reports the measured U7PG2's word
+	u7 := inform.U7PG2.Radios
+	if p, _ := DecoAgentProfile(m, map[string]bool{"ng": false, "na": false}); p.Radios["ng"].IEEEModes != u7["ng"].IEEEModes || p.Radios["na"].IEEEModes != u7["na"].IEEEModes {
+		t.Errorf("non-ax radios: %+v, want the U7PG2's ieee_modes %d and %d", p.Radios, u7["ng"].IEEEModes, u7["na"].IEEEModes)
 	}
 	if p, _ := DecoAgentProfileWith(m, nil, DecoAgentFeatures{BandSteer: true}); p.WifiCaps != 131072|4 {
 		t.Errorf("band steering: wifi_caps %d", p.WifiCaps)
@@ -184,7 +190,7 @@ func TestU7LTAgentProfile(t *testing.T) {
 	if !ok || p.WifiCaps&WifiCapWPA3 != 0 {
 		t.Fatalf("profile ok=%v wifi_caps %#x", ok, p.WifiCaps)
 	}
-	if p.Radios["ng"].IEEEModes != decoAgentIEEEModesNGn || p.Radios["na"].IEEEModes != decoAgentIEEEModesNAn || !p.Radios["na"].Is11ac {
+	if p.Radios["ng"].IEEEModes != nonAXIEEEModes("ng") || p.Radios["na"].IEEEModes != nonAXIEEEModes("na") || !p.Radios["na"].Is11ac {
 		t.Errorf("radios %+v", p.Radios)
 	}
 	p, _ = DecoAgentProfileWith(m, heAX, DecoAgentFeatures{WPA3: true})
@@ -210,13 +216,19 @@ func TestUHDIWAgentProfile(t *testing.T) {
 	if !ok || p.Model != "UHDIW" || p.WifiCaps != WifiCapLockAP || p.FWCaps&(FWCapQCASwitch|FWCapOWRTSwitch) != 0 {
 		t.Fatalf("profile ok=%v model %s wifi_caps %#x fw_caps %#x", ok, p.Model, p.WifiCaps, p.FWCaps)
 	}
-	for b, max := range map[string]int{"ng": 20, "na": 23} {
+	// the unit's own power (JCOW414MaxTx, the source of mtkwifi's layout
+	// too), not the UAP-IW-HD's larger catalogue maximum
+	for _, cr := range m.Radios {
+		b, max := cr.Band, JCOW414MaxTx(cr.Band)
 		r := p.Radios[b]
+		if max <= 0 || max > cr.MaxTx {
+			t.Errorf("%s: the unit's %d dBm is not below the catalogue's %d: nothing is capped", b, max, cr.MaxTx)
+		}
 		if r.NSS != 2 || r.RadioCaps != RadioCapMIMO2 || r.MaxTx != max {
 			t.Errorf("%s: nss %d radio_caps %#x max_tx %d, want 2x2 and %d dBm", b, r.NSS, r.RadioCaps, r.MaxTx, max)
 		}
 	}
-	if p.Radios["na"].IEEEModes != decoAgentIEEEModesNAn || p.Radios["ng"].IEEEModes != decoAgentIEEEModesNGn {
+	if p.Radios["na"].IEEEModes != nonAXIEEEModes("na") || p.Radios["ng"].IEEEModes != nonAXIEEEModes("ng") {
 		t.Errorf("ieee modes %+v", p.Radios)
 	}
 	p, _ = DecoAgentProfileWith(m, heAX, DecoAgentFeatures{WPA3: true, PortVLAN: true})

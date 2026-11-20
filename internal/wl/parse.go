@@ -98,8 +98,31 @@ func parseWPAAuth(b []byte) string {
 	return strings.Join(parts, "+")
 }
 
+// ParseCountry reads `wl country` ("US (US/0) UNITED STATES"): the code
+// ("US") and the regulatory revision (0); rev is -1 when the output does
+// not give one. It is the one reader of that output.
+func ParseCountry(s string) (code string, rev int) {
+	rev = -1
+	f := strings.Fields(s)
+	if len(f) == 0 {
+		return "", rev
+	}
+	if len(f) > 1 && strings.HasPrefix(f[1], "(") {
+		in := strings.Trim(f[1], "()")
+		if i := strings.IndexByte(in, '/'); i >= 0 {
+			if r, err := strconv.Atoi(in[i+1:]); err == nil {
+				rev = r
+			}
+		}
+	}
+	return f[0], rev
+}
+
 // parseCountry reads `wl country` ("US (US/0) UNITED STATES") -> "US".
-func parseCountry(b []byte) string { return firstField(b) }
+func parseCountry(b []byte) string {
+	code, _ := ParseCountry(string(b))
+	return code
+}
 
 // firstField returns the first whitespace-separated token of b.
 func firstField(b []byte) string {
@@ -460,7 +483,7 @@ func staHeader(t string) (string, bool) {
 		return "", false
 	}
 	mac := strings.TrimSuffix(strings.TrimSpace(rest), ":")
-	hw, err := netParseMAC(mac)
+	hw, err := NormMAC(mac)
 	if err != nil {
 		return "", false
 	}

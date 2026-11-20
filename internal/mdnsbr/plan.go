@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // Env is the unit as the planner needs it (the agent reads it from its
@@ -23,20 +25,19 @@ type Env struct {
 // LocalBridge is the bridge bcmwifi builds for a VLAN (1 = untagged).
 func LocalBridge(vlan int) string {
 	if vlan <= 1 {
-		return "br-lan"
+		return unit.LANBridge
 	}
-	return "br-v" + strconv.Itoa(vlan)
+	return unit.VLANBridge(vlan)
 }
 
-// localVLAN is the VLAN of a local bridge name (ok false for other names).
+// localVLAN is the VLAN of a local bridge name (ok false for other names:
+// a VLAN bridge counts only as LocalBridge names it, for VLANs 2-4094).
 func localVLAN(br string) (int, bool) {
-	if br == "br-lan" {
+	if br == unit.LANBridge {
 		return 1, true
 	}
-	if s, ok := strings.CutPrefix(br, "br-v"); ok {
-		if v, err := strconv.Atoi(s); err == nil && v >= 2 && v <= 4094 && strconv.Itoa(v) == s {
-			return v, true
-		}
+	if v, ok := unit.ParseVLANBridge(br); ok && v >= 2 && v <= 4094 && unit.VLANBridge(v) == br {
+		return v, true
 	}
 	return 0, false
 }
@@ -150,7 +151,7 @@ func BuildPlan(c Config, env Env) (Plan, []string) {
 			switch {
 			case c.APMode:
 				note("VLAN %d has no bridge here and AP mode takes no wired mDNS: nothing to bridge from it", v)
-			case env.Uplink == "" || !ifRE.MatchString(env.Uplink):
+			case env.Uplink == "" || !devRE.MatchString(env.Uplink):
 				note("VLAN %d has no bridge here and the uplink is not known: not bridged", v)
 			default:
 				addPort(Port{Name: env.Uplink, VID: v, VLAN: v})
@@ -159,7 +160,7 @@ func BuildPlan(c Config, env Env) (Plan, []string) {
 		}
 		for _, x := range ports {
 			switch {
-			case !ifRE.MatchString(x), env.Guest[x]:
+			case !devRE.MatchString(x), env.Guest[x]:
 				continue
 			case env.Vifs[x]:
 				addPort(Port{Name: x, VLAN: v, Vif: true})

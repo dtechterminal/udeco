@@ -27,6 +27,10 @@ import (
 const (
 	appTimeoutDefault = 30 * time.Second
 	appTimeoutSlack   = 15 * time.Second
+	// DefaultRequestTimeout is the app's budget for a request without a
+	// timeout of its own (45 s): what a Client and the Mesh give a request
+	// when their config does not say.
+	DefaultRequestTimeout = appTimeoutDefault + appTimeoutSlack
 )
 
 var appTimeouts = map[uint16]time.Duration{
@@ -38,7 +42,7 @@ var appTimeouts = map[uint16]time.Duration{
 }
 
 // AppRequestTimeout is how long the app waits for opcode's whole request:
-// 45 s by default, 75 s for the client list.
+// DefaultRequestTimeout (45 s), 75 s for the client list.
 func AppRequestTimeout(opcode uint16) time.Duration {
 	t, ok := appTimeouts[opcode]
 	if !ok {

@@ -56,7 +56,7 @@ REV2: T1, T2, T3, T5, T7, T8 and a lite T4 have now run (§12 has the status of 
 | Failure | Keep the old table and its growing age, and set `abnormal`. Never send a fresh empty table. | [D] CE §6 |
 | Safeguards | Defer while our own airtime is above 30 %. Abort the band if a client drops. Skip a radio that carries a wireless uplink. One radio at a time. `scanabort` on cancel. REV2: own airtime from `cca_get_stats -c 0 -s 5`; no `wl chanspec` read is published while a band runs. | [A]; REV2: inputs [M] (T5, T7) |
 | Storage | In memory, mirrored to `/tmp/udeco/rftable_<radio>.json` (≤ 4 kB each, atomic rename, stamped with boot ID and uptime). Nothing on flash. | [A] |
-| Modes | Takeover: scan. Observe: no scans by default; opt-in `observe_scans` for testing, since acsd2 coexists but loses its chanim records. | [M]/[A]; REV2: chanim with acsd2 **stopped** still untested (T6) |
+| Modes | Takeover: scan. Observe: no scans. An opt-in `observe_scans` for testing was planned, since acsd2 coexists but loses its chanim records; it was never built (the agent's config has no such key and refuses it as unknown). | [M]/[A]; REV2: chanim with acsd2 **stopped** still untested (T6) |
 
 ---
 
@@ -558,7 +558,7 @@ REV2: and now on both radios: no scan-caused drop in 3 wl1 sweeps, about 60 sing
      - Abort on the first drop only when it follows an off-channel call within 2 s. Otherwise allow one unexplained drop per band before aborting.
      - Log each drop with its timing relative to the last call, so T4 can tell scan-caused drops from background churn.
      - REV2: **adopted.** Background churn is measured on 5 GHz too: two wl13 clients left during the session while no off-channel call was running on wl1 (one 150-220 s after the last one, the other while only reads ran), and one of them looks like a device switching between two MACs [M §2.3]. Under the old "any MAC gone" rule, a band running at that moment would have aborted for nothing.
-   - VERIFIER: the starting set is `userVAPs` only, so the backhaul vif (`wlX1`, dwds) is not watched. Under takeover it is down (agent-design §1), so this is fine there. With `observe_scans` on a unit whose `wlX1` has peers (a wireless child Deco), scanning that radio cuts the child's backhaul. Treat "`wlX1` has associated peers" like a wireless uplink (§8.4) and skip the radio.
+   - VERIFIER: the starting set is `userVAPs` only, so the backhaul vif (`wlX1`, dwds) is not watched. Under takeover it is down (agent-design §1), so this is fine there. With `observe_scans` (never built, §10) on a unit whose `wlX1` has peers (a wireless child Deco), scanning that radio would cut the child's backhaul. Treat "`wlX1` has associated peers" like a wireless uplink (§8.4) and skip the radio.
 3. **Interleave.** At most one channel per call, at least `HomeGap` back home between calls, at most about 140 ms off in a row (§3.2). The fallback sweep is about 0.6 s off per pass with 10 s between passes (§3.3).
    - REV2 [M T3, T4, T7]: chunked: 107-145 ms per call on average, **up to about 0.25 s**, 16-20 % duty. Fallback sweep (`-p 110`): stretches of up to about 0.25 s with 30-60 ms home visits, about 80 % duty for 1.3-1.6 s, 10 s between passes. On 5 GHz, pass 2 skips unmeasured channels, which removes 5 of 16 off-channel calls on .205 (§3.2).
 4. **Wireless uplink.**
@@ -610,7 +610,7 @@ REV2: and now on both radios: no scan-caused drop in 3 wl1 sweeps, about 60 sing
   - Observe mode promises "nothing on the unit changes".
   - Our scan replaces acsd2's chanim records (1-5 and 8 were gone after the first scan) [M], which feeds TP-Link's own channel logic with our data.
   - The controller cannot apply a channel in observe mode anyway, so the table would buy nothing.
-- Opt-in for testing: config key `observe_scans` (bool, default false; the config rejects unknown keys, so it must be added to `config.go`) [A].
+- Opt-in for testing: config key `observe_scans` (bool, default false; the config rejects unknown keys, so it must be added to `config.go`) [A]. **Never built:** `cmd/udeco-ap/config.go` has no such key, so a config that sets it is refused as an unknown key, and observe mode runs no scans. The rest of this bullet is the plan as it was written.
   - When it is set, the same code runs.
   - "Busy" from `wl scan` (acsd2 scanning) is retried (§3.2 step 2).
   - Measured: 7 sweeps beside a live acsd2, with no client drop and no acsd2 rescan within 60 s [M].
@@ -753,14 +753,14 @@ Changes to existing code:
   - `quick-scan:<band>:<bw>` → `quickScan`.
   - `spectrum-scan` → `manualSpectrum`.
   - `scan` keeps the neighbour scan.
-  - Observe mode runs scans only when `observe_scans` is set.
+  - Observe mode runs scans only when `observe_scans` is set. (`observe_scans` was never built: observe mode runs no scans.)
   - The "wl scans every channel" log line goes.
 - `scan.go`:
   - `merge` no longer sets `spectrum_table` or `spectrum_scanning`. `spectrumState.merge` does.
   - `quickscan_scanning` is added only while true.
   - The quick-scan BSS list still refreshes `scan_table` through `KeepSeen`.
 - `wifi.go`: `health` returns early while a spectrum band is SCANNING (§8.7). REV2: it waits for the band instead of skipping (§8.7); `bss`/PING are unaffected by a scan [M T7].
-- `config.go`: `observe_scans` (bool).
+- `config.go`: `observe_scans` (bool). Never built: the key does not exist.
 
 ### 11.4 Fixtures: `internal/wl/testdata/spectrum/`
 

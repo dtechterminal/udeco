@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // Minimum data rate and beacon rate per BSS (Options.MinRates).
@@ -68,13 +71,10 @@ func rateToken(half int, basic bool) string {
 }
 
 // RateOpts are the rest of a band's minimum-rate setting (the controller's
-// beacon_rate and minrate_cck_rates.status; translate.MinRateOpts).
-type RateOpts struct {
-	// BeaconKbps is the beacon/management rate; 0 = the minimum.
-	BeaconKbps int
-	// NoCCK drops the 802.11b rates (1, 2, 5.5, 11 Mb/s) on 2.4 GHz.
-	NoCCK bool
-}
+// beacon_rate and minrate_cck_rates.status): translate's type. BeaconKbps
+// is the beacon/management rate (0 = the minimum); NoCCK drops the 802.11b
+// rates (1, 2, 5.5, 11 Mb/s) on 2.4 GHz.
+type RateOpts = translate.MinRateOpts
 
 // ssidRateset is the wl rateset for s on band (Options.MinRates): its
 // minimum-rate set, or the band's TP-Link default when s has no minimum
@@ -85,12 +85,12 @@ type RateOpts struct {
 func ssidRateset(s SSID, band string) (args []string, note string) {
 	kbps, o := 0, RateOpts{}
 	for k, v := range s.MinRateKbps {
-		if normBand(k) == band && v > 0 {
+		if rf.Norm(k) == band && v > 0 {
 			kbps = v
 		}
 	}
 	for k, v := range s.MinRateOpts {
-		if normBand(k) == band {
+		if rf.Norm(k) == band {
 			o = v
 		}
 	}

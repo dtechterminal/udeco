@@ -169,7 +169,7 @@ func parseScanResults(b []byte, band string) []apstate.BSS {
 			}
 		case strings.HasPrefix(t, "BSSID: "):
 			f := strings.Fields(t)
-			if mac, err := netParseMAC(f[1]); err == nil {
+			if mac, err := NormMAC(f[1]); err == nil {
 				cur.BSSID = mac
 			}
 			if _, capText, ok := strings.Cut(t, "Capability:"); ok {

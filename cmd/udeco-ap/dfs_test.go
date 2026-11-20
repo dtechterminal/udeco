@@ -19,7 +19,7 @@ func TestRadarEvent(t *testing.T) {
 	if len(evs) != 1 || len(a.radarOut()) != 0 {
 		t.Fatalf("queue %+v", evs)
 	}
-	p := radarPayload(evs[0], "wifi1")
+	p := radarPayload(evs[0].Band, evs[0].Channel, evs[0].FreqMHz, "wifi1")
 	want := map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": "na", "radio_name": "wifi1", "channel": 100, "freq": 5500}
 	for k, v := range want {
 		if p[k] != v {

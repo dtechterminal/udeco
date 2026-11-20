@@ -43,6 +43,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -112,6 +113,14 @@ func (a *agent) quickScan(ctx context.Context, band string, bw int) {
 	a.wakeLoop() // quickscan_scanning
 }
 
+// bands5GFirst are the unit's bands with 5 GHz first: the order a real AP
+// runs a spectrum scan in.
+func bands5GFirst() []string {
+	b := rf.Bands()
+	slices.Reverse(b)
+	return b
+}
+
 // spectrumScan is `cmd spectrum-scan` (loop goroutine; the scan runs in the
 // background).
 func (a *agent) spectrumScan(ctx context.Context) {
@@ -124,7 +133,7 @@ func (a *agent) spectrumScan(ctx context.Context) {
 		a.logf("%s: skipped, %s", what, why)
 		return
 	}
-	bands := []string{"na", "ng"} // 5 GHz first, as the real AP
+	bands := bands5GFirst()
 	// how each band runs: its spectrum runner, else the neighbour survey
 	// (site_survey), else nothing
 	var runners, surveys []string

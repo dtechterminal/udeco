@@ -9,10 +9,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/repotest"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // deploy/deco-ap.sh, judged without a device: --preflight-file feeds the
@@ -110,7 +112,7 @@ func TestDeployPreflight(t *testing.T) {
 // The script changes /data/persist_shell.sh only under --edit-persist; by
 // default it prints the one line to approve.
 func TestDeployPersistOnlyWithFlag(t *testing.T) {
-	b := string(readFixture(t, "../../deploy", "deco-ap.sh"))
+	b := repotest.Read(t, decoDeploy)
 	i := strings.Index(b, `elif [ "$edit_persist" = 1 ]; then`)
 	j := strings.Index(b[i:], "\nelse\n")
 	if i < 0 || j < 0 {
@@ -127,32 +129,30 @@ func TestDeployPersistOnlyWithFlag(t *testing.T) {
 			}
 		}
 	}
+	// the line itself, the documents that quote it and the rollback that
+	// deletes it: TestDeploySuperviseLine
 	if !strings.Contains(b[i+j:], `echo "$LINE"`) {
 		t.Error("the default branch does not print the line to approve")
 	}
-	m := regexp.MustCompile(`(?m)^LINE="(.*)"$`).FindStringSubmatch(b)
-	if m == nil || !strings.Contains(m[1], "sh $START") || !strings.Contains(m[1], "$MARK") {
-		t.Errorf("supervise line %v", m)
-	}
 }
 
-// launcher renders deploy/deco-ap.sh's start.sh with the unit's paths
-// moved under root.
+// launcher renders the start.sh deploy/deco-ap.sh writes on a unit (its
+// LAUNCH template, as the shell expands it), with the unit's paths, which
+// are the script's own, moved under root ("" for the unit's). The tests
+// that run it find its files under root by internal/unit's names;
+// TestUnitLayout holds the script's paths to those.
 func launcher(t *testing.T, root string) string {
 	t.Helper()
-	b := string(readFixture(t, "../../deploy", "deco-ap.sh"))
-	m := regexp.MustCompile(`(?s)<<'LAUNCH'\n(.*?)\nLAUNCH\n`).FindStringSubmatch(b)
-	if m == nil {
-		t.Fatal("no launcher in deploy/deco-ap.sh")
+	paths := scriptVars(t, decoDeploy, "DIR", "BIN", "GZ", "SUM", "START", "RAMDIR", "CFG")
+	under := map[string]string{}
+	for _, n := range []string{"DIR", "BIN", "GZ", "SUM", "START", "RAMDIR", "CFG"} {
+		under[n] = root + paths[n]
 	}
-	s := strings.ReplaceAll(m[1], `\$`, "\x00")
-	s = strings.NewReplacer(
-		"$RAMDIR", root+"/tmp/udeco-bin", "$BIN", root+"/tp_data/udeco/udeco-ap", "$GZ", root+"/tp_data/udeco/udeco-ap.gz",
-		"$SUM", root+"/tp_data/udeco/udeco-ap.md5", "$CFG", root+"/tp_data/udeco/udeco-ap.json").Replace(s)
-	if strings.Contains(s, "$") {
-		t.Fatalf("unexpanded variable in the launcher:\n%s", s)
+	text, unknown := repotest.HeredocText(repotest.Heredoc(t, repotest.Read(t, decoDeploy), "LAUNCH"), under)
+	if len(unknown) != 0 {
+		t.Fatalf("the launcher uses %q, which are not paths of deploy/deco-ap.sh this test knows:\n%s", unknown, text)
 	}
-	return strings.ReplaceAll(s, "\x00", "$")
+	return text + "\n"
 }
 
 // The launcher unpacks a gzip-shipped agent to ramfs, checks it against
@@ -164,10 +164,10 @@ func TestDeployLauncher(t *testing.T) {
 		t.Skip("no sh")
 	}
 	root := t.TempDir()
-	dir := filepath.Join(root, "tp_data/udeco")
-	ram := filepath.Join(root, "tmp/udeco-bin")
+	dir := filepath.Join(root, unit.DecoDir)
+	ram := filepath.Join(root, unit.RAMDir)
 	bin := filepath.Join(root, "bin")
-	for _, d := range []string{dir, filepath.Join(root, "tmp"), bin} {
+	for _, d := range []string{dir, filepath.Dir(ram), bin} {
 		os.MkdirAll(d, 0o755)
 	}
 	// fake pidof (FAKE_RUNNING=1: an agent runs) and, where the host has

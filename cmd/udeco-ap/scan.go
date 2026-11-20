@@ -49,6 +49,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -375,7 +376,7 @@ func spectrumRows(t map[int][]wl.SpectrumRow) []map[string]any {
 }
 
 // defaultNoise stands in for an unknown radio noise floor (dBm).
-const defaultNoise = -95
+const defaultNoise = rf.NoiseFloorDBm
 
 // u6ScanRows adds the U6 Pro's scan_table keys and its rssi convention to
 // apstate.ScanTable rows (noise 0 = unknown).

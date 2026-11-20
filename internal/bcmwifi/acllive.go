@@ -69,8 +69,8 @@ func (a *Applier) planACLLive(primary string, conf []byte, drv []vifDriver, file
 		return nil
 	}
 	var sets []confSet
-	if !a.sameConf(confPath(run, primary), conf) {
-		old, err := a.readFile(confPath(run, primary))
+	if !a.sameConf(ConfPath(run, primary), conf) {
+		old, err := a.readFile(ConfPath(run, primary))
 		if err != nil {
 			return nil
 		}
@@ -89,7 +89,7 @@ func (a *Applier) planACLLive(primary string, conf []byte, drv []vifDriver, file
 	}
 	l := &aclLive{prev: map[string]vifDriver{}, paths: map[string]bool{drvPath(run, primary): true}}
 	if len(sets) > 0 {
-		l.paths[confPath(run, primary)] = true
+		l.paths[ConfPath(run, primary)] = true
 	}
 	changed := len(sets) > 0
 	var settings []Step
@@ -115,7 +115,7 @@ func (a *Applier) planACLLive(primary string, conf []byte, drv []vifDriver, file
 	}
 	for _, f := range files {
 		switch {
-		case f.Kind == StepWrite && f.Path == confPath(run, primary) && len(sets) == 0:
+		case f.Kind == StepWrite && f.Path == ConfPath(run, primary) && len(sets) == 0:
 			// unchanged (checked above)
 		case !l.paths[f.Path]:
 			return nil // a file this update does not own: full reconcile

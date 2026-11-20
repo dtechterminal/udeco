@@ -5,7 +5,6 @@ package mdnsbr
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 )
@@ -37,8 +36,6 @@ const ChainName = "UDECO-MDNS"
 type Runner interface {
 	Run(ctx context.Context, name string, args ...string) ([]byte, error)
 }
-
-var ifRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,14}$`)
 
 var chainRules = [][]string{
 	{"-p", "IPv4", "--ip-dst", "224.0.0.251", "--ip-proto", "udp", "--ip-dport", "5353", "-j", "DROP"},
@@ -113,7 +110,7 @@ func (x *Interceptor) chainOK(ctx context.Context) (exists, ok bool) {
 func (x *Interceptor) Set(ctx context.Context, vifs []string) error {
 	want := map[string]bool{}
 	for _, v := range vifs {
-		if !ifRE.MatchString(v) {
+		if !devRE.MatchString(v) {
 			return fmt.Errorf("mdns bridge: %q is not an interface name", v)
 		}
 		want[v] = true

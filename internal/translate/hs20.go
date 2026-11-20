@@ -4,7 +4,7 @@ package translate
 
 import (
 	"regexp"
-	"strings"
+	"slices"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/hs20"
 )
@@ -39,12 +39,8 @@ func init() {
 // WLAN that is not WPA-Enterprise (hostapd refuses hs20=1 without
 // WPA2-Enterprise/CCMP), or a part that would leave it weaker if dropped.
 func wlanHotspot2(cfg Cfg, w, a string, x *WLANIntent, note func(string, ...any)) string {
-	for _, m := range indices(cfg, strings.TrimSuffix(a, ".")+".wpa.key") {
-		for _, k := range strings.Fields(cfg[a+"wpa.key."+m+".mgmt"]) {
-			if k == "OSEN" {
-				return "OSEN (Hotspot 2.0 online sign-up security) is not supported"
-			}
-		}
+	if slices.Contains(wpaKeyMgmt(cfg, a, wpaKeySent(cfg, a)), "OSEN") {
+		return "OSEN (Hotspot 2.0 online sign-up security) is not supported"
 	}
 	c, notes, off := hs20.Parse(cfg, a, w)
 	for _, n := range notes {
@@ -56,7 +52,7 @@ func wlanHotspot2(cfg Cfg, w, a string, x *WLANIntent, note func(string, ...any)
 	if c == nil {
 		return ""
 	}
-	if x.Security != "wpa2-enterprise" && x.Security != "wpa3-enterprise" {
+	if x.Security != SecWPA2Ent && x.Security != SecWPA3Ent {
 		return "Hotspot 2.0 needs WPA-Enterprise (security here: " + x.Security + ")"
 	}
 	x.Hotspot2 = c

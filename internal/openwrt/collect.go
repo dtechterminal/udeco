@@ -12,6 +12,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"math/bits"
 	"net"
@@ -25,6 +26,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 )
 
 // Target is how to reach the AP.
@@ -33,6 +36,27 @@ type Target struct {
 	User       string
 	KeyFile    string // private key (the daemon's own)
 	KnownHosts string // known_hosts file with the AP's host key
+}
+
+// What the tools that reach an AP over SSH take when nothing is given
+// (cmd/owctl, cmd/owplan, cmd/owprobe; cmd/uow's -ap-user, -ap-key and
+// -ap-known-hosts).
+const (
+	DefaultAddr       = "192.168.1.2:22"
+	DefaultUser       = "root"
+	DefaultKeyFile    = "ap_ed25519"
+	DefaultKnownHosts = "ap_known_hosts"
+)
+
+// TargetFlags registers -addr, -user, -key and -known-hosts on fs and
+// returns the Target they fill when fs is parsed.
+func TargetFlags(fs *flag.FlagSet) *Target {
+	t := &Target{}
+	fs.StringVar(&t.Addr, "addr", DefaultAddr, "AP ssh address")
+	fs.StringVar(&t.User, "user", DefaultUser, "ssh user")
+	fs.StringVar(&t.KeyFile, "key", DefaultKeyFile, "ssh private key for the AP")
+	fs.StringVar(&t.KnownHosts, "known-hosts", DefaultKnownHosts, "known_hosts file with the AP's host key")
+	return t
 }
 
 type Client struct {
@@ -113,7 +137,10 @@ func (cl *Client) Close() {
 }
 
 // collectScript prints sections "=== name" followed by their content.
-const collectScript = `
+// The counters of the "stats" section are apstate.VAPNetdevFields, the
+// list the vap_table rows are filled from (TestCollectScriptGolden holds
+// the rendered text).
+var collectScript = `
 echo "=== board"; ubus call system board
 echo "=== info"; ubus call system info
 echo "=== route"; ip route show default
@@ -127,7 +154,7 @@ for i in $(ubus call iwinfo devices | jsonfilter -e '@.devices[*]'); do
   echo "=== txpw $i"; ubus call iwinfo txpowerlist "{\"device\":\"$i\"}"
   echo "=== ant $i"; iw phy $p info | grep 'Available Antennas'
   echo "=== survey $i"; iw dev $i survey dump | grep -A6 'in use'
-  echo "=== stats $i"; for f in rx_bytes tx_bytes rx_packets tx_packets rx_errors tx_errors rx_dropped tx_dropped; do printf '%s=%s\n' $f $(cat /sys/class/net/$i/statistics/$f); done
+  echo "=== stats $i"; for f in ` + strings.Join(apstate.VAPNetdevFields, " ") + `; do printf '%s=%s\n' $f $(cat /sys/class/net/$i/statistics/$f); done
 done
 for e in $(ls /sys/class/net); do
   [ -e /sys/class/net/$e/phy80211 ] && continue
@@ -181,18 +208,11 @@ func Parse(out []byte, now time.Time) (*Snapshot, error) {
 		}
 		s.MemTotal, s.MemFree, s.MemBuf, s.MemCache = info.Memory.Total, info.Memory.Free, info.Memory.Buffered, info.Memory.Cached
 	}
-	if f := strings.Fields(string(secs.get("cpu"))); len(f) >= 5 && f[0] == "cpu" {
-		for i, v := range f[1:] {
-			n := atoi(v)
-			s.CPUTotal += n
-			if i == 3 || i == 4 { // idle, iowait
-				s.CPUIdle += n
-			}
-		}
-	}
+	s.CPUTotal, s.CPUIdle = apstate.ParseCPULine(string(secs.get("cpu")))
 	if f := strings.Fields(string(secs.get("route"))); len(f) >= 3 && f[0] == "default" {
 		s.Gateway = f[2]
 	}
+	// not internal/wl's parseARP, which also skips an incomplete entry (flags 0x0)
 	for _, line := range strings.Split(string(secs.get("arp")), "\n")[1:] {
 		f := strings.Fields(line)
 		if len(f) >= 4 && f[3] != "00:00:00:00:00:00" {

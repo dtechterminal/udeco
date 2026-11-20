@@ -4,6 +4,7 @@ package wl
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -16,9 +17,6 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 )
 
-// The bridge the Deco's LAN, ports and user Wi-Fi networks are in.
-const lanBridge = "br-lan"
-
 // readSystem fills the system fields of s from /proc, /sys and /tmp under
 // Root. /proc/uptime, /proc/loadavg, /proc/stat and /proc/meminfo are
 // required; everything else is best effort.
@@ -27,9 +25,11 @@ func (c *Collector) readSystem(s *apstate.Snapshot) error {
 	if err != nil {
 		return err
 	}
-	if f := strings.Fields(up); len(f) > 0 {
-		v, _ := strconv.ParseFloat(f[0], 64)
-		s.Uptime = int64(v)
+	// whole seconds; as before, an empty file leaves s.Uptime alone and a
+	// first field that is no number gives 0 (cmd/udeco-ap's readUptime,
+	// the other caller of ParseUptime, reports both)
+	if sec, err := apstate.ParseUptime(up); !errors.Is(err, apstate.ErrNoUptime) {
+		s.Uptime = int64(sec)
 	}
 	load, err := c.readFile("/proc/loadavg")
 	if err != nil {
@@ -92,21 +92,11 @@ func (c *Collector) readFile(p string) (string, error) {
 	return string(b), err
 }
 
-// parseProcStat sums the first "cpu" line: total jiffies and idle+iowait.
+// parseProcStat sums the first line of /proc/stat, the "cpu" line: total
+// jiffies and idle+iowait (apstate.ParseCPULine).
 func parseProcStat(s string) (total, idle int64) {
 	line, _, _ := strings.Cut(s, "\n")
-	f := strings.Fields(line)
-	if len(f) < 5 || f[0] != "cpu" {
-		return 0, 0
-	}
-	for i, v := range f[1:] {
-		n, _ := strconv.ParseInt(v, 10, 64)
-		total += n
-		if i == 3 || i == 4 {
-			idle += n
-		}
-	}
-	return total, idle
+	return apstate.ParseCPULine(line)
 }
 
 // parseMeminfo reads /proc/meminfo into bytes per key.
@@ -157,7 +147,9 @@ func parseRoute(s string) string {
 	return ""
 }
 
-// parseARP reads /proc/net/arp into mac -> ip (complete entries only).
+// parseARP reads /proc/net/arp into mac -> ip (complete entries only:
+// internal/openwrt's Parse keeps an incomplete one that has a MAC, so the
+// two readers stay two, apstate/proc.go).
 func parseARP(s string) map[string]string {
 	m := map[string]string{}
 	for i, line := range strings.Split(s, "\n") {
@@ -212,13 +204,12 @@ func (c *Collector) readPorts() []apstate.Port {
 	return ports
 }
 
-// statNames are the /sys/class/net/<dev>/statistics files reported per VAP.
-var statNames = []string{"rx_bytes", "tx_bytes", "rx_packets", "tx_packets", "rx_errors", "tx_errors", "rx_dropped", "tx_dropped"}
-
-// netStats reads the interface counters (missing files read as 0).
+// netStats reads the interface counters a vap_table row carries
+// (apstate.VAPNetdevFields, the /sys/class/net/<dev>/statistics files of
+// those names; missing files read as 0).
 func (c *Collector) netStats(dev string) map[string]int64 {
-	m := make(map[string]int64, len(statNames))
-	for _, k := range statNames {
+	m := make(map[string]int64, len(apstate.VAPNetdevFields))
+	for _, k := range apstate.VAPNetdevFields {
 		v, _ := strconv.ParseUint(c.trimmed("/sys/class/net/"+dev+"/statistics/"+k), 10, 64)
 		m[k] = int64(v)
 	}
@@ -286,7 +277,14 @@ func tpKeyvals(s string, want ...string) map[string]string {
 	return m
 }
 
-func netParseMAC(s string) (string, error) {
+// NormMAC returns the 6-byte MAC address s in lower case with colons
+// (net.ParseMAC's spellings; no space around it). It is the one MAC
+// normaliser of the Wi-Fi side: internal/bcmwifi's normMAC and
+// internal/mtkwifi trim their input and call it. internal/ftpeer.NormMAC
+// (unicast and non-zero only), internal/deco.NormMAC (TP-Link's
+// spellings) and cmd/udeco-ap's colon-only normMAC take other sets on
+// purpose.
+func NormMAC(s string) (string, error) {
 	hw, err := net.ParseMAC(s)
 	if err != nil || len(hw) != 6 {
 		return "", fmt.Errorf("bad MAC %q", s)

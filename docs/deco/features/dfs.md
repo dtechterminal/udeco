@@ -23,6 +23,10 @@ the refusal, so later plans use IN and do not restart the radio on every
 tick. `driver_country` still overrides the country, but it is no longer
 recommended.
 
+Superseded by the sections below: IN/288 turned out to have low power and
+no Wi-Fi 6 rates on this board, and the last section has the tables the
+units run now (`driver_country_bands`).
+
 **Channel** (`internal/bcmwifi/dfs.go`, plan.go):
 
 - A DFS chanspec gets `wl spect 1` (802.11h) before the chanspec, in the
@@ -91,11 +95,18 @@ to observe mode.
 
 ## Unverified on hardware
 
+This list is the note's state when its sections above were written
+(2026-11-20). The current status is the "DFS channels" and "Country" rows
+of the [README](../../../README.md) and the dated sections below; where they
+differ from this list, they are right.
+
 - Verified: the Bedroom X20 accepts `wl country IN/288` with the radio down
   (2026-11-20, "IN (IN/288) INDIA", 80 MHz blocks 36/52/100/116/132/149,
   chanspec_txpwr_max 18 dBm on 36-64/80, 25 on 100-144/80, 18.5 on
-  149-161/80). Not verified: the agent's own apply of it, and serving a
-  DFS channel.
+  149-161/80). Not verified when this was written: the agent's own apply of
+  it, and serving a DFS channel. DFS channels have been served since (the
+  CAC timings under "Deploying a DFS channel on a Deco" above, and the
+  README row).
 - The output formats of `wl dfs_status` and `wl chan_info`. They are taken
   from the Broadcom `wl` utility's source and have not been read on an X20.
   If either cannot be read, CAC and radar handling stay off: Verify and
@@ -129,6 +140,9 @@ untouched, and the camera went back to 72 Mbps at once.
 (bcmwifi `Desired.BandCountry`): full power on both bands, with DFS on 5 GHz.
 Keep 5 GHz on 100-144 under IN/288: 36-48 is the low-power block there.
 
+Superseded by the sections below (IN/288 on 5 GHz gave way to US, then to
+`#a`).
+
 ## IN/288 has no Wi-Fi 6 rates: run US on both bands (2026-11-20)
 
 `wl -i wl1 curppr` on Bedroom (IN/288, 132/80) showed every HE row as `-`
@@ -149,6 +163,9 @@ Wi-Fi 6 matters more than DFS here, so every Deco runs US/0 on both bands
 since 19:07 IST: Hallway 40/80; Bedroom and Owner's Room 149/80, which hear
 each other at -76 dBm and so share air time; the Garage 149/80, which none
 of the Decos hear. Do not set a band to IN/288 while Wi-Fi 6 is wanted.
+
+The choice of US on 5 GHz is superseded by the last section ("5 GHz on `#a`
+by the user's choice"); the measurements here stand.
 
 Which countries have DFS and Wi-Fi 6 together (checked on Bedroom, 2026-11-20)?
 None of the real ones. `wl chanspecs -c <cc> -b 5 -w 80` over all 267 codes in

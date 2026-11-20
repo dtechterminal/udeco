@@ -1,0 +1,33 @@
+table bridge unifi_guest
+delete table bridge unifi_guest
+table bridge unifi_guest {
+	set guest_ifs { type ifname; elements = { "phy0-ap2", "phy1-ap2" }; }
+	set restricted { type ipv4_addr; flags interval; elements = { 192.168.0.0/16, 10.0.0.0/8 }; }
+	set pre_allow { type ipv4_addr; flags interval; elements = { 192.168.1.9 }; }
+	set dns { type ipv4_addr; flags interval; elements = { 192.168.1.53, 192.168.1.1 }; }
+	set authorized { type ether_addr; flags timeout; }
+	chain guest_in {
+		meta mark & 0xc0000000 == 0x40000000 accept
+		meta mark & 0x30000000 == 0x10000000 accept
+		ether type { 0x888e, arp } accept
+		udp sport 68 udp dport 67 accept
+		ip daddr @dns meta l4proto { tcp, udp } th dport 53 accept
+		ether type ip6 drop
+		ip daddr @pre_allow accept
+		ip daddr 192.168.1.1 tcp dport { 8880, 8843, 8881, 8882 } accept
+		ip daddr @restricted drop
+		ether saddr @authorized accept
+		drop
+	}
+	chain guest_out {
+		ether type ip6 drop
+	}
+	chain forward_hook { type filter hook forward priority 0; policy accept;
+		iifname @guest_ifs jump guest_in
+		oifname @guest_ifs jump guest_out
+	}
+	chain input_hook { type filter hook input priority 0; policy accept;
+		iifname @guest_ifs tcp dport 8882 accept
+		iifname @guest_ifs jump guest_in
+	}
+}

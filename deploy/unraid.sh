@@ -13,8 +13,12 @@
 #   deploy/unraid.sh stop       stop and remove the daemon container
 #
 # Environment: UNRAID_HOST (default root@192.168.0.4; "local" when run on the
-# host itself), APPDATA (default /mnt/osssd/appdata/unifi-deco).
+# host itself), APPDATA (default /mnt/osssd/appdata/unifi-deco), UDECO_SRC
+# (default /tmp/udeco-src; where the source is copied to on the host).
 set -euo pipefail
+
+# header_text (read here, before the cd below: $0 may be a relative path)
+. "$(dirname "$0")/lib.sh"
 
 HOST=${UNRAID_HOST:-root@192.168.0.4}
 APPDATA=${APPDATA:-/mnt/osssd/appdata/unifi-deco}
@@ -22,6 +26,7 @@ SRC=${UDECO_SRC:-/tmp/udeco-src}
 IMAGE=udeco:latest
 NAME=udeco
 RUNAS=99:100 # Unraid nobody:users; the image runs as this user
+CONFIG=/data/udeco.json # the config in the container ($APPDATA is mounted at /data): the image's CMD and udeco's -config default
 
 cd "$(dirname "$0")/.."
 
@@ -46,7 +51,9 @@ build() {
 }
 
 # prepare makes the appdata directory and refuses to go on without a config
-# and credentials. It never prints a credential.
+# and credentials: the env file udeco reads by default, or a config that
+# names a password file or an env file of its own (udeco says so when that
+# file is missing). It never prints a credential.
 prepare() {
 	remote "set -e
 mkdir -p '$APPDATA'
@@ -56,7 +63,7 @@ if [ ! -f '$APPDATA/udeco.json' ]; then
 	echo 'no $APPDATA/udeco.json: copy deploy/udeco.example.json there and edit it' >&2
 	exit 1
 fi
-if [ ! -f '$APPDATA/credentials.env' ] && ! grep -q '\"password_file\"' '$APPDATA/udeco.json'; then
+if [ ! -f '$APPDATA/credentials.env' ] && ! grep -q '\"password_file\"' '$APPDATA/udeco.json' && ! grep -q '\"credentials_file\"' '$APPDATA/udeco.json'; then
 	echo 'no credentials: create $APPDATA/credentials.env (TPLINK_EMAIL=..., TPLINK_PASSWORD=...), chown $RUNAS, chmod 600' >&2
 	exit 1
 fi
@@ -65,7 +72,7 @@ find '$APPDATA' -maxdepth 1 -type f \\( -name credentials.env -o -name '*.pass' 
 }
 
 oneshot() {
-	remote "docker run --rm --network host --user $RUNAS -v '$APPDATA:/data' '$IMAGE' -config /data/udeco.json $1"
+	remote "docker run --rm --network host --user $RUNAS -v '$APPDATA:/data' '$IMAGE' -config $CONFIG $1"
 }
 
 case "${1:-}" in
@@ -90,7 +97,7 @@ run)
 	prepare
 	remote "docker rm -f '$NAME' >/dev/null 2>&1 || true
 docker run -d --name '$NAME' --restart unless-stopped --network host --user $RUNAS \
-	-v '$APPDATA:/data' '$IMAGE' -config /data/udeco.json"
+	-v '$APPDATA:/data' '$IMAGE' -config $CONFIG"
 	echo "started; follow with: $0 logs"
 	;;
 logs)
@@ -100,7 +107,7 @@ stop)
 	remote "docker rm -f '$NAME'"
 	;;
 *)
-	sed -n '4,15p' "$0" | sed 's/^# \{0,1\}//'
+	header_text "$0" 4
 	exit 2
 	;;
 esac

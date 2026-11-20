@@ -17,13 +17,10 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", "192.168.1.2:22", "AP ssh address")
-	user := flag.String("user", "root", "ssh user")
-	key := flag.String("key", "ap_ed25519", "ssh private key for the AP")
-	kh := flag.String("known-hosts", "ap_known_hosts", "known_hosts file with the AP's host key")
+	target := openwrt.TargetFlags(flag.CommandLine)
 	raw := flag.String("raw", "", "also save the raw collection output here (mode 600)")
 	flag.Parse()
-	cl := openwrt.NewClient(openwrt.Target{Addr: *addr, User: *user, KeyFile: *key, KnownHosts: *kh})
+	cl := openwrt.NewClient(*target)
 	defer cl.Close()
 	s1, err := cl.Collect()
 	if err != nil {

@@ -8,13 +8,10 @@ package main
 // Mesh command queue; nothing here blocks on a Deco.
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -24,6 +21,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/deco"
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/antoniocosta/unifi-openwrt/internal/informhttp"
 	"github.com/antoniocosta/unifi-openwrt/internal/openwrt"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
@@ -60,8 +58,8 @@ func newRunner(d *daemon, u UnitConfig, owner bool) (*runner, error) {
 		return nil, err
 	}
 	os.Chmod(r.dir, 0o700)
-	r.statePath = filepath.Join(r.dir, "state.json")
-	r.cfgPath = filepath.Join(r.dir, "system_cfg.txt")
+	r.statePath = filepath.Join(r.dir, device.StateFile)
+	r.cfgPath = filepath.Join(r.dir, device.SystemCfgFile)
 	st, found, err := device.Load(r.statePath)
 	if err != nil {
 		return nil, err
@@ -75,7 +73,7 @@ func newRunner(d *daemon, u UnitConfig, owner bool) (*runner, error) {
 		Dev: inform.Device{MAC: mac, IP: d.daemonIP, Netmask: d.cfg.Netmask, Gateway: d.cfg.Gateway,
 			Hostname: u.Name, Model: d.profile.Model, ModelDisplay: d.profile.Display},
 	}
-	r.x.Unhandled, r.x.KnownSection = device.OpenLedger(filepath.Join(r.dir, "unhandled.json")), translate.Handled
+	r.x.Unhandled, r.x.KnownSection = device.OpenLedger(filepath.Join(r.dir, device.UnhandledFile)), translate.Handled
 	if r.x.S.HashID == "" {
 		if r.x.S.HashID, err = device.NewHashID(); err != nil {
 			return nil, err
@@ -111,7 +109,7 @@ func (r *runner) start() error {
 	r.sa = &device.SSHAdopt{
 		Listen:    net.JoinHostPort(r.d.h.sshListenHost, strconv.Itoa(r.u.SSHDPort)),
 		AllowFrom: []string{r.d.cfg.ConsoleIP},
-		HostKey:   filepath.Join(r.dir, "ssh_host_ed25519.pem"),
+		HostKey:   filepath.Join(r.dir, device.SSHHostKeyFile),
 		Requests:  r.adopt,
 	}
 	if err := r.sa.Start(); err != nil {
@@ -162,7 +160,7 @@ func (r *runner) extra() map[string]any {
 // reportIP is the daemon IP (the controller SSHes there to adopt and
 // re-provision), or with report_ip=deco and once adopted, the Deco's own.
 func (r *runner) reportIP(s *openwrt.Snapshot) string {
-	if r.d.cfg.ReportIP == "deco" && r.x.S.Adopted && s.IP != "" {
+	if r.d.cfg.ReportIP == reportDeco && r.x.S.Adopted && s.IP != "" {
 		return s.IP
 	}
 	return r.d.daemonIP
@@ -218,7 +216,7 @@ func (r *runner) loop(ctx context.Context) {
 		r.planWLAN("startup")
 	}
 	h := r.d.h
-	interval := 10 * time.Second
+	interval := device.DefaultInformInterval
 	errs := 0
 	for {
 		now := time.Now()
@@ -243,7 +241,7 @@ func (r *runner) loop(ctx context.Context) {
 			if r.x.S.CfgVersion != cfgBefore && !next.Reset {
 				r.planWLAN("cfgversion " + cfgBefore + " -> " + r.x.S.CfgVersion)
 			}
-			if next.Reset && r.d.cfg.OnRemove == "stop" {
+			if next.Reset && r.d.cfg.OnRemove == onRemoveStop {
 				r.logf("STOP: removed from the controller (setdefault); on_remove=stop, the Deco is untouched")
 				r.d.blocks.Drop(r.u.Name)
 				return
@@ -265,7 +263,7 @@ func (r *runner) loop(ctx context.Context) {
 			}
 			if errs > 0 {
 				// like a real AP: keep informing, further and further apart
-				wait = min(max(interval, 5*time.Second)*time.Duration(1<<min(errs-1, 4)), time.Minute)
+				wait = device.InformBackoff(interval, errs)
 				if errs == 1 || errs%10 == 0 {
 					r.logf("%d bad answer(s) in a row: next inform in %s", errs, wait)
 				}
@@ -295,68 +293,10 @@ func (r *runner) loop(ctx context.Context) {
 	}
 }
 
-// informOnce sends one inform and handles the answer (cmd/uow/main.go
-// informOnce). ok=false counts as a bad answer.
+// informOnce sends one inform and handles the answer, as cmd/uow does
+// (device.InformOnce). ok=false counts as a bad answer.
 func (r *runner) informOnce() (device.Outcome, bool) {
-	x := r.x
-	js, err := x.Payload(time.Now())
-	if err != nil {
-		r.logf("payload: %v", err)
-		return device.Outcome{}, false
-	}
-	pkt, err := inform.Encode(x.Dev.MAC, x.S.Key, x.Cipher(), js, nil)
-	if err != nil {
-		r.logf("encode: %v", err)
-		return device.Outcome{}, false
-	}
-	req, _ := http.NewRequest(http.MethodPost, x.S.InformURL, bytes.NewReader(pkt))
-	req.Header.Set("Content-Type", "application/x-binary")
-	resp, err := r.d.h.httpClient.Do(req)
-	if err != nil {
-		r.logf("POST: %v", err)
-		return device.Outcome{}, false
-	}
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
-	resp.Body.Close()
-	switch resp.StatusCode {
-	case http.StatusOK:
-	case http.StatusNotFound:
-		if !x.S.Adopted {
-			return device.Outcome{}, true // pending: normal
-		}
-		r.logf("HTTP 404 while adopted (forgotten?)")
-		return device.Outcome{}, false
-	default:
-		r.logf("HTTP %d (%d bytes)", resp.StatusCode, len(body))
-		return device.Outcome{}, false
-	}
-	if len(body) == 0 {
-		return device.Outcome{}, true
-	}
-	_, plain, err := inform.Decode(body, x.S.Key)
-	if err != nil && x.S.Key != inform.DefaultKeyHex {
-		_, plain, err = inform.Decode(body, inform.DefaultKeyHex)
-	}
-	if err != nil {
-		r.logf("reply did not decode: %v", err)
-		return device.Outcome{}, false
-	}
-	o, err := x.Handle(plain, time.Now())
-	if err != nil {
-		r.logf("%v", err)
-		return o, false
-	}
-	for _, e := range o.Events {
-		if !strings.HasPrefix(e, "noop ") || o.Immediate {
-			r.logf("%s", e)
-		}
-	}
-	if o.Changed {
-		if err := x.S.Save(r.statePath); err != nil {
-			r.logf("saving state: %v", err)
-		}
-	}
-	return o, true
+	return device.InformOnce(r.x, informhttp.Poster(r.d.h.httpClient), r.statePath, r.logf)
 }
 
 // planWLAN hands the saved system_cfg to the Wi-Fi applier, which logs the
@@ -373,24 +313,24 @@ func (r *runner) planWLAN(why string) {
 // action carries out a controller action (device.Outcome.Actions) through
 // the Mesh command queue, or logs it when the Deco has no equivalent.
 func (r *runner) action(a string) {
-	verb, arg, _ := strings.Cut(a, ":")
+	verb, arg := device.SplitAction(a)
 	switch verb {
-	case "reboot":
+	case device.ActReboot:
 		r.logf("RESTART requested by the controller: Deco reboot (0x4016) via the master")
 		r.await("reboot", r.d.mesh.Submit(deco.Command{Kind: deco.CmdReboot, MAC: r.u.MAC}))
-	case "block":
+	case device.ActBlock:
 		r.d.blocks.Set(r.u.Name, r.x.S.Blocked)
-	case "unblock":
+	case device.ActUnblock:
 		// the new blocked list arrives with the "block" action
-	case "locate":
+	case device.ActLocate:
 		r.logf("locate %s: logged only (a Deco has no locate)", arg)
-	case "led":
+	case device.ActLED:
 		r.logf("LED %s from the controller: not supported yet (logged only)", arg)
-	case "kick":
+	case device.ActKick:
 		r.logf("kick %s: unsupported on Deco (no opcode); logged only", arg)
-	case "scan", "spectrum-scan":
+	case device.ActScan, device.ActSpectrumScan:
 		r.logf("%s: unsupported on Deco; logged only", verb)
-	case "guest-auth", "guest-unauth":
+	case device.ActGuestAuth, device.ActGuestUnauth:
 		r.logf("%s %s: a Deco guest network has no portal; ignored", verb, arg)
 	default:
 		r.logf("action %q: ignored", a)

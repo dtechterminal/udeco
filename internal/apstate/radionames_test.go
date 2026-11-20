@@ -4,6 +4,10 @@ package apstate
 
 import (
 	"testing"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // A system_cfg the controller builds for a U6-Lite reported with radios
@@ -86,5 +90,65 @@ func TestFieldsRadioNamesFallback(t *testing.T) {
 	n := CfgInfo{RadioNames: map[string]string{"na": "rai0"}}.radioNames(two.Radios)
 	if n[0] != "rai0" || n[1] != "wifi1" {
 		t.Errorf("duplicate band names %v", n)
+	}
+}
+
+// translate's table of radio names has all five names UniFi uses, the
+// MediaTek ones under the bands the agent reports them for (models), and
+// the positional ones in the order the agent numbers its radios (rf.Bands):
+// a name read back from system_cfg lands on the radio that reported it.
+func TestRadioNameTable(t *testing.T) {
+	all := map[string]string{"wifi0": "ng", "ra0": "ng", "wifi1": "na", "rai0": "na", "wifi2": "6e"}
+	for name, band := range all {
+		if got, ok := translate.RadioNameBand(name); !ok || got != band {
+			t.Errorf("RadioNameBand(%q) = %q, %v, want %q", name, got, ok, band)
+		}
+		if got := cfgRadioBand(name, ""); got != band {
+			t.Errorf("cfgRadioBand(%q) = %q, want %q", name, got, band)
+		}
+	}
+	mtk := models.DecoAgentRadioNames()
+	if len(mtk) != 2 {
+		t.Fatalf("DecoAgentRadioNames() = %v", mtk)
+	}
+	for band, name := range mtk {
+		if got, ok := translate.RadioNameBand(name); !ok || got != band {
+			t.Errorf("the agent reports %s as %q, which the table takes as %q (%v)", band, name, got, ok)
+		}
+		delete(all, name)
+	}
+	for i, band := range rf.Bands() {
+		name := translate.PositionalRadioName(i)
+		if got, ok := translate.RadioNameBand(name); !ok || got != band {
+			t.Errorf("radio %d (%s) is reported as %q, which the table takes as %q (%v)", i, band, name, got, ok)
+		}
+		delete(all, name)
+	}
+	if len(all) != 1 || all["wifi2"] != "6e" {
+		t.Errorf("names neither MediaTek nor positional: %v, want wifi2 only", all)
+	}
+	// the mode tells before the name does
+	for _, c := range []struct{ phy, mode, want string }{
+		{"wifi0", "11naht40", "na"}, {"rai0", "11nght20", "ng"}, {"ra0", "11axhe160_6e", "6e"}, {"wifi9", "", ""},
+	} {
+		if got := cfgRadioBand(c.phy, c.mode); got != c.want {
+			t.Errorf("cfgRadioBand(%q, %q) = %q, want %q", c.phy, c.mode, got, c.want)
+		}
+	}
+}
+
+// Snapshot.RadioNames: positional names to the UCI band, 5 GHz for a radio
+// whose band has no UCI name.
+func TestSnapshotRadioNames(t *testing.T) {
+	s := &Snapshot{Radios: []Radio{{Band: "ng"}, {Band: "na"}, {Band: "6e"}, {Band: ""}, {Band: "2g"}}}
+	want := map[string]string{"wifi0": "2g", "wifi1": "5g", "wifi2": "6g", "wifi3": "5g", "wifi4": "5g"}
+	got := s.RadioNames()
+	if len(got) != len(want) {
+		t.Fatalf("RadioNames() = %v, want %v", got, want)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("RadioNames()[%s] = %q, want %q", k, got[k], v)
+		}
 	}
 }

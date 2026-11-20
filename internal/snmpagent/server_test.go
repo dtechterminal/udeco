@@ -5,6 +5,7 @@ package snmpagent
 import (
 	"bytes"
 	"encoding/binary"
+	"net"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -587,5 +588,19 @@ func TestRateLimit(t *testing.T) {
 	clk.t = clk.t.Add(time.Second)
 	if s.Handle(req, lanHost) == nil {
 		t.Error("the bucket did not refill")
+	}
+}
+
+// Options.Addr "" is DefaultAddr (UDP 161, the SNMP port, on every IPv4
+// address), the address cmd/udeco-ap opens too; a given one is kept.
+func TestDefaultAddr(t *testing.T) {
+	if got := New(Options{}).o.Addr; got != DefaultAddr {
+		t.Errorf("Addr of New(Options{}) = %q, want DefaultAddr %q", got, DefaultAddr)
+	}
+	if got := New(Options{Addr: "127.0.0.1:1161"}).o.Addr; got != "127.0.0.1:1161" {
+		t.Errorf("a given Addr became %q", got)
+	}
+	if host, port, err := net.SplitHostPort(DefaultAddr); err != nil || port != "161" || host != "0.0.0.0" {
+		t.Errorf("DefaultAddr %q: host %q port %q (%v)", DefaultAddr, host, port, err)
 	}
 }

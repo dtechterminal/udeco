@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // Bridger is what the port VLANs need of the Wi-Fi applier
@@ -97,7 +99,8 @@ func (m *Manager) live(phys int) Live {
 	return l
 }
 
-var vlanBrRE = regexp.MustCompile(`^br-v([0-9]+)$`)
+// vlanBrRE: a VLAN bridge's name (unit.VLANBridge).
+var vlanBrRE = regexp.MustCompile(`^` + regexp.QuoteMeta(unit.VLANBridgePrefix) + `([0-9]+)$`)
 
 // is reports whether live already is want.
 func (m *Manager) is(l Live, want PortWant) bool {
@@ -114,7 +117,7 @@ func (m *Manager) is(l Live, want PortWant) bool {
 		return false
 	}
 	for v := range tagged {
-		if _, ok := l.Tagged[v]; !ok || l.TaggedBr[v] != "br-v"+strconv.Itoa(v) {
+		if _, ok := l.Tagged[v]; !ok || l.TaggedBr[v] != unit.VLANBridge(v) {
 			return false
 		}
 	}
@@ -136,7 +139,7 @@ func matchBridge(br string, native int, lan string) bool {
 	case native == 0:
 		return br == lan
 	}
-	return br == "br-v"+strconv.Itoa(native)
+	return br == unit.VLANBridge(native)
 }
 
 // usedVLANs are the VLAN bridges the LAN ports use now.
@@ -308,7 +311,7 @@ func (m *Manager) applyPort(ctx context.Context, p int, want PortWant, l Live) (
 	}
 	sort.Ints(add)
 	for _, v := range add {
-		if d, ok := l.Tagged[v]; ok && l.TaggedBr[v] == "br-v"+strconv.Itoa(v) && m.o.B.Exists(d) {
+		if d, ok := l.Tagged[v]; ok && l.TaggedBr[v] == unit.VLANBridge(v) && m.o.B.Exists(d) {
 			continue
 		}
 		if _, err := m.o.B.EnsurePortVLAN(ctx, Parent(p), v); err != nil {
@@ -345,7 +348,7 @@ func (m *Manager) setting(l Live) (PortWant, bool) {
 		return PortWant{}, false
 	}
 	for v := range l.Tagged {
-		if l.TaggedBr[v] != "br-v"+strconv.Itoa(v) {
+		if l.TaggedBr[v] != unit.VLANBridge(v) {
 			return PortWant{}, false
 		}
 		pw.Tagged = append(pw.Tagged, v)

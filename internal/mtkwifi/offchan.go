@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -218,8 +219,8 @@ const (
 	scoreSlots  = 55     // {score, channel} pairs in the 444 bytes
 	chanRec     = 28     // one channel record of OID 0x8999
 	chanBuf     = 16 * chanRec
-	busyStep    = 4000 // µs per score point
-	noiseFloor  = -95  // dBm: the stand-in noise floor (no driver reading)
+	busyStep    = 4000             // µs per score point
+	noiseFloor  = rf.NoiseFloorDBm // dBm: the stand-in noise floor (no driver reading)
 )
 
 // ownAirKeep: how old the collector's estimate of our stations' airtime
@@ -1045,15 +1046,7 @@ func blockLows(chans []int, w int) []int {
 }
 
 // chanFreq24 is the 20 MHz channel's centre frequency.
-func chanFreq24(ch int, band string) int {
-	if band == "ng" {
-		if ch == 14 {
-			return 2484
-		}
-		return 2407 + 5*ch
-	}
-	return 5000 + 5*ch
-}
+func chanFreq24(ch int, band string) int { return rf.ChanFreq(band, ch) }
 
 // Listed implements wl.SpectrumBackend: the blocks of the channel list
 // (read under the restart gate when not cached).

@@ -19,16 +19,13 @@ import (
 // min_rates (takeover only) turns on: `wl rateset` per BSS has not been
 // exercised on the X20 yet.
 
-// minRateOpts maps a WLAN's per-band beacon rate and CCK choice.
+// minRateOpts is a WLAN's per-band beacon rate and CCK choice for bcmwifi:
+// a copy (bcmwifi.RateOpts is translate.MinRateOpts), nil when there is none.
 func minRateOpts(m map[string]translate.MinRateOpts) map[string]bcmwifi.RateOpts {
 	if len(m) == 0 {
 		return nil
 	}
-	out := make(map[string]bcmwifi.RateOpts, len(m))
-	for b, o := range m {
-		out[b] = bcmwifi.RateOpts{BeaconKbps: o.BeaconKbps, NoCCK: o.NoCCK}
-	}
-	return out
+	return maps.Clone(m)
 }
 
 // jioMinRates drops the SSIDs' minimum data rates for platform jio-mtk

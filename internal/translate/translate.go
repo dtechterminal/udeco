@@ -117,7 +117,7 @@ func Plan(cfg Cfg, cur UCI, f Features) Result {
 		phy := cfg[p+"phyname"]
 		mode := cfg[p+"ieee_mode"]
 		band := "5g"
-		if strings.Contains(mode, "ng") || phy == "wifi0" && !strings.Contains(mode, "na") {
+		if byName, _ := qcaRadioBand(phy); strings.Contains(mode, "ng") || byName == "ng" && !strings.Contains(mode, "na") {
 			band = "2g"
 		}
 		if f.Phys != nil {
@@ -160,9 +160,9 @@ func Plan(cfg Cfg, cur UCI, f Features) Result {
 			r.Notes = append(r.Notes, fmt.Sprintf("radio %s: %s", sec, s))
 		})
 		switch tpMode {
-		case "custom":
+		case TxCustom:
 			want["txpower"] = strconv.Itoa(tpDBm)
-		case "low", "medium":
+		case TxLow, TxMedium:
 			// No known preset -> dBm mapping for OpenWrt: leave it as it is.
 			r.Notes = append(r.Notes, fmt.Sprintf("radio %s: tx power preset %q has no OpenWrt value: txpower left as it is", sec, tpMode))
 		default: // auto, high: OpenWrt's default (the regulatory maximum)
@@ -475,12 +475,7 @@ func encryption(cfg Cfg, a string) (string, string) {
 		}
 		return "none", ""
 	}
-	var mgmt []string
-	for i := 1; i <= 4; i++ {
-		if m := cfg[fmt.Sprintf("%swpa.key.%d.mgmt", a, i)]; m != "" {
-			mgmt = append(mgmt, strings.Fields(m)...)
-		}
-	}
+	mgmt := wpaKeyMgmt(cfg, a, wpaKeyFirst4)
 	has := func(s string) bool {
 		for _, m := range mgmt {
 			if m == s {
@@ -518,10 +513,7 @@ func keyMgmt(cfg Cfg, a, enc string, ft bool) string {
 	if enc == "none" {
 		return ""
 	}
-	var mgmt []string
-	for i := 1; i <= 4; i++ {
-		mgmt = append(mgmt, strings.Fields(cfg[fmt.Sprintf("%swpa.key.%d.mgmt", a, i)])...)
-	}
+	mgmt := wpaKeyMgmt(cfg, a, wpaKeyFirst4)
 	if enc == "sae-mixed" && cfg[a+"wpa3.transition"] == "enabled" {
 		mgmt = append(mgmt, "WPA-PSK")
 	}
@@ -540,17 +532,41 @@ func keyMgmt(cfg Cfg, a, enc string, ft bool) string {
 	return strings.Join(out, " ")
 }
 
-func pmf(status, mode string) string {
-	if status != "enabled" {
-		return "0"
+// wpaKeyMgmt is the controller's key management list of the aaa section a
+// ("aaa.N."): the words of aaa.N.wpa.key.M.mgmt for each M of idx, in that
+// order. idx is the caller's choice of entries: wpaKeyFirst4 (the OpenWrt
+// path) or wpaKeySent (the intent).
+func wpaKeyMgmt(cfg Cfg, a string, idx []string) []string {
+	var mgmt []string
+	for _, m := range idx {
+		mgmt = append(mgmt, strings.Fields(cfg[a+"wpa.key."+m+".mgmt"])...)
 	}
-	switch mode {
-	case "2":
-		return "2"
-	default:
-		return "1"
-	}
+	return mgmt
 }
+
+// wpaKeyFirst4: entries 1 to 4, sent or not (the OpenWrt path's rule; an
+// entry above 4 is not read there).
+var wpaKeyFirst4 = []string{"1", "2", "3", "4"}
+
+// wpaKeySent: every aaa.N.wpa.key.M entry the controller sent, by number.
+func wpaKeySent(cfg Cfg, a string) []string {
+	return indices(cfg, strings.TrimSuffix(a, ".")+".wpa.key")
+}
+
+// pmfLevel is aaa.N.pmf.status and .mode as a PMF level (PMFLevel): off
+// unless enabled, required for mode 2, optional for any other mode.
+func pmfLevel(status, mode string) int {
+	if status != "enabled" {
+		return 0
+	}
+	if mode == "2" {
+		return 2
+	}
+	return 1
+}
+
+// pmf is pmfLevel as OpenWrt's ieee80211w value.
+func pmf(status, mode string) string { return strconv.Itoa(pmfLevel(status, mode)) }
 
 func boolStr(b bool) string {
 	if b {

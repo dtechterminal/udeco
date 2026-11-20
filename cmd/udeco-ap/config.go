@@ -9,29 +9,35 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/antoniocosta/unifi-openwrt/internal/inform"
+	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // DefaultConfigPath is where persist_shell.sh starts the agent from.
-const DefaultConfigPath = "/tp_data/udeco/udeco-ap.json"
+const DefaultConfigPath = unit.DecoDir + "/" + unit.ConfigFile
 
 // Config is /tp_data/udeco/udeco-ap.json (agent-design.md §3.5). Unknown
 // keys are an error, so a typo never silently turns a safety switch off or on.
 type Config struct {
 	InformURL string `json:"inform_url"` // http://<controller>:8080/inform (IPv4 host)
 	ConsoleIP string `json:"console_ip"` // the only address allowed to SSH-adopt on SSHDPort
-	Model     string `json:"model"`      // UAL6 (the only model with deliberate capability words)
-	SSHDPort  int    `json:"sshd_port"`  // SSH-adopt responder; never 22 (the unit's real dropbear)
+	Model     string `json:"model"`      // models.DecoAgentModel on a Deco (the default); a models.JCOW414Models code on platform jio-mtk
+	SSHDPort  int    `json:"sshd_port"`  // SSH-adopt responder (default decosys.DefaultSSHDPort); never 22 (the unit's real dropbear)
 	Takeover  bool   `json:"takeover"`   // false = observe: inform only, nothing on the unit changes
 	Apply     bool   `json:"apply"`      // takeover: apply the controller's Wi-Fi (false = plans logged only)
 	Egress    bool   `json:"egress"`     // takeover: block the unit's own traffic beyond the LAN
-	Log       string `json:"log"`        // "syslog" (default) or "stderr"
+	Log       string `json:"log"`        // logSyslog (the default) or logStderr
 	// MgmtSources are the only sources (IPv4/IPv6 addresses or CIDRs)
 	// allowed to SSH :22 once takeover installs the inbound fence (R5).
 	// Empty (the default) accepts :22 from the whole LAN and never drops
@@ -109,17 +115,18 @@ type Config struct {
 	// (internal/jioports, ports.go).
 	Platform string `json:"platform,omitempty"`
 	// PortsUnlocked (platform jio-mtk, model UHDIW) lists the LAN ports
-	// (1-3) whose VLANs the controller may change. Ports 2 and 3 always
-	// may; port 1 (the tenant's router) only when listed here, so its
-	// untagged LAN stays as it is whatever the controller sends. Port 4 is
-	// the uplink and is never changed (beyond the VLAN devices on it).
+	// (jioports.LANPorts, 1-3) whose VLANs the controller may change. Ports
+	// 2 and 3 always may; port 1 (the tenant's router) only when listed
+	// here, so its untagged LAN stays as it is whatever the controller
+	// sends. Port 4 (jioports.UplinkPhys) is the uplink and is never
+	// changed (beyond the VLAN devices on it).
 	PortsUnlocked []int `json:"ports_unlocked,omitempty"`
 	// PortsConfirmS (model UHDIW) is how long a port change waits for an
-	// inform the controller answers before it is reverted (60-900 s; 0 =
-	// 90; under 60 s a healthy controller can miss it: an inform in flight
-	// and the next one each take up to collectTO + informTO, 30 s). PortsLossS is how long the controller may stay unreachable
-	// before every port the agent may change goes back on the LAN
-	// (60-3600 s; 0 = 300). The port monitor: ports.go.
+	// inform the controller answers before it is reverted. PortsLossS is
+	// how long the controller may stay unreachable before every port the
+	// agent may change goes back on the LAN. Seconds; the range each takes
+	// and what 0 (absent) stands for: portsConfirmKey, portsLossKey. The
+	// port monitor: ports.go.
 	PortsConfirmS int `json:"ports_confirm_s,omitempty"`
 	PortsLossS    int `json:"ports_loss_s,omitempty"`
 	// SiteSurvey (platform jio-mtk) lets the controller's scan commands
@@ -214,13 +221,112 @@ type Config struct {
 	// (loginlock.go, docs/deco/features/login-lock.md). false never locks.
 	LoginLock *bool `json:"login_lock,omitempty"`
 	// LoginLockFailOpenS is how long the controller may stay silent (no
-	// reply that decodes with the device key) before the lock opens
-	// (60-3600 s; 0 = 600).
+	// reply that decodes with the device key) before the lock opens.
+	// Seconds; range and default: loginLockFailOpenKey.
 	LoginLockFailOpenS int `json:"login_lock_failopen_s,omitempty"`
 }
 
-// defaultLoginLockFailOpen is the login lock's silence window.
-const defaultLoginLockFailOpen = 10 * time.Minute
+// The values of the log key.
+const (
+	logSyslog = "syslog"
+	logStderr = "stderr"
+)
+
+// secondsKey is a config key that holds a time in whole seconds: the range
+// a set value must be in and the value an absent key (0) stands for. The
+// range check, its error text and the key's accessor all read it, and the
+// documents that give its numbers (README.md, docs/deco/agent-design.md,
+// docs/deco/features/login-lock.md) are held to it (TestDocsSecondsKeys).
+type secondsKey struct {
+	name          string // the JSON key
+	min, max, def int    // seconds
+}
+
+var (
+	// ports_confirm_s. Under 60 s a healthy controller can miss the
+	// window: an inform in flight and the next one each take up to
+	// collectTO + informTO, 30 s.
+	portsConfirmKey = secondsKey{name: "ports_confirm_s", min: 60, max: 900, def: 90}
+	// ports_loss_s
+	portsLossKey = secondsKey{name: "ports_loss_s", min: 60, max: 3600, def: 300}
+	// login_lock_failopen_s, the login lock's silence window
+	loginLockFailOpenKey = secondsKey{name: "login_lock_failopen_s", min: 60, max: 3600, def: 600}
+)
+
+// check refuses a set value (v != 0) outside the key's range.
+func (k secondsKey) check(v int) error {
+	if v != 0 && (v < k.min || v > k.max) {
+		return fmt.Errorf("config: %s %d: want %d-%d seconds (default %d)", k.name, v, k.min, k.max, k.def)
+	}
+	return nil
+}
+
+// of is the key's time for the value v: the default when the key is absent.
+func (k secondsKey) of(v int) time.Duration {
+	if v == 0 {
+		v = k.def
+	}
+	return time.Duration(v) * time.Second
+}
+
+// keySet is a config key by its JSON name and whether the config sets it.
+// A check on a group of keys takes its condition and the names in its
+// message from one list of these (TestConfigKeyGroups holds each entry to
+// the field with that JSON tag).
+type keySet struct {
+	name string
+	set  bool
+}
+
+func anySet(ks []keySet) bool {
+	return slices.ContainsFunc(ks, func(k keySet) bool { return k.set })
+}
+
+// keyNames lists the keys' names as a message does: "a", "a and b",
+// "a, b and c".
+func keyNames(ks []keySet) string {
+	names := make([]string, len(ks))
+	for i, k := range ks {
+		names[i] = k.name
+	}
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
+// decoOnlyKeys are the keys platform jio-mtk refuses. Not among them:
+// wpa3 (SAE on the 5 GHz radio only: the MT7663 driver has it) and
+// min_rates (the 2.4 GHz radio's BasicRate, mtkwifi minRate).
+func (c *Config) decoOnlyKeys() []keySet {
+	return []keySet{{"mdns_bridge", c.MdnsBridge}, {"hotspot2", c.Hotspot2}, {"egress", c.Egress},
+		{"twt", c.TWT != nil}, {"uplink_ssid_down", c.UplinkSSIDDown != nil},
+		{"uplink_gateway_down", c.UplinkGatewayDown}, {"sta_snoop", c.StaSnoop != nil},
+		{"assoc_garp", c.AssocGARP != nil}, {"rx_desense", c.RxDesense}}
+}
+
+// jioOnlyKeys are the keys only platform jio-mtk takes
+// (docs/deco/features/garage-parity.md lists them), the LAN ports' keys
+// (portKeys) aside.
+func (c *Config) jioOnlyKeys() []keySet {
+	return []keySet{{"uplink_loss", c.UplinkLoss != nil}, {"uplink_loss_ssid", c.UplinkLossSSID != ""},
+		{"bss_pinning", c.BSSPinning}, {"proxy_arp", c.ProxyARP != nil},
+		{"proxy_arp_driver", c.ProxyARPDriver}, {"dfs", c.DFS}}
+}
+
+// The LAN ports' keys (platform jio-mtk as the model with LAN ports):
+// ports_unlocked, the port monitor's two times, and all three.
+func (c *Config) portsUnlockedKey() keySet {
+	return keySet{"ports_unlocked", len(c.PortsUnlocked) > 0}
+}
+
+func (c *Config) portTimerKeys() []keySet {
+	return []keySet{{portsConfirmKey.name, c.PortsConfirmS != 0}, {portsLossKey.name, c.PortsLossS != 0}}
+}
+
+func (c *Config) portKeys() []keySet {
+	return append([]keySet{c.portsUnlockedKey()}, c.portTimerKeys()...)
+}
 
 // loginLock: the login lock runs (takeover with apply, unless login_lock
 // is false).
@@ -229,10 +335,7 @@ func (c *Config) loginLock() bool {
 }
 
 func (c *Config) loginLockFailOpen() time.Duration {
-	if c.LoginLockFailOpenS == 0 {
-		return defaultLoginLockFailOpen
-	}
-	return time.Duration(c.LoginLockFailOpenS) * time.Second
+	return loginLockFailOpenKey.of(c.LoginLockFailOpenS)
 }
 
 // uplinkLoss: the SSIDs are isolated on uplink loss (platform jio-mtk)
@@ -243,24 +346,23 @@ func (c *Config) uplinkLoss() bool { return c.jio() && (c.UplinkLoss == nil || *
 // unless proxy_arp is false).
 func (c *Config) proxyARP() bool { return c.jio() && (c.ProxyARP == nil || *c.ProxyARP) }
 
-func (c *Config) portsConfirm() time.Duration {
-	if c.PortsConfirmS == 0 {
-		return defaultPortsConfirm
-	}
-	return time.Duration(c.PortsConfirmS) * time.Second
-}
+func (c *Config) portsConfirm() time.Duration { return portsConfirmKey.of(c.PortsConfirmS) }
 
-func (c *Config) portsLoss() time.Duration {
-	if c.PortsLossS == 0 {
-		return defaultPortsLoss
-	}
-	return time.Duration(c.PortsLossS) * time.Second
-}
+func (c *Config) portsLoss() time.Duration { return portsLossKey.of(c.PortsLossS) }
 
 // PlatformJio is the JioFiber JCOW414 (MediaTek) platform.
 const PlatformJio = "jio-mtk"
 
 func (c *Config) jio() bool { return c != nil && c.Platform == PlatformJio }
+
+// hasLANPorts reports whether the configured model is reported with LAN
+// ports: one with a rear uplink jack (models.RearUplinkPort, the rule the
+// profile's switch bits follow). Of the models the agent takes that is the
+// UAP-IW-HD, on platform jio-mtk.
+func (c *Config) hasLANPorts() bool {
+	m, ok := models.Lookup(c.Model)
+	return ok && m.RearUplinkPort() > 0
+}
 
 func loadConfig(path string) (*Config, error) {
 	b, err := os.ReadFile(path)
@@ -270,8 +372,15 @@ func loadConfig(path string) (*Config, error) {
 	return parseConfig(b)
 }
 
+// defaultConfig is what parseConfig starts from: the value of every key
+// with a default other than its zero value. deploy/deco-ap.sh writes the
+// same three into a new unit's config (TestDeployDefaultConfig).
+func defaultConfig() *Config {
+	return &Config{Model: models.DecoAgentModel, SSHDPort: decosys.DefaultSSHDPort, Log: logSyslog}
+}
+
 func parseConfig(b []byte) (*Config, error) {
-	c := &Config{Model: "UAL6", SSHDPort: 2222, Log: "syslog"}
+	c := defaultConfig()
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(c); err != nil {
@@ -297,54 +406,51 @@ func (c *Config) validate() error {
 	c.Model = strings.ToUpper(c.Model)
 	switch c.Platform {
 	case "":
-		if c.Model != "UAL6" {
-			return fmt.Errorf("config: model %q: only UAL6 is supported (its capability words are chosen for this hardware)", c.Model)
+		if c.Model != models.DecoAgentModel {
+			return fmt.Errorf("config: model %q: only %s is supported (its capability words are chosen for this hardware)", c.Model, models.DecoAgentModel)
 		}
 	case PlatformJio:
 		if !models.JCOW414Models[c.Model] {
-			return fmt.Errorf("config: model %q: platform %s is reported as U7LT (UAP-AC-Lite) or UHDIW (UAP-IW-HD, with its LAN ports): set \"model\": \"U7LT\" or \"UHDIW\"", c.Model, c.Platform)
+			return fmt.Errorf("config: model %q: platform %s is reported as %s (UAP-AC-Lite) or %s (UAP-IW-HD, with its LAN ports): set \"model\": %q or %q",
+				c.Model, c.Platform, models.ModelU7LT, models.ModelUHDIW, models.ModelU7LT, models.ModelUHDIW)
 		}
-		if len(c.PortsUnlocked) > 0 && c.Model != "UHDIW" {
-			return fmt.Errorf("config: ports_unlocked needs model UHDIW (the only model reported with LAN ports)")
+		unlocked, timers := c.portsUnlockedKey(), c.portTimerKeys()
+		if unlocked.set && !c.hasLANPorts() {
+			return fmt.Errorf("config: %s needs model %s (the only model reported with LAN ports)", unlocked.name, models.ModelUHDIW)
 		}
-		if (c.PortsConfirmS != 0 || c.PortsLossS != 0) && c.Model != "UHDIW" {
-			return fmt.Errorf("config: ports_confirm_s and ports_loss_s need model UHDIW (the only model reported with LAN ports)")
+		if anySet(timers) && !c.hasLANPorts() {
+			return fmt.Errorf("config: %s need model %s (the only model reported with LAN ports)", keyNames(timers), models.ModelUHDIW)
 		}
-		if c.PortsConfirmS != 0 && (c.PortsConfirmS < 60 || c.PortsConfirmS > 900) {
-			return fmt.Errorf("config: ports_confirm_s %d: want 60-900 seconds (default 90)", c.PortsConfirmS)
+		if err := portsConfirmKey.check(c.PortsConfirmS); err != nil {
+			return err
 		}
-		if c.PortsLossS != 0 && (c.PortsLossS < 60 || c.PortsLossS > 3600) {
-			return fmt.Errorf("config: ports_loss_s %d: want 60-3600 seconds (default 300)", c.PortsLossS)
+		if err := portsLossKey.check(c.PortsLossS); err != nil {
+			return err
 		}
 		seen := map[int]bool{}
 		for _, p := range c.PortsUnlocked {
-			if p < 1 || p > 3 || seen[p] {
-				return fmt.Errorf("config: ports_unlocked %v: want distinct LAN ports 1-3 (port 4 is the uplink and is never changed)", c.PortsUnlocked)
+			if lan := jioports.LANPorts; !slices.Contains(lan, p) || seen[p] {
+				return fmt.Errorf("config: %s %v: want distinct LAN ports %d-%d (port %d is the uplink and is never changed)",
+					unlocked.name, c.PortsUnlocked, lan[0], lan[len(lan)-1], jioports.UplinkPhys)
 			}
 			seen[p] = true
 		}
-		// wpa3: SAE on the 5 GHz radio only (the MT7663 driver has it);
-		// min_rates: the 2.4 GHz radio's BasicRate (mtkwifi minRate)
-		for name, on := range map[string]bool{"mdns_bridge": c.MdnsBridge,
-			"hotspot2": c.Hotspot2, "egress": c.Egress, "twt": c.TWT != nil,
-			"uplink_ssid_down": c.UplinkSSIDDown != nil, "uplink_gateway_down": c.UplinkGatewayDown,
-			"sta_snoop": c.StaSnoop != nil, "assoc_garp": c.AssocGARP != nil,
-			"rx_desense": c.RxDesense} {
-			if on {
-				return fmt.Errorf("config: %s is not supported on platform %s", name, c.Platform)
+		for _, k := range c.decoOnlyKeys() {
+			if k.set {
+				return fmt.Errorf("config: %s is not supported on platform %s", k.name, c.Platform)
 			}
 		}
 	default:
 		return fmt.Errorf("config: platform %q: want \"\" (Deco) or %q", c.Platform, PlatformJio)
 	}
-	if (c.UplinkLoss != nil || c.UplinkLossSSID != "" || c.BSSPinning || c.ProxyARP != nil || c.ProxyARPDriver || c.DFS) && !c.jio() {
-		return errors.New("config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver and dfs are for platform " + PlatformJio + " only")
+	if ks := c.jioOnlyKeys(); anySet(ks) && !c.jio() {
+		return errors.New("config: " + keyNames(ks) + " are for platform " + PlatformJio + " only")
 	}
 	if c.ProxyARPDriver && !c.proxyARP() {
 		return errors.New("config: proxy_arp_driver needs proxy_arp")
 	}
-	if (len(c.PortsUnlocked) > 0 || c.PortsConfirmS != 0 || c.PortsLossS != 0) && !c.jio() {
-		return errors.New("config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform " + PlatformJio + " only")
+	if ks := c.portKeys(); anySet(ks) && !c.jio() {
+		return errors.New("config: " + keyNames(ks) + " are for platform " + PlatformJio + " only")
 	}
 	if c.SSHDPort < 1 || c.SSHDPort > 65535 || c.SSHDPort == 22 {
 		return fmt.Errorf("config: sshd_port %d: want 1-65535 and never 22 (the unit's own dropbear)", c.SSHDPort)
@@ -403,13 +509,11 @@ func (c *Config) validate() error {
 	if c.LoginLock != nil && *c.LoginLock && (!c.Takeover || !c.Apply) {
 		return errors.New("config: login_lock needs takeover and apply (observe mode never changes the unit)")
 	}
-	if c.LoginLockFailOpenS != 0 {
-		if c.LoginLockFailOpenS < 60 || c.LoginLockFailOpenS > 3600 {
-			return fmt.Errorf("config: login_lock_failopen_s %d: want 60-3600 seconds (default 600)", c.LoginLockFailOpenS)
-		}
-		if !c.loginLock() {
-			return errors.New("config: login_lock_failopen_s needs the login lock (takeover and apply, login_lock not false)")
-		}
+	if err := loginLockFailOpenKey.check(c.LoginLockFailOpenS); err != nil {
+		return err
+	}
+	if c.LoginLockFailOpenS != 0 && !c.loginLock() {
+		return errors.New("config: " + loginLockFailOpenKey.name + " needs the login lock (takeover and apply, login_lock not false)")
 	}
 	if c.SiteSurvey && !c.Takeover {
 		return errors.New("config: site_survey needs takeover (observe mode runs no scans and claims no RF scan)")
@@ -423,9 +527,9 @@ func (c *Config) validate() error {
 		}
 	}
 	switch c.Log {
-	case "syslog", "stderr":
+	case logSyslog, logStderr:
 	default:
-		return fmt.Errorf("config: log %q: want syslog or stderr", c.Log)
+		return fmt.Errorf("config: log %q: want %s or %s", c.Log, logSyslog, logStderr)
 	}
 	return nil
 }
@@ -450,16 +554,14 @@ func (c *Config) downlinkWatchdog() bool { return c.DownlinkWatchdog == nil || *
 // twt: TWT is on unless the twt key is false.
 func (c *Config) twt() bool { return c.TWT == nil || *c.TWT }
 
-func (c *Config) controllerIP() string {
-	u, _ := url.Parse(c.InformURL)
-	return u.Hostname()
-}
+func (c *Config) controllerIP() string { return inform.URLHost(c.InformURL) }
 
-// validDriverDTIMBands: keys "ng"/"na", periods 1-255.
+// validDriverDTIMBands: keys the radios' bands (rf.Bands: "ng", "na"),
+// periods 1-255.
 func validDriverDTIMBands(m map[string]int) error {
 	for b, v := range m {
-		if b != "ng" && b != "na" {
-			return fmt.Errorf("config: driver_dtim_bands: band %q is not ng or na", b)
+		if bands := rf.Bands(); !slices.Contains(bands, b) {
+			return fmt.Errorf("config: driver_dtim_bands: band %q is not %s", b, strings.Join(bands, " or "))
 		}
 		if v < 1 || v > 255 {
 			return fmt.Errorf("config: driver_dtim_bands: %s period %d is not 1-255", b, v)
@@ -468,19 +570,17 @@ func validDriverDTIMBands(m map[string]int) error {
 	return nil
 }
 
-// validDriverCountryBands: keys "ng"/"na", values two-letter country codes
-// or "#a".
+// validDriverCountryBands: keys the radios' bands (rf.Bands: "ng", "na"),
+// values driver countries (bcmwifi.ValidCountry: a two-letter code, or
+// "#a", Broadcom's all-channels table with no radar detection and Wi-Fi 6
+// on 52-144).
 func validDriverCountryBands(m map[string]string) error {
 	for b, c := range m {
-		if b != "ng" && b != "na" {
-			return fmt.Errorf("config: driver_country_bands: band %q is not ng or na", b)
+		if bands := rf.Bands(); !slices.Contains(bands, b) {
+			return fmt.Errorf("config: driver_country_bands: band %q is not %s", b, strings.Join(bands, " or "))
 		}
-		c = strings.TrimSpace(c)
-		if c == "#a" {
-			continue // Broadcom's all-channels table: no radar detection, Wi-Fi 6 on 52-144 (bcmwifi.NoRadarCountry)
-		}
-		if len(c) != 2 || strings.IndexFunc(c, func(r rune) bool { return (r < 'A' || r > 'Z') && (r < 'a' || r > 'z') }) >= 0 {
-			return fmt.Errorf("config: driver_country_bands: %s country %q is not a two-letter code", b, c)
+		if !bcmwifi.ValidCountry(c) {
+			return fmt.Errorf("config: driver_country_bands: %s country %q is not a two-letter code", b, strings.TrimSpace(c))
 		}
 	}
 	return nil

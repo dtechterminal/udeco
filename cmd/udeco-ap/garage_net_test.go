@@ -6,6 +6,7 @@ import (
 	"context"
 	"net"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -122,6 +123,15 @@ func TestGarageRadar(t *testing.T) {
 	e := a.sta.queue[0]
 	if e["event_string"] != "EVT_AP_RadarDetected" || e["radio"] != "na" || e["channel"] != 52 || e["freq"] != 5260 {
 		t.Errorf("event %v", e)
+	}
+	// The whole payload as it goes on the wire. radio_name is wifi1
+	// (jioRadarRadioName), not the name the 5 GHz radio is reported under
+	// with MediaTek naming (rai0): that is the open item
+	// tables-radar-event-payload, and this pins today's event until it is
+	// decided.
+	want := map[string]any{"event_string": "EVT_AP_RadarDetected", "radio": "na", "radio_name": "wifi1", "channel": 52, "freq": 5260}
+	if !reflect.DeepEqual(e, want) {
+		t.Errorf("payload %v, want %v", e, want)
 	}
 }
 

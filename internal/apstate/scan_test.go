@@ -88,3 +88,22 @@ func TestSplitBands(t *testing.T) {
 		t.Errorf("split: %+v", res)
 	}
 }
+
+// ChannelFreq picks the band by a frequency in it; FreqChannel is its
+// reverse, channel 14 included.
+func TestChannelFreq(t *testing.T) {
+	for _, c := range []struct{ ch, ref, want int }{
+		{1, 2412, 2412}, {6, 2412, 2437}, {13, 2462, 2472}, {14, 2412, 2484},
+		{36, 5180, 5180}, {36, 5000, 5180}, {100, 5745, 5500}, {165, 5180, 5825},
+		{14, 5180, 5070}, {36, 2412, 2587}, // the band is ref's, whatever the channel
+	} {
+		if got := ChannelFreq(c.ch, c.ref); got != c.want {
+			t.Errorf("ChannelFreq(%d, %d) = %d, want %d", c.ch, c.ref, got, c.want)
+		}
+	}
+	for _, c := range []struct{ ch, ref int }{{1, 2412}, {11, 2412}, {14, 2412}, {36, 5180}, {149, 5180}, {165, 5180}} {
+		if got := FreqChannel(ChannelFreq(c.ch, c.ref)); got != c.ch {
+			t.Errorf("FreqChannel(ChannelFreq(%d, %d)) = %d", c.ch, c.ref, got)
+		}
+	}
+}

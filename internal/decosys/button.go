@@ -22,6 +22,13 @@ import (
 // sends no SEEN on release (audit Q18 is open), the button does nothing
 // until the next reboot; a power cycle is the recovery either way, since
 // every takeover change is lost on reboot.
+// SyslogTag is the tag of the agent's lines in the unit's syslog: its own
+// log (cmd/udeco-ap setupLog) and what the reset wrapper below logs with
+// logger. The Deco's launcher (the LAUNCH template in deploy/deco-ap.sh)
+// logs with logger too; cmd/udeco-ap's TestDeployLauncherTags holds its
+// tags.
+const SyslogTag = "udeco-ap"
+
 const (
 	// resetMarker identifies any udeco-ap wrapper (cmd/udeco-ap's guard.go
 	// uses the same tag), so a wrapper is never saved as TP-Link's script.
@@ -41,19 +48,19 @@ func resetWrapper(orig string) string {
 case "$ACTION" in
 released)
 	if [ "${SEEN:-0}" -ge %[2]d ] 2>/dev/null; then
-		logger -t udeco-ap "reset button held ${SEEN}s: factory reset"
+		logger -t %[4]s "reset button held ${SEEN}s: factory reset"
 		ACTION=pressed
 		export ACTION
 		exec /bin/sh %[1]s "$@"
 	fi
-	logger -t udeco-ap "reset button released after ${SEEN:-?}s: ignored (hold %[2]d s to factory-reset)"
+	logger -t %[4]s "reset button released after ${SEEN:-?}s: ignored (hold %[2]d s to factory-reset)"
 	;;
 *)
-	logger -t udeco-ap "reset button $ACTION: ignored until release"
+	logger -t %[4]s "reset button $ACTION: ignored until release"
 	;;
 esac
 exit 0
-`, orig, resetHold, resetMarker)
+`, orig, resetHold, resetMarker, SyslogTag)
 }
 
 // buttonStep returns the step that installs the wrapper, or nil when it is

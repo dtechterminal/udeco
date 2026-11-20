@@ -189,11 +189,15 @@ only, from `internal/snmpagent`. See docs/deco/features/snmp.md.
 
 ## Integration (for the agent that owns models/agent.go)
 
+Done since this list was written (2026-11-19): `internal/models/agent.go`
+claims all three bits below as listed, and the capability table in
+agent-design.md has them. The list is kept as the record of what was asked.
+
 - **fw3_caps 0x40** (path monitoring), both modes.
-  - Nothing sends `fw3_caps` yet. It needs `inform.Profile.FW3Caps`,
+  - When this was written nothing sent `fw3_caps`. It needed `inform.Profile.FW3Caps`,
     `device.Session.FW3Caps` emitted as `m["fw3_caps"] = uint32(...)` like
     fw2_caps, and `agent.go setup` passing `FW3Caps: int(p.FW3Caps)`.
-  - Multicast inspect (fw3 0x80) needs the same word.
+  - Multicast inspect (fw3 0x80) needed the same word.
 - **fw_caps 0x1000000** (syslog encryption), both modes.
 - **fw_caps 0x20000000** (RADIUS filter), takeover only, like RF_SCAN:
   `DecoAgentFeatures`.

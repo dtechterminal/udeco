@@ -19,7 +19,7 @@ type IfLimit struct {
 func qosRuleset(ls []IfLimit) (string, error) {
 	var sets, rules strings.Builder
 	for i, l := range ls {
-		if !ifnameOK.MatchString(l.Ifname) {
+		if !ifnameOK(l.Ifname) {
 			return "", fmt.Errorf("bad interface name %q", l.Ifname)
 		}
 		for _, x := range []struct {

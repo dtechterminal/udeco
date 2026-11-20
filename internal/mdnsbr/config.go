@@ -69,6 +69,11 @@ const (
 	maxSvcLen   = 255
 )
 
+// devRE is this package's one rule for an interface name, in the
+// controller's config and on the unit: 1 to 15 characters of
+// [A-Za-z0-9._-], the first a letter or a digit. internal/apstate's
+// IfNameChars is the same characters without the rule for the first;
+// cmd/udeco-ap's TestInterfaceNameRules holds the two to each other.
 var devRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,14}$`)
 
 func on(v string) bool {

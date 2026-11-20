@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
-var ifnameOK = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,15}$`)
+// ifnameOK is this package's one check of an interface name before it goes
+// into a script or a rule set: apstate.IfNameChars.
+func ifnameOK(s string) bool { return apstate.IfNameChars(s) }
 
 // guestRuleset renders the nftables bridge table for guest interfaces:
 // EAPOL, ARP, DHCP and DNS (to the LAN's DNS servers only) pass; IPv6 and
@@ -22,7 +26,7 @@ var ifnameOK = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,15}$`)
 // the captive portal.
 func guestRuleset(ifnames []string, g translate.Guest, dns []string, brMAC string) (string, error) {
 	for _, i := range ifnames {
-		if !ifnameOK.MatchString(i) {
+		if !ifnameOK(i) {
 			return "", fmt.Errorf("bad interface name %q", i)
 		}
 	}
@@ -70,13 +74,18 @@ func guestRuleset(ifnames []string, g translate.Guest, dns []string, brMAC strin
 		if _, err := netip.ParseAddr(g.PortalHost); err != nil {
 			return "", fmt.Errorf("portal host %q is not an IPv4 address", g.PortalHost)
 		}
-		portalAllow = fmt.Sprintf("\t\tip daddr %s tcp dport { 8880, 8843, 8881, 8882 } accept\n", g.PortalHost)
+		var ports []string
+		for _, p := range device.PortalHostPorts() {
+			ports = append(ports, strconv.Itoa(p))
+		}
+		portalAllow = fmt.Sprintf("\t\tip daddr %s tcp dport { %s } accept\n", g.PortalHost, strings.Join(ports, ", "))
 		portalTail = "\t\tether saddr @authorized accept\n\t\tdrop\n"
 		if brMAC != "" {
 			redirect = strings.Replace(redirect, "\t}\n", fmt.Sprintf("\t\tiifname @guest_ifs ether saddr != @authorized ip daddr != %s tcp dport 80 meta mark set 0x10000000 meta pkttype set host ether daddr set %s\n\t}\n", g.PortalHost, brMAC), 1)
 			// after a portal login the controller sends the browser to
-			// <some host>:8882/redirect?ec=...: the AP takes it, whatever the host
-			redirect = strings.Replace(redirect, "\t}\n", fmt.Sprintf("\t\tiifname @guest_ifs tcp dport 8882 meta mark set 0x10000000 meta pkttype set host ether daddr set %s\n\t}\n", brMAC), 1)
+			// <some host>:<device.PortalPort>/redirect?ec=...: the AP takes it,
+			// whatever the host
+			redirect = strings.Replace(redirect, "\t}\n", fmt.Sprintf("\t\tiifname @guest_ifs tcp dport %d meta mark set 0x10000000 meta pkttype set host ether daddr set %s\n\t}\n", device.PortalPort, brMAC), 1)
 		}
 	}
 	q := make([]string, len(ifnames))
@@ -115,11 +124,11 @@ table bridge unifi_guest {
 		oifname @guest_ifs jump guest_out
 	}
 	chain input_hook { type filter hook input priority 0; policy accept;
-		iifname @guest_ifs tcp dport 8882 accept
+		iifname @guest_ifs tcp dport %[9]d accept
 		iifname @guest_ifs jump guest_in
 	}
 }
-`, " elements = { "+strings.Join(q, ", ")+" };", elem(restricted), elem(pre), elem(dnsl), redirect, "", portalAllow, portalTail), nil
+`, " elements = { "+strings.Join(q, ", ")+" };", elem(restricted), elem(pre), elem(dnsl), redirect, "", portalAllow, portalTail, device.PortalPort), nil
 }
 
 // GuestDNSPort is where the AP's guest DNS forwarder listens. It is not
@@ -168,21 +177,7 @@ func (cl *Client) SetGuest(ifnames []string, g translate.Guest) error {
 		portal = portalStart(g.PortalURL)
 	}
 	if _, err := netip.ParseAddr(brIP); err == nil && brMAC != "" {
-		fwd = fmt.Sprintf(`if ! { [ -f /var/run/unifi-guest-dns.pid ] && kill -0 $(cat /var/run/unifi-guest-dns.pid) 2>/dev/null; }; then
-  dnsmasq --conf-file=/dev/null --port=%[1]d --listen-address=%[2]s --bind-interfaces --no-hosts --resolv-file=/tmp/resolv.conf.d/resolv.conf.auto --pid-file=/var/run/unifi-guest-dns.pid --user=dnsmasq --group=dnsmasq --cache-size=150 || exit 3
-fi
-nft -f - <<'NAT'
-table ip unifi_guest_nat
-delete table ip unifi_guest_nat
-table ip unifi_guest_nat {
-	chain prerouting { type nat hook prerouting priority dstnat; policy accept;
-		meta mark & 0xc0000000 == 0x40000000 meta l4proto { tcp, udp } th dport 53 redirect to :%[1]d
-		meta mark & 0x30000000 == 0x10000000 tcp dport 80 redirect to :%[3]d
-		meta mark & 0x30000000 == 0x10000000 tcp dport 8882 redirect to :8882
-	}
-}
-NAT
-%[4]s`, GuestDNSPort, brIP, PortalPort, portal)
+		fwd = guestForwarder(brIP, portal)
 	} else {
 		brMAC = "" // no forwarder: guests use the LAN's DNS directly
 	}
@@ -200,9 +195,33 @@ NAT
 	return nil
 }
 
-// PortalPort is the AP-side redirector for unauthorized guests' HTTP (a
-// separate uhttpd instance; LuCI's stays on 80/443).
-const PortalPort = 8085
+// guestForwarder is the script that starts the guest DNS forwarder on the
+// AP's address brIP and installs the nat table that redirects the marked
+// guest traffic to it and to the portal endpoints; portal (portalStart or
+// portalStop) follows.
+func guestForwarder(brIP, portal string) string {
+	return fmt.Sprintf(`if ! { [ -f /var/run/unifi-guest-dns.pid ] && kill -0 $(cat /var/run/unifi-guest-dns.pid) 2>/dev/null; }; then
+  dnsmasq --conf-file=/dev/null --port=%[1]d --listen-address=%[2]s --bind-interfaces --no-hosts --resolv-file=/tmp/resolv.conf.d/resolv.conf.auto --pid-file=/var/run/unifi-guest-dns.pid --user=dnsmasq --group=dnsmasq --cache-size=150 || exit 3
+fi
+nft -f - <<'NAT'
+table ip unifi_guest_nat
+delete table ip unifi_guest_nat
+table ip unifi_guest_nat {
+	chain prerouting { type nat hook prerouting priority dstnat; policy accept;
+		meta mark & 0xc0000000 == 0x40000000 meta l4proto { tcp, udp } th dport 53 redirect to :%[1]d
+		meta mark & 0x30000000 == 0x10000000 tcp dport 80 redirect to :%[3]d
+		meta mark & 0x30000000 == 0x10000000 tcp dport %[5]d redirect to :%[5]d
+	}
+}
+NAT
+%[4]s`, GuestDNSPort, brIP, localRedirectPort, portal, device.PortalPort)
+}
+
+// localRedirectPort is the AP-side redirector for unauthorized guests'
+// HTTP (a separate uhttpd instance; LuCI's stays on 80/443). It is not
+// device.PortalPort, where the AP takes the controller's redirect after a
+// portal login (cmd/uow -portal-listen).
+const localRedirectPort = 8085
 
 const portalStop = `[ -f /var/run/unifi-portal.pid ] && kill $(cat /var/run/unifi-portal.pid) 2>/dev/null; rm -f /var/run/unifi-portal.pid; true
 `
@@ -232,7 +251,7 @@ if ! { [ -f /var/run/unifi-portal.pid ] && kill -0 $(cat /var/run/unifi-portal.p
   uhttpd -f -p 0.0.0.0:%d -h /tmp/unifi-portal -x /cgi-bin -E /cgi-bin/r -D -t 10 -T 5 -A 0 -N 50 &
   echo $! > /var/run/unifi-portal.pid
 fi
-`, cgi, PortalPort)
+`, cgi, localRedirectPort)
 }
 
 // AuthorizeGuest lets a guest MAC past the portal for ttl (nft set element

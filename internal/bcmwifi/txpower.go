@@ -8,6 +8,9 @@ import (
 	"math"
 	"path"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
 // Transmit power presets (docs/deco/features/tx-power.md). A U6 Pro maps
@@ -27,14 +30,17 @@ import (
 //     the next plan (Tick) reads the new limit and sets the preset live. A
 //     degraded radio with none learnt (the agent restarted but not the
 //     unit) takes the reading plus the live degrade once and keeps that.
-//   - the floor is txMinDBm (5 dBm, as the collector's min_txpower).
+//   - the floor is wl.MinTxDBm (5 dBm, the collector's min_txpower).
 //
 // The controller is told the mode and the resulting dBm (TxPower), not
 // "custom" and the target maximum.
+//
+// The mode words are translate's (TxAuto ... TxCustom). Read here more
+// loosely than translate writes them: in any case, "" as auto, and
+// txMiddle as medium.
 
-// txMinDBm is the floor of the range (wl has no getter for it; the
-// collector reports the same, internal/wl minTxDBm).
-const txMinDBm = 5
+// txMiddle is another word for the medium preset, accepted here only.
+const txMiddle = "middle"
 
 // txpwrDegrade maps a UniFi tx power mode to wl txpwr_degrade (quarter-dB
 // below the radio's ceiling, see above). ceiling <= 0: unknown.
@@ -42,34 +48,34 @@ func txpwrDegrade(r Radio, ceiling float64) (q int, note string) {
 	mode := strings.ToLower(r.TxPowerMode)
 	if ceiling <= 0 {
 		switch mode {
-		case "", "auto", "high":
+		case "", translate.TxAuto, translate.TxHigh:
 			return 0, ""
-		case "medium", "middle":
+		case translate.TxMedium, txMiddle:
 			return 12, "tx power ceiling unknown: medium is 3 dB below it"
-		case "low":
+		case translate.TxLow:
 			return 24, "tx power ceiling unknown: low is 6 dB below it"
-		case "custom":
+		case translate.TxCustom:
 			return 0, "custom tx power: the radio's ceiling is unknown, using high"
 		}
 		return 0, fmt.Sprintf("tx power mode %q unknown, using high", r.TxPowerMode)
 	}
-	span := math.Max(0, ceiling-txMinDBm)
+	span := math.Max(0, ceiling-wl.MinTxDBm)
 	switch mode {
-	case "", "auto", "high":
+	case "", translate.TxAuto, translate.TxHigh:
 		return 0, ""
-	case "medium", "middle":
+	case translate.TxMedium, txMiddle:
 		return int(math.Round(span * 2)), ""
-	case "low":
+	case translate.TxLow:
 		return int(math.Round(span * 4)), ""
-	case "custom":
+	case translate.TxCustom:
 		p := float64(r.TxPower)
 		switch {
 		case p > ceiling:
 			note = fmt.Sprintf("custom tx power %d dBm above the radio's %.2f dBm: clamped", r.TxPower, ceiling)
 			p = ceiling
-		case p < txMinDBm:
-			note = fmt.Sprintf("custom tx power %d dBm below the floor: clamped to %d dBm", r.TxPower, txMinDBm)
-			p = txMinDBm
+		case p < wl.MinTxDBm:
+			note = fmt.Sprintf("custom tx power %d dBm below the floor: clamped to %d dBm", r.TxPower, wl.MinTxDBm)
+			p = wl.MinTxDBm
 		}
 		return int(math.Round((ceiling - p) * 4)), note
 	}
@@ -81,12 +87,12 @@ func txpwrDegrade(r Radio, ceiling float64) (q int, note string) {
 func txReportFor(r Radio, ceiling float64, q int) (mode string, dbm int) {
 	switch mode = strings.ToLower(r.TxPowerMode); mode {
 	case "":
-		mode = "auto"
-	case "middle":
-		mode = "medium"
-	case "auto", "high", "medium", "low", "custom":
+		mode = translate.TxAuto
+	case txMiddle:
+		mode = translate.TxMedium
+	case translate.TxAuto, translate.TxHigh, translate.TxMedium, translate.TxLow, translate.TxCustom:
 	default:
-		mode = "high"
+		mode = translate.TxHigh
 	}
 	if ceiling > 0 {
 		dbm = int(math.Round(ceiling - float64(q)/4))

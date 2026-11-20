@@ -28,6 +28,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // Runner executes a command and returns its stdout. Implementations must
@@ -123,7 +126,7 @@ func New(o Options) *Collector {
 		o.ScanTimeout = defaultScanTimeout
 	}
 	if o.Bridge == "" {
-		o.Bridge = lanBridge
+		o.Bridge = unit.LANBridge
 	}
 	if o.Ports == nil {
 		o.Ports = ethName
@@ -192,18 +195,10 @@ func sleepCtx(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// ifaceOK accepts kernel interface names only (no option or shell tricks).
-func ifaceOK(s string) bool {
-	if s == "" || len(s) > 15 || s[0] == '-' {
-		return false
-	}
-	for _, r := range s {
-		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.') {
-			return false
-		}
-	}
-	return true
-}
+// ifaceOK accepts kernel interface names only (no option or shell tricks):
+// apstate.IfNameChars, and no leading '-', which `wl -i` would read as an
+// option.
+func ifaceOK(s string) bool { return apstate.IfNameChars(s) && s[0] != '-' }
 
 func firstLine(s string) string {
 	l, _, _ := strings.Cut(strings.TrimSpace(s), "\n")

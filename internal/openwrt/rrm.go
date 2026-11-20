@@ -69,7 +69,7 @@ func NeighborElement(n Neighbor) (string, error) {
 // SyncNeighbors sets the neighbour list of an AP interface to its own entry
 // plus nbrs (only when it differs). Returns whether it changed.
 func (cl *Client) SyncNeighbors(iface string, nbrs []Neighbor) (bool, error) {
-	if !ifaceSafe(iface) {
+	if !ifnameOK(iface) {
 		return false, fmt.Errorf("rrm: bad interface %q", iface)
 	}
 	out, err := cl.Run("ubus call hostapd." + iface + " rrm_nr_get_own; echo @@; ubus call hostapd." + iface + " rrm_nr_list")

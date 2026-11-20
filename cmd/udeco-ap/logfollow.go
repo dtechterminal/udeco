@@ -208,7 +208,7 @@ func (ff *fileFollower) flushPart() error {
 }
 
 // logTap hands the agent's own log lines to a running log follower
-// (platform jio-mtk, log "stderr"); without one it costs a mutex.
+// (platform jio-mtk, log logStderr); without one it costs a mutex.
 type logTap struct {
 	mu sync.Mutex
 	ch chan string

@@ -35,7 +35,7 @@ func ifbName(ifname string) string {
 // shapeScript renders the tc commands for one interface (idempotent: it
 // clears what it set before).
 func shapeScript(s IfShape) (string, error) {
-	if !ifnameOK.MatchString(s.Ifname) {
+	if !ifnameOK(s.Ifname) {
 		return "", fmt.Errorf("bad interface %q", s.Ifname)
 	}
 	ifb := ifbName(s.Ifname)
@@ -76,7 +76,7 @@ func shapeScript(s IfShape) (string, error) {
 func (cl *Client) SetShaping(ss []IfShape, clear []string) error {
 	var b strings.Builder
 	for _, c := range clear {
-		if !ifnameOK.MatchString(c) {
+		if !ifnameOK(c) {
 			continue
 		}
 		fmt.Fprintf(&b, "tc qdisc del dev %[1]s root 2>/dev/null; tc qdisc del dev %[1]s ingress 2>/dev/null; ip link del %[2]s 2>/dev/null\n", c, ifbName(c))

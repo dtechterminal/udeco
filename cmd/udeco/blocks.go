@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 	"github.com/antoniocosta/unifi-openwrt/internal/deco"
 )
 
@@ -299,12 +300,7 @@ func (b *blockSync) save() {
 	}
 	sort.Strings(out.Added)
 	raw, _ := json.MarshalIndent(out, "", "  ")
-	tmp := b.path + ".tmp"
-	err := os.WriteFile(tmp, raw, 0o600)
-	if err == nil {
-		err = os.Rename(tmp, b.path)
-	}
-	if err != nil {
+	if err := atomicfile.Write(b.path, b.path+".tmp", raw, 0o600); err != nil {
 		b.logf("blocks: saving: %v", err)
 	}
 }

@@ -3,8 +3,11 @@
 package wl
 
 import (
+	"errors"
 	"strconv"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // chanspec is a decoded Broadcom chanspec (wl 17.10, d11ac format).
@@ -81,29 +84,45 @@ func parseChanspecHex(s string) (chanspec, bool) {
 	return decodeChanspec(uint16(n))
 }
 
+// errBadChannel: a chanspec text whose channel is no positive number.
+var errBadChannel = errors.New("bad channel")
+
+// ParseChanspecText splits wl's text form of a chanspec into the control
+// channel and the width in MHz: "6" (20), "7u" and "44l" (40), "36/80",
+// "36/160". It is the one reader of that form (parseChanspecString here,
+// bcmwifi's parseChanspec): no band, and no look at which block the
+// channel is in. A "/" is looked for before the u or l, so the error for
+// "36/80u" is the width's number error; the other error is "bad channel".
+func ParseChanspecText(s string) (control, width int, err error) {
+	s = strings.TrimSpace(s)
+	width = 20
+	num := s
+	if n, w, ok := strings.Cut(s, "/"); ok {
+		num = n
+		if width, err = strconv.Atoi(w); err != nil {
+			return 0, 0, err
+		}
+	} else if strings.HasSuffix(s, "u") || strings.HasSuffix(s, "l") {
+		num = s[:len(s)-1]
+		width = 40
+	}
+	ch, err := strconv.Atoi(num)
+	if err != nil || ch <= 0 {
+		return 0, 0, errBadChannel
+	}
+	return ch, width, nil
+}
+
 // parseChanspecString decodes wl's text form of a chanspec: "6", "7u",
 // "44l", "36/80", "36/160". band is "ng" or "na" (the text has no band).
 func parseChanspecString(s, band string) (chanspec, bool) {
 	s = strings.TrimSpace(s)
 	c := chanspec{Band: band, Width: 20}
-	num := s
-	switch {
-	case strings.HasSuffix(s, "u"), strings.HasSuffix(s, "l"):
-		num = s[:len(s)-1]
-		c.Width = 40
-	case strings.Contains(s, "/"):
-		var w string
-		num, w, _ = strings.Cut(s, "/")
-		n, err := strconv.Atoi(w)
-		if err != nil {
-			return c, false
-		}
-		c.Width = n
-	}
-	ch, err := strconv.Atoi(num)
-	if err != nil || ch <= 0 {
+	ch, width, err := ParseChanspecText(s)
+	if err != nil {
 		return c, false
 	}
+	c.Width = width
 	c.Control, c.Center = ch, ch
 	switch {
 	case c.Width == 40 && strings.HasSuffix(s, "u"):
@@ -120,26 +139,11 @@ func parseChanspecString(s, band string) (chanspec, bool) {
 // blockCenter returns the centre channel of the 5 GHz 40/80/160 MHz block
 // that holds control channel ch (0 when there is none).
 func blockCenter(ch, width int) int {
-	firsts := map[int][]int{
-		40:  {36, 44, 52, 60, 100, 108, 116, 124, 132, 140, 149, 157, 165, 173},
-		80:  {36, 52, 100, 116, 132, 149, 165},
-		160: {36, 100, 149},
-	}[width]
-	for _, f := range firsts {
-		if ch >= f && ch < f+width/5 {
-			return f + (width/5-4)/2
-		}
+	if f := rf.BlockStart(ch, width); f != 0 {
+		return f + (width/5-4)/2
 	}
 	return 0
 }
 
 // chanFreq returns the centre frequency in MHz of a channel in a band.
-func chanFreq(ch int, band string) int {
-	if band == "ng" {
-		if ch == 14 {
-			return 2484
-		}
-		return 2407 + 5*ch
-	}
-	return 5000 + 5*ch
-}
+func chanFreq(ch int, band string) int { return rf.ChanFreq(band, ch) }

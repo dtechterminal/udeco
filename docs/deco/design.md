@@ -47,7 +47,7 @@
 cmd/udeco/main.go          config, Mesh, runners, signal handling
 cmd/udeco/runner.go        per-AP port of uow's loop (main.go:290-477)
 cmd/udeco/print.go         -print: one read-only poll dumped as JSON (no UniFi traffic)
-internal/deco/             spec/go/{tmp,business,schemas,discovery}.go
+internal/deco/             tmp.go, business.go, schemas.go, discovery.go: the protocol (P§9), ported from the spec's Go reference
 internal/deco/mesh.go      session owner, poller, MeshState cache, apply queue, block reconcile
 internal/deco/collect.go   Unit + clients -> openwrt.Snapshot (normMAC, connKey, Skeleton)
 internal/deco/wlan.go      UniFi WLANs -> partial 0x4008 bodies, backup/verify/rollback
@@ -264,41 +264,15 @@ Use `BuildHostSet(get, patchedHost)` and, separately, `BuildGuestSet`. Each body
 
 ## 9. Deployment on Unraid (192.168.0.4)
 
-**Dockerfile.** Multi-stage `golang:1.26` → `gcr.io/distroless/static`. The binary is `/udeco` and the volume is `/data`.
+**Image.** The [`Dockerfile`](../../Dockerfile) is multi-stage: a static binary is built in the Go image and copied into a distroless one (the Dockerfile names both images). The binary is `/udeco` and the volume is `/data`.
 
-**Run command:**
+**Run command.** [`deploy/unraid.sh`](../../deploy/unraid.sh) `run` builds the image on the host and starts the container. The script holds the command, the user the container runs as and the host directory mounted at `/data`; [README.md](README.md), Setup step 4, shows the equivalent `docker run`.
 
-```sh
-docker run -d --name udeco --restart unless-stopped --network host \
-  -v /mnt/user/appdata/udeco:/data \
-  -e UDECO_TPLINK_PASSWORD_FILE=/data/secrets/tplink_password \
-  udeco:latest -config /data/udeco.json
-```
-
-**Config `/data/udeco.json`:**
-
-```json
-{
-  "inform_url": "http://192.168.0.1:8080/inform",
-  "console_ip": "192.168.0.1",
-  "daemon_ip": "192.168.0.4", "netmask": "255.255.255.0", "gateway": "192.168.0.1",
-  "tplink_id": "<exact stored TP-Link ID; md5 must equal TDP owner>",
-  "mesh": { "master": "b0:a7:b9:3e:16:94",
-            "host_key_sha256": "SHA256:wcQkT6FKAB+PxFEAkHQhV3++pQsPCk9bNpU+4EfN4b4" },
-  "units": [
-    { "name": "deco-241", "ip": "192.168.0.241", "mac": "b0:a7:b9:3e:16:94", "sshd_port": 22201 },
-    { "name": "deco-205", "ip": "192.168.0.205", "mac": "b0:a7:b9:3e:17:00", "sshd_port": 22202 },
-    { "name": "deco-232", "ip": "192.168.0.232", "mac": "b0:a7:b9:3e:15:fc", "sshd_port": 22203 }
-  ],
-  "profile": "U7PG2", "wifi_caps": 131072,
-  "apply": false, "report_ip": "daemon", "on_remove": "stop", "kick_emulation": false,
-  "poll": "15s", "inform_interval": "10s"
-}
-```
+**Config `/data/udeco.json`.** [`deploy/udeco.example.json`](../../deploy/udeco.example.json) is the example, and a test loads it. README.md, Setup step 1, lists every key and its default.
 
 **Secrets.**
 
-- The password file is mode 0600 and owned by root.
+- The TP-Link password is never in the JSON. README.md, Setup step 2, lists where it is read from; `deploy/unraid.sh` gives the files in the appdata directory to the container's user and makes the credential files mode 0600.
 - The password is never logged, and is passed only to `ssh.Password`.
 - State directories are `/data/units/<mac>/`, mode 0700, and hold `state.json`, `system_cfg.txt`, the host keys and `unhandled.json`.
 

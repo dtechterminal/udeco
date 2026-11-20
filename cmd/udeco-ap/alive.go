@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/atomicfile"
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 )
 
@@ -114,11 +115,7 @@ func (a *agent) markAlive(state string, setJob bool, job string) {
 	b, _ := json.Marshal(r)
 	p := a.alivePath()
 	os.MkdirAll(filepath.Dir(p), 0o700)
-	tmp := p + ".tmp"
-	err := os.WriteFile(tmp, append(b, '\n'), 0o600)
-	if err == nil {
-		err = os.Rename(tmp, p)
-	}
+	err := atomicfile.Write(p, p+".tmp", append(b, '\n'), 0o600)
 	if err != nil && !s.failed {
 		a.logf("alive record %s: %v", p, err)
 		s.failed = true

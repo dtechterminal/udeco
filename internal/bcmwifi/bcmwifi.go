@@ -60,6 +60,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/ftpeer"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -72,8 +73,8 @@ type Runner interface {
 
 // Default locations on the device.
 const (
-	DefaultStateDir = "/tp_data/udeco/state" // persistent (ubifs, mounted sync): last-good only
-	DefaultRunDir   = "/tmp/udeco"           // ramfs, unbounded, RAM-backed: confs, pids, ACLs, baseline
+	DefaultStateDir = unit.DecoDir + "/" + unit.StateSub // persistent (ubifs, mounted sync): last-good only
+	DefaultRunDir   = unit.RunDir                        // ramfs, unbounded, RAM-backed: confs, pids, ACLs, baseline
 	CtrlDir         = "/var/run/udeco-hostapd"
 )
 

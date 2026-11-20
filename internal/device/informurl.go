@@ -16,9 +16,12 @@ import (
 // it, and egress allows the controller by address, so a name would need
 // DNS), with an optional numeric port and no user info.
 //
-// Every place the URL can change goes through it: the start config, a
-// setparam's mgmt_cfg inform_url, cmd set-adopt's uri and an SSH
-// set-adopt/set-inform. A rejected URL leaves the old one in place.
+// Every place the URL can change goes through it: the AP agent's start
+// config, a setparam's mgmt_cfg inform_url, cmd set-adopt's uri and an
+// SSH set-adopt/set-inform. A rejected URL leaves the old one in place.
+// The start URL of the other two daemons does not: cmd/udeco's config has
+// a wider rule of its own (startInformURL, with a test of the difference)
+// and cmd/uow's -url flag is not checked.
 func CheckInformURL(s string) error {
 	u, err := url.Parse(s)
 	if err != nil {

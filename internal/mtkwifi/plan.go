@@ -33,15 +33,22 @@ import (
 	"strings"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // RadioDef is one radio of the unit.
 type RadioDef struct {
-	Band      string   // "ng" or "na"
-	Ifaces    []string // BSS netdevs in profile slot order; [0] reads the profile
-	Dat       string   // driver profile (device path)
-	MaxStaKey string   // per-BSS client limit list in the profile
-	MaxTxDBm  int      // TxPower=100 (%)
+	Band string // "ng" or "na"
+	// Ifaces are the BSS netdevs in profile slot order; [0] reads the
+	// profile. Their number is the most SSIDs the radio serves.
+	Ifaces    []string
+	Dat       string // driver profile (device path)
+	MaxStaKey string // per-BSS client limit list in the profile
+	MaxTxDBm  int    // TxPower=100 (%)
+	MinTxDBm  int    // the lowest power reported to the controller (min_txpower)
+	NSS       int    // spatial streams
 	// TxLive is the iwpriv set key that changes the power at once: the
 	// MT7603's TxPower (CmdSetTxPowerCtrl), the MT7663's PowerDropCtrl
 	// (its `set TxPower` only stores the value)
@@ -60,13 +67,18 @@ type RadioDef struct {
 	Spectrum string
 }
 
-// JCOW414 is the JioFiber JCOW414 layout.
+// JCOW414 is the JioFiber JCOW414 layout: two 2x2 radios with four BSS
+// netdevs each. The power at TxPower=100 % is models.JCOW414MaxTx (what the
+// unit's profile is capped at); the tests hold the rest that the reported
+// models also state (streams, lowest power, SAE, the radio names) to
+// internal/models.
 var JCOW414 = []RadioDef{
 	{Band: "ng", Ifaces: []string{"ra0", "ra1", "ra2", "ra3"}, Dat: "/etc/Wireless/RT2860AP/RT2860AP.dat",
-		MaxStaKey: "MaxStaNum", MaxTxDBm: 20, TxLive: "TxPower", HWName: "MT7603E", Spectrum: SpectrumOffChan},
+		MaxStaKey: "MaxStaNum", MaxTxDBm: models.JCOW414MaxTx("ng"), MinTxDBm: 5, NSS: 2, TxLive: "TxPower", HWName: "MT7603E",
+		Spectrum: SpectrumOffChan},
 	{Band: "na", Ifaces: []string{"rai0", "rai1", "rai2", "rai3"}, Dat: "/etc/Wireless/RT2860AP_AC/RT2860AP.dat",
-		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: 23, TxLive: "PowerDropCtrl", HWName: "MT7663", SAE: true, UAPSD: true,
-		HSFlag: true},
+		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: models.JCOW414MaxTx("na"), MinTxDBm: 5, NSS: 2, TxLive: "PowerDropCtrl", HWName: "MT7663",
+		SAE: true, UAPSD: true, HSFlag: true},
 }
 
 // Channels the units' country (IN, CountryRegion 0 / CountryRegionABand 10)
@@ -136,8 +148,8 @@ type RadioPlan struct {
 	// each BSS's AssocReqRssiThres (live only, never in the profile) and
 	// the agent's weak-station kick (minrssi.go)
 	MinRSSI int `json:",omitempty"`
-	// TxMode is the controller's power mode (auto, high, medium, low,
-	// custom), reported back with the power (collector.go radioTx)
+	// TxMode is the controller's power mode (translate.TxAuto ...
+	// TxCustom), reported back with the power (collector.go radioTx)
 	TxMode string `json:",omitempty"`
 	// Slots is each BSS's profile slot (its netdev Ifaces[slot]), parallel
 	// to BSS; nil = positional (BSS[i] in slot i). Set by BSS pinning
@@ -201,16 +213,6 @@ func (r RadioPlan) hash() string {
 	return hex.EncodeToString(h[:8])
 }
 
-func normBand(b string) string {
-	switch strings.ToLower(b) {
-	case "ng", "2g", "2.4g", "2ghz", "2.4ghz":
-		return "ng"
-	case "na", "5g", "5ghz":
-		return "na"
-	}
-	return ""
-}
-
 // plans builds each radio's plan from d. Notes say what is not served.
 // sae: WPA3 may be served on the radios whose driver has it.
 func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan, []string) {
@@ -227,7 +229,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 		rp := RadioPlan{Band: rd.Band, On: ok && ri.Enabled, Width: ri.Width, TxPct: pct, MinRSSI: minRSSI(ri.MinRSSI),
 			TxMode: ri.TxPowerMode}
 		if rp.TxMode == "" {
-			rp.TxMode = "auto"
+			rp.TxMode = translate.TxAuto
 		}
 		allowed := chans24
 		if rd.Band == "na" {
@@ -252,7 +254,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 		case rd.Band == "na" && rp.Width != 20 && rp.Width != 40 && rp.Width != 80:
 			rp.Width = 80
 		}
-		if rd.Band == "na" && rp.Channel == 165 && rp.Width > 20 {
+		if rf.Only20MHz(rd.Band, rp.Channel) && rp.Width > 20 {
 			rp.Width = 20
 		}
 		maxSta := ri.MaxClients
@@ -269,30 +271,30 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 				RRM: s.RRM, BTM: s.BSSTransition, UAPSD: s.UAPSD && rd.UAPSD, M2U: s.MulticastToUnicast,
 				Sched: len(s.Schedule) > 0, ProxyARP: s.ProxyARP}
 			switch s.Security {
-			case "open", "":
+			case translate.SecOpen, "":
 				b.Auth, b.Encr = "OPEN", "NONE"
-			case "wpa2wpa3":
+			case translate.SecWPA2WPA3:
 				if sae && rd.SAE {
 					b.Auth, b.Encr, b.PSK, b.PMF = "WPA2PSKWPA3PSK", "AES", s.Passphrase, 1
 				} else {
 					b.Auth, b.Encr, b.PSK = "WPA2PSK", "AES", s.Passphrase
 				}
-			case "wpa3":
+			case translate.SecWPA3:
 				if !sae || !rd.SAE {
 					note("%s: SSID %q: security wpa3 is not supported by this driver: not served", rd.Band, s.SSID)
 					continue
 				}
 				b.Auth, b.Encr, b.PSK, b.PMF = "WPA3PSK", "AES", s.Passphrase, 2
-			case "wpa2":
+			case translate.SecWPA2:
 				b.Auth, b.Encr, b.PSK = "WPA2PSK", "AES", s.Passphrase
 				// PMF as the controller sets it, where the driver has it
 				// (the MT7663; the MT7603 module has no PMF profile keys).
 				// PMF asked and not served is noted by bssNotes.
 				switch {
 				case !rd.SAE:
-				case s.PMF == "required":
+				case s.PMF == translate.PMFRequired:
 					b.PMF = 2
-				case s.PMF == "optional":
+				case s.PMF == translate.PMFOptional:
 					b.PMF = 1
 				}
 			default:
@@ -313,6 +315,14 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 				note("%s: SSID %q: VLAN %d cannot be served: not served", rd.Band, s.SSID, b.VLAN)
 				continue
 			}
+			// The length only (8..64 bytes), not translate.ValidWPAPassphrase,
+			// which also wants printable ASCII and, at 64, hex digits. What
+			// that rule refuses is written to the profile here: 64
+			// characters that are not hex, and bytes outside printable ASCII
+			// (translate applies the rule to WPA2 and WPA2/WPA3 WLANs before
+			// they come here, not to WPA3-only ones). Applying it here would
+			// stop serving such an SSID: left to the owner.
+			// TestPassphraseLengthOnly shows the difference.
 			if b.Auth != "OPEN" && (len(b.PSK) < 8 || len(b.PSK) > 64) {
 				note("%s: SSID %q: no valid passphrase: not served", rd.Band, s.SSID)
 				continue
@@ -325,7 +335,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 				note("%s: SSID %q: this radio serves at most %d SSIDs: not served", rd.Band, s.SSID, len(rd.Ifaces))
 				continue
 			}
-			if s.Security == "wpa2wpa3" && b.Auth == "WPA2PSK" {
+			if s.Security == translate.SecWPA2WPA3 && b.Auth == "WPA2PSK" {
 				note("%s: SSID %q: served as WPA2 only (no SAE in this driver)", rd.Band, s.SSID)
 			}
 			bssNotes(s, b, rd, note)
@@ -347,7 +357,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 
 func onBand(s bcmwifi.SSID, band string) bool {
 	for _, b := range s.Bands {
-		if normBand(b) == band {
+		if rf.Norm(b) == band {
 			return true
 		}
 	}
@@ -381,11 +391,11 @@ var txDrops = []struct{ db, pct int }{{0, 100}, {1, 75}, {3, 50}, {6, 25}, {9, 1
 // and 6 dB brackets (as the Deco's presets).
 func txPctNote(r bcmwifi.Radio, maxDBm int) (int, string) {
 	switch r.TxPowerMode {
-	case "medium":
+	case translate.TxMedium:
 		return 50, ""
-	case "low":
+	case translate.TxLow:
 		return 25, ""
-	case "custom":
+	case translate.TxCustom:
 		if r.TxPower <= 0 || maxDBm <= 0 {
 			return 100, ""
 		}
@@ -539,7 +549,7 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 	}
 	kv["TxPower"] = strconv.Itoa(rp.TxPct)
 	if rd.Band == "na" && isDFS(rp.Channel) {
-		kv["CountryRegionABand"] = "0" // the only region with 52-64 (dfs.go)
+		kv[regionA] = dfsRegA // the only region with 52-64 (dfs.go)
 	}
 	var auth, encr, hide, nofw, maxsta, mfpc, mfpr []string
 	for i, b := range rp.BSS {

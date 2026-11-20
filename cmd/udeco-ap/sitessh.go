@@ -2,7 +2,7 @@
 
 package main
 
-// Site SSH logins on the agent's own SSH server (sshd_port, 2222), never
+// Site SSH logins on the agent's own SSH server (sshd_port), never
 // on port 22, which is the owner's dropbear (docs/deco/agent-design.md
 // "Site SSH logins"). Takeover only.
 //
@@ -51,12 +51,13 @@ type siteSSH struct {
 	logged    string            // the state last logged
 }
 
-// siteSSHOptions is SSHAdopt.Site: takeover configurations only.
+// siteSSHOptions is SSHAdopt.Site: takeover configurations only. A session's
+// PATH is agentPATH on both platforms (on jio-mtk too: not jioPATH).
 func (a *agent) siteSSHOptions() *device.SiteOptions {
 	if !a.cfg.Takeover {
 		return nil
 	}
-	return &device.SiteOptions{Shell: a.o.siteShell, Home: a.dev("/root")}
+	return &device.SiteOptions{Shell: a.o.siteShell, Home: a.dev("/root"), Path: agentPATH}
 }
 
 // siteFromCfg takes the saved system_cfg's switch and users (loop

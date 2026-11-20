@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Intent is the controller's system_cfg as backend-neutral desired state for
@@ -41,11 +43,11 @@ type RadioIntent struct {
 	Enabled     bool
 	Channel     int    // primary channel; 0 = auto
 	Width       int    // MHz (20, 40, 80, 160) from ieee_mode; 0 = not recognised
-	TxPowerMode string // auto, low, medium, high (the controller's presets) or custom
-	TxPower     int    // dBm, only for TxPowerMode custom
+	TxPowerMode string // TxAuto, TxLow, TxMedium, TxHigh (the controller's presets) or TxCustom
+	TxPower     int    // dBm, only for TxPowerMode TxCustom
 	MinRSSI     int    // dBm (negative); 0 = off
 	MaxClients  int    // per radio (stamgr load balance); 0 = no limit
-	BandSteer   string // "prefer_5g", "equal"; "" = off for this radio's WLANs
+	BandSteer   string // BandSteerPrefer5G or BandSteerEqual; "" = off for this radio's WLANs
 	// Blocked: radio.N.blklst, the channels the radio's automatic channel
 	// must not take (comma or space separated, as the U6 Pro's
 	// block_acs_channel takes them)
@@ -68,9 +70,9 @@ type WLANIntent struct {
 	Hidden  bool
 	Guest   bool
 
-	Security   string // open, wpa2, wpa3, wpa2wpa3, wpa2-enterprise, wpa3-enterprise, owe
+	Security   string // one of the Sec* modes below
 	Passphrase string // WPA2/WPA3 personal; secret
-	PMF        string // disabled, optional, required
+	PMF        string // PMFDisabled, PMFOptional or PMFRequired
 	GroupRekey int    // seconds; 0 = never (the controller's default)
 
 	VLAN           int    // 802.1Q id; 0 = untagged (the AP's own LAN)
@@ -119,6 +121,7 @@ type WLANIntent struct {
 	Hotspot2  *Hotspot2 // Hotspot 2.0 / Passpoint (aaa.N.hs20.*, hs20.go); nil = off
 	// Schedule: nil = always on. Otherwise the weekly windows the WLAN is up
 	// in, AP local time, as "mon 0800-1730" (end exclusive; 2400 = midnight).
+	// ScheduleOn reads them.
 	Schedule  []string
 	RateLimit *RateLimit // per-client limit (user group)
 
@@ -126,6 +129,50 @@ type WLANIntent struct {
 	// e.g. wifi0ap0); the inform's vap_table reports VAPs under these names.
 	Devnames map[string]string
 }
+
+// The words of an Intent. translate produces them and every backend
+// (bcmwifi, mtkwifi, the OpenWrt path, the agent) switches on them by the
+// names given here; TestIntentWords pins the values, which are stored in a
+// unit's saved state.
+
+// Security modes (WLANIntent.Security, BandWLAN.Security): this project's
+// own names for what the controller's aaa.N section asks for.
+const (
+	SecOpen     = "open"
+	SecWPA2     = "wpa2"
+	SecWPA3     = "wpa3"
+	SecWPA2WPA3 = "wpa2wpa3"
+	SecWPA2Ent  = "wpa2-enterprise"
+	SecWPA3Ent  = "wpa3-enterprise"
+	SecOWE      = "owe"
+)
+
+// Management frame protection (WLANIntent.PMF, BandWLAN.PMF). PMFFloor is
+// the least a security mode needs.
+const (
+	PMFDisabled = "disabled"
+	PMFOptional = "optional"
+	PMFRequired = "required"
+)
+
+// Transmit power modes (RadioIntent.TxPowerMode): the controller's
+// radio.N.txpower_mode values, passed through.
+const (
+	TxAuto   = "auto"
+	TxLow    = "low"
+	TxMedium = "medium"
+	TxHigh   = "high"
+	TxCustom = "custom"
+)
+
+// Band steering modes (RadioIntent.BandSteer, Steering.Mode): the
+// controller's bandsteering.mode values, passed through. BandSteerOff is
+// the controller's word for no steering; an Intent says "" instead.
+const (
+	BandSteerPrefer5G = "prefer_5g"
+	BandSteerEqual    = "equal"
+	BandSteerOff      = "off"
+)
 
 // MACFilter is a WLAN's MAC access list.
 type MACFilter struct {
@@ -200,10 +247,6 @@ func IntentFrom(cfg Cfg) (Intent, []string) {
 
 // --- radios ---
 
-// legacyBand maps the intent's band names to the package's older ones
-// (wlanRates).
-var legacyBand = map[string]string{"ng": "2g", "na": "5g", "6e": "6g"}
-
 var widthRe = regexp.MustCompile(`(?:ht|vht|he|eht)(\d+)`)
 
 // intentRadios fills in.Radios and in.Country and returns phy -> band.
@@ -222,8 +265,9 @@ func intentRadios(cfg Cfg, in *Intent, nb *noteList) map[string]string {
 			continue
 		}
 		band := "na"
+		byName, _ := RadioNameBand(phy)
 		switch {
-		case strings.Contains(mode, "ng") || (phy == "wifi0" || phy == "ra0") && !strings.Contains(mode, "na"):
+		case strings.Contains(mode, "ng") || byName == "ng" && !strings.Contains(mode, "na"):
 			band = "ng"
 		case strings.Contains(mode, "6e"):
 			band = "6e"
@@ -283,28 +327,30 @@ func txPower(mode, tp string, note func(string)) (string, int) {
 		v, err := strconv.Atoi(tp)
 		if err != nil || v <= 0 {
 			note(fmt.Sprintf("tx power %q not recognised: auto", tp))
-			return "auto", 0
+			return TxAuto, 0
 		}
-		return "custom", v
+		return TxCustom, v
 	}
 	switch mode {
 	case "":
-		if tp == "" || tp == "auto" {
-			return "auto", 0
+		if tp == "" || tp == "auto" { // radio.N.txpower's own "auto"
+			return TxAuto, 0
 		}
 		return custom()
-	case "auto", "low", "medium", "high":
+	case TxAuto, TxLow, TxMedium, TxHigh:
 		return mode, 0
-	case "custom":
+	case TxCustom:
 		return custom()
 	default:
 		note(fmt.Sprintf("txpower_mode %q not recognised: auto", mode))
-		return "auto", 0
+		return TxAuto, 0
 	}
 }
 
 // intentStamgr adds minimum RSSI, client limits (stamgr.N) and band
-// steering (bandsteering) to the radios.
+// steering (bandsteering) to the radios. Its rule for the stamgr sections
+// is not LegacyStamgr's (stamgr.go says how they differ); the two share
+// only how a value is read (stamgrMinRSSI, stamgrMaxSta).
 func intentStamgr(cfg Cfg, in *Intent, phyBand map[string]string, nb *noteList) {
 	if cfg["stamgr.status"] != "disabled" {
 		for _, n := range indices(cfg, "stamgr") {
@@ -321,15 +367,12 @@ func intentStamgr(cfg Cfg, in *Intent, phyBand map[string]string, nb *noteList) 
 				continue
 			}
 			if cfg[p+"minrssi.status"] == "true" || cfg[p+"minrssi.status"] == "enabled" {
-				if v, err := strconv.Atoi(cfg[p+"minrssi.rssi"]); err == nil && v != 0 {
-					if v > 0 { // RSSI above the noise floor -> dBm
-						v -= 95
-					}
+				if v, ok := stamgrMinRSSI(cfg[p+"minrssi.rssi"]); ok {
 					r.MinRSSI = v
 				}
 			}
 			if cfg[p+"loadbalance.status"] == "true" || cfg[p+"loadbalance.status"] == "enabled" {
-				if v, err := strconv.Atoi(cfg[p+"loadbalance.maxsta"]); err == nil && v > 0 {
+				if v := stamgrMaxSta(cfg[p+"loadbalance.maxsta"]); v > 0 {
 					r.MaxClients = v
 				}
 			}
@@ -401,7 +444,7 @@ func intentWLANs(cfg Cfg, in *Intent, phyBand map[string]string, nb *noteList) m
 		band, ok := phyBand[cfg[w+"parent"]]
 		if !ok {
 			// the UniFi convention when radio sections do not name the parent
-			band, ok = map[string]string{"wifi0": "ng", "wifi1": "na", "wifi2": "6e", "ra0": "ng", "rai0": "na"}[cfg[w+"parent"]]
+			band, ok = RadioNameBand(cfg[w+"parent"])
 		}
 		if _, have := in.Radios[band]; !ok || (!have && len(in.Radios) > 0) {
 			skip(fmt.Sprintf("radio %q is not on this AP: ignored", cfg[w+"parent"]))
@@ -433,7 +476,7 @@ func intentWLANs(cfg Cfg, in *Intent, phyBand map[string]string, nb *noteList) m
 			continue
 		}
 		kept, dropped := groups[x.ID][dup], vap{n, x}
-		if kept.x.Security == "open" && x.Security != "open" {
+		if kept.x.Security == SecOpen && x.Security != SecOpen {
 			kept, dropped = dropped, kept
 			groups[x.ID][dup] = kept
 		}
@@ -516,7 +559,7 @@ func intentVAP(cfg Cfg, n, w, a, band, ssid string, vlanNet map[string]string, l
 	if why := wlanHotspot2(cfg, w, a, &x, note); why != "" { // Hotspot 2.0: hs20.go
 		return x, why
 	}
-	if v := cfg[a+"wpa.group_rekey"]; v != "" && x.Security != "open" {
+	if v := cfg[a+"wpa.group_rekey"]; v != "" && x.Security != SecOpen {
 		if r, err := strconv.Atoi(v); err == nil && r >= 0 {
 			x.GroupRekey = r
 		} else {
@@ -525,16 +568,16 @@ func intentVAP(cfg Cfg, n, w, a, band, ssid string, vlanNet map[string]string, l
 	}
 	if x.FT = cfg[a+"ft.status"] == "enabled"; x.FT {
 		switch {
-		case x.Security == "open" || x.Security == "owe":
+		case x.Security == SecOpen || x.Security == SecOWE:
 			note("802.11r on an open/OWE network: not supported, off")
 			x.FT = false
-		case x.Security == "wpa3" && cfg[a+"wpa3.ft.status"] == "disabled":
+		case x.Security == SecWPA3 && cfg[a+"wpa3.ft.status"] == "disabled":
 			note("802.11r is on but FT-SAE (wpa3.ft.status) is off: 802.11r off")
 			x.FT = false
-		case x.Security == "wpa2wpa3" && cfg[a+"wpa3.ft.status"] != "enabled":
+		case x.Security == SecWPA2WPA3 && cfg[a+"wpa3.ft.status"] != "enabled":
 			note("802.11r is on for WPA2 only (wpa3.ft.status is off): WPA3 clients do not fast-roam")
 		}
-		x.FTSAE = x.FT && (x.Security == "wpa3" || x.Security == "wpa2wpa3") && cfg[a+"wpa3.ft.status"] == "enabled"
+		x.FTSAE = x.FT && (x.Security == SecWPA3 || x.Security == SecWPA2WPA3) && cfg[a+"wpa3.ft.status"] == "enabled"
 		if x.FT {
 			x.FTKey = cfg[a+"iapp_key"]
 			x.FTOverDS = isOn(cfg[a+"ft_over_ds"])
@@ -633,10 +676,7 @@ func isOn(v string) bool {
 // incomplete) and the WLAN must stay off: it is never built weaker, and
 // never open.
 func wlanSecurity(cfg Cfg, w, a string, x *WLANIntent, note func(string, ...any)) string {
-	var mgmt []string
-	for _, m := range indices(cfg, strings.TrimSuffix(a, ".")+".wpa.key") {
-		mgmt = append(mgmt, strings.Fields(cfg[a+"wpa.key."+m+".mgmt"])...)
-	}
+	mgmt := wpaKeyMgmt(cfg, a, wpaKeySent(cfg, a))
 	has := func(names ...string) bool {
 		for _, m := range mgmt {
 			for _, s := range names {
@@ -673,14 +713,14 @@ func wlanSecurity(cfg Cfg, w, a string, x *WLANIntent, note func(string, ...any)
 		}
 		wpa3 := has("WPA-EAP-SHA256") && !has("WPA-EAP") ||
 			cfg[a+"wpa3.support"] == "enabled" && cfg[a+"wpa3.transition"] != "enabled"
-		x.Security = "wpa2-enterprise"
+		x.Security = SecWPA2Ent
 		if wpa3 {
-			x.Security = "wpa3-enterprise"
+			x.Security = SecWPA3Ent
 		} else if cfg[a+"wpa3.support"] == "enabled" || has("WPA-EAP-SHA256") {
 			note("WPA2/WPA3-Enterprise transition: built as wpa2-enterprise")
 		}
 	case has("OWE") || wpa == "" && psk == "" && len(mgmt) == 0 && cfg[a+"wpa3.support"] == "enabled":
-		x.Security = "owe"
+		x.Security = SecOWE
 		if cfg[a+"owe_devname"] != "" {
 			note("OWE transition (an open twin of this SSID) is not supported: OWE only")
 		}
@@ -688,7 +728,7 @@ func wlanSecurity(cfg Cfg, w, a string, x *WLANIntent, note func(string, ...any)
 		if ppsk {
 			return "private pre-shared keys without a WPA mode: not built as open"
 		}
-		x.Security = "open"
+		x.Security = SecOpen
 	default:
 		switch wpa {
 		case "1":
@@ -699,11 +739,11 @@ func wlanSecurity(cfg Cfg, w, a string, x *WLANIntent, note func(string, ...any)
 		enc, encNote := encryption(cfg, a)
 		switch enc {
 		case "sae-mixed":
-			x.Security = "wpa2wpa3"
+			x.Security = SecWPA2WPA3
 		case "sae":
-			x.Security = "wpa3"
+			x.Security = SecWPA3
 		case "psk2+ccmp":
-			x.Security = "wpa2"
+			x.Security = SecWPA2
 			if strings.HasPrefix(encNote, "no key mgmt") {
 				note("%s", encNote)
 			}
@@ -725,7 +765,7 @@ func wlanSecurity(cfg Cfg, w, a string, x *WLANIntent, note func(string, ...any)
 			}
 			return "WPA personal without a passphrase"
 		}
-		if psk != "" && x.Security != "wpa3" && !validWPAPassphrase(psk) {
+		if psk != "" && x.Security != SecWPA3 && !ValidWPAPassphrase(psk) {
 			return "passphrase is not 8-63 characters (or 64 hex digits) as WPA2 requires"
 		}
 		if strings.IndexFunc(psk, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
@@ -754,29 +794,61 @@ func wlanSecurity(cfg Cfg, w, a string, x *WLANIntent, note func(string, ...any)
 			return "RADIUS MAC authentication without a RADIUS auth server"
 		}
 	}
-	x.PMF = map[string]string{"0": "disabled", "1": "optional", "2": "required"}[pmf(cfg[a+"pmf.status"], cfg[a+"pmf.mode"])]
-	switch x.Security {
-	case "open":
-		x.PMF = "disabled"
-	case "wpa3", "owe", "wpa3-enterprise":
-		if x.PMF != "required" {
+	x.PMF = PMFWord(pmfLevel(cfg[a+"pmf.status"], cfg[a+"pmf.mode"]))
+	if x.Security == SecOpen {
+		x.PMF = PMFDisabled
+	} else if floor := PMFFloor(x.Security); PMFLevel(x.PMF) < PMFLevel(floor) {
+		if floor == PMFRequired {
 			note("PMF %s raised to required (%s needs it)", x.PMF, x.Security)
-			x.PMF = "required"
-		}
-	case "wpa2wpa3":
-		if x.PMF == "disabled" {
+		} else {
 			note("PMF disabled raised to optional (WPA2/WPA3 transition needs it)")
-			x.PMF = "optional"
 		}
+		x.PMF = floor
 	}
-	if c := cfg[a+"pmf.cipher"]; c != "" && c != "AES-128-CMAC" && x.PMF != "disabled" {
+	if c := cfg[a+"pmf.cipher"]; c != "" && c != "AES-128-CMAC" && x.PMF != PMFDisabled {
 		note("PMF cipher %q is not supported: AES-128-CMAC", c)
 	}
 	return ""
 }
 
-// validWPAPassphrase: what hostapd accepts as wpa_passphrase or wpa_psk.
-func validWPAPassphrase(p string) bool {
+// PMFFloor is the least management frame protection a security mode needs:
+// PMFRequired for WPA3, OWE and WPA3-Enterprise, PMFOptional for the
+// WPA2/WPA3 transition, PMFDisabled for the rest. IntentFromCfg raises a
+// WLAN's PMF to it. The backends have their own code for the PMF they
+// render (bcmwifi keyMgmt, mtkwifi plans); their tests hold it to this
+// floor for the mode they serve, and mtkwifi's names where it serves less
+// than was asked (a transition BSS is fixed at optional; a transition SSID
+// served as WPA2 where there is no SAE has none).
+func PMFFloor(security string) string {
+	switch security {
+	case SecWPA3, SecOWE, SecWPA3Ent:
+		return PMFRequired
+	case SecWPA2WPA3:
+		return PMFOptional
+	}
+	return PMFDisabled
+}
+
+// pmfWords are the PMF words by level.
+var pmfWords = []string{PMFDisabled, PMFOptional, PMFRequired}
+
+// PMFLevel is a PMF word as a number, hostapd's ieee80211w: 0 disabled,
+// 1 optional, 2 required; -1 for any other word.
+func PMFLevel(pmf string) int { return slices.Index(pmfWords, pmf) }
+
+// PMFWord is the PMF word of a level (0, 1, 2); "" for any other number.
+func PMFWord(level int) string {
+	if level < 0 || level >= len(pmfWords) {
+		return ""
+	}
+	return pmfWords[level]
+}
+
+// ValidWPAPassphrase: what hostapd accepts as wpa_passphrase (8-63
+// printable ASCII characters) or wpa_psk (64 hex digits). bcmwifi's
+// validPSK is this rule; mtkwifi checks the length only (its plan.go says
+// why).
+func ValidWPAPassphrase(p string) bool {
 	if len(p) == 64 {
 		for _, c := range p {
 			if !strings.ContainsRune("0123456789abcdefABCDEF", c) {
@@ -840,6 +912,12 @@ func wlanVLAN(cfg Cfg, a, dev string, vlanNet map[string]string, note func(strin
 
 // BandWLAN is one band's own security and roaming settings of a WLAN
 // (WLANIntent.PerBand). Passphrase stays WLAN-wide.
+//
+// This is the one list of the per-band settings: each field is the
+// WLANIntent field of the same name. bandFields is derived from it,
+// bcmwifi.BandSettings is this type, and tests hold the code that names
+// the fields one by one (bandWLAN here, bcmwifi's ForBand and bandSettings)
+// to it.
 type BandWLAN struct {
 	Security           string
 	PMF                string
@@ -860,10 +938,16 @@ func bandWLAN(v WLANIntent) BandWLAN {
 		Isolation: v.Isolation, GroupRekey: v.GroupRekey}
 }
 
-// bandFields are the WLANIntent fields BandWLAN carries per band.
-var bandFields = map[string]bool{"security": true, "pmf": true, "ft": true, "ftsae": true, "ftoverds": true,
-	"mobilitydomain": true, "bsstransition": true, "rrm": true, "uapsd": true, "proxyarp": true,
-	"multicasttounicast": true, "hidden": true, "isolation": true, "grouprekey": true}
+// bandFields are the WLANIntent fields BandWLAN carries per band: BandWLAN's
+// own field names, in lower case as differing names them.
+var bandFields = func() map[string]bool {
+	m := map[string]bool{}
+	t := reflect.TypeOf(BandWLAN{})
+	for i := 0; i < t.NumField(); i++ {
+		m[strings.ToLower(t.Field(i).Name)] = true
+	}
+	return m
+}()
 
 // mergeVAPs merges one WLAN's per-band VAPs. Band-wide settings are taken
 // from the first VAP. When the bands differ in security or roaming settings,
@@ -999,7 +1083,31 @@ func scheduleOn(s *Schedule) (windows []string, never bool) {
 	return windows, len(windows) == 0
 }
 
-// hhmm parses "HHMM" (00:00-24:00) to minutes; -1 if invalid.
+// ScheduleOn reports whether now (the AP's local time) falls in one of the
+// windows of a WLANIntent.Schedule: the reader of the text scheduleOn
+// writes ("mon 0800-1730", end exclusive). A nil Schedule (always on) is
+// the caller's to tell apart; with no window that matches, the WLAN is off.
+func ScheduleOn(windows []string, now time.Time) bool {
+	day := days[(int(now.Weekday())+6)%7] // days starts on Monday, time.Weekday on Sunday
+	m := now.Hour()*60 + now.Minute()
+	for _, w := range windows {
+		d, span, ok := strings.Cut(w, " ")
+		if !ok || d != day {
+			continue
+		}
+		a, b, ok := strings.Cut(span, "-")
+		if !ok {
+			continue
+		}
+		from, to := hhmm(a), hhmm(b)
+		if from >= 0 && to >= 0 && from <= m && m < to {
+			return true
+		}
+	}
+	return false
+}
+
+// hhmm parses "HHMM" (00:00-24:00) to minutes; negative if invalid.
 func hhmm(s string) int {
 	v, err := strconv.Atoi(s)
 	if err != nil || len(s) != 4 {
@@ -1062,7 +1170,9 @@ func intentSyslog(cfg Cfg, nb *noteList) *SyslogIntent {
 	if cfg["syslog.status"] != "enabled" || cfg["syslog.remote.status"] != "enabled" || cfg["syslog.remote.ip"] == "" {
 		return nil
 	}
-	s := &SyslogIntent{Host: cfg["syslog.remote.ip"], Port: 514, Encrypted: cfg["syslog.remote.encrypt"] == "enabled"}
+	// DefaultSyslogPort also for an encrypted target without a port: see
+	// DefaultEncryptedSyslogPort
+	s := &SyslogIntent{Host: cfg["syslog.remote.ip"], Port: DefaultSyslogPort, Encrypted: cfg["syslog.remote.encrypt"] == "enabled"}
 	if v, err := strconv.Atoi(cfg["syslog.remote.port"]); err == nil && v > 0 && v < 65536 {
 		s.Port = v
 	}

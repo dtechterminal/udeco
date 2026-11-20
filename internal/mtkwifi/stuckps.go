@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
 )
 
 // The downlink watchdog. Seen on the Garage 2026-11-20 (the pump, a Tuya
@@ -196,7 +197,7 @@ func (a *Applier) KickStuck(ctx context.Context, s *apstate.Snapshot) []string {
 					continue
 				}
 				sentAt := a.o.wall() // a reply is only one after the probe left
-				if err := a.o.sendFrame(a.o.Bridge, arpFrame(hw, self, 1, selfIP, hw, ip)); err != nil {
+				if err := a.o.sendFrame(a.o.Bridge, stasnoop.ARPFrame(hw, self, 1, selfIP, hw, ip)); err != nil {
 					a.o.Logf("mtkwifi: downlink watchdog: probe to %s: %v", mac, err)
 					p.next = now.Add(stuckProbeEvery)
 					continue

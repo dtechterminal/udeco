@@ -12,7 +12,8 @@ package main
 // false); adopted; the saved system_cfg's sshd section is there and lets
 // no site login in from the LAN (translate.SSHDIntent.LANLogins false);
 // the last controller reply that counts is younger than
-// login_lock_failopen_s (600 s). Anything else is OPEN.
+// login_lock_failopen_s (its default and range: loginLockFailOpenKey in
+// config.go). Anything else is OPEN.
 //
 // A reply counts (lockReply) only once the agent has handled it in full
 // (decoded with the device key and accepted by device.Session.Handle: a
@@ -24,8 +25,8 @@ package main
 // had); its other effects are the agent's as before.
 //
 // Who acts: the loop goroutine looks after every inform (cheap: it acts
-// only when the decision changed, so the 10-minute fail-open lands within
-// one inform interval); the worker's tick re-asserts a lock in place
+// only when the decision changed, so the fail-open lands within one
+// inform interval); the worker's tick re-asserts a lock in place
 // (rules can be lost); the agent's stop and the hand-back to TP-Link
 // remove it. decosys/jiosys build the chain (UDECO-LOCK) and fail open:
 // a lock that cannot be installed in full is taken out again. Each

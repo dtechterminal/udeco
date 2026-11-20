@@ -25,8 +25,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
 	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 const garpEvery = 10 * time.Second
@@ -39,7 +41,7 @@ type garpState struct {
 
 // mgmtBridge is the bridge the AP's own address (and so its ARP table) is
 // on.
-const mgmtBridge = "br-lan"
+const mgmtBridge = unit.LANBridge
 
 // onHapdEvent is hapdmon's OnEvent hook (its goroutine): an authorization
 // is queued for the GARP goroutine; a full queue drops it.
@@ -137,13 +139,7 @@ func (a *agent) assocGARP(ev hapdmon.Event, now time.Time, arp map[string]string
 }
 
 // bridgeName is vif's bridge (sysfs; "" when it is in none).
-func (a *agent) bridgeName(vif string) string {
-	link, err := os.Readlink(filepath.Join(a.o.root, "sys/class/net", vif, "brport", "bridge"))
-	if err != nil {
-		return ""
-	}
-	return filepath.Base(link)
-}
+func (a *agent) bridgeName(vif string) string { return bcmwifi.BridgeOf(a.o.root, vif) }
 
 // wiredPorts are the non-Wi-Fi members of vif's bridge (sysfs).
 func (a *agent) wiredPorts(vif string) []string {

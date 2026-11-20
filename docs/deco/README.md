@@ -36,15 +36,21 @@ Copy `deploy/udeco.example.json` to `/mnt/osssd/appdata/unifi-deco/udeco.json`. 
 | `inform_url` | required | Controller inform URL. The host must be an IP. |
 | `console_ip` | inform host | The only address allowed to SSH-adopt. |
 | `daemon_ip` | local IP toward the controller | IP reported to the controller (192.168.0.4). |
+| `netmask` | `255.255.255.0` | Netmask reported to the controller. |
+| `gateway` | inform host | Gateway reported to the controller. |
 | `tplink_id` | `TPLINK_EMAIL` | Exact stored TP-Link ID (casing matters: `md5(id)` must equal the master's TDP owner hash). |
+| `password_file` | none | File that holds the TP-Link password (step 2, Credentials). |
+| `credentials_file` | `<state_dir>/credentials.env` | Env file with the TP-Link ID and password (step 2, Credentials). A file named here must exist. |
 | `mesh.master` | first unit | Master unit, by IP or MAC. |
 | `mesh.host_key_sha256` | trust on first use | Pins the master's SSH host key. Without it the first key seen is saved to `master_host_key`. |
 | `units[]` | required | `name`, `ip`, `mac`, `sshd_port` (default 22201 + index). |
 | `model` | `U7PG2` | UniFi model presented. |
+| `profile` | none | Another name for `model`: read when `model` is not set. |
 | `wifi_caps` | 0 | Capability bitmap; 131072 claims WPA3. |
 | `apply` | `false` | Write to the Decos. Off means plans are only logged. |
 | `report_ip` | `daemon` | `deco` reports the Deco's own IP after adoption (untested). |
 | `on_remove` | `stop` | After the controller forgets a unit, either stop its runner (`stop`) or show it as pending again (`pending`). |
+| `kick_emulation` | `false` | Not implemented: `true` is accepted and said so in the log at start; a kick is only logged. |
 | `poll` | `15s` | Device list, client speed and IoT client poll interval (minimum 5 s). |
 | `clients_every` | `10m` | 0x4012 client-list interval (minimum 10 min): names, client types, last known access Deco and band. Slow (62 s live); never on the inform path. |
 | `no_client_list` | `false` | Never read 0x4012. Stations are then placed only by 0x4040 entries. |

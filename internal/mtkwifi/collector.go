@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -111,7 +113,7 @@ func NewCollector(o CollectorOptions) *Collector {
 		o.Root = "/"
 	}
 	if o.Bridge == "" {
-		o.Bridge = "bdg2"
+		o.Bridge = unit.JioLANBridge
 	}
 	if o.Layout == nil {
 		o.Layout = JCOW414
@@ -172,7 +174,7 @@ func (c *Collector) Collect(ctx context.Context) (*apstate.Snapshot, error) {
 	for _, rd := range c.o.Layout {
 		main := rd.Ifaces[0]
 		r := apstate.Radio{Iface: main, Phy: main, Mode: "Master", Band: rd.Band,
-			NSS: 2, HWName: rd.HWName, VHT: rd.Band == "na", TxMin: 5, TxMax: rd.MaxTxDBm, Noise: noiseFloor}
+			NSS: rd.NSS, HWName: rd.HWName, VHT: rd.Band == "na", TxMin: rd.MinTxDBm, TxMax: rd.MaxTxDBm, Noise: noiseFloor}
 		r.Width = c.radioWidth(rd)
 		c.radioTx(&r, rd)
 		if !c.isUp(main) {
@@ -480,11 +482,12 @@ func readTxModes(root, runDir string) map[string]string {
 	return m
 }
 
-var statNames = []string{"rx_bytes", "tx_bytes", "rx_packets", "tx_packets", "rx_errors", "tx_errors", "rx_dropped", "tx_dropped"}
-
+// netStats reads the interface counters a vap_table row carries
+// (apstate.VAPNetdevFields, as internal/wl's netStats; the numbers are
+// read signed here and unsigned there, so only the names are shared).
 func (c *Collector) netStats(dev string) map[string]int64 {
 	m := map[string]int64{}
-	for _, k := range statNames {
+	for _, k := range apstate.VAPNetdevFields {
 		v, _ := strconv.ParseInt(c.read("/sys/class/net/"+dev+"/statistics/"+k), 10, 64)
 		m[k] = v
 	}
@@ -518,9 +521,13 @@ func newLogAnchored(before, after string) (string, bool) {
 
 // Caps describes the radios for the agent's capability words.
 func (c *Collector) Caps(context.Context) (wl.Caps, error) {
-	cp := wl.Caps{Country: "IN", MaxBSS: 4, Bands: map[string]wl.BandCaps{}}
-	for _, rd := range c.o.Layout {
-		b := wl.BandCaps{TxMinDBm: 5, TxMaxDBm: rd.MaxTxDBm, NSS: 2, HT: true, Channels: map[int][]int{}}
+	cp := wl.Caps{Country: "IN", Bands: map[string]wl.BandCaps{}}
+	for i, rd := range c.o.Layout {
+		// BSSes per radio: its netdevs (the radio with the fewest)
+		if n := len(rd.Ifaces); i == 0 || n < cp.MaxBSS {
+			cp.MaxBSS = n
+		}
+		b := wl.BandCaps{TxMinDBm: rd.MinTxDBm, TxMaxDBm: rd.MaxTxDBm, NSS: rd.NSS, HT: true, Channels: map[int][]int{}}
 		if rd.Band == "ng" {
 			b.Channels[20], b.Channels[40] = chans24, chans24
 		} else {
@@ -531,8 +538,9 @@ func (c *Collector) Caps(context.Context) (wl.Caps, error) {
 				five = append(five, chans5[4:]...)
 			}
 			b.Channels[20] = five
-			b.Channels[40] = five[:len(five)-1] // not 165
-			b.Channels[80] = five[:len(five)-1]
+			// wider: all but the 20 MHz only channel (165)
+			wide := slices.DeleteFunc(slices.Clone(five), func(ch int) bool { return rf.Only20MHz(rd.Band, ch) })
+			b.Channels[40], b.Channels[80] = wide, wide
 		}
 		cp.Bands[rd.Band] = b
 	}
@@ -690,7 +698,7 @@ func parseMacTable(log string) []sta {
 		if k < 4 || k+7 >= len(tok) {
 			continue
 		}
-		st := sta{Station: apstate.Station{MAC: mac, Authorized: true, Connected: conn, Noise: -95}}
+		st := sta{Station: apstate.Station{MAC: mac, Authorized: true, Connected: conn, Noise: noiseFloor}}
 		st.bss, _ = strconv.Atoi(tok[k-4])
 		st.PowerSave = tok[k-3] == "1"
 		best := 0

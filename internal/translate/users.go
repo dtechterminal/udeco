@@ -4,6 +4,7 @@ package translate
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -25,6 +26,23 @@ var (
 	// never managed: the AP's own accounts
 	systemUsers = map[string]bool{"root": true, "nobody": true, "daemon": true, "ftp": true, "network": true, "dnsmasq": true, "ntp": true, "logd": true, "ubus": true}
 )
+
+// LoginNamePattern is the pattern a device login's name must match, as
+// text, and SystemUsers the names never taken from the controller. They are
+// for the test that holds internal/device's second check of a site login
+// (SiteLoginNamePattern, SiteSystemUsers) to this one: the two checks stay
+// separate code on purpose.
+func LoginNamePattern() string { return userName.String() }
+
+// SystemUsers is a copy of the AP's own accounts, sorted.
+func SystemUsers() []string {
+	out := make([]string, 0, len(systemUsers))
+	for n := range systemUsers {
+		out = append(out, n)
+	}
+	sort.Strings(out)
+	return out
+}
 
 // Users returns the admin logins from system_cfg (enabled, with a valid name
 // and crypt hash, not an AP system account) and notes about skipped ones.

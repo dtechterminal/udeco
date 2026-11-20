@@ -15,7 +15,7 @@ func (cl *Client) Scan(iface string, perStep int) ([]BSS, []ChanSurvey, error) {
 	if perStep < 1 || perStep > 8 {
 		perStep = 4
 	}
-	if !ifaceSafe(iface) {
+	if !ifnameOK(iface) {
 		return nil, nil, fmt.Errorf("scan: bad interface %q", iface)
 	}
 	// One full-band scan gives each 5 GHz channel too short a dwell on
@@ -58,18 +58,6 @@ echo @@SURVEY@@; iw dev $IF survey dump`, iface, perStep))
 		bss = append(bss, b)
 	}
 	return bss, SurveyDelta(ParseSurvey(before), ParseSurvey(after)), nil
-}
-
-func ifaceSafe(s string) bool {
-	if s == "" || len(s) > 15 {
-		return false
-	}
-	for _, c := range s {
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_' || c == '.') {
-			return false
-		}
-	}
-	return true
 }
 
 func firstLine(s string) string {

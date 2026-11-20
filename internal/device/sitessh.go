@@ -121,6 +121,23 @@ var siteSystemUsers = map[string]bool{"root": true, "nobody": true, "daemon": tr
 
 var siteUserName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_-]{0,31}$`)
 
+// SiteLoginNamePattern is the pattern a site login's name must match, as
+// text, and SiteSystemUsers the accounts never logged in. They are for the
+// test (cmd/udeco-ap) that holds this second check to the agent's first one
+// (translate.LoginNamePattern, translate.SystemUsers): the same pattern,
+// and every account refused there refused here too.
+func SiteLoginNamePattern() string { return siteUserName.String() }
+
+// SiteSystemUsers is a copy of the refused accounts, sorted.
+func SiteSystemUsers() []string {
+	out := make([]string, 0, len(siteSystemUsers))
+	for n := range siteSystemUsers {
+		out = append(out, n)
+	}
+	slices.Sort(out)
+	return out
+}
+
 // siteNameOK is a name a site login may have.
 func siteNameOK(name string) bool { return siteUserName.MatchString(name) && !siteSystemUsers[name] }
 

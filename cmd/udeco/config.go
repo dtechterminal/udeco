@@ -2,7 +2,7 @@
 
 package main
 
-// Configuration: JSON at /data/udeco.json (docs/deco/design.md §9). The
+// Configuration: JSON at defaultConfigPath (docs/deco/README.md, Setup). The
 // TP-Link password is never in the JSON: it comes from TPLINK_PASSWORD,
 // TPLINK_PASSWORD_FILE, password_file or an env file (credentials.env) and
 // is held only as a deco.Secret.
@@ -64,7 +64,7 @@ type MeshSection struct {
 	HostKeySHA256 string `json:"host_key_sha256,omitempty"`
 }
 
-// Config is /data/udeco.json.
+// Config is the config file (-config, default defaultConfigPath).
 type Config struct {
 	InformURL string `json:"inform_url"`
 	ConsoleIP string `json:"console_ip,omitempty"` // allowed to SSH-adopt; default the inform host
@@ -84,13 +84,13 @@ type Config struct {
 	WifiCaps int    `json:"wifi_caps,omitempty"`
 
 	Apply         bool   `json:"apply"`
-	ReportIP      string `json:"report_ip,omitempty"` // daemon (default) | deco
-	OnRemove      string `json:"on_remove,omitempty"` // stop (default) | pending
+	ReportIP      string `json:"report_ip,omitempty"` // reportDaemon (default) | reportDeco
+	OnRemove      string `json:"on_remove,omitempty"` // onRemoveStop (default) | onRemovePending
 	KickEmulation bool   `json:"kick_emulation,omitempty"`
 	HideWired     bool   `json:"hide_wired,omitempty"`
 
-	Poll           Duration `json:"poll,omitempty"`            // device list, client speeds, IoT clients; default 15s
-	ClientsEvery   Duration `json:"clients_every,omitempty"`   // 0x4012 (see below); default and minimum 10m
+	Poll           Duration `json:"poll,omitempty"`            // device list, client speeds, IoT clients; default deco.DefaultPoll, at least minPoll
+	ClientsEvery   Duration `json:"clients_every,omitempty"`   // 0x4012 (see below); default and minimum deco.MinClientsEvery
 	NoClientList   bool     `json:"no_client_list,omitempty"`  // never read 0x4012
 	InformInterval Duration `json:"inform_interval,omitempty"` // inform at least this often; 0 = the controller's
 	StateDir       string   `json:"state_dir,omitempty"`       // default the config file's directory
@@ -99,8 +99,35 @@ type Config struct {
 }
 
 const (
-	defaultModel    = "U7PG2"
+	defaultModel    = models.DefaultModel // the measured UAP-AC-Pro
 	defaultSSHDPort = 22201
+	minPoll         = 5 * time.Second
+)
+
+// Where the TP-Link credentials come from besides the config's own keys:
+// environment variables, each of which the env file may set as well, and
+// the env file's name in the state directory. deploy/unraid.sh and
+// docs/deco/README.md name them too (TestUnraidScriptCredentials,
+// TestCredentialNames).
+const (
+	envTPLinkEmail           = "TPLINK_EMAIL"
+	envTPLinkPassword        = "TPLINK_PASSWORD"
+	envTPLinkPasswordFile    = "TPLINK_PASSWORD_FILE"
+	envTPLinkPasswordFileAlt = "UDECO_TPLINK_PASSWORD_FILE" // the environment only, not the env file
+	credentialsFileName      = "credentials.env"
+)
+
+// The values of report_ip: the address a unit is reported with.
+const (
+	reportDaemon = "daemon" // the daemon's, always
+	reportDeco   = "deco"   // the Deco's own once adopted
+)
+
+// The values of on_remove: what a unit's runner does once the controller
+// forgets the unit.
+const (
+	onRemoveStop    = "stop"    // stops
+	onRemovePending = "pending" // goes on informing, as a unit to adopt
 )
 
 // loadConfig reads and validates path. It never reads secrets.
@@ -126,7 +153,7 @@ func parseConfig(b []byte) (*Config, error) {
 	}
 	for _, k := range []string{"password", "tplink_password"} {
 		if _, ok := probe[k]; ok {
-			return nil, fmt.Errorf("%q is not read from the config: use TPLINK_PASSWORD_FILE, password_file or credentials.env", k)
+			return nil, fmt.Errorf("%q is not read from the config: use %s, password_file or %s", k, envTPLinkPasswordFile, credentialsFileName)
 		}
 	}
 	dec := json.NewDecoder(bytes.NewReader(b))
@@ -154,9 +181,9 @@ func (c *Config) validate() error {
 		return fmt.Errorf("clients_every %s is below the %s minimum (0x4012 is slow and blocks the session)",
 			time.Duration(c.ClientsEvery), deco.MinClientsEvery)
 	}
-	u, err := url.Parse(c.InformURL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || net.ParseIP(u.Hostname()) == nil {
-		return fmt.Errorf("inform_url %q: want http://<ip>:8080/inform (IP-literal host)", c.InformURL)
+	u, err := startInformURL(c.InformURL)
+	if err != nil {
+		return err
 	}
 	if c.ConsoleIP == "" {
 		c.ConsoleIP = u.Hostname()
@@ -183,23 +210,23 @@ func (c *Config) validate() error {
 	}
 	switch c.ReportIP {
 	case "":
-		c.ReportIP = "daemon"
-	case "daemon", "deco":
+		c.ReportIP = reportDaemon
+	case reportDaemon, reportDeco:
 	default:
-		return fmt.Errorf("report_ip %q: want daemon or deco", c.ReportIP)
+		return fmt.Errorf("report_ip %q: want %s or %s", c.ReportIP, reportDaemon, reportDeco)
 	}
 	switch c.OnRemove {
 	case "":
-		c.OnRemove = "stop"
-	case "stop", "pending":
+		c.OnRemove = onRemoveStop
+	case onRemoveStop, onRemovePending:
 	default:
-		return fmt.Errorf("on_remove %q: want stop or pending", c.OnRemove)
+		return fmt.Errorf("on_remove %q: want %s or %s", c.OnRemove, onRemoveStop, onRemovePending)
 	}
 	if c.Poll == 0 {
-		c.Poll = Duration(15 * time.Second)
+		c.Poll = Duration(deco.DefaultPoll)
 	}
-	if time.Duration(c.Poll) < 5*time.Second {
-		return fmt.Errorf("poll %s is below 5s", time.Duration(c.Poll))
+	if time.Duration(c.Poll) < minPoll {
+		return fmt.Errorf("poll %s is below %s", time.Duration(c.Poll), minPoll)
 	}
 	if len(c.Units) == 0 {
 		return errors.New("no units")
@@ -288,11 +315,12 @@ type env func(string) string
 //	           config password_file, env file TPLINK_PASSWORD_FILE, env file TPLINK_PASSWORD
 //
 // The env file is credentials_file, default <state_dir>/credentials.env; a
-// missing file is fine. Errors and warnings name files, never values.
+// missing file is fine. Errors and warnings name files, never values. The
+// names are the env* constants and credentialsFileName.
 func loadSecrets(c *Config, getenv env, warn func(string, ...any)) (Secrets, error) {
 	path := c.CredentialsFile
 	if path == "" {
-		path = filepath.Join(c.StateDir, "credentials.env")
+		path = filepath.Join(c.StateDir, credentialsFileName)
 	}
 	file, err := readEnvFile(path, warn)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -302,15 +330,15 @@ func loadSecrets(c *Config, getenv env, warn func(string, ...any)) (Secrets, err
 		return Secrets{}, fmt.Errorf("credentials_file %s: not found", path)
 	}
 	var s Secrets
-	s.TPLinkID = firstNonEmpty(c.TPLinkID, getenv("TPLINK_EMAIL"), file["TPLINK_EMAIL"])
-	if c.TPLinkID != "" && file["TPLINK_EMAIL"] != "" && file["TPLINK_EMAIL"] != c.TPLinkID {
-		warn("tplink_id in the config differs from TPLINK_EMAIL in %s; using the config's", path)
+	s.TPLinkID = firstNonEmpty(c.TPLinkID, getenv(envTPLinkEmail), file[envTPLinkEmail])
+	if c.TPLinkID != "" && file[envTPLinkEmail] != "" && file[envTPLinkEmail] != c.TPLinkID {
+		warn("tplink_id in the config differs from %s in %s; using the config's", envTPLinkEmail, path)
 	}
 	switch {
-	case getenv("TPLINK_PASSWORD") != "":
-		s.Password = deco.Secret(getenv("TPLINK_PASSWORD"))
+	case getenv(envTPLinkPassword) != "":
+		s.Password = deco.Secret(getenv(envTPLinkPassword))
 	default:
-		for _, f := range []string{getenv("TPLINK_PASSWORD_FILE"), getenv("UDECO_TPLINK_PASSWORD_FILE"), c.PasswordFile, file["TPLINK_PASSWORD_FILE"]} {
+		for _, f := range []string{getenv(envTPLinkPasswordFile), getenv(envTPLinkPasswordFileAlt), c.PasswordFile, file[envTPLinkPasswordFile]} {
 			if f == "" {
 				continue
 			}
@@ -321,12 +349,12 @@ func loadSecrets(c *Config, getenv env, warn func(string, ...any)) (Secrets, err
 			s.Password = deco.Secret(pw)
 			break
 		}
-		if s.Password == "" && file["TPLINK_PASSWORD"] != "" {
-			s.Password = deco.Secret(file["TPLINK_PASSWORD"])
+		if s.Password == "" && file[envTPLinkPassword] != "" {
+			s.Password = deco.Secret(file[envTPLinkPassword])
 		}
 	}
 	if s.TPLinkID == "" {
-		return s, errors.New("no TP-Link ID: set tplink_id, TPLINK_EMAIL or TPLINK_EMAIL in credentials.env")
+		return s, errors.New("no TP-Link ID: set tplink_id, " + envTPLinkEmail + " or " + envTPLinkEmail + " in " + credentialsFileName)
 	}
 	return s, nil
 }
@@ -397,17 +425,17 @@ func readEnvFile(path string, warn func(string, ...any)) (map[string]string, err
 	return out, nil
 }
 
-// localIPToward is the local address the kernel would use to reach the
-// inform host (no packet is sent: UDP connect only).
-func localIPToward(informURL string) (string, error) {
-	u, err := url.Parse(informURL)
-	if err != nil {
-		return "", err
+// startInformURL is the rule for the config's inform_url: http or https
+// to an IP-literal host. It is wider than device.CheckInformURL, the rule
+// for every later change of the URL (a setparam, a set-adopt, an SSH
+// set-inform), which takes http to an IPv4 literal only, without user
+// info and with a port in range: an https or IPv6 start URL passes here
+// and could not be set again later. TestStartInformURL lists where the
+// two differ. Which rule the config should have is the owner's call.
+func startInformURL(s string) (*url.URL, error) {
+	u, err := url.Parse(s)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || net.ParseIP(u.Hostname()) == nil {
+		return nil, fmt.Errorf("inform_url %q: want http:// or https:// to an IP-literal host, like http://192.168.1.1:8080/inform", s)
 	}
-	c, err := net.Dial("udp4", net.JoinHostPort(u.Hostname(), "9"))
-	if err != nil {
-		return "", err
-	}
-	defer c.Close()
-	return c.LocalAddr().(*net.UDPAddr).IP.String(), nil
+	return u, nil
 }

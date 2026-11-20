@@ -147,7 +147,8 @@ func sortedKeys(m map[string]string) []string {
 
 // replaceKeepMode writes b over path atomically, with path's mode (the
 // unit's /etc/passwd and /etc/shadow are 0777 on this firmware; changing
-// that is not the agent's call).
+// that is not the agent's call). It is not atomicfile.Write: the mode goes
+// on the temporary file before the rename.
 func replaceKeepMode(path string, b []byte) error {
 	mode := os.FileMode(0o600)
 	if fi, err := os.Stat(path); err == nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
+	"github.com/antoniocosta/unifi-openwrt/internal/models"
 )
 
 // The model the controller holds for this unit.
@@ -24,12 +25,13 @@ import (
 
 // legacyAdoptedModel is the model a state written before State.Model was
 // adopted as: earlier builds accepted only U7LT on jio-mtk and UAL6 on a
-// Deco.
+// Deco. These are the codes those builds used, whatever the defaults
+// (models.DecoAgentModel) become.
 func (a *agent) legacyAdoptedModel() string {
 	if a.cfg.jio() {
-		return "U7LT"
+		return models.ModelU7LT
 	}
-	return "UAL6"
+	return models.ModelUAL6
 }
 
 // checkAdoptedModel fills st.Model for an adopted state of an earlier build
