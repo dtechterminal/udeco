@@ -158,5 +158,8 @@ AU, SG, SA, DO and IN/288 in turn and reading `curppr` showed every HE rate
 disabled for all of them, on 36/80 and 149/80 as well as on 52/80, 100/80 and
 132/80, so it is the country table and not the channel. Only US/0 and `#a`
 fill the HE rows. `#a` is Broadcom's all-channels test table, not a country:
-it gives HE at 23.5 dBm on 52/80 and 100/80. Whether it runs radar detection
-was not checked. TP-Link's data for this board carries Wi-Fi 6 only for US.
+it gives HE at 23.5 dBm on 52/80 and 100/80, but it runs no radar detection:
+on 100/80 under `#a` (Bedroom, 2026-11-20 19:16 IST) `wl dfs_status` stayed
+IDLE for 80 s, with no CAC and no In-Service Monitoring, where IN/288 on the
+same radio runs a 60 s CAC and then monitors. It also offers 116/80, in the
+weather-radar band. Do not run DFS channels under `#a`. TP-Link's data for this board carries Wi-Fi 6 only for US.
