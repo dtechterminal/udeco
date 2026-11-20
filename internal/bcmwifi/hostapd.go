@@ -89,12 +89,16 @@ type hapdBSS struct {
 	FTPeers []ftpeer.Peer
 }
 
-// hostapd file names in RunDir.
-func confPath(runDir, primary string) string { return path.Join(runDir, "hapd-"+primary+".conf") }
-func pidPath(runDir, primary string) string  { return path.Join(runDir, "hapd-"+primary+".pid") }
-func drvPath(runDir, primary string) string  { return path.Join(runDir, "drv-"+primary+".json") }
-func denyPath(runDir, vif string) string     { return path.Join(runDir, vif+".deny") }
-func acceptPath(runDir, vif string) string   { return path.Join(runDir, vif+".accept") }
+// ConfPath is the hostapd conf of a radio (primary: wl0, wl1) in RunDir.
+// It exists while the agent's hostapd serves that radio: written when the
+// radio is taken, removed when Wi-Fi is handed back.
+func ConfPath(runDir, primary string) string { return path.Join(runDir, "hapd-"+primary+".conf") }
+
+// More hostapd file names in RunDir.
+func pidPath(runDir, primary string) string { return path.Join(runDir, "hapd-"+primary+".pid") }
+func drvPath(runDir, primary string) string { return path.Join(runDir, "drv-"+primary+".json") }
+func denyPath(runDir, vif string) string    { return path.Join(runDir, vif+".deny") }
+func acceptPath(runDir, vif string) string  { return path.Join(runDir, vif+".accept") }
 
 // mobilityDomain derives the 802.11r MDID from the SSID, so every unit
 // serving the SSID agrees without coordination.

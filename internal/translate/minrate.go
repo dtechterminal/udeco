@@ -2,7 +2,11 @@
 
 package translate
 
-import "strconv"
+import (
+	"strconv"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+)
 
 // Minimum data rate control (UniFi "2G/5G Data Rate Control").
 //
@@ -46,7 +50,7 @@ type MinRateOpts struct {
 // false when the WLAN uses the band's default rates (no minimum, or the
 // lowest rate the band has).
 func wlanMinRate(cfg Cfg, w, band string) (kbps int, o MinRateOpts, ok bool) {
-	sup, _ := wlanRates(cfg, w, legacyBand[band])
+	sup, _ := wlanRates(cfg, w, rf.Legacy(band))
 	if sup == nil {
 		return 0, MinRateOpts{}, false
 	}

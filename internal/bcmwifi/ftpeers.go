@@ -168,11 +168,11 @@ func (a *Applier) SyncFTPeers(ctx context.Context, d Desired) (FTSync, error) {
 			continue
 		}
 		p := rl.Primary
-		conf, err := a.readFile(confPath(a.o.RunDir, p))
+		conf, err := a.readFile(ConfPath(a.o.RunDir, p))
 		if err != nil {
 			continue // not ours (yet)
 		}
-		pid, ok := a.findProc("hostapd", confPath(a.o.RunDir, p))
+		pid, ok := a.findProc("hostapd", ConfPath(a.o.RunDir, p))
 		if !ok {
 			continue
 		}

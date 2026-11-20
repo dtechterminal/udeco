@@ -33,6 +33,7 @@ import (
 	"strings"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // RadioDef is one radio of the unit.
@@ -201,16 +202,6 @@ func (r RadioPlan) hash() string {
 	return hex.EncodeToString(h[:8])
 }
 
-func normBand(b string) string {
-	switch strings.ToLower(b) {
-	case "ng", "2g", "2.4g", "2ghz", "2.4ghz":
-		return "ng"
-	case "na", "5g", "5ghz":
-		return "na"
-	}
-	return ""
-}
-
 // plans builds each radio's plan from d. Notes say what is not served.
 // sae: WPA3 may be served on the radios whose driver has it.
 func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan, []string) {
@@ -252,7 +243,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 		case rd.Band == "na" && rp.Width != 20 && rp.Width != 40 && rp.Width != 80:
 			rp.Width = 80
 		}
-		if rd.Band == "na" && rp.Channel == 165 && rp.Width > 20 {
+		if rf.Only20MHz(rd.Band, rp.Channel) && rp.Width > 20 {
 			rp.Width = 20
 		}
 		maxSta := ri.MaxClients
@@ -347,7 +338,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 
 func onBand(s bcmwifi.SSID, band string) bool {
 	for _, b := range s.Bands {
-		if normBand(b) == band {
+		if rf.Norm(b) == band {
 			return true
 		}
 	}

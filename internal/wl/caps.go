@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // Caps are the static hardware facts of the unit, as the driver reports
@@ -20,7 +22,7 @@ type Caps struct {
 // BandCaps describes one radio.
 type BandCaps struct {
 	Channels map[int][]int // width MHz -> allowed primary channels, from `wl chanspecs`
-	// TxMinDBm has no driver source; it is a fixed floor (minTxDBm).
+	// TxMinDBm has no driver source; it is a fixed floor (MinTxDBm).
 	// TxMaxDBm is the highest per-chanspec limit of `wl chanspec_txpwr_max`.
 	TxMinDBm, TxMaxDBm int
 	NSS                int // popcount of `wl hw_txchain`
@@ -34,9 +36,37 @@ type BandCaps struct {
 	MaxListedWidth int
 }
 
-// minTxDBm is the lowest TX power we offer. `wl` has no getter for a
-// minimum; this matches the UniFi U6-Lite profile (models catalog, 5 dBm).
-const minTxDBm = 5
+// MinTxDBm is the lowest TX power we offer, and the floor bcmwifi sets
+// (its txpower.go). `wl` has no getter for a minimum; this matches the
+// UniFi U6-Lite profile (models catalog, 5 dBm).
+const MinTxDBm = 5
+
+// bwCapBits is `wl bw_cap`'s bitmap: one bit per channel width.
+var bwCapBits = []struct{ bit, mhz int }{{1, 20}, {2, 40}, {4, 80}, {8, 160}}
+
+// BWCap is the `wl bw_cap` bitmap that allows every width up to width MHz
+// (20 MHz always): 1, 3, 7, 15.
+func BWCap(width int) int {
+	v := bwCapBits[0].bit
+	for _, w := range bwCapBits[1:] {
+		if width >= w.mhz {
+			v |= w.bit
+		}
+	}
+	return v
+}
+
+// BWCapMaxWidth is the widest width in MHz a `wl bw_cap` bitmap allows (0:
+// none of the known widths).
+func BWCapMaxWidth(v int) int {
+	mhz := 0
+	for _, w := range bwCapBits {
+		if v&w.bit != 0 {
+			mhz = w.mhz
+		}
+	}
+	return mhz
+}
 
 // radioStatic is what is read once per radio and reused by Collect.
 type radioStatic struct {
@@ -184,16 +214,9 @@ func (c *Collector) readRadioStatic(ctx context.Context, dev string) (radioStati
 	r.caps.VHT = r.band == "na" && n == 1
 	r.caps.HE = capSet["11ax"]
 
-	if out, err := get("bw_cap", map[string]string{"ng": "2g", "na": "5g"}[r.band]); err == nil {
+	if out, err := get("bw_cap", rf.Legacy(r.band)); err == nil {
 		if v, ok := parseInt(out); ok && v > 0 {
-			for _, w := range []struct {
-				bit int64
-				mhz int
-			}{{1, 20}, {2, 40}, {4, 80}, {8, 160}} {
-				if v&w.bit != 0 {
-					r.caps.MaxListedWidth = w.mhz
-				}
-			}
+			r.caps.MaxListedWidth = BWCapMaxWidth(int(v))
 		}
 	}
 	if out, err = get("chanspecs"); err != nil {
@@ -208,7 +231,7 @@ func (c *Collector) readRadioStatic(ctx context.Context, dev string) (radioStati
 	r.caps.Channels = channelsByWidth(list)
 	r.specs = list
 	for _, cs := range list {
-		if cs.Band == "na" && cs.Control >= 52 && cs.Control <= 144 {
+		if rf.IsDFS(cs.Band, cs.Control) {
 			r.caps.DFS = true
 		}
 	}
@@ -217,7 +240,7 @@ func (c *Collector) readRadioStatic(ctx context.Context, dev string) (radioStati
 		return r, err
 	}
 	r.txMax = parseChanspecTxpwrMax(out)
-	r.caps.TxMinDBm = minTxDBm
+	r.caps.TxMinDBm = MinTxDBm
 	best := math.Inf(-1)
 	for _, v := range r.txMax {
 		best = max(best, v)

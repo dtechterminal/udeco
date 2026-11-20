@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // DFS on the 5 GHz radio (docs/deco/features/dfs.md). A U6 Pro serves the
@@ -104,24 +106,7 @@ func (a *Applier) nopOf(ctx context.Context, p string, cs chanspec) []int {
 }
 
 // subChannels are the 20 MHz channels a 5 GHz chanspec covers.
-func subChannels(cs chanspec) []int {
-	w := cs.Width
-	if w < 20 {
-		w = 20
-	}
-	n := w / 20
-	// blocks are aligned from channel 36 (and 149) in steps of n*4
-	base := 36
-	if cs.Ctrl >= 149 {
-		base = 149
-	}
-	first := cs.Ctrl - (cs.Ctrl-base)%(n*4)
-	var out []int
-	for i := 0; i < n; i++ {
-		out = append(out, first+4*i)
-	}
-	return out
-}
+func subChannels(cs chanspec) []int { return rf.SubChannels(cs.Ctrl, cs.Width) }
 
 func (cs chanspec) dfs() bool {
 	for _, ch := range subChannels(cs) {
@@ -151,7 +136,7 @@ func (a *Applier) followRadar(ctx context.Context, p string, want, live chanspec
 		a.dfsMoved = map[string]dfsMove{}
 	}
 	a.dfsMoved[p] = dfsMove{From: want, To: live, At: now}
-	a.radarQ = append(a.radarQ, RadarEvent{Band: "na", Radio: p, Channel: want.Ctrl, FreqMHz: 5000 + 5*want.Ctrl,
+	a.radarQ = append(a.radarQ, RadarEvent{Band: "na", Radio: p, Channel: want.Ctrl, FreqMHz: rf.ChanFreq(rf.Band5G, want.Ctrl),
 		From: want.String(), To: live.String(), At: now})
 	a.o.Logf("bcmwifi: radar: %s left %s for %s (channels %v out of service)", p, want, live, hit)
 	return true, fmt.Sprintf("radar on %s (channels %v out of service): on the driver's %s", want, hit, live)

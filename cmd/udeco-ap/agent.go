@@ -35,6 +35,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
 	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/pathmon"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
@@ -666,7 +667,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	a.profile = p
 	a.radioCaps = map[string]apstate.RadioCaps{}
 	var radios []inform.Radio
-	for i, band := range []string{"ng", "na"} {
+	for i, band := range rf.Bands() {
 		rp, ok := p.Radios[band]
 		if !ok {
 			continue
@@ -677,7 +678,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 			rc.HasDFS = true // 52-64 (mtkwifi dfs.go); has_fccdfs is the US rules', not IN's
 		}
 		a.radioCaps[band] = rc
-		radios = append(radios, inform.Radio{Name: fmt.Sprintf("wifi%d", i), Radio: band, Channel: "auto",
+		radios = append(radios, inform.Radio{Name: translate.PositionalRadioName(i), Radio: band, Channel: "auto",
 			MinTxpower: rp.MinTx, MaxTxpower: rp.MaxTx, NSS: rp.NSS, BuiltinAnt: true})
 	}
 

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/openwrt"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 var (
@@ -27,8 +28,8 @@ var (
 
 // Defaults for figures the Deco does not report.
 const (
-	noiseFloor     = -95 // dBm; rssi = signal - noise, so never 0 (unifi.go:222)
-	defaultSignal  = -60 // dBm when neither strength nor level is known
+	noiseFloor     = rf.NoiseFloorDBm // dBm; rssi = signal - noise, so never 0 (unifi.go:222)
+	defaultSignal  = -60              // dBm when neither strength nor level is known
 	defaultMaxGap  = 60 * time.Second
 	defaultMaxAge  = 45 * time.Second // 3 polls at the default 15 s
 	counterExpiry  = time.Hour        // forget a client's byte counters after this long unseen

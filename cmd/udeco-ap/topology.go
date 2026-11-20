@@ -45,6 +45,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/jioports"
 	"github.com/antoniocosta/unifi-openwrt/internal/lldp"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // loopWindow: the gateway's MAC learned on both ports within this long
@@ -372,7 +373,7 @@ func (a *agent) observeRemoved(p string, pp apstate.Port, ok bool, reason string
 // record of the ports taken out follows (loopFile).
 func (a *agent) bridgePort(ctx context.Context, port, why string, in bool) {
 	op := map[bool]string{true: "addif", false: "delif"}[in]
-	if _, err := a.o.run.Run(ctx, "brctl", op, "br-lan", port); err != nil {
+	if _, err := a.o.run.Run(ctx, "brctl", op, unit.LANBridge, port); err != nil {
 		a.logf("loop guard: brctl %s br-lan %s: %v", op, port, err)
 		return
 	}

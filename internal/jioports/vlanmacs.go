@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // VLANMACs reads the wired clients learned on unit port phys while its
@@ -19,7 +20,7 @@ import (
 // ok is false when the device is in no br-vN.
 func VLANMACs(root string, phys int) (rows []map[string]any, ok bool) {
 	dev := Untagged(phys)
-	brs, _ := filepath.Glob(filepath.Join(root, "/sys/class/net/br-v*"))
+	brs, _ := filepath.Glob(filepath.Join(root, "/sys/class/net", unit.VLANBridgePrefix+"*"))
 	for _, dir := range brs {
 		m := vlanBrRE.FindStringSubmatch(filepath.Base(dir))
 		if m == nil {

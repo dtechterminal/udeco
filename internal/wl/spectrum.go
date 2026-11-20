@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // ScanPlan shapes one band measurement. DefaultScanPlan returns the design
@@ -1351,7 +1352,7 @@ func (b *bandRun) passiveChannels(ctx context.Context) error {
 			b.note("chan_info: %v; 52-144 taken as passive", err)
 		}
 		for _, ch := range b.chans {
-			if b.band == "na" && ch >= 52 && ch <= 144 {
+			if rf.IsDFS(b.band, ch) {
 				b.passive[ch] = true
 			}
 		}

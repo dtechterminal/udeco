@@ -10,6 +10,7 @@ import (
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
@@ -31,16 +32,21 @@ import (
 // wins, a tie keeps the live channel, then the lowest channel.
 
 // staticChannels are the candidates without usable caps.
-var staticChannels = map[string][]int{"ng": {1, 6, 11}, "na": {36, 40, 44, 48, 149, 153, 157, 161}}
+var staticChannels = map[string][]int{"ng": rf.NonOverlap24(), "na": {36, 40, 44, 48, 149, 153, 157, 161}}
+
+// audibleFloor: a neighbour at or below it does not count (dBm), and a
+// louder one counts by how far above it is.
+const audibleFloor = rf.NoiseFloorDBm
 
 // pickChannel picks band's channel (0 with a note when none qualifies).
 func pickChannel(band string, allowed []int, blocked map[int]bool, width int, bss []apstate.BSS, util map[int]int, cur int) (int, string) {
 	var cand []int
+	nonOverlap := rf.NonOverlap24()
 	for _, ch := range allowed {
 		switch {
 		case blocked[ch]:
-		case band == "ng" && ch != 1 && ch != 6 && ch != 11:
-		case band == "na" && ch >= 52 && ch <= 144:
+		case band == "ng" && !slices.Contains(nonOverlap, ch):
+		case rf.IsDFS(band, ch):
 		default:
 			cand = append(cand, ch)
 		}
@@ -59,7 +65,7 @@ func pickChannel(band string, allowed []int, blocked map[int]bool, width int, bs
 		lo, hi := span(band, ch, width)
 		score := 0
 		for _, b := range bss {
-			if b.Signal <= -95 {
+			if b.Signal <= audibleFloor {
 				continue
 			}
 			w, cf := b.Width, b.CenterFreq
@@ -70,7 +76,7 @@ func pickChannel(band string, allowed []int, blocked map[int]bool, width int, bs
 				cf = b.Freq
 			}
 			if cf-w/2 < hi && cf+w/2 > lo {
-				score += b.Signal + 95
+				score += b.Signal - audibleFloor
 			}
 		}
 		for _, c := range sub20(band, ch, width) {
@@ -87,30 +93,20 @@ func pickChannel(band string, allowed []int, blocked map[int]bool, width int, bs
 // span is the frequency range (MHz) a channel of width covers.
 func span(band string, ch, width int) (lo, hi int) {
 	if band == "ng" {
-		f := 2407 + 5*ch
+		f := rf.ChanFreq(band, ch)
 		return f - 10, f + 10
 	}
 	s := sub20(band, ch, width)
-	return 5000 + 5*s[0] - 10, 5000 + 5*s[len(s)-1] + 10
+	return rf.ChanFreq(band, s[0]) - 10, rf.ChanFreq(band, s[len(s)-1]) + 10
 }
 
 // sub20 are the 20 MHz channels a 5 GHz channel of width covers (blocks
-// aligned from 36 and 149); 2.4 GHz: the channel itself.
+// aligned from 36 and 149, rf.SubChannels); 2.4 GHz: the channel itself.
 func sub20(band string, ch, width int) []int {
 	if band == "ng" || width <= 20 {
 		return []int{ch}
 	}
-	n := width / 20
-	base := 36
-	if ch >= 149 {
-		base = 149
-	}
-	first := ch - (ch-base)%(n*4)
-	out := make([]int, n)
-	for i := range out {
-		out[i] = first + 4*i
-	}
-	return out
+	return rf.SubChannels(ch, width)
 }
 
 func keys(m map[int]bool) []int {
@@ -169,7 +165,7 @@ func (a *agent) autoChannels(ctx context.Context, d bcmwifi.Desired, in translat
 		}
 		width := r.Width
 		if width == 0 {
-			width = map[string]int{"ng": 20, "na": 80}[band]
+			width = bcmwifi.DefaultWidth(band)
 		}
 		allowed := staticChannels[band]
 		if b, ok := caps.Bands[band]; usable && ok {

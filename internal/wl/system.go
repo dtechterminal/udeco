@@ -16,9 +16,6 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 )
 
-// The bridge the Deco's LAN, ports and user Wi-Fi networks are in.
-const lanBridge = "br-lan"
-
 // readSystem fills the system fields of s from /proc, /sys and /tmp under
 // Root. /proc/uptime, /proc/loadavg, /proc/stat and /proc/meminfo are
 // required; everything else is best effort.

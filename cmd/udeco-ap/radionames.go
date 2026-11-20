@@ -3,10 +3,9 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/antoniocosta/unifi-openwrt/internal/device"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
 // Radio naming (docs/deco/agent-design.md §3.8).
@@ -66,7 +65,7 @@ func (a *agent) renameRadios() {
 		if n := names[r.Radio]; n != "" {
 			r.Name = n
 		} else {
-			r.Name = fmt.Sprintf("wifi%d", i)
+			r.Name = translate.PositionalRadioName(i)
 		}
 	}
 }

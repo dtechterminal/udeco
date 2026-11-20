@@ -371,6 +371,8 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 | `internal/mtkwifi`, `internal/jiosys` | the JioFiber platform |
 | `internal/inform`, `internal/device`, `internal/translate` | UniFi inform protocol and the controller's settings |
 | `internal/ftpeer`, `internal/pathmon`, `internal/lldp`, `internal/snmpagent`, `internal/mdnsbr`, `internal/hs20`, `internal/radsec` | fast-roaming key exchange, uplink monitor, LLDP, SNMP, mDNS bridge, Hotspot 2.0, RadSec |
+| `internal/rf`, `internal/unit` | facts every package shares, each written once: band names, channel and frequency arithmetic, bridge names |
+| `internal/repotest` | test helpers that hold the shell scripts and the docs to the Go code |
 | `deploy/` | `deco-ap.sh` (Deco deploy), `jio-start.sh` (JioFiber supervisor with the gateway guard) |
 | `packaging/deco` | persistent install on a Deco |
 | `tools/wifi-inet-monitor` | per-client internet monitor that runs on the gateway |

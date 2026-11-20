@@ -26,7 +26,7 @@ func ipLine(cidr string) string {
 }
 
 // watchUnit is a quiet, taken-over 205 with the watch tools present.
-func watchUnit(t *testing.T) (*unit, *fakeRun, *Manager) {
+func watchUnit(t *testing.T) (*fakeUnit, *fakeRun, *Manager) {
 	t.Helper()
 	u := newUnit(t, "205")
 	u.setProcs(keepProcs(readProcsFixture(t, "205"), "192.168.0.1"))

@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // liveRadio is the PHY state read with wl getters.
@@ -316,7 +318,7 @@ func (a *Applier) knownBSSID(vif string) string {
 	for _, base := range tplinkBases(prim) {
 		a.confBSSIDs(base+".conf", found)
 	}
-	a.confBSSIDs(confPath(a.o.RunDir, prim), found)
+	a.confBSSIDs(ConfPath(a.o.RunDir, prim), found)
 	if b, err := a.loadBaseline(); err == nil && b != nil {
 		for _, v := range b.Vifs {
 			if m := normMAC(v.BSSID); m != "" {
@@ -339,7 +341,8 @@ func (a *Applier) vifKnown(name string) bool {
 	return vifIndex(name) > 0 && a.knownBSSID(name) != ""
 }
 
-var vBridgeRe = regexp.MustCompile(`^br-v([0-9]{1,4})$`)
+// vBridgeRe: a VLAN bridge's name (vlanBridge), with up to four digits.
+var vBridgeRe = regexp.MustCompile(`^` + regexp.QuoteMeta(unit.VLANBridgePrefix) + `([0-9]{1,4})$`)
 
 // readLive reads the state Plan needs. Radio getters must succeed; a vif
 // whose bss state cannot be read counts as up (so it is taken down).
@@ -411,7 +414,7 @@ func (a *Applier) readLive(ctx context.Context, l *layout) (*liveState, error) {
 		if _, ours := a.ourHostapd(p); ours {
 			ls.Ours[p] = true
 			var h hapdProc
-			h.hapdConf(a, confPath(a.o.RunDir, p))
+			h.hapdConf(a, ConfPath(a.o.RunDir, p))
 			ls.OursBSS[p] = h.BSS
 			a.learnAnchor(p, h.Iface)
 		}
@@ -430,7 +433,7 @@ func (a *Applier) ourHostapd(primary string) (int, bool) {
 	if pid, ok := a.pidAlive(pidPath(a.o.RunDir, primary), "hostapd"); ok {
 		return pid, true
 	}
-	return a.findProc("hostapd", confPath(a.o.RunDir, primary))
+	return a.findProc("hostapd", ConfPath(a.o.RunDir, primary))
 }
 
 // readMAC reads a vif's driver MAC filter. Unknown (Known=false) when a
@@ -510,7 +513,7 @@ func (a *Applier) uplink() (string, error) {
 		return a.o.Uplink, nil
 	}
 	var up []string
-	for _, p := range a.bridgePorts("br-lan") {
+	for _, p := range a.bridgePorts(unit.LANBridge) {
 		if !strings.HasPrefix(p, "eth") {
 			continue
 		}

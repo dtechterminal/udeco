@@ -265,7 +265,7 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		for _, v := range r.vifs {
 			st = append(st, onVif(v, optStep("lower "+v, "wl", "-i", v, "bss", "down")))
 		}
-		st = append(st, Step{Kind: StepStop, Desc: "stop agent hostapd on " + r.p, Path: pidPath(a.o.RunDir, r.p), Proc: "hostapd", Match: confPath(a.o.RunDir, r.p)})
+		st = append(st, Step{Kind: StepStop, Desc: "stop agent hostapd on " + r.p, Path: pidPath(a.o.RunDir, r.p), Proc: "hostapd", Match: ConfPath(a.o.RunDir, r.p)})
 		for _, v := range r.vifs {
 			if br := a.bridgeOf(v); br != "" && (b != nil || vBridgeRe.MatchString(br)) {
 				st = append(st, Step{Kind: StepBridgeDel, Desc: "unbridge " + v, Port: v, IfPresent: v})
@@ -279,7 +279,7 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		}
 	}
 	for _, r := range radios {
-		for _, f := range []string{confPath(a.o.RunDir, r.p), drvPath(a.o.RunDir, r.p), pidPath(a.o.RunDir, r.p)} {
+		for _, f := range []string{ConfPath(a.o.RunDir, r.p), drvPath(a.o.RunDir, r.p), pidPath(a.o.RunDir, r.p)} {
 			st = append(st, Step{Kind: StepRemove, Desc: "remove agent file", Path: f, Optional: true})
 		}
 	}

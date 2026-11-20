@@ -200,10 +200,6 @@ func IntentFrom(cfg Cfg) (Intent, []string) {
 
 // --- radios ---
 
-// legacyBand maps the intent's band names to the package's older ones
-// (wlanRates).
-var legacyBand = map[string]string{"ng": "2g", "na": "5g", "6e": "6g"}
-
 var widthRe = regexp.MustCompile(`(?:ht|vht|he|eht)(\d+)`)
 
 // intentRadios fills in.Radios and in.Country and returns phy -> band.
@@ -222,8 +218,9 @@ func intentRadios(cfg Cfg, in *Intent, nb *noteList) map[string]string {
 			continue
 		}
 		band := "na"
+		byName, _ := RadioNameBand(phy)
 		switch {
-		case strings.Contains(mode, "ng") || (phy == "wifi0" || phy == "ra0") && !strings.Contains(mode, "na"):
+		case strings.Contains(mode, "ng") || byName == "ng" && !strings.Contains(mode, "na"):
 			band = "ng"
 		case strings.Contains(mode, "6e"):
 			band = "6e"
@@ -401,7 +398,7 @@ func intentWLANs(cfg Cfg, in *Intent, phyBand map[string]string, nb *noteList) m
 		band, ok := phyBand[cfg[w+"parent"]]
 		if !ok {
 			// the UniFi convention when radio sections do not name the parent
-			band, ok = map[string]string{"wifi0": "ng", "wifi1": "na", "wifi2": "6e", "ra0": "ng", "rai0": "na"}[cfg[w+"parent"]]
+			band, ok = RadioNameBand(cfg[w+"parent"])
 		}
 		if _, have := in.Radios[band]; !ok || (!have && len(in.Radios) > 0) {
 			skip(fmt.Sprintf("radio %q is not on this AP: ignored", cfg[w+"parent"]))

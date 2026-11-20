@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // Uplink loss. A U6 whose uplink goes down takes its user and guest SSIDs
@@ -62,7 +64,7 @@ func (w *UplinkWatch) Observe(carrier bool, now time.Time) bool {
 // served: nothing is taken down then.
 func isolatedPlans(want map[string]RadioPlan, keep string) map[string]RadioPlan {
 	id := ""
-	for _, band := range []string{"ng", "na"} {
+	for _, band := range rf.Bands() {
 		for _, b := range want[band].BSS {
 			if id == "" && (keep != "" && b.SSID == keep || keep == "" && b.VLAN == 0 && !b.Guest) {
 				id = b.ID

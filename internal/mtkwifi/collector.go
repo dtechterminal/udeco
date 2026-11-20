@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -111,7 +113,7 @@ func NewCollector(o CollectorOptions) *Collector {
 		o.Root = "/"
 	}
 	if o.Bridge == "" {
-		o.Bridge = "bdg2"
+		o.Bridge = unit.JioLANBridge
 	}
 	if o.Layout == nil {
 		o.Layout = JCOW414
@@ -531,8 +533,9 @@ func (c *Collector) Caps(context.Context) (wl.Caps, error) {
 				five = append(five, chans5[4:]...)
 			}
 			b.Channels[20] = five
-			b.Channels[40] = five[:len(five)-1] // not 165
-			b.Channels[80] = five[:len(five)-1]
+			// wider: all but the 20 MHz only channel (165)
+			wide := slices.DeleteFunc(slices.Clone(five), func(ch int) bool { return rf.Only20MHz(rd.Band, ch) })
+			b.Channels[40], b.Channels[80] = wide, wide
 		}
 		cp.Bands[rd.Band] = b
 	}
@@ -689,7 +692,7 @@ func parseMacTable(log string) []sta {
 		if k < 4 || k+7 >= len(tok) {
 			continue
 		}
-		st := sta{Station: apstate.Station{MAC: mac, Authorized: true, Connected: conn, Noise: -95}}
+		st := sta{Station: apstate.Station{MAC: mac, Authorized: true, Connected: conn, Noise: noiseFloor}}
 		st.bss, _ = strconv.Atoi(tok[k-4])
 		best := 0
 		for _, r := range strings.Split(tok[k], "/") {

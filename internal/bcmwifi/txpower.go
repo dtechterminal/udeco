@@ -8,6 +8,8 @@ import (
 	"math"
 	"path"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
 // Transmit power presets (docs/deco/features/tx-power.md). A U6 Pro maps
@@ -27,14 +29,10 @@ import (
 //     the next plan (Tick) reads the new limit and sets the preset live. A
 //     degraded radio with none learnt (the agent restarted but not the
 //     unit) takes the reading plus the live degrade once and keeps that.
-//   - the floor is txMinDBm (5 dBm, as the collector's min_txpower).
+//   - the floor is wl.MinTxDBm (5 dBm, the collector's min_txpower).
 //
 // The controller is told the mode and the resulting dBm (TxPower), not
 // "custom" and the target maximum.
-
-// txMinDBm is the floor of the range (wl has no getter for it; the
-// collector reports the same, internal/wl minTxDBm).
-const txMinDBm = 5
 
 // txpwrDegrade maps a UniFi tx power mode to wl txpwr_degrade (quarter-dB
 // below the radio's ceiling, see above). ceiling <= 0: unknown.
@@ -53,7 +51,7 @@ func txpwrDegrade(r Radio, ceiling float64) (q int, note string) {
 		}
 		return 0, fmt.Sprintf("tx power mode %q unknown, using high", r.TxPowerMode)
 	}
-	span := math.Max(0, ceiling-txMinDBm)
+	span := math.Max(0, ceiling-wl.MinTxDBm)
 	switch mode {
 	case "", "auto", "high":
 		return 0, ""
@@ -67,9 +65,9 @@ func txpwrDegrade(r Radio, ceiling float64) (q int, note string) {
 		case p > ceiling:
 			note = fmt.Sprintf("custom tx power %d dBm above the radio's %.2f dBm: clamped", r.TxPower, ceiling)
 			p = ceiling
-		case p < txMinDBm:
-			note = fmt.Sprintf("custom tx power %d dBm below the floor: clamped to %d dBm", r.TxPower, txMinDBm)
-			p = txMinDBm
+		case p < wl.MinTxDBm:
+			note = fmt.Sprintf("custom tx power %d dBm below the floor: clamped to %d dBm", r.TxPower, wl.MinTxDBm)
+			p = wl.MinTxDBm
 		}
 		return int(math.Round((ceiling - p) * 4)), note
 	}

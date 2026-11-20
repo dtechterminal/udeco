@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // planStamgr: the UniFi's per-radio station manager (docs/internals.md),
@@ -22,7 +24,6 @@ import (
 // interface carrying a UniFi SSID).
 func planStamgr(cfg Cfg, cur UCI, r *Result) []Op {
 	radios := apRadios(cur)
-	bands := map[string]string{"ng": "2g", "na": "5g", "6e": "6g"}
 	minRSSI := map[string]string{} // radio section -> dBm
 	maxSta := map[string]string{}
 	for i := 1; i <= 8; i++ {
@@ -31,7 +32,7 @@ func planStamgr(cfg Cfg, cur UCI, r *Result) []Op {
 		if band == "" {
 			continue
 		}
-		sec := radios[bands[band]]
+		sec := radios[rf.Legacy(band)]
 		if sec == "" {
 			r.Notes = append(r.Notes, fmt.Sprintf("stamgr.%d: no %s radio here", i, band))
 			continue

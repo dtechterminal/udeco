@@ -32,6 +32,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/apstate"
 	"github.com/antoniocosta/unifi-openwrt/internal/mdnsbr"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 type mdnsState struct {
@@ -178,7 +179,7 @@ func (a *agent) mdnsEnv(s *apstate.Snapshot, info apstate.CfgInfo) mdnsbr.Env {
 				env.MACs = append(env.MACs, mac)
 			}
 		}
-		if n != "br-lan" && !strings.HasPrefix(n, "br-v") {
+		if n != unit.LANBridge && !strings.HasPrefix(n, unit.VLANBridgePrefix) {
 			continue
 		}
 		ports, err := os.ReadDir(path.Join(sys, n, "brif"))

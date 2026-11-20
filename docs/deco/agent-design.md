@@ -250,7 +250,7 @@ means Wi-Fi is TP-Link's again: `decosys.Restore`, mode -> observe, persistent m
 loud log and event. An Apply error after which the agent still owns Wi-Fi
 (rolled back to last-good) keeps takeover; that system_cfg is retried once when the controller sends it again
 (§3.7, cfgversion), otherwise not until another arrives.
-"Owns Wi-Fi" is read from bcmwifi's documented file layout (`RunDir/hapd-wlN.conf`), see open items.
+"Owns Wi-Fi" is read from bcmwifi's hostapd confs (`RunDir/hapd-wlN.conf`; the agent takes the names from `bcmwifi.ConfPath` and `bcmwifi.Primaries`), see open items.
 Note this includes an Apply that failed before changing anything (baseline capture): TP-Link still has Wi-Fi,
 so its services are restored too.
 

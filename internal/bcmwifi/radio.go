@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/wl"
 )
 
@@ -50,23 +51,22 @@ func parseChanspec(s string) (chanspec, error) {
 	if len(f) == 0 {
 		return chanspec{}, fmt.Errorf("empty chanspec")
 	}
-	t := f[0]
-	c := chanspec{Width: 20}
-	if i := strings.IndexByte(t, '/'); i >= 0 {
-		w, err := strconv.Atoi(t[i+1:])
-		if err != nil {
-			return chanspec{}, fmt.Errorf("chanspec %q: %w", t, err)
-		}
-		c.Width, t = w, t[:i]
-	} else if n := len(t); n > 0 && (t[n-1] == 'l' || t[n-1] == 'u') {
-		c.Width, t = 40, t[:n-1]
+	// the first field is the text form, the rest its hex form
+	ch, width, err := wl.ParseChanspecText(f[0])
+	if err != nil {
+		return chanspec{}, fmt.Errorf("chanspec %q: %w", f[0], err)
 	}
-	ch, err := strconv.Atoi(t)
-	if err != nil || ch <= 0 {
-		return chanspec{}, fmt.Errorf("chanspec %q: bad channel", f[0])
-	}
-	c.Ctrl = ch
-	return c, nil
+	return chanspec{Ctrl: ch, Width: width}, nil
+}
+
+// maxWidth is the widest channel bcmwifi sets, in MHz: a wider one the
+// controller asks for runs at this width, with a note (radioNotes).
+const maxWidth = 80
+
+// DefaultWidth is the channel width in MHz of a radio the controller gives
+// none: 20 on 2.4 GHz, 80 on 5 GHz (0 for a band this unit has not).
+func DefaultWidth(band string) int {
+	return map[string]int{"ng": 20, "na": maxWidth}[band]
 }
 
 // desiredChanspec returns the chanspec to set for r on band, given the live
@@ -81,9 +81,9 @@ func desiredChanspec(band string, r Radio, live chanspec, bc *wl.BandCaps) (c ch
 	width := r.Width
 	switch {
 	case width == 0:
-		width = map[string]int{"ng": 20, "na": 80}[band]
-	case width > 80:
-		width = 80
+		width = DefaultWidth(band)
+	case width > maxWidth:
+		width = maxWidth
 	}
 	if band == "ng" && width > 40 {
 		width = 40
@@ -107,7 +107,7 @@ func desiredChanspec(band string, r Radio, live chanspec, bc *wl.BandCaps) (c ch
 		if !valid {
 			return live, false, []string{fmt.Sprintf("radio na: channel %d invalid, keeping %s", ch, live)}
 		}
-		if ch == 165 && width > 20 {
+		if rf.Only20MHz(band, ch) && width > 20 {
 			notes = append(notes, "radio na: channel 165 is 20 MHz only")
 			width = 20
 		}
@@ -142,26 +142,18 @@ func desiredChanspec(band string, r Radio, live chanspec, bc *wl.BandCaps) (c ch
 }
 
 // dfsChannel reports a 5 GHz DFS channel (52-144).
-func dfsChannel(band string, ch int) bool { return band == "na" && ch >= 52 && ch <= 144 }
+func dfsChannel(band string, ch int) bool { return rf.IsDFS(band, ch) }
 
 // bwCap is the wl bw_cap bitmap allowing up to width.
-func bwCap(width int) int {
-	switch {
-	case width >= 160:
-		return 15
-	case width >= 80:
-		return 7
-	case width >= 40:
-		return 3
-	}
-	return 1
-}
+func bwCap(width int) int { return wl.BWCap(width) }
 
+// bandArg is wl's band argument for band: every radio that is not the
+// 2.4 GHz one is the 5 GHz one.
 func bandArg(band string) string {
-	if band == "ng" {
-		return "2g"
+	if band == rf.Band2G {
+		return rf.Legacy(rf.Band2G)
 	}
-	return "5g"
+	return rf.Legacy(rf.Band5G)
 }
 
 // parseTargetMax reads "Maximum Tx Power Target (chanspec:0xe22a):\t23.50  23.50".
@@ -232,21 +224,8 @@ type country struct {
 
 // parseCountry reads "US (US/0) UNITED STATES".
 func parseCountry(s string) country {
-	c := country{Rev: -1}
-	f := strings.Fields(s)
-	if len(f) == 0 {
-		return c
-	}
-	c.Code = f[0]
-	if len(f) > 1 && strings.HasPrefix(f[1], "(") {
-		in := strings.Trim(f[1], "()")
-		if i := strings.IndexByte(in, '/'); i >= 0 {
-			if r, err := strconv.Atoi(in[i+1:]); err == nil {
-				c.Rev = r
-			}
-		}
-	}
-	return c
+	code, rev := wl.ParseCountry(s)
+	return country{Code: code, Rev: rev}
 }
 
 // countryArg is the wl country argument for code, and whether live already

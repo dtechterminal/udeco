@@ -137,7 +137,7 @@ func TestFTSAEPeerAddedLive(t *testing.T) {
 	u := newFTUnit(t, "")
 	d := ftDesired()
 	applyOK(t, u.a, d)
-	pidBefore, _ := u.a.findProc("hostapd", confPath(DefaultRunDir, "wl1"))
+	pidBefore, _ := u.a.findProc("hostapd", ConfPath(DefaultRunDir, "wl1"))
 
 	peers := []ftpeer.Peer{ftPeer("02:11:22:33:44:50", "na", "Example Network", testFTKey, "br-lan"),
 		ftPeer("02:11:22:33:44:24", "ng", "Example Network", testFTKey, "br-lan")}
@@ -164,7 +164,7 @@ func TestFTSAEPeerAddedLive(t *testing.T) {
 		t.Errorf("added %q", r.Added)
 	}
 	noKeyIn(t, "the sync report", strings.Join(append(r.Added, r.Problems...), "\n"))
-	if pid, _ := u.a.findProc("hostapd", confPath(DefaultRunDir, "wl1")); pid != pidBefore {
+	if pid, _ := u.a.findProc("hostapd", ConfPath(DefaultRunDir, "wl1")); pid != pidBefore {
 		t.Errorf("hostapd restarted (%d -> %d)", pidBefore, pid)
 	}
 

@@ -76,16 +76,16 @@ func (f *fakeRun) take() []string {
 
 var errExit1 = errors.New("exit status 1")
 
-// unit is a fake device root.
-type unit struct {
+// fakeUnit is a fake device root.
+type fakeUnit struct {
 	t    *testing.T
 	root string
 }
 
 // newUnit builds a fake root from the fixtures of one device ("205"/"241").
-func newUnit(t *testing.T, dev string) *unit {
+func newUnit(t *testing.T, dev string) *fakeUnit {
 	t.Helper()
-	u := &unit{t: t, root: t.TempDir()}
+	u := &fakeUnit{t: t, root: t.TempDir()}
 	u.setProcs(readProcsFixture(t, dev))
 	for _, n := range readLinesFixture(t, "initd-"+dev+".txt") {
 		u.write("etc/init.d/"+n, "#!/bin/sh /etc/rc.common\n")
@@ -99,7 +99,7 @@ func newUnit(t *testing.T, dev string) *unit {
 	return u
 }
 
-func (u *unit) write(p, s string) {
+func (u *fakeUnit) write(p, s string) {
 	u.t.Helper()
 	full := filepath.Join(u.root, p)
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -110,7 +110,7 @@ func (u *unit) write(p, s string) {
 	}
 }
 
-func (u *unit) read(p string) string {
+func (u *fakeUnit) read(p string) string {
 	u.t.Helper()
 	b, err := os.ReadFile(filepath.Join(u.root, p))
 	if err != nil {
@@ -121,7 +121,7 @@ func (u *unit) read(p string) string {
 
 // setProcs replaces the fake /proc with the given pid -> argv table. Kernel
 // threads get an empty cmdline, as on the device.
-func (u *unit) setProcs(ps map[int][]string) {
+func (u *fakeUnit) setProcs(ps map[int][]string) {
 	u.t.Helper()
 	if err := os.RemoveAll(filepath.Join(u.root, "proc")); err != nil {
 		u.t.Fatal(err)
@@ -189,7 +189,7 @@ func keepProcs(ps map[int][]string, gw string) map[int][]string {
 	return out
 }
 
-func newManager(u *unit, r Runner, dry bool) *Manager {
+func newManager(u *fakeUnit, r Runner, dry bool) *Manager {
 	return New(Options{Root: u.root, Run: r, ControllerIP: "192.168.0.1", GatewayIP: "192.168.0.1",
 		LANCIDR: "192.168.0.0/24", DryRun: dry})
 }

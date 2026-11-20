@@ -43,6 +43,7 @@ import (
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
 	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/mtkwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
@@ -505,16 +506,17 @@ func (a *agent) wifiFailed(ctx context.Context, op string, err error) {
 }
 
 // wifiOwned reports whether the agent's hostapd confs exist: bcmwifi
-// writes RunDir/hapd-wlN.conf when it takes a radio and removes them when
-// it hands Wi-Fi back.
+// writes one per radio (bcmwifi.ConfPath) when it takes the radio and
+// removes them when it hands Wi-Fi back.
 // TODO(bcmwifi-owned): use an exported bcmwifi ownership query once there
-// is one; this reads bcmwifi's documented file layout.
+// is one; until then the files are found through bcmwifi's own names
+// (ConfPath, Primaries), not rebuilt here.
 func (a *agent) wifiOwned() bool {
 	if o, ok := a.wifi.(interface{ Owned() bool }); ok {
 		return o.Owned()
 	}
-	for _, p := range []string{"wl0", "wl1"} {
-		if _, err := os.Stat(a.dev(filepath.Join(a.o.runDir, "hapd-"+p+".conf"))); err == nil {
+	for _, p := range bcmwifi.Primaries() {
+		if _, err := os.Stat(a.dev(bcmwifi.ConfPath(a.o.runDir, p))); err == nil {
 			return true
 		}
 	}
@@ -740,7 +742,7 @@ func withDriverCountry(d bcmwifi.Desired, override string) (bcmwifi.Desired, []s
 		return d, nil
 	}
 	notes := []string{fmt.Sprintf("country %s: the radios run as %s (driver_country)", d.Country, dc)}
-	if r, ok := d.Radios["na"]; ok && r.Enabled && r.Channel >= 52 && r.Channel <= 144 {
+	if r, ok := d.Radios["na"]; ok && r.Enabled && rf.IsDFS("na", r.Channel) {
 		notes = append(notes, fmt.Sprintf("5 GHz DFS channel %d under driver_country %s: refused unless that table has it; remove driver_country to serve it in %s", r.Channel, dc, d.Country))
 	}
 	d.Country = dc
@@ -755,7 +757,7 @@ var bandNames = map[string]string{"ng": "2.4 GHz", "na": "5 GHz"}
 // the country already in force is no override.
 func withDriverCountryBands(d bcmwifi.Desired, bands map[string]string) (bcmwifi.Desired, []string) {
 	var notes []string
-	for _, b := range []string{"ng", "na"} {
+	for _, b := range rf.Bands() {
 		cc := bcmwifi.NormCountry(bands[b])
 		if cc == "" || strings.EqualFold(cc, d.Country) {
 			continue

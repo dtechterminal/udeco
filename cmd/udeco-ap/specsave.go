@@ -305,7 +305,7 @@ func (a *agent) restoreSpectrum(ctx context.Context, now time.Time) {
 // copy follows a change.
 func (a *agent) fitRestored(ctx context.Context) {
 	changed := false
-	for _, band := range []string{"na", "ng"} {
+	for _, band := range bands5GFirst() {
 		r := a.scans.runner(band)
 		if r == nil {
 			continue

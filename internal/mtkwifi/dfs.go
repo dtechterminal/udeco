@@ -5,9 +5,12 @@ package mtkwifi
 import (
 	"context"
 	"regexp"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // DFS on the MT7663 (Options.DFS, agent config dfs; off by default until
@@ -40,9 +43,11 @@ import (
 //   - Never touched: IEEE80211H, RDRegion, DfsEnable, DfsZeroWait, nor any
 //     of the driver's DFS test commands.
 
+// chansDFS are the DFS channels this unit serves: the part of rf.IsDFS's
+// range its driver's region has.
 var chansDFS = []int{52, 56, 60, 64}
 
-func isDFS(ch int) bool { return ch >= 52 && ch <= 64 && ch%4 == 0 }
+func isDFS(ch int) bool { return slices.Contains(chansDFS, ch) }
 
 const (
 	dfsQuiet = 90 * time.Second     // CAC 65 s and the BSSes' restart
@@ -279,17 +284,7 @@ func (a *Applier) dfsRestarted(rd RadioDef) {
 // radarSeen records a radar on ch (the radio now on to).
 func (a *Applier) radarSeen(rd *RadioDef, rp RadioPlan, ch, to int) {
 	end := a.o.mono() + nopHold
-	out := []int{ch}
-	switch {
-	case rp.Width >= 80:
-		out = chansDFS
-	case rp.Width == 40:
-		out = []int{ch &^ 4, ch&^4 + 4} // 52/56, 60/64
-		if (ch/4)%2 == 0 {
-			out = []int{ch - 4, ch}
-		}
-	}
-	for _, c := range out {
+	for _, c := range radarOut(ch, rp.Width) {
 		a.dfs.nop[c] = end
 	}
 	a.dfs.moved = to
@@ -299,9 +294,30 @@ func (a *Applier) radarSeen(rd *RadioDef, rp RadioPlan, ch, to int) {
 	a.o.Logf("mtkwifi: %s: radar on channel %d: the driver moved the radio to %d; back after %s", rd.Band, ch, to, nopHold)
 	a.dfs.mu.Lock()
 	if len(a.dfs.radar) < 16 {
-		a.dfs.radar = append(a.dfs.radar, RadarEvent{Channel: ch, MovedTo: to, Freq: 5000 + 5*ch, At: time.Now()})
+		a.dfs.radar = append(a.dfs.radar, RadarEvent{Channel: ch, MovedTo: to, Freq: rf.ChanFreq(rf.Band5G, ch), At: time.Now()})
 	}
 	a.dfs.mu.Unlock()
+}
+
+// radarOut are the channels a radar on ch takes out of service on a radio
+// of width MHz: all of chansDFS at 80 MHz, a pair at 40 MHz, else ch.
+//
+// The 40 MHz pair differs from the channel's 40 MHz block
+// (rf.SubChannels(ch, 40)) for the lower channel of a block: 52 gives 48
+// and 52 where the block is 52/56, and 60 gives 56 and 60 where the block
+// is 60/64. TestRadarOut pins both answers; the rule is kept as it was
+// until the unit's own non-occupancy list has been checked.
+func radarOut(ch, width int) []int {
+	switch {
+	case width >= 80:
+		return chansDFS
+	case width == 40:
+		if (ch/4)%2 == 0 {
+			return []int{ch - 4, ch}
+		}
+		return []int{ch &^ 4, ch&^4 + 4}
+	}
+	return []int{ch}
 }
 
 // TakeRadar returns the radar detections since the last call.

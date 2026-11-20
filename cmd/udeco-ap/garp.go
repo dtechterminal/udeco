@@ -27,6 +27,7 @@ import (
 
 	"github.com/antoniocosta/unifi-openwrt/internal/hapdmon"
 	"github.com/antoniocosta/unifi-openwrt/internal/stasnoop"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 const garpEvery = 10 * time.Second
@@ -39,7 +40,7 @@ type garpState struct {
 
 // mgmtBridge is the bridge the AP's own address (and so its ARP table) is
 // on.
-const mgmtBridge = "br-lan"
+const mgmtBridge = unit.LANBridge
 
 // onHapdEvent is hapdmon's OnEvent hook (its goroutine): an authorization
 // is queued for the GARP goroutine; a full queue drops it.

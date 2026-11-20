@@ -31,7 +31,7 @@ func (a *Applier) priorSlots() map[string]string {
 		}
 	}
 	live := map[string]string{} // vif -> id, from the driver-state files
-	for _, prim := range radioOrderPrimaries() {
+	for _, prim := range Primaries() {
 		b, err := a.readFile(drvPath(a.o.RunDir, prim))
 		if err != nil {
 			continue
@@ -77,7 +77,9 @@ func radioOf(v string) string {
 	return v[:3]
 }
 
-func radioOrderPrimaries() []string {
+// Primaries are the radios' primary interfaces (wl0, wl1), in the order
+// radios are planned in.
+func Primaries() []string {
 	var out []string
 	for _, b := range radioOrder {
 		out = append(out, bandPrimary[b])

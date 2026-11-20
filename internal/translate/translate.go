@@ -117,7 +117,7 @@ func Plan(cfg Cfg, cur UCI, f Features) Result {
 		phy := cfg[p+"phyname"]
 		mode := cfg[p+"ieee_mode"]
 		band := "5g"
-		if strings.Contains(mode, "ng") || phy == "wifi0" && !strings.Contains(mode, "na") {
+		if byName, _ := qcaRadioBand(phy); strings.Contains(mode, "ng") || byName == "ng" && !strings.Contains(mode, "na") {
 			band = "2g"
 		}
 		if f.Phys != nil {

@@ -4,6 +4,8 @@ package main
 import (
 	"context"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // homeListenEvery: how often each radio listens on its own channel. A U6 Pro
@@ -42,7 +44,7 @@ func (a *agent) startHomeListen(ctx context.Context) {
 // homeListenRound listens once on each band's own channel. lastErr keeps
 // the last error per band, so a repeating one is logged once.
 func (a *agent) homeListenRound(ctx context.Context, lastErr map[string]string) {
-	for _, band := range []string{"ng", "na"} {
+	for _, band := range rf.Bands() {
 		if a.scanBlock() != "" || a.scans.busy() {
 			return
 		}

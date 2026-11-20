@@ -10,6 +10,9 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // Desired is the complete Wi-Fi state the agent wants. It mirrors
@@ -204,14 +207,18 @@ func maskSecret(v string) string {
 var bandPrimary = map[string]string{"ng": "wl0", "na": "wl1"}
 
 // radioOrder is the order radios are planned in.
-var radioOrder = []string{"ng", "na"}
+var radioOrder = rf.Bands()
 
-func normBand(b string) string {
-	switch strings.ToLower(strings.TrimSpace(b)) {
-	case "ng", "2g", "2.4g", "2ghz", "2.4ghz":
-		return "ng"
-	case "na", "5g", "5ghz":
-		return "na"
+// bandAlias is the other name of one of this unit's bands (ng <-> 2g,
+// na <-> 5g); "" for any other name.
+func bandAlias(band string) string {
+	for _, b := range radioOrder {
+		switch band {
+		case b:
+			return rf.Legacy(b)
+		case rf.Legacy(b):
+			return b
+		}
 	}
 	return ""
 }
@@ -341,9 +348,9 @@ func (l *layout) usedVif(vif string) (vifAssign, bool) {
 // vlanBridge names the bridge an SSID on vid joins.
 func vlanBridge(vid int) string {
 	if vid == 0 {
-		return "br-lan"
+		return unit.LANBridge
 	}
-	return fmt.Sprintf("br-v%d", vid)
+	return unit.VLANBridge(vid)
 }
 
 // planLayout validates d and places its SSIDs on vifs. exists reports whether
@@ -419,13 +426,13 @@ func planLayout(d Desired, exists func(string) bool, o layoutOpts) *layout {
 			}
 			if !o.minRates {
 				l.Notes = append(l.Notes, fmt.Sprintf("ssid %s: minimum rate %s=%d kbps not applied (Options.MinRates is off; untested on hardware)", s.ID, b, k))
-			} else if _, n := ssidRateset(ns, normBand(b)); n != "" {
+			} else if _, n := ssidRateset(ns, rf.Norm(b)); n != "" {
 				l.Notes = append(l.Notes, fmt.Sprintf("ssid %s: %s", s.ID, n))
 			}
 		}
 		var bands []string
 		for _, b := range s.Bands {
-			if nb := normBand(b); nb != "" && !contains(bands, nb) {
+			if nb := rf.Norm(b); nb != "" && !contains(bands, nb) {
 				bands = append(bands, nb)
 			} else if nb == "" {
 				l.Notes = append(l.Notes, fmt.Sprintf("ssid %s: band %q not supported on this unit", s.ID, b))
@@ -565,8 +572,8 @@ func radioNotes(band string, r Radio) []string {
 	if r.BandSteer != "" && r.BandSteer != "off" {
 		n = append(n, fmt.Sprintf("radio %s: band steering %q not implemented", band, r.BandSteer))
 	}
-	if r.Width > 80 {
-		n = append(n, fmt.Sprintf("radio %s: width %d not available, using 80", band, r.Width))
+	if r.Width > maxWidth {
+		n = append(n, fmt.Sprintf("radio %s: width %d not available, using %d", band, r.Width, maxWidth))
 	}
 	return n
 }
@@ -872,8 +879,7 @@ type BandSettings struct {
 func (s SSID) ForBand(band string) SSID {
 	b, ok := s.PerBand[band]
 	if !ok {
-		alias := map[string]string{"ng": "2g", "na": "5g", "2g": "ng", "5g": "na"}[band]
-		if b, ok = s.PerBand[alias]; !ok {
+		if b, ok = s.PerBand[bandAlias(band)]; !ok {
 			return s
 		}
 	}

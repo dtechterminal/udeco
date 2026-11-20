@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // Runner executes commands on the device.
@@ -148,7 +149,7 @@ func New(o Options) *Applier {
 		o.Root = "/"
 	}
 	if o.Bridge == "" {
-		o.Bridge = "bdg2"
+		o.Bridge = unit.JioLANBridge
 	}
 	if o.Logf == nil {
 		o.Logf = func(string, ...any) {}
@@ -560,7 +561,7 @@ func writeFile(p string, b []byte, mode os.FileMode) error {
 
 // ------------------------------------------------------------- bridging
 
-func vlanBridge(vid int) string { return "br-v" + strconv.Itoa(vid) }
+func vlanBridge(vid int) string { return unit.VLANBridge(vid) }
 
 // vlanParent is the switch port device of the uplink: eth0.4 for eth0.4.1.
 func (a *Applier) vlanParent() (string, error) {
@@ -637,7 +638,8 @@ func (a *Applier) ensureVLAN(ctx context.Context, vid int) (string, error) {
 	return br, nil
 }
 
-var vlanBr = regexp.MustCompile(`^br-v([0-9]+)$`)
+// vlanBr: a VLAN bridge's name (vlanBridge).
+var vlanBr = regexp.MustCompile(`^` + regexp.QuoteMeta(unit.VLANBridgePrefix) + `([0-9]+)$`)
 
 // cleanVLANs removes the agent's VLAN bridges neither a BSS nor a LAN port
 // (SetPortVLANs) uses any more. A LAN port's device still in a bridge being

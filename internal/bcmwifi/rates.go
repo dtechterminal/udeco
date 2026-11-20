@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 // Minimum data rate and beacon rate per BSS (Options.MinRates).
@@ -85,12 +87,12 @@ type RateOpts struct {
 func ssidRateset(s SSID, band string) (args []string, note string) {
 	kbps, o := 0, RateOpts{}
 	for k, v := range s.MinRateKbps {
-		if normBand(k) == band && v > 0 {
+		if rf.Norm(k) == band && v > 0 {
 			kbps = v
 		}
 	}
 	for k, v := range s.MinRateOpts {
-		if normBand(k) == band {
+		if rf.Norm(k) == band {
 			o = v
 		}
 	}

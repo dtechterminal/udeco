@@ -28,6 +28,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // Runner executes a command and returns its stdout. Implementations must
@@ -123,7 +125,7 @@ func New(o Options) *Collector {
 		o.ScanTimeout = defaultScanTimeout
 	}
 	if o.Bridge == "" {
-		o.Bridge = lanBridge
+		o.Bridge = unit.LANBridge
 	}
 	if o.Ports == nil {
 		o.Ports = ethName

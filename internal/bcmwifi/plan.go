@@ -661,7 +661,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		drvStep = len(files)
 		files = append(files,
 			writeStep("write driver state", drvPath(a.o.RunDir, p), 0o644, heldJSON),
-			writeStep("write hostapd conf", confPath(a.o.RunDir, p), 0o600, conf))
+			writeStep("write hostapd conf", ConfPath(a.o.RunDir, p), 0o600, conf))
 	}
 
 	_, takeover := ls.TPLink[p]
@@ -671,10 +671,10 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		acl = a.planACLLive(p, conf, drvACL, files)
 		// sameConf: the FT-SAE peer lines are added live (SyncFTPeers), not
 		// by a restart.
-		reconcile = reconcile || !ls.Ours[p] || !acl.covers(confPath(a.o.RunDir, p)) && !a.sameConf(confPath(a.o.RunDir, p), conf) ||
+		reconcile = reconcile || !ls.Ours[p] || !acl.covers(ConfPath(a.o.RunDir, p)) && !a.sameConf(ConfPath(a.o.RunDir, p), conf) ||
 			!acl.covers(drvPath(a.o.RunDir, p)) && !a.sameFile(drvPath(a.o.RunDir, p), files[drvStep].Data)
 		for _, f := range files {
-			if f.Kind == StepWrite && !acl.covers(f.Path) && f.Path != confPath(a.o.RunDir, p) && !a.sameFile(f.Path, f.Data) {
+			if f.Kind == StepWrite && !acl.covers(f.Path) && f.Path != ConfPath(a.o.RunDir, p) && !a.sameFile(f.Path, f.Data) {
 				reconcile = true
 			}
 		}
@@ -797,7 +797,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 	}
 	if ls.Ours[p] {
-		st = append(st, Step{Kind: StepStop, Desc: "stop agent hostapd on " + p, Path: pidPath(a.o.RunDir, p), Proc: "hostapd", Match: confPath(a.o.RunDir, p)})
+		st = append(st, Step{Kind: StepStop, Desc: "stop agent hostapd on " + p, Path: pidPath(a.o.RunDir, p), Proc: "hostapd", Match: ConfPath(a.o.RunDir, p)})
 		for _, v := range ls.OursBSS[p] {
 			gone[v] = true
 		}
@@ -857,7 +857,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	st = append(st, stale...)
 	if len(hr.BSS) == 0 {
 		rp.Steps = append(st,
-			Step{Kind: StepRemove, Desc: "remove hostapd conf", Path: confPath(a.o.RunDir, p)},
+			Step{Kind: StepRemove, Desc: "remove hostapd conf", Path: ConfPath(a.o.RunDir, p)},
 			Step{Kind: StepRemove, Desc: "remove driver state", Path: drvPath(a.o.RunDir, p)})
 		rp.Steps = append(rp.Steps, liveDrv(len(phy) > 0)...)
 		rp.Driver = driverStatus(dp, rp.TWTSet)
@@ -875,7 +875,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		st = append(st, apResetSteps(p, false)...) // anchor.go: the master
 	}
 	st = append(st,
-		cmdStep("start hostapd on "+p, "hostapd", "-B", "-P", pidPath(a.o.RunDir, p), confPath(a.o.RunDir, p)),
+		cmdStep("start hostapd on "+p, "hostapd", "-B", "-P", pidPath(a.o.RunDir, p), ConfPath(a.o.RunDir, p)),
 		Step{Kind: StepWait, Desc: "wait for hostapd on " + p, Ifaces: vifs, Path: CtrlDir, Port: vifs[len(vifs)-1]},
 		optStep("keep placeholder "+ph+" down", "wl", "-i", ph, "bss", "down"))
 	// dwds and rrm need the radio down: one wl down / wl up for all the
@@ -951,7 +951,7 @@ func (a *Applier) placeholder(vif string) (hapdPlaceholder, error) {
 	if ph, ok := a.ph[vif]; ok {
 		return ph, nil
 	}
-	if b, err := a.readFile(confPath(a.o.RunDir, vif[:3])); err == nil {
+	if b, err := a.readFile(ConfPath(a.o.RunDir, vif[:3])); err == nil {
 		if ph, ok := parsePlaceholder(b, vif); ok {
 			a.ph[vif] = ph
 			return ph, nil

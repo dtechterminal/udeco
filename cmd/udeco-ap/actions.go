@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/antoniocosta/unifi-openwrt/internal/bcmwifi"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 )
 
 func (a *agent) action(ctx context.Context, act string) {
@@ -56,7 +57,7 @@ func (a *agent) action(ctx context.Context, act string) {
 	case "unblock":
 		// the whole new list arrives with the "block" action
 	case "scan":
-		a.startScan(ctx, []string{"ng", "na"})
+		a.startScan(ctx, rf.Bands())
 	case "spectrum-scan":
 		a.spectrumScan(ctx)
 	case "quick-scan":

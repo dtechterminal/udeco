@@ -67,7 +67,7 @@ func (a *Applier) anchorWith(primary string, known func(string) bool) string {
 	if a.o.Run != nil {
 		if _, ours := a.ourHostapd(primary); ours {
 			var h hapdProc
-			h.hapdConf(a, confPath(a.o.RunDir, primary))
+			h.hapdConf(a, ConfPath(a.o.RunDir, primary))
 			a.learnAnchor(primary, h.Iface)
 		} else if tp, ok := a.tplinkHostapd(primary); ok {
 			a.learnAnchor(primary, tp.Iface)

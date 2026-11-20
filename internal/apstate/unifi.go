@@ -5,6 +5,7 @@ package apstate
 import (
 	"fmt"
 	"github.com/antoniocosta/unifi-openwrt/internal/models"
+	"github.com/antoniocosta/unifi-openwrt/internal/rf"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 	"sort"
 	"strings"
@@ -51,7 +52,7 @@ func (info CfgInfo) radioNames(rs []Radio) []string {
 	for i, r := range rs {
 		n := info.RadioNames[r.Band]
 		if n == "" || used[n] {
-			n = fmt.Sprintf("wifi%d", i)
+			n = translate.PositionalRadioName(i)
 		}
 		used[n] = true
 		out[i] = n
@@ -589,7 +590,8 @@ func cfgRadioBand(phy, mode string) string {
 	case mode != "":
 		return "na"
 	}
-	return map[string]string{"wifi0": "ng", "ra0": "ng", "wifi1": "na", "rai0": "na", "wifi2": "6e"}[phy]
+	band, _ := translate.RadioNameBand(phy)
+	return band
 }
 
 // WLANIDs reads ssid -> wlan id from a system_cfg text (wireless.N.ssid and
@@ -627,14 +629,11 @@ func WLANIDs(systemCfg string) map[string]string {
 func (s *Snapshot) RadioNames() map[string]string {
 	m := map[string]string{}
 	for i, r := range s.Radios {
-		b := "5g"
-		switch r.Band {
-		case "ng":
-			b = "2g"
-		case "6e":
-			b = "6g"
+		b := rf.Legacy(r.Band)
+		if b == "" {
+			b = rf.Legacy(rf.Band5G) // a radio of no known band counts as 5 GHz
 		}
-		m[fmt.Sprintf("wifi%d", i)] = b
+		m[translate.PositionalRadioName(i)] = b
 	}
 	return m
 }

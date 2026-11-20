@@ -43,6 +43,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/antoniocosta/unifi-openwrt/internal/unit"
 )
 
 // Runner executes a command and returns its stdout. Implementations apply
@@ -243,7 +245,7 @@ func New(o Options) *Manager {
 		o.Logf = func(string, ...any) {}
 	}
 	if o.LANDev == "" {
-		o.LANDev = "br-lan"
+		o.LANDev = unit.LANBridge
 	}
 	if o.SSHDPort == 0 {
 		o.SSHDPort = DefaultSSHDPort
