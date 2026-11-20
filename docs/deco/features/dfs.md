@@ -162,4 +162,8 @@ it gives HE at 23.5 dBm on 52/80 and 100/80, but it runs no radar detection:
 on 100/80 under `#a` (Bedroom, 2026-11-20 19:16 IST) `wl dfs_status` stayed
 IDLE for 80 s, with no CAC and no In-Service Monitoring, where IN/288 on the
 same radio runs a 60 s CAC and then monitors. It also offers 116/80, in the
-weather-radar band. Do not run DFS channels under `#a`. TP-Link's data for this board carries Wi-Fi 6 only for US.
+weather-radar band. Do not run DFS channels under `#a`. The cause is in the table: with the radio down,
+`wl chan_info 100` reads "RADAR Sensitive, Passive" under IN/288 but only "5G
+Band" under `#a` (52 and 120 likewise), and `wl spect 2` (strict 802.11h)
+does not change it, so the driver's CAC and monitoring never engage; the
+`dfs_preism`/`dfs_postism` overrides only act on radar-sensitive channels. TP-Link's data for this board carries Wi-Fi 6 only for US.
