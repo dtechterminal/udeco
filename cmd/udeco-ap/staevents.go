@@ -115,6 +115,16 @@ type staEvents struct {
 	kicks map[string]time.Time
 	at    time.Time        // this reading's time (the feed's, else clock)
 	clock func() time.Time // nil = time.Now
+	// algo, when set (the Deco with the connection-timing events,
+	// staconn.go), names an association's auth_algo ("ft", "sae", "open")
+	// from the station and its SSID; the association then carries no
+	// auth_rssi: without wifi_caps2 0x2000 (no sta_roam) the controller's
+	// detector would take the association/sta_leave pairs on top of the
+	// success events and write each roam twice (deco-crosscheck: claim
+	// 0x2000, or send no auth_rssi on association). The inform-based roam
+	// path still covers this AP.
+	algo   func(mac, ssid string) string
+	ssidOf map[string]string // vap_table name -> its SSID (this reading)
 }
 
 // staHint is a sta_leave's assoc_status for a while.
@@ -191,6 +201,15 @@ type staFeed struct {
 // is a feed) and queues the events. The first reading only seeds (clients
 // already associated when the agent starts get no association event).
 func (e *staEvents) observe(f map[string]any, feed *staFeed) {
+	if e.algo != nil {
+		e.ssidOf = map[string]string{}
+		vaps, _ := f["vap_table"].([]map[string]any)
+		for _, v := range vaps {
+			name, _ := v["name"].(string)
+			ssid, _ := v["essid"].(string)
+			e.ssidOf[name] = ssid
+		}
+	}
 	if feed != nil {
 		e.at = feed.now
 	} else if e.clock != nil {
@@ -456,11 +475,18 @@ func (e *staEvents) leave(mac string, p staSeen, at int64) {
 }
 
 func (e *staEvents) assoc(mac string, c staSeen) {
-	e.push(map[string]any{
+	ev := map[string]any{
 		"message_type": staTracker, "event_type": staEvAssoc,
 		"mac": mac, "vap": c.vap, "auth_rssi": c.signal, "assoc_status": 0,
 		"last_seen": c.lastSeen,
-	})
+	}
+	if e.algo != nil {
+		delete(ev, "auth_rssi")
+		if v := e.algo(mac, e.ssidOf[c.vap]); v != "" {
+			ev["auth_algo"] = v
+		}
+	}
+	e.push(ev)
 }
 
 // staVifNames maps this reading's BSS interfaces (wl12) to their vap_table
@@ -545,7 +571,7 @@ func (a *agent) startStaMonitor(ctx context.Context) {
 		return
 	}
 	m := hapdmon.New(hapdmon.Options{Dir: a.dev(bcmwifi.CtrlDir), LocalDir: a.dev(a.o.runDir),
-		Want: bcmwifi.ServedVif, Logf: a.logf})
+		Want: bcmwifi.ServedVif, Logf: a.logf, OnEvent: a.onHapdEvent})
 	a.hapd = m
 	a.bg.Add(1)
 	go func() { defer a.bg.Done(); m.Run(ctx) }()

@@ -54,8 +54,10 @@ type connRig struct {
 	t0     time.Time
 	queue  []map[string]any
 	snoop  map[string]bool
+	since  map[string]time.Time
 	signal map[string]int
 	assoc  map[string]bool
+	read   int // the reading's start, ms (0: none)
 }
 
 func newConnRig() *connRig {
@@ -81,8 +83,12 @@ func (r *connRig) frame(ms int, o stasnoop.Obs) {
 // judge is one reading at ms.
 func (r *connRig) judge(ms int) []map[string]any {
 	n := len(r.queue)
-	r.c.judge(connReading{now: r.at(ms), up: 1000 + int64(ms/1000), vifs: map[string]string{"wl12": "wifi1ap1"},
-		snooped: r.snoop, signal: r.signal, assoc: r.assoc, gwMAC: cGW, gwIP: cGWIP},
+	var read time.Time
+	if r.read != 0 {
+		read = r.at(r.read)
+	}
+	r.c.judge(connReading{now: r.at(ms), read: read, up: 1000 + int64(ms/1000), vifs: map[string]string{"wl12": "wifi1ap1"},
+		snooped: r.snoop, snoopSince: r.since, signal: r.signal, assoc: r.assoc, gwMAC: cGW, gwIP: cGWIP},
 		func(ev map[string]any) { r.queue = append(r.queue, ev) })
 	return r.queue[n:]
 }
@@ -144,15 +150,18 @@ func TestConnSuccess(t *testing.T) {
 	wantFields(t, ev, map[string]any{
 		"message_type": staTracker, "event_type": "success", "mac": cSta, "vap": "wifi1ap1",
 		"auth_ts": float64(r.t0.UnixMicro()) / 1e6, "auth_rssi": -58, "avg_rssi": -58,
-		"assoc_delta": 10000, "auth_delta": 0, "wpa_auth_delta": 40000, "ip_delta": 250000, "traffic_delta": 50000,
+		"assoc_delta": 10000, "wpa_auth_delta": 40000, "ip_delta": 250000, "traffic_delta": 50000,
 		"assoc_failures": 0, "auth_failures": 0, "wpa_auth_failures": 0, "ip_failures": 0, "traffic_failures": 0,
 		"ip_assign_type": "dhcp", "arp_reply_gw_seen": "yes", "dns_resp_seen": "yes", "dns_timeouts": 0, "dns_responses": 1,
 		"last_seen": 1005, "assoc_status": 0,
 	})
-	for _, k := range []string{"assoc_delta", "wpa_auth_delta", "ip_delta", "traffic_delta", "auth_delta"} {
+	for _, k := range []string{"assoc_delta", "wpa_auth_delta", "ip_delta", "traffic_delta"} {
 		if _, ok := ev[k].(int64); !ok {
 			t.Errorf("%s is %T, want an integer", k, ev[k])
 		}
+	}
+	if _, ok := ev["auth_delta"]; ok {
+		t.Error("auth_delta on a PSK connection (the spec omits it)")
 	}
 	if id, _ := ev["event_id"].(string); id == "" {
 		t.Error("no event_id")
@@ -163,7 +172,7 @@ func TestConnSuccess(t *testing.T) {
 	if got := r.judge(60000); len(got) != 0 {
 		t.Fatalf("judged twice: %v", got)
 	}
-	if ip, ok := r.c.ipOf(cSta, r.at(60000)); !ok || ip != cIP {
+	if ip, ok := r.c.ipOf(cSta, "", r.at(60000)); !ok || ip != cIP {
 		t.Errorf("ipOf %q %v", ip, ok)
 	}
 }
@@ -196,8 +205,8 @@ func TestConnSoftFailureFixup(t *testing.T) {
 	}
 	wantFields(t, got[0], map[string]any{"event_type": "fixup", "dns_resp_seen": "yes", "dns_responses": 1,
 		"auth_ts": float64(r.t0.UnixMicro()) / 1e6})
-	if got[0]["event_id"] == id {
-		t.Error("same event_id")
+	if got[0]["event_id"] != id {
+		t.Error("fixup with another event_id than its soft failure")
 	}
 	if got := r.judge(200000); len(got) != 0 {
 		t.Fatalf("more: %v", got)
@@ -250,8 +259,10 @@ func TestConnEAP(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("events %v", got)
 	}
+	// auth_delta EAP-STARTED -> EAP-SUCCESS, wpa_auth_delta from the end
+	// of EAP-SUCCESS (deco-crosscheck)
 	wantFields(t, got[0], map[string]any{"event_type": "success", "radius_auth_status": "success", "radius_auth_delta": 200000,
-		"wpa_auth_delta": 260000, "ip_assign_type": "static", "ip_delta": 0, "traffic_delta": 40000})
+		"auth_delta": 200000, "wpa_auth_delta": 40000, "ip_assign_type": "static", "ip_delta": 0, "traffic_delta": 40000, "auth_failures": 0})
 
 	r = newConnRig()
 	r.anchor(0, anchorAssoc)
@@ -261,7 +272,18 @@ func TestConnEAP(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("events %v", got)
 	}
-	wantFields(t, got[0], map[string]any{"event_type": "failure", "radius_auth_status": "failure"})
+	wantFields(t, got[0], map[string]any{"event_type": "failure", "radius_auth_status": "failure", "auth_failures": 1, "wpa_auth_failures": 0})
+
+	// a RADIUS timeout is an authentication failure, not a 4-way one
+	r = newConnRig()
+	r.anchor(0, anchorAssoc)
+	r.sock(20, hapdmon.EAPStarted)
+	r.sock(30020, hapdmon.EAPTimeout)
+	got = r.judge(int(staConnJudge/time.Millisecond) + 31000)
+	if len(got) != 1 {
+		t.Fatalf("events %v", got)
+	}
+	wantFields(t, got[0], map[string]any{"event_type": "failure", "radius_auth_status": "failure", "auth_failures": 1, "wpa_auth_failures": 0})
 }
 
 // A fast transition: auth_algo "ft", and the address the client kept is a
@@ -410,7 +432,7 @@ func TestConnEventsFromTaps(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("no tap on wl12")
 	}
-	fmt.Fprintf(pw, "Fri Nov 20 12:00:00 2026 daemon.info hostapd: wl12: STA %s IEEE 802.11: associated (aid 1)\n", staMAC)
+	fmt.Fprintf(pw, "%s daemon.info hostapd: wl12: STA %s IEEE 802.11: associated (aid 1)\n", time.Now().Format(time.ANSIC), staMAC)
 	time.Sleep(20 * time.Millisecond)
 	mon.mu.Lock()
 	mon.evs = []hapdmon.Event{{Vif: "wl12", MAC: staMAC, Kind: hapdmon.Connected, At: time.Now()}}

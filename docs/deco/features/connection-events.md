@@ -23,7 +23,11 @@
 ## What the agent does (takeover, Deco; `sta_snoop`, default on)
 
 - Sources:
-  - hostapd's syslog (`logread -f`, a follower of its own; a line's time is when it arrived):
+  - hostapd's syslog (`logread -f`, a follower of its own; a line's time is when it arrived; the
+    first line, which logread replays from its buffer on every (re)start, is skipped when its own
+    timestamp is older than the follower; an "authenticated"/"associated" line that arrives within
+    1 s after the same station's authorization on the same BSS (an FT roam, whose syslog line can
+    trail the socket event) belongs to that attempt and starts no new one):
     "IEEE 802.11: authenticated", "associated"/"reassociated", "WPA: pairwise key handshake
     completed", "WPA: FT authentication already completed" (a fast transition), "EAPOL-Key
     timeout", "disassociated"/"deauthenticated";
@@ -37,24 +41,39 @@
 - `cmd/udeco-ap/staconn.go`: one attempt per station, started at its first anchor. Deltas:
   `assoc_delta` authenticated -> associated, `wpa_auth_delta` associated -> authorized,
   `ip_delta` authorized -> DHCP ACK, `traffic_delta` authorized -> its first frame,
-  `radius_auth_delta` EAP start -> result; `auth_delta` is 0 (the driver authenticates and only
-  the end is logged). `ip_assign_type` "dhcp" (an ACK seen), "roam" (an address used without
+  `radius_auth_delta` EAP start -> result. 802.1X (deco-crosscheck): `auth_delta` EAP-STARTED ->
+  EAP-SUCCESS, `wpa_auth_delta` from EAP-SUCCESS to authorized; an EAP rejection or an
+  EAP TIMEOUT-FAILURE is `auth_failures` 1 with `radius_auth_status` "failure" (a timeout used to
+  count as a 4-way `wpa_auth_failure`). PSK: no `auth_delta` (omitted, as the spec says). `ip_assign_type` "dhcp" (an ACK seen), "roam" (an address used without
   DHCP after a fast transition), "static" (used without DHCP otherwise). Judged at each reading:
   - success: authorized, an address, a frame from the station and a DNS answer;
   - soft failure: authorized 30 s ago without that (unanswered queries older than 5 s are
     `dns_timeouts`, no address an `ip_failure`, no frame a `traffic_failure`), or the station left
     before; a success within 2 minutes after a soft failure sends a fixup with the completed
-    values (the agent's reading of "fixup");
+    values and the soft failure's `event_id` (the spec: unique per attempt, reused for fixup);
+  - an attempt authorized on the socket after the reading began has its association event in the
+    next reading (station events hold it), so its success waits for that reading too: the
+    controller never gets the success first;
   - failure: never authorized 30 s after it started and not associated in the reading; PSK
     mismatches and EAPOL timeouts count as `wpa_auth_failures`, a full BSS as `assoc_failures`, an
     EAP rejection sets `radius_auth_status` "failure".
-  - `auth_ts` is the attempt's start, made unique per unit; `event_id` is unique; `auth_rssi` is
-    the first reading's signal, `avg_rssi` the latest.
+  - `auth_ts` is the attempt's start, made unique per unit; `event_id` is unique per attempt;
+    `auth_rssi` is the first reading's signal, `avg_rssi` the latest. A station no reading listed
+    (one that failed before it was ever associated in a reading) has no signal: both are omitted,
+    never 0 (the controller's -75 dBm gate takes 0 as strong and would count a far neighbour's
+    retries). Whether the controller then counts or drops those counters is INFERRED (drops).
 - One event per extra inform, through the same bounded queue (128) as association/sta_leave.
 - No attempt is judged on a BSS without a running tap (without DNS every attempt would read as a
-  soft failure).
+  soft failure). A tap that dies with its vif (hostapd restart at an apply) is reopened at the
+  next reading and retried at every reading for a minute; an attempt authorized before its BSS's
+  tap (re)opened is dropped unjudged, never a soft failure.
 - No `sta_roam`, no wifi_caps2 0x2000: the controller needs the AP a client came from, which the
-  agent cannot know reliably; roams stay association/sta_leave pairs plus the success events.
+  agent cannot know reliably. With the timing events on, the association event carries
+  `auth_algo` ("ft" for a fast transition seen in syslog, "sae" on a WPA3-only SSID served with
+  `wpa3`, else "open") and no `auth_rssi`: the deco-crosscheck capability rule (claim 0x2000, or
+  send no `auth_rssi` on association) keeps the detector from writing each roam twice; roams
+  then come from the controller's inform-based path. `sta_snoop` false keeps the old association
+  event (with `auth_rssi`).
 - `sta_snoop` false: no follower, no taps, no timing events. Takeover only; refused on jio-mtk.
 
 ## Unverified on hardware
@@ -66,3 +85,6 @@
   with the flow cache on (fcache may bypass the netdev for accelerated flows; DNS/DHCP are short
   and usually not accelerated), and the CPU cost on a busy BSS.
 - How the controller's WiFi Connectivity view shows these events from this agent.
+- Clients that resolve only over IPv6 or encrypted DNS (DoT/DoH): the tap passes IPv4 UDP 53
+  only, so such a client would read as a soft failure on every connection. Whether this site
+  advertises an IPv6 resolver was not checked (deferred).

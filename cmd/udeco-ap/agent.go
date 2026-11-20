@@ -264,8 +264,10 @@ type agent struct {
 	minr     minRSSIState // loop goroutine only (minrssi.go)
 	upl      uplinkGuard  // the uplink watcher's (uplink.go)
 	conn     *connState   // connection-timing events (staconn.go); loop goroutine; nil = off
-	garp     garpState    // gratuitous ARP on association (garp.go); loop goroutine
-	no2      no2ghzState  // loop goroutine only (no2ghz.go)
+	garp     garpState    // gratuitous ARP on association (garp.go); its goroutine
+	garpOnce sync.Once
+	garpARP  atomic.Pointer[map[string]string] // the last reading's ARP table (garp.go)
+	no2      no2ghzState                       // loop goroutine only (no2ghz.go)
 	lldp     *lldp.Service
 	res      atomic.Pointer[resources] // the last R4 reading (self-check)
 	pm       *pathmonState             // path monitoring (pathmon.go)

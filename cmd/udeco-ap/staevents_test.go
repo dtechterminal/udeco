@@ -332,7 +332,7 @@ func TestStaEventsFromHostapd(t *testing.T) {
 	})
 	if len(got) != 2 || got[0]["event_type"] != "sta_leave" || got[1]["event_type"] != "association" ||
 		got[0]["mac"] != staMAC || got[1]["mac"] != staMAC || got[0]["vap"] == "" || got[0]["vap"] != got[1]["vap"] ||
-		got[1]["auth_rssi"] != float64(-55) {
+		got[1]["auth_algo"] != "open" || got[1]["auth_rssi"] != nil {
 		t.Fatalf("events %v", got)
 	}
 }

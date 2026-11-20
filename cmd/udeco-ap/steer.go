@@ -36,11 +36,17 @@ type wifiPolicy struct {
 	// no2ghz: the SSIDs with "restrict to 5 GHz" that broadcast on both
 	// bands (no2ghz.go)
 	no2ghz map[string]bool
+	// sae: the WPA3-only SSIDs (an association there is SAE when the
+	// agent serves WPA3, staconn.go authAlgo)
+	sae map[string]bool
 }
 
 func policyFrom(d bcmwifi.Desired) *wifiPolicy {
-	p := &wifiPolicy{steer: map[string]string{}, roam: roamPolicy(d), minRSSI: map[string]int{}, no2ghz: map[string]bool{}}
+	p := &wifiPolicy{steer: map[string]string{}, roam: roamPolicy(d), minRSSI: map[string]int{}, no2ghz: map[string]bool{}, sae: map[string]bool{}}
 	for _, s := range d.SSIDs {
+		if s.Enabled && s.Security == bcmwifi.SecWPA3 {
+			p.sae[s.SSID] = true
+		}
 		if s.Enabled && s.No2GHz && s.SSID != "" && slices.Contains(s.Bands, "ng") && slices.Contains(s.Bands, "na") {
 			p.no2ghz[s.SSID] = true
 		}

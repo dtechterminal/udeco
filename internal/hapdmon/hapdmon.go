@@ -96,8 +96,11 @@ type Options struct {
 	Ping     time.Duration     // keepalive: PING after this long without a message, re-attach after as long again without PONG (10 s)
 	Retry    time.Duration     // first wait before attaching again after a failure, doubled up to a minute (2 s)
 	Max      int               // events kept at most until Take (256); the oldest go first
-	Logf     func(string, ...any)
-	Now      func() time.Time
+	// OnEvent, when set, also gets every event as it is received (the
+	// monitor's goroutine; it must not block).
+	OnEvent func(Event)
+	Logf    func(string, ...any)
+	Now     func() time.Time
 }
 
 // Monitor follows the BSS sockets of one hostapd control directory.
@@ -164,12 +167,15 @@ func (m *Monitor) Attached() map[string]time.Time {
 
 func (m *Monitor) push(e Event) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if len(m.events) >= m.o.Max {
 		m.events = m.events[1:]
 		m.dropped++
 	}
 	m.events = append(m.events, e)
+	m.mu.Unlock()
+	if m.o.OnEvent != nil {
+		m.o.OnEvent(e)
+	}
 }
 
 func (m *Monitor) setSince(name string, t time.Time) {

@@ -80,6 +80,9 @@ const (
 	anchorMax     = 512              // syslog anchors kept between readings
 	snoopMax      = 1024             // frames kept between readings
 	snoopRetry    = time.Minute      // a tap that failed is opened again after this
+	// anchorSkew: a syslog anchor arrives through syslogd and logread,
+	// later than the control socket's AP-STA-CONNECTED it belongs to.
+	anchorSkew = time.Second
 )
 
 // anchorKind is one hostapd syslog line that marks a step.
@@ -134,6 +137,18 @@ func parseAnchor(line string) (staAnchor, bool) {
 	return a, true
 }
 
+// replayedLine: a log line stamped (busybox logread: "Fri Nov 20 12:00:00
+// 2026 ...") more than a second before the follower started, i.e. the
+// buffered line `logread -f -l 1` prints first. An unparsable stamp is not
+// a replay.
+func replayedLine(line string, started time.Time) bool {
+	if len(line) < len(time.ANSIC) {
+		return false
+	}
+	t, err := time.ParseInLocation(time.ANSIC, line[:len(time.ANSIC)], started.Location())
+	return err == nil && started.Sub(t) > time.Second
+}
+
 // normMAC is a MAC address in lower case ("" when it is none).
 func normMAC(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
@@ -163,14 +178,29 @@ type connIn struct {
 
 // connReading is what the tracker needs from a reading.
 type connReading struct {
-	now     time.Time
+	now time.Time
+	// read: when the reading started (feed.read; zero: no socket feed).
+	// staevents holds a socket authorization from after it for the next
+	// reading's association event; that attempt's success or fixup waits
+	// for that reading too (never before its association)
+	read    time.Time
 	up      int64             // the reading's uptime
 	vifs    map[string]string // BSS interface -> vap_table name
 	snooped map[string]bool   // the BSSes with a running tap
-	signal  map[string]int    // station -> signal (dBm)
-	assoc   map[string]bool   // stations associated in the reading
-	gwMAC   string
-	gwIP    string
+	// snoopSince: when each BSS's tap (re)opened. An attempt authorized
+	// before it (a tap that died with its vif at a hostapd restart) had its
+	// DHCP and DNS unseen: it is dropped, never judged.
+	snoopSince map[string]time.Time
+	signal     map[string]int  // station -> signal (dBm)
+	assoc      map[string]bool // stations associated in the reading
+	gwMAC      string
+	gwIP       string
+}
+
+// assocPending: a's association event waits for the next reading
+// (authorized on the socket after this reading started).
+func (r connReading) assocPending(a *connAttempt) bool {
+	return !r.read.IsZero() && !a.sockAt.IsZero() && !a.sockAt.Before(r.read)
 }
 
 // connAttempt is one station's connection attempt.
@@ -181,6 +211,7 @@ type connAttempt struct {
 	assoc      time.Time // associated
 	wpa        time.Time // authorized: the 4-way handshake (or FT) is done
 	authorized bool
+	sockAt     time.Time // hostapd's AP-STA-CONNECTED (socket) for this attempt
 	ft         bool
 	eapStart   time.Time
 	eapDone    time.Time
@@ -200,7 +231,7 @@ type connAttempt struct {
 	assocFails int
 	rssi       int // the first signal seen (auth_rssi)
 	soft       time.Time
-	softID     string
+	id         string  // event_id, once given: one per attempt, reused by its fixup
 	ts         float64 // auth_ts, once given
 }
 
@@ -209,14 +240,21 @@ type connTracker struct {
 	att    map[string]*connAttempt
 	lastTS float64
 	seq    uint64
-	ips    map[string]staIP // station -> its last address
-	in     []connIn
-	gone   []*connAttempt // authorized attempts that ended, to judge
+	// ips: station -> its last address and the bridge it was seen on; read
+	// by the GARP goroutine too (garp.go), hence ipMu
+	ipMu sync.Mutex
+	ips  map[string]staIP
+	// bridgeOf names a BSS's bridge (nil: unknown, ""); cached per judge
+	bridgeOf func(vif string) string
+	brCache  map[string]string
+	in       []connIn
+	gone     []*connAttempt // authorized attempts that ended, to judge
 }
 
 type staIP struct {
 	ip string
 	at time.Time
+	br string // the bridge of the BSS it was seen on
 }
 
 func newConnTracker() *connTracker {
@@ -226,13 +264,44 @@ func newConnTracker() *connTracker {
 // add queues one input (they are applied in time order by judge).
 func (c *connTracker) add(in connIn) { c.in = append(c.in, in) }
 
-// ipOf is a station's address when known lately.
-func (c *connTracker) ipOf(mac string, now time.Time) (string, bool) {
+// ipOf is a station's address when known lately on bridge br: an address
+// seen on another bridge (another network) is none.
+func (c *connTracker) ipOf(mac, br string, now time.Time) (string, bool) {
+	c.ipMu.Lock()
+	defer c.ipMu.Unlock()
 	s, ok := c.ips[mac]
-	if !ok || now.Sub(s.at) > staIPKeep {
+	if !ok || now.Sub(s.at) > staIPKeep || s.br != br {
 		return "", false
 	}
 	return s.ip, true
+}
+
+func (c *connTracker) setIP(mac, ip, br string, at time.Time) {
+	c.ipMu.Lock()
+	defer c.ipMu.Unlock()
+	c.ips[mac] = staIP{ip, at, br}
+}
+
+func (c *connTracker) forgetIP(mac string) {
+	c.ipMu.Lock()
+	defer c.ipMu.Unlock()
+	delete(c.ips, mac)
+}
+
+// bridge is vif's bridge (cached for one judge).
+func (c *connTracker) bridge(vif string) string {
+	if c.bridgeOf == nil {
+		return ""
+	}
+	if br, ok := c.brCache[vif]; ok {
+		return br
+	}
+	if c.brCache == nil {
+		c.brCache = map[string]string{}
+	}
+	br := c.bridgeOf(vif)
+	c.brCache[vif] = br
+	return br
 }
 
 // open returns mac's open attempt on vif, starting one at at.
@@ -263,6 +332,13 @@ func (c *connTracker) apply(in connIn, gwMAC, gwIP string) {
 		a := c.att[x.MAC]
 		switch x.Kind {
 		case anchorAuth, anchorAssoc:
+			if a != nil && a.authorized && a.vif == x.Vif && !in.at.Before(a.wpa) && in.at.Sub(a.wpa) < anchorSkew {
+				// the syslog line of the (re)association AP-STA-CONNECTED
+				// already reported, arriving late through syslogd and
+				// logread (an FT reassociation logs it in the same call):
+				// part of this attempt, not a new one
+				break
+			}
 			if a != nil && (a.authorized || a.vif != x.Vif) {
 				c.retire(x.MAC) // a new attempt
 			}
@@ -301,6 +377,7 @@ func (c *connTracker) apply(in connIn, gwMAC, gwIP string) {
 				a = c.open(ev.MAC, ev.Vif, in.at)
 			}
 			a.authorized = true
+			a.sockAt = in.at
 			if a.wpa.IsZero() {
 				a.wpa = in.at
 			}
@@ -321,7 +398,10 @@ func (c *connTracker) apply(in connIn, gwMAC, gwIP string) {
 			a := c.open(ev.MAC, ev.Vif, in.at)
 			a.radius, a.eapDone = "failure", in.at
 		case hapdmon.EAPTimeout:
-			c.open(ev.MAC, ev.Vif, in.at).wpaFails++
+			// TIMEOUT-FAILURE(2): the authentication server (or the
+			// station's EAP) timed out, not the 4-way handshake
+			a := c.open(ev.MAC, ev.Vif, in.at)
+			a.radius, a.eapDone = "failure", in.at
 		}
 	case in.frame != nil:
 		c.frame(*in.frame, in.at, gwMAC, gwIP)
@@ -350,9 +430,9 @@ func (c *connTracker) frame(o stasnoop.Obs, at time.Time, gwMAC, gwIP string) {
 	// what the station's own frames say about its address
 	switch {
 	case o.Kind == stasnoop.DHCPAck && o.Out && o.YourIP != "" && o.YourIP != "0.0.0.0":
-		c.ips[mac] = staIP{o.YourIP, at}
+		c.setIP(mac, o.YourIP, c.bridge(o.Vif), at)
 	case !o.Out && o.Kind != stasnoop.DHCPDiscover && o.Kind != stasnoop.DHCPRequest && o.SrcIP != "" && o.SrcIP != "0.0.0.0":
-		c.ips[mac] = staIP{o.SrcIP, at}
+		c.setIP(mac, o.SrcIP, c.bridge(o.Vif), at)
 	}
 	a := c.att[mac]
 	if a == nil || a.vif != o.Vif || !a.authorized {
@@ -412,20 +492,27 @@ func (c *connTracker) frame(o stasnoop.Obs, at time.Time, gwMAC, gwIP string) {
 func (c *connTracker) judge(r connReading, push func(map[string]any)) {
 	in := c.in
 	c.in = nil
+	c.brCache = nil
 	sort.SliceStable(in, func(i, j int) bool { return in[i].at.Before(in[j].at) })
 	for _, x := range in {
 		c.apply(x, r.gwMAC, r.gwIP)
 	}
+	c.ipMu.Lock()
 	for m, s := range c.ips {
 		if r.now.Sub(s.at) > staIPKeep {
 			delete(c.ips, m)
 		}
 	}
+	c.ipMu.Unlock()
 	gone := c.gone
 	c.gone = nil
 	for _, a := range gone {
 		vap := r.vifs[a.vif]
-		if vap == "" || !r.snooped[a.vif] {
+		if vap == "" || !r.snooped[a.vif] || r.beforeTap(a) {
+			continue
+		}
+		if r.assocPending(a) {
+			c.gone = append(c.gone, a)
 			continue
 		}
 		c.rssi(a, r)
@@ -450,6 +537,8 @@ func (c *connTracker) judge(r connReading, push func(map[string]any)) {
 			if r.now.Sub(a.started()) > staConnFixup {
 				delete(c.att, m)
 			}
+		case a.authorized && r.beforeTap(a):
+			delete(c.att, m) // its frames went unseen: no basis for a verdict
 		case !a.authorized:
 			if r.now.Sub(a.started()) < staConnJudge {
 				continue
@@ -459,6 +548,8 @@ func (c *connTracker) judge(r connReading, push func(map[string]any)) {
 				continue // associated after all (a part the agent did not see), or no attempt to speak of
 			}
 			push(c.event(a, "failure", vap, r))
+		case a.complete() && r.assocPending(a):
+			continue // its association event rides the next reading
 		case a.complete():
 			typ := "success"
 			if !a.soft.IsZero() {
@@ -475,6 +566,12 @@ func (c *connTracker) judge(r connReading, push func(map[string]any)) {
 			push(c.event(a, "soft failure", vap, r))
 		}
 	}
+}
+
+// beforeTap: a was authorized before its BSS's tap (re)opened.
+func (r connReading) beforeTap(a *connAttempt) bool {
+	since, ok := r.snoopSince[a.vif]
+	return ok && !a.wpa.IsZero() && a.wpa.Before(since)
 }
 
 // rssi keeps the attempt's first signal (auth_rssi).
@@ -509,13 +606,15 @@ func (c *connTracker) event(a *connAttempt, typ, vap string, r connReading) map[
 		}
 		a.ts, c.lastTS = ts, ts
 	}
-	c.seq++
-	id := fmt.Sprintf("%x-%x", int64(a.ts*1e6), c.seq)
+	if a.id == "" {
+		c.seq++
+		a.id = fmt.Sprintf("%x-%x", int64(a.ts*1e6), c.seq)
+	}
 	ev := map[string]any{
-		"message_type": staTracker, "event_type": typ, "event_id": id,
+		"message_type": staTracker, "event_type": typ, "event_id": a.id,
 		"mac": a.mac, "vap": vap, "auth_ts": a.ts, "last_seen": r.up, "assoc_status": 0,
 		"auth_rssi": a.rssi, "avg_rssi": r.signal[a.mac],
-		"auth_delta": int64(0), "assoc_delta": delta(a.auth, a.assoc), "wpa_auth_delta": delta(a.assoc, a.wpa),
+		"assoc_delta": delta(a.auth, a.assoc), "wpa_auth_delta": delta(a.assoc, a.wpa),
 		"ip_delta": int64(0), "traffic_delta": int64(0),
 		"assoc_failures": a.assocFails, "auth_failures": 0, "wpa_auth_failures": a.wpaFails,
 		"ip_failures": 0, "traffic_failures": 0, "dns_timeouts": 0, "dns_responses": a.dnsResp,
@@ -523,12 +622,32 @@ func (c *connTracker) event(a *connAttempt, typ, vap string, r connReading) map[
 	if ev["avg_rssi"] == 0 {
 		ev["avg_rssi"] = a.rssi
 	}
+	// no signal known (a station that failed before any reading listed
+	// it): no RSSI rather than 0, which the controller's -75 dBm gate on
+	// non-success counters would take as a strong one
+	if a.rssi == 0 {
+		delete(ev, "auth_rssi")
+	}
+	if ev["avg_rssi"] == 0 {
+		delete(ev, "avg_rssi")
+	}
 	if a.ft {
 		ev["auth_algo"] = "ft"
 	}
 	if a.radius != "" {
+		// 802.1X (deco-crosscheck): auth_delta EAP-STARTED -> EAP-SUCCESS,
+		// wpa_auth_delta from the end of EAP-SUCCESS; EAP-FAILURE or
+		// TIMEOUT-FAILURE is an auth_failure. auth_delta is omitted for PSK.
 		ev["radius_auth_status"] = a.radius
 		ev["radius_auth_delta"] = delta(a.eapStart, a.eapDone)
+		if a.radius == "success" {
+			ev["auth_delta"] = delta(a.eapStart, a.eapDone)
+			if !a.eapDone.IsZero() {
+				ev["wpa_auth_delta"] = delta(a.eapDone, a.wpa)
+			}
+		} else {
+			ev["auth_failures"] = 1
+		}
 	}
 	if typ == "failure" {
 		if a.wpaFails == 0 && a.assocFails == 0 && a.radius != "failure" {
@@ -584,6 +703,8 @@ type connState struct {
 	open    stasnoop.Opener // nil = stasnoop.Open
 	readers map[string]context.CancelFunc
 	failed  map[string]time.Time
+	died    map[string]time.Time // a running tap that ended (ENETDOWN: its vif went with a hostapd restart)
+	since   map[string]time.Time // when each running tap opened
 	done    chan string
 	logged  map[string]bool
 }
@@ -622,9 +743,14 @@ func (a *agent) startConnEvents(ctx context.Context) {
 	if a.cfg.jio() || !a.cfg.staSnoopOn() {
 		return
 	}
-	a.conn = &connState{t: newConnTracker(), anchors: &anchorRing{}, ring: stasnoop.NewRing(snoopMax),
+	t := newConnTracker()
+	t.bridgeOf = a.bridgeName
+	a.conn = &connState{t: t, anchors: &anchorRing{}, ring: stasnoop.NewRing(snoopMax),
 		open: a.o.snoopOpen, readers: map[string]context.CancelFunc{}, failed: map[string]time.Time{},
+		died: map[string]time.Time{}, since: map[string]time.Time{},
 		done: make(chan string, 16), logged: map[string]bool{}}
+	a.startGARP(ctx) // garp.go: on the socket event, not the reading
+	a.sta.algo = a.authAlgo
 	r := a.conn.anchors
 	a.bg.Add(1)
 	go func() {
@@ -636,7 +762,13 @@ func (a *agent) startConnEvents(ctx context.Context) {
 				stop := context.AfterFunc(ctx, func() { rc.Close() }) // unblocks the scan
 				sc := bufio.NewScanner(rc)
 				sc.Buffer(make([]byte, 4096), 4096)
+				started, first := time.Now(), true
 				for sc.Scan() {
+					if first && replayedLine(sc.Text(), started) {
+						first = false
+						continue // logread -l 1 replays the newest buffered line
+					}
+					first = false
 					if x, ok := parseAnchor(sc.Text()); ok {
 						r.add(connIn{at: time.Now(), anchor: &x})
 					}
@@ -652,6 +784,34 @@ func (a *agent) startConnEvents(ctx context.Context) {
 			wait = min(2*wait, time.Minute)
 		}
 	}()
+}
+
+// authAlgo is an association's auth_algo (staevents.go; loop goroutine):
+// "ft" when the station's attempt is a fast transition (its FT syslog line,
+// in the tracker or still in the anchor ring), "sae" on a WPA3-only SSID
+// served with wpa3, else "open".
+func (a *agent) authAlgo(mac, ssid string) string {
+	if cs := a.conn; cs != nil {
+		if x := cs.t.att[mac]; x != nil && x.ft || cs.anchors.ft(mac) {
+			return "ft"
+		}
+	}
+	if pol := a.policy.Load(); a.cfg.WPA3 && pol != nil && pol.sae[ssid] {
+		return "sae"
+	}
+	return "open"
+}
+
+// ft: an FT anchor of mac waits in the ring.
+func (r *anchorRing) ft(mac string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, in := range r.in {
+		if in.anchor != nil && in.anchor.MAC == mac && in.anchor.Kind == anchorFT {
+			return true
+		}
+	}
+	return false
 }
 
 // connReading feeds one reading to the tracker and queues its events
@@ -678,8 +838,9 @@ func (a *agent) connReading(ctx context.Context, s *apstate.Snapshot, f map[stri
 	for i := range feed.evs {
 		ev := feed.evs[i]
 		in = append(in, connIn{at: ev.At, sock: &ev})
-		a.assocGARP(ev, now, s.ARP) // garp.go
 	}
+	arp := s.ARP
+	a.garpARP.Store(&arp) // the GARP's fallback source (garp.go)
 	obs, odrop := cs.ring.Take()
 	if odrop > 0 && !cs.logged["drop"] {
 		cs.logged["drop"] = true
@@ -691,10 +852,11 @@ func (a *agent) connReading(ctx context.Context, s *apstate.Snapshot, f map[stri
 	for _, x := range in {
 		cs.t.add(x)
 	}
-	r := connReading{now: now, vifs: feed.vifs, snooped: map[string]bool{}, signal: map[string]int{}, assoc: map[string]bool{}}
+	r := connReading{now: now, read: feed.read, vifs: feed.vifs, snooped: map[string]bool{}, snoopSince: map[string]time.Time{}, signal: map[string]int{}, assoc: map[string]bool{}}
 	r.up, _ = toInt64(f["uptime"])
 	for vif := range cs.readers {
 		r.snooped[vif] = true
+		r.snoopSince[vif] = cs.since[vif]
 	}
 	for _, rd := range s.Radios {
 		for _, v := range rd.VAPs {
@@ -719,9 +881,13 @@ drain:
 		select {
 		case vif := <-cs.done:
 			if c := cs.readers[vif]; c != nil {
+				// opened again at once (its vif is usually back within
+				// seconds of a hostapd restart), then at every reading
+				// for snoopRetry before the slow retry
 				c()
 				delete(cs.readers, vif)
-				cs.failed[vif] = now
+				delete(cs.since, vif)
+				cs.died[vif] = now
 			}
 		default:
 			break drain
@@ -731,6 +897,7 @@ drain:
 		if !want[vif] {
 			cancel()
 			delete(cs.readers, vif)
+			delete(cs.since, vif)
 		}
 	}
 	open := cs.open
@@ -739,7 +906,9 @@ drain:
 	}
 	var start []string
 	for vif := range want {
-		if cs.readers[vif] == nil && (cs.failed[vif].IsZero() || now.Sub(cs.failed[vif]) >= snoopRetry) {
+		died, ok := cs.died[vif]
+		recent := ok && now.Sub(died) < snoopRetry
+		if cs.readers[vif] == nil && (recent || cs.failed[vif].IsZero() || now.Sub(cs.failed[vif]) >= snoopRetry) {
 			start = append(start, vif)
 		}
 	}
@@ -754,8 +923,10 @@ drain:
 			continue
 		}
 		delete(cs.failed, vif)
+		delete(cs.died, vif)
 		rctx, cancel := context.WithCancel(ctx)
 		cs.readers[vif] = cancel
+		cs.since[vif] = now
 		a.bg.Add(1)
 		go func(vif string) {
 			defer a.bg.Done()

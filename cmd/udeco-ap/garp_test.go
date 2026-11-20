@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
@@ -72,7 +73,7 @@ func TestAssocGARP(t *testing.T) {
 	if got := g.connected("wl12"); len(got) != 0 {
 		t.Fatalf("address unknown, yet sent on %v", got)
 	}
-	g.h.a.conn.t.ips[cSta] = staIP{cIP, g.now}
+	g.h.a.conn.t.setIP(cSta, cIP, "br-lan", g.now)
 	if got := g.connected("wl12"); len(got) != 1 || got[0] != "eth1" {
 		t.Fatalf("sent on %v", got)
 	}
@@ -81,11 +82,12 @@ func TestAssocGARP(t *testing.T) {
 		t.Fatalf("not rate-limited: %v", got)
 	}
 	g.now = g.now.Add(garpEvery)
+	g.h.a.conn.t.setIP(cSta, cIP, "br-vlan20", g.now)
 	if got := g.connected("wl13"); len(got) != 1 || got[0] != "eth1.20" {
 		t.Fatalf("VLAN bridge: sent on %v", got)
 	}
-	// the reading's ARP table is a source too
-	delete(g.h.a.conn.t.ips, cSta)
+	// the reading's ARP table (the AP's own, br-lan) is a source too
+	g.h.a.conn.t.forgetIP(cSta)
 	g.now = g.now.Add(garpEvery)
 	g.h.a.assocGARP(hapdmon.Event{Vif: "wl12", MAC: cSta, Kind: hapdmon.Connected, At: g.now}, g.now, map[string]string{cSta: cIP})
 	if len(g.sent) != 3 {
@@ -97,7 +99,7 @@ func TestAssocGARP(t *testing.T) {
 // with assoc_garp false, not outside takeover.
 func TestAssocGARPQuiet(t *testing.T) {
 	g := newGarpRig(t, nil)
-	g.h.a.conn.t.ips[cSta] = staIP{cIP, g.now}
+	g.h.a.conn.t.setIP(cSta, cIP, "br-lan", g.now)
 	for _, k := range []hapdmon.Kind{hapdmon.Disconnected, hapdmon.PSKMismatch, hapdmon.EAPSuccess} {
 		g.h.a.assocGARP(hapdmon.Event{Vif: "wl12", MAC: cSta, Kind: k, At: g.now}, g.now, nil)
 	}
@@ -110,8 +112,38 @@ func TestAssocGARPQuiet(t *testing.T) {
 	}
 	f := false
 	g = newGarpRig(t, func(c *Config) { c.AssocGARP = &f })
-	g.h.a.conn.t.ips[cSta] = staIP{cIP, g.now}
+	g.h.a.conn.t.setIP(cSta, cIP, "br-lan", g.now)
 	if got := g.connected("wl12"); len(got) != 0 {
 		t.Fatalf("off: %v", got)
 	}
+}
+
+// An address learnt on another bridge (the station was on the guest VLAN,
+// now on the main SSID) is never announced: it would put a guest address
+// into the LAN, or a LAN one into a VLAN.
+func TestAssocGARPOtherBridge(t *testing.T) {
+	g := newGarpRig(t, nil)
+	g.h.a.conn.t.setIP(cSta, "192.168.20.7", "br-vlan20", g.now)
+	if got := g.connected("wl12"); len(got) != 0 {
+		t.Fatalf("address from br-vlan20 announced on br-lan: %v", got)
+	}
+	if got := g.connected("wl13"); len(got) != 1 || got[0] != "eth1.20" {
+		t.Fatalf("same bridge: %v", got)
+	}
+}
+
+// The GARP goes out when hostapd reports the authorization (the socket
+// event), not at the next reading up to an inform interval later.
+func TestAssocGARPOnEvent(t *testing.T) {
+	g := newGarpRig(t, nil)
+	g.h.a.conn.t.setIP(cSta, cIP, "br-lan", time.Now())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	g.h.a.startGARP(ctx)
+	g.h.a.onHapdEvent(hapdmon.Event{Vif: "wl12", MAC: cSta, Kind: hapdmon.Connected, At: time.Now()})
+	eventually(t, "a GARP on eth1", func() bool {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		return len(g.sent) == 1 && g.sent[0] == "eth1"
+	})
 }
