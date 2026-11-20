@@ -60,6 +60,9 @@ type liveVif struct {
 	MAC    liveMAC
 	DWDS   int    // -1 when unreadable
 	Rates  string // canonical legacy rateset (Options.MinRates only)
+	// DHCPUnicast: wl dhcp_unicast, -1 when unreadable (hostapd.go
+	// dhcpUnicastStep)
+	DHCPUnicast int
 }
 
 // liveState is what Plan diffs against.
@@ -389,10 +392,15 @@ func (a *Applier) readLive(ctx context.Context, l *layout) (*liveState, error) {
 				continue
 			}
 			out, err := a.wlGet(ctx, v, "bss")
-			lv := liveVif{Exists: true, Up: err != nil || out != "down", Bridge: a.bridgeOf(v), MAC: a.readMAC(ctx, v), DWDS: -1}
+			lv := liveVif{Exists: true, Up: err != nil || out != "down", Bridge: a.bridgeOf(v), MAC: a.readMAC(ctx, v), DWDS: -1, DHCPUnicast: -1}
 			if out, err := a.wlGet(ctx, v, "dwds"); err == nil {
 				if n, err := parseIntOut(out); err == nil {
 					lv.DWDS = n
+				}
+			}
+			if out, err := a.wlGet(ctx, v, "dhcp_unicast"); err == nil {
+				if n, err := parseIntOut(out); err == nil {
+					lv.DHCPUnicast = n
 				}
 			}
 			if a.o.MinRates {

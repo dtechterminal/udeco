@@ -55,7 +55,9 @@ type baseVif struct {
 
 // baseIovars are the per-vif iovars the agent changes, in restore order.
 // dwds first: the driver takes it only while the BSS is down.
-var baseIovars = []string{"dwds", "closednet", "ap_isolate", "bss_maxassoc", "wmf_bss_enable", "rrm", "rrm_nbr_scan", "fbt", "fbt_mdid", "fbt_ap"}
+// wnm goes back with dwds and rrm (radio down); dhcp_unicast is live.
+var baseIovars = []string{"dwds", "closednet", "ap_isolate", "bss_maxassoc", "wmf_bss_enable", "rrm", "rrm_nbr_scan", "fbt", "fbt_mdid", "fbt_ap",
+	"wnm", "dhcp_unicast"}
 
 // backhaulDefaults are TP-Link's settings of its backhaul vif wlN1 (read on
 // .205: dwds 1, closednet 1, bss_maxassoc 16). The hand-back restores them
@@ -435,7 +437,7 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		}
 		for _, io := range v.Iovars {
 			s := onVif(v.Vif, optStep("restore "+v.Vif+" "+io[0], "wl", "-i", v.Vif, io[0], io[1]))
-			if io[0] == "dwds" || io[0] == "rrm" {
+			if io[0] == "dwds" || io[0] == "rrm" || io[0] == "wnm" {
 				r := radioOf(v.Vif)
 				if _, seen := downOnly[r]; !seen {
 					downOrder = append(downOrder, r)

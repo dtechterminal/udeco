@@ -253,7 +253,7 @@ func (f *fakeDev) createVif(v string) {
 	f.write("/sys/class/net/"+v+"/flags", "0x1002\n")
 	f.maclist[v] = nil
 	f.tc[v] = []string{"qdisc pfifo_fast 0: root refcnt 2 bands 3"}
-	for k, val := range map[string]string{"assoclist": "", "bss": "down", "dwds": "0", "macmode": "0", "closednet": "0", "ap_isolate": "0",
+	for k, val := range map[string]string{"assoclist": "", "bss": "down", "dwds": "0", "macmode": "0", "closednet": "0", "ap_isolate": "0", "dhcp_unicast": "0", "wnm": "0x1",
 		"bss_maxassoc": "128", "wmf_bss_enable": "0", "rrm": "0x0", "rrm_nbr_scan": "0", "fbt": "0", "fbt_mdid": "0", "fbt_ap": "0"} {
 		f.state[v+" "+k] = val
 	}

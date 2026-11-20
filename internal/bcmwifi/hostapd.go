@@ -459,6 +459,11 @@ type vifDriver struct {
 	// Rates is the wl rateset for the SSID's minimum rate (Options.MinRates
 	// only); empty leaves the driver's rateset alone.
 	Rates []string `json:"rateset,omitempty"`
+	// WNM is the driver's wnm bitmap when the SSID's 802.11v BSS
+	// transition is off: "0", as a U6 Pro writes wnm 0 (aaa.conf). Empty
+	// (11v on) leaves the fresh vif's driver default, 0x1 BSS-Transition.
+	// Written with dwds and rrm (radio down).
+	WNM string `json:"wnm,omitempty"`
 
 	// FTKeyID names the FT-SAE key hostapd was started with (ftpeer.KeyID,
 	// not the key): a key change restarts the radio although the r0kh/r1kh
@@ -474,12 +479,20 @@ func driverFor(u vifAssign, bssid string, maxSta int, blocked []string, minRates
 	d := vifDriver{
 		Vif: u.Vif, SSIDID: s.ID,
 		Closed: b2i(s.Hidden), Isolate: b2i(s.Isolation), MaxAssoc: maxSta,
-		WMF: b2i(s.MulticastToUnicast), RRM: "0x0",
+		WMF: b2i(s.MulticastToUnicast),
+		// RRM capabilities always on, as a U6 Pro writes `rrm 1` whatever
+		// the controller's 11k (wireless.conf): TP-Link's client-vif value.
+		// Only the neighbor list upkeep follows 11k (rrm_nbr_scan,
+		// neighbors.go).
+		RRM:     "0x33",
 		Macmode: mode, Maclist: list,
 		DenyACL: acl.Deny, AcceptACL: acl.Accept, Allow: acl.Allow,
 	}
 	if s.RRM {
-		d.RRM, d.NbrScan = "0x33", 1 // TP-Link's client-vif value
+		d.NbrScan = 1
+	}
+	if !s.BSSTransition {
+		d.WNM = "0"
 	}
 	if s.FT {
 		d.FBT = 1
@@ -515,6 +528,11 @@ func radioDownSteps(radio string, ds []vifDriver, extra ...Step) []Step {
 		st = append(st,
 			cmdStep("set "+d.Vif+" dwds", "wl", "-i", d.Vif, "dwds", itoa(d.DWDS)),
 			cmdStep("set "+d.Vif+" rrm", "wl", "-i", d.Vif, "rrm", d.RRM))
+		if d.WNM != "" {
+			// Whether the driver takes wnm with the radio up is not known:
+			// here, as rrm, it is down.
+			st = append(st, optStep("set "+d.Vif+" wnm (no BSS transition)", "wl", "-i", d.Vif, "wnm", d.WNM))
+		}
 		if len(d.Rates) > 0 {
 			st = append(st, cmdStep("set "+d.Vif+" rateset", append([]string{"wl", "-i", d.Vif, "rateset"}, d.Rates...)...))
 		}
@@ -537,6 +555,7 @@ func driverSteps(d vifDriver) []Step {
 		wl("bss_maxassoc", itoa(d.MaxAssoc)),
 		wl("wmf_bss_enable", itoa(d.WMF)),
 		wl("rrm_nbr_scan", itoa(d.NbrScan)),
+		dhcpUnicastStep(v),
 	}
 	if d.FBT == 1 {
 		st = append(st,
@@ -552,6 +571,18 @@ func driverSteps(d vifDriver) []Step {
 	}
 	st = append(st, macSteps(v, d.Macmode, d.Maclist)...)
 	return st
+}
+
+// dhcpUnicastStep turns on the driver's DHCP unicast conversion on a
+// client vif: a group-addressed DHCP reply (UDP to port 68, BOOTREPLY)
+// whose chaddr is a station of that BSS goes out unicast to it, before WMF.
+// A U6 Pro runs `idhcp 1` on every VAP (wireless.conf), with no
+// controller key; this is the Broadcom equivalent (wl.ko l2_filter
+// dhcp_unicast, iovar flags 0: set with the BSS up). Optional: a driver
+// without it ("Unsupported") keeps the SSID going. The hand-back restores
+// TP-Link's value (0) from the baseline.
+func dhcpUnicastStep(vif string) Step {
+	return optStep("set "+vif+" dhcp_unicast (intelligent DHCP)", "wl", "-i", vif, "dhcp_unicast", "1")
 }
 
 // macSteps programs the driver MAC filter the way TP-Link does: macmode,

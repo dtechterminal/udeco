@@ -579,6 +579,9 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 				if !lv.Up {
 					st = append(st, cmdStep("raise "+v, "wl", "-i", v, "bss", "up"))
 				}
+				if lv.DHCPUnicast == 0 { // live-settable: re-asserted in place
+					st = append(st, dhcpUnicastStep(v))
+				}
 			default:
 				// The placeholder wlN1 (or a vif no hostapd serves) stays
 				// BSS down, out of every bridge and without a MAC filter.
