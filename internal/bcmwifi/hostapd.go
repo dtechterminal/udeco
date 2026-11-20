@@ -191,6 +191,11 @@ func renderHostapd(r hapdRadio) (string, error) {
 	if ch <= 0 { // hostapd has no ACS here; the value is informational
 		ch = map[string]int{"ng": 1, "na": 36}[r.Band]
 	}
+	if dfsChannel(r.Band, ch) {
+		// wl owns the channel (and the DFS CAC, dfs.go); a radar channel
+		// here would make hostapd start a CAC of its own over nl80211
+		ch = 36
+	}
 	w("channel", ch)
 	if r.Country != "" {
 		w("country_code", r.Country)

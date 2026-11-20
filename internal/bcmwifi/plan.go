@@ -41,6 +41,10 @@ type Step struct {
 	Port     string      `json:",omitempty"`
 	Proc     string      `json:",omitempty"`
 	Optional bool        `json:",omitempty"` // a failure is logged and Apply goes on
+	// Alts (StepCmd) are run in turn when Argv fails; the first that
+	// works stands in for it, and Argv is remembered as refused
+	// (Applier.refused) so later plans use the alternative.
+	Alts [][]string `json:",omitempty"`
 	// IfPresent names the vif a lower or unbridge step acts on: when that
 	// netdev does not exist (a hostapd that exited deleted it, live fact
 	// F2), there is nothing to do and the step succeeds.
@@ -122,6 +126,9 @@ type Plan struct {
 
 	takeover   bool // a TP-Link hostapd was running: Apply captures a baseline first
 	disruptive bool // a radio is reconciled in full (hostapd restarted)
+	// cac: the radios in a DFS channel availability check (Tick leaves
+	// them alone, dfs.go)
+	cac []string
 	// twt: band -> the radio's TWT line, band+" driver" -> its driver-parity
 	// line (parity.go), also in Notes (Tick logs changes)
 	twt map[string]string
@@ -211,6 +218,10 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 		}
 		p.Foreign = append(p.Foreign, rp.Foreign...)
 		p.disruptive = p.disruptive || rp.Reconcile
+		if rl.Band == "na" && a.inCAC(ctx, rl.Primary) {
+			p.cac = append(p.cac, rl.Primary)
+			p.Notes = append(p.Notes, "radio na: DFS channel availability check in progress (no beacons until it ends)")
+		}
 	}
 	for _, vid := range ls.VBridges {
 		if !containsInt(l.VLANs, vid) {
@@ -424,8 +435,18 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	if wantCountry != "" {
 		arg, same := countryArg(wantCountry, lr.Country)
 		cc = strings.ToUpper(wantCountry)
+		fb := countryFallback[cc]
+		if fb != "" && a.refused["wl -i "+p+" country "+arg] {
+			note(fmt.Sprintf("country %s refused by the driver: running %s (the driver's own rev)", arg, fb))
+			arg, same = fb, lr.Country.Code == cc
+			fb = ""
+		}
 		if !same {
-			phy = append(phy, wl("set country "+arg, "country", arg))
+			cst := wl("set country "+arg, "country", arg)
+			if fb != "" {
+				cst.Alts = [][]string{{"wl", "-i", p, "country", fb}}
+			}
+			phy = append(phy, cst)
 			if cc != "US" {
 				note("country " + cc + ": TP-Link also writes boardflags4/ED thresholds to kernel nvram for non-US; the agent never does")
 			}
@@ -446,6 +467,17 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 		want, change, n := desiredChanspec(rl.Band, rl.Radio, lr.Chanspec, bc)
 		rp.Notes = append(rp.Notes, n...)
+		if rl.Band == "na" && want != lr.Chanspec && want.dfs() {
+			// radar: follow the driver's move (dfs.go)
+			if moved, n := a.followRadar(ctx, p, want, lr.Chanspec); moved {
+				note(n)
+				change, want = false, lr.Chanspec
+			}
+		}
+		if change && want.dfs() && lr.Drv["spect"] != 1 {
+			// 802.11h before the DFS chanspec (dfs.go)
+			phy = append(phy, wl("802.11h on for DFS", "spect", "1"))
+		}
 		if change {
 			if bw := bwCap(want.Width); bw != lr.BWCap {
 				phy = append(phy, wl("set bw_cap", "bw_cap", bandArg(rl.Band), itoa(bw)))

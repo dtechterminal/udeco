@@ -181,7 +181,16 @@ func parseTargetMax(s string) float64 {
 
 // countryRev is TP-Link's regrev per country (tplink_brcm.sh COUNTRYCODE_*).
 // Other countries are set without a rev, letting the driver choose.
-var countryRev = map[string]int{"US": 0, "CA": 2, "JP": 0, "KR": 1, "AU": 8, "DE": 0}
+//
+// IN/288: the driver's IN/0 table has no 80 MHz chanspec at all (verified
+// on .205 2026-11-19, the reason for the driver_country override); IN/288
+// is the India table with 80 MHz and the DFS band (not read on an X20:
+// unverified on hardware). A driver that refuses it gets countryFallback.
+var countryRev = map[string]int{"US": 0, "CA": 2, "JP": 0, "KR": 1, "AU": 8, "DE": 0, "IN": 288}
+
+// countryFallback is set (without a rev: the driver picks one) when the
+// driver refuses countryRev's rev for the country.
+var countryFallback = map[string]string{"IN": "IN"}
 
 // country is a parsed wl country: code and rev (-1 = unknown).
 type country struct {

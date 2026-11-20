@@ -115,7 +115,7 @@ func TestCountry(t *testing.T) {
 	if arg, same := countryArg("CA", c); arg != "CA/2" || same {
 		t.Errorf("CA: %q %t", arg, same)
 	}
-	if arg, same := countryArg("IN", c); arg != "IN" || same {
+	if arg, same := countryArg("IN", c); arg != "IN/288" || same {
 		t.Errorf("IN: %q %t", arg, same)
 	}
 }

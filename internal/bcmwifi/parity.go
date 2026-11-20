@@ -69,6 +69,12 @@ func driverIovars(band string, bssload bool) []driverIovar {
 	if band == "ng" {
 		l = append(l, driverIovar{name: "vht_features", want: 0x6, tplink: tplinkVHTng})
 	}
+	if band == "na" {
+		// 802.11h spectrum management (U6 doth 1): the driver's DFS (radar
+		// detection, CAC) and TPC (dfs.go). TP-Link's value is the
+		// baseline's; none known without one.
+		l = append(l, driverIovar{name: "spect", want: 1})
+	}
 	return append(l,
 		driverIovar{name: "rxchain_pwrsave_enable", want: 0, tplink: "0"},
 		driverIovar{name: "radio_pwrsave_enable", want: 0, tplink: "0"})

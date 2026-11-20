@@ -175,9 +175,15 @@ type Applier struct {
 	twtSeen map[string]string
 	// txCeil: radio+chanspec -> tx power ceiling (dBm), txRep: band -> the
 	// last planned tx power (txpower.go)
-	txMu   sync.Mutex
-	txCeil map[string]float64
-	txRep  map[string]txReport
+	// refused: StepCmd argv a driver refused and an Alts stood in for
+	// (country IN/288); dfsMoved: primary -> a radar move followed,
+	// radarQ: radar moves Tick has not reported yet (dfs.go)
+	refused  map[string]bool
+	dfsMoved map[string]dfsMove
+	radarQ   []RadarEvent
+	txMu     sync.Mutex
+	txCeil   map[string]float64
+	txRep    map[string]txReport
 
 	sleep func(time.Duration)
 	poll  time.Duration
