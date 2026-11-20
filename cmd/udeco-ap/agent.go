@@ -578,7 +578,8 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 		a.wifi = a.o.newWifi(bcmwifi.Options{Root: a.o.root, Run: a.o.run,
 			StateDir: filepath.Join(a.o.base, wifiStateSub), RunDir: a.o.runDir,
 			Uplink: a.uplink, DryRun: !a.cfg.Apply, Logf: a.logf, Caps: a.o.col.Caps,
-			MinRates: a.cfg.MinRates, WPA3: a.cfg.WPA3, FTSAE: a.cfg.ftSAE(), NoTWT: !a.cfg.twt()})
+			MinRates: a.cfg.MinRates, WPA3: a.cfg.WPA3, FTSAE: a.cfg.ftSAE(), NoTWT: !a.cfg.twt(),
+			KeepDesense: a.cfg.RxDesense})
 		if a.uplink == "" {
 			a.logf("uplink port: not found from the gateway's FDB entry (bcmwifi picks the only br-lan port with carrier)")
 		}

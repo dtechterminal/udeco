@@ -25,6 +25,9 @@ type liveRadio struct {
 	TargetMax float64
 	MAC       liveMAC // the primary's driver MAC filter
 	TWT       int     // wl twt enab: 0 or 1, -1 when unreadable (twt.go)
+	// Drv: the radio-wide driver settings the agent holds at a U6 Pro's
+	// value, by iovar (unread when a getter failed; parity.go).
+	Drv map[string]int
 }
 
 // liveMAC is a driver MAC filter as read back (wl macmode, wl mac).
@@ -378,6 +381,7 @@ func (a *Applier) readLive(ctx context.Context, l *layout) (*liveState, error) {
 		}
 		lr.MAC = a.readMAC(ctx, p)
 		lr.TWT = a.readTWT(ctx, p)
+		lr.Drv = a.readDriver(ctx, p, rl.Band)
 		ls.Radios[p] = lr
 		for _, v := range rl.Vifs {
 			if !a.netdevExists(v) {

@@ -75,3 +75,41 @@ func TestE2ETWT(t *testing.T) {
 		}
 	}
 }
+
+// rx_desense keeps TP-Link's receiver desense (bcmwifi.Options.KeepDesense);
+// absent, the agent clears it as a U6 Pro (ani_enable 0). Takeover, Deco
+// only.
+func TestConfigRxDesense(t *testing.T) {
+	base := `{"inform_url":"http://192.168.0.2:8080/inform","console_ip":"192.168.0.3"`
+	for _, c := range []struct {
+		extra string
+		want  bool
+		err   string
+	}{
+		{`,"takeover":true`, false, ""},
+		{`,"takeover":true,"rx_desense":true`, true, ""},
+		{`,"rx_desense":true`, false, "rx_desense needs takeover"},
+		{`,"takeover":true,"platform":"jio-mtk","model":"U7LT","rx_desense":true`, false, "rx_desense is not supported on platform jio-mtk"},
+	} {
+		cfg, err := parseConfig([]byte(base + c.extra + "}"))
+		if c.err != "" {
+			if err == nil || !strings.Contains(err.Error(), c.err) {
+				t.Errorf("%s: err %v, want %q", c.extra, err, c.err)
+			}
+			continue
+		}
+		if err != nil || cfg.RxDesense != c.want {
+			t.Errorf("%s: %v rx_desense %t", c.extra, err, cfg.RxDesense)
+		}
+	}
+	for _, keep := range []bool{false, true} {
+		cfg, _ := mtkCfg(t)
+		e := newE2E(t, cfg, true, func(c *Config, o *options) { c.RxDesense = keep })
+		e.adopt()
+		eventually(t, "the bcmwifi dry-run apply", func() bool { return strings.Contains(e.logs.all(), "is live") })
+		e.stop()
+		if e.wifi.opts.KeepDesense != keep {
+			t.Errorf("rx_desense %t: bcmwifi.Options.KeepDesense %t", keep, e.wifi.opts.KeepDesense)
+		}
+	}
+}

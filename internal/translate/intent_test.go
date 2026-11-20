@@ -332,6 +332,8 @@ func TestIntentU6Pro(t *testing.T) {
 		Security: "wpa2", Passphrase: "iot-secret-pass", PMF: "disabled",
 		VLAN: 2, Isolation: true, UAPSD: true, DTIM: map[string]int{"ng": 1},
 		Devnames: map[string]string{"ng": "wifi0ap0"},
+		// the enhanced-IoT WLAN: the controller turns its BSS Load element off
+		NoBSSLoad: true,
 	}, {
 		ID: "1", SSID: "Example Network", Bands: []string{"na"}, Enabled: true,
 		Security: "wpa2wpa3", Passphrase: "home-secret-pass", PMF: "optional", GroupRekey: 3600,

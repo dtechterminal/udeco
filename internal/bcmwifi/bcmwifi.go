@@ -125,6 +125,11 @@ type Options struct {
 	// state is written only inside a radio down/up the plan makes anyway
 	// (twt.go).
 	NoTWT bool
+	// KeepDesense keeps TP-Link's glitch-based receiver desense (the
+	// interference mitigation mode's bit 0x1). Off in a zero Options: the
+	// agent clears it, as a U6 Pro runs ani_enable 0 (parity.go); the agent
+	// sets it from its config (rx_desense true).
+	KeepDesense bool
 	// Ctrl sends one command to the hostapd control socket of vif
 	// (CtrlDir/<vif>) and returns the reply. nil = a unix datagram socket
 	// under Root. Used for the commands that carry a secret (SET r0kh/r1kh

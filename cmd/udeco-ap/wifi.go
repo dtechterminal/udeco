@@ -637,7 +637,8 @@ func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 			// when it sends one (bcmwifi ftsae.go)
 			FTSAE: wl.FTSAE, FTKey: wl.FTKey, FTOverDS: wl.FTOverDS, MobilityDomain: wl.MobilityDomain,
 			UAPSD: wl.UAPSD, ProxyARP: wl.ProxyARP, MulticastToUnicast: wl.MulticastToUnicast,
-			DTIM: wl.DTIM, MinRateKbps: wl.MinRateKbps, Schedule: wl.Schedule}
+			DTIM: wl.DTIM, MinRateKbps: wl.MinRateKbps, Schedule: wl.Schedule,
+			NoBSSLoad: wl.NoBSSLoad} // per radio in bcmwifi (parity.go)
 		s.MinRateOpts = minRateOpts(wl.MinRateOpts)
 		for band, b := range wl.PerBand {
 			if s.PerBand == nil {

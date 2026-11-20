@@ -66,17 +66,21 @@ type WLANIntent struct {
 	PMF        string // disabled, optional, required
 	GroupRekey int    // seconds; 0 = never (the controller's default)
 
-	VLAN               int    // 802.1Q id; 0 = untagged (the AP's own LAN)
-	Isolation          bool   // client (L2) isolation
-	FT                 bool   // 802.11r
-	MobilityDomain     string // 802.11r mobility domain (4 hex digits); "" = backend's choice
-	FTSAE              bool   // with FT, WPA3 (SAE) clients fast-roam too (aaa.N.wpa3.ft.status)
-	FTKey              string // with FT: the WLAN's iapp_key, UniFi's key for PMK-R1 transfers between APs; secret
-	FTOverDS           bool   // 802.11r over the DS (aaa.N.ft_over_ds); off = over the air
-	BSSTransition      bool   // 802.11v
-	RRM                bool   // 802.11k
-	UAPSD              bool
-	ProxyARP           bool
+	VLAN           int    // 802.1Q id; 0 = untagged (the AP's own LAN)
+	Isolation      bool   // client (L2) isolation
+	FT             bool   // 802.11r
+	MobilityDomain string // 802.11r mobility domain (4 hex digits); "" = backend's choice
+	FTSAE          bool   // with FT, WPA3 (SAE) clients fast-roam too (aaa.N.wpa3.ft.status)
+	FTKey          string // with FT: the WLAN's iapp_key, UniFi's key for PMK-R1 transfers between APs; secret
+	FTOverDS       bool   // 802.11r over the DS (aaa.N.ft_over_ds); off = over the air
+	BSSTransition  bool   // 802.11v
+	RRM            bool   // 802.11k
+	UAPSD          bool
+	ProxyARP       bool
+	// NoBSSLoad: wireless.N.qbssload=disabled on a VAP of the WLAN (the
+	// controller sends it for an enhanced-IoT WLAN); absent = on, as a U6
+	// Pro advertises the BSS Load element by default.
+	NoBSSLoad          bool
 	MulticastToUnicast bool // multicast enhancement
 	// PerBand holds each band's own security and roaming settings when the
 	// controller sends them differently per radio (e.g. WPA2/WPA3 on 5 GHz
@@ -466,6 +470,7 @@ func intentVAP(cfg Cfg, n, w, a, band, ssid string, vlanNet map[string]string, l
 		UAPSD:              cfg[w+"uapsd"] == "enabled",
 		ProxyARP:           cfg[a+"proxy_arp"] == "enabled",
 		MulticastToUnicast: isOn(cfg[w+"mcast.enhance"]),
+		NoBSSLoad:          cfg[w+"qbssload"] == "disabled",
 		Devnames:           map[string]string{},
 	}
 	if x.ID == "" {
@@ -874,6 +879,7 @@ func mergeVAPs(vaps []WLANIntent, nb *noteList) WLANIntent {
 			x.Devnames[k] = d
 		}
 		x.RoamAssist = mergeBandInts(x.RoamAssist, v.RoamAssist)
+		x.NoBSSLoad = x.NoBSSLoad || v.NoBSSLoad // the backend's element is per radio anyway
 		diff := differing(vaps[0], v)
 		var other []string
 		perBand := false
@@ -908,7 +914,7 @@ func differing(a, b WLANIntent) []string {
 	var out []string
 	for i := 0; i < t.NumField(); i++ {
 		switch name := t.Field(i).Name; name {
-		case "Bands", "Enabled", "DTIM", "MinRateKbps", "MinRateOpts", "Devnames", "RoamAssist", "PerBand":
+		case "Bands", "Enabled", "DTIM", "MinRateKbps", "MinRateOpts", "Devnames", "RoamAssist", "PerBand", "NoBSSLoad":
 		default:
 			if !reflect.DeepEqual(va.Field(i).Interface(), vb.Field(i).Interface()) {
 				out = append(out, strings.ToLower(name))
@@ -1077,7 +1083,7 @@ var wirelessRules = map[string]rule{
 
 	"mode": rNeutral("master"), "wmm": rNeutral("enabled"), "wds": rOff, "autowds": rOff,
 	"authmode": rNeutral("1"), "puren": rNeutral("0"), "pureg": rNeutral("0"),
-	"addmtikie": rOff, "no2ghz_oui": rOff, "qbssload": rOff, "advertise_ap_name": rOff,
+	"addmtikie": rOff, "no2ghz_oui": rOff, "qbssload": rRead, "advertise_ap_name": rOff,
 	"mcastrate": rNeutral("auto"), "bga_filter": rNeutral("enabled"),
 	"multicast.suppressor": rOff, "iot": rOff, "btm_disassoc.status": rRead, "btm_disassoc.threshold": rRead,
 
@@ -1412,6 +1418,7 @@ func (w WLANIntent) String() string {
 	opt(w.UAPSD, "uapsd")
 	opt(w.ProxyARP, "proxy-arp")
 	opt(w.MulticastToUnicast, "mcast-enhance")
+	opt(w.NoBSSLoad, "no-bssload")
 	opt(len(w.DTIM) > 0, fmt.Sprintf("dtim=%v", w.DTIM))
 	opt(len(w.MinRateKbps) > 0, fmt.Sprintf("minrate=%v", w.MinRateKbps))
 	opt(len(w.RoamAssist) > 0, fmt.Sprintf("roam-assist=%v", w.RoamAssist))

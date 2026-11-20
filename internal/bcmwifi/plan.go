@@ -122,7 +122,8 @@ type Plan struct {
 
 	takeover   bool // a TP-Link hostapd was running: Apply captures a baseline first
 	disruptive bool // a radio is reconciled in full (hostapd restarted)
-	// twt: band -> the radio's TWT line, also in Notes (Tick logs changes)
+	// twt: band -> the radio's TWT line, band+" driver" -> its driver-parity
+	// line (parity.go), also in Notes (Tick logs changes)
 	twt map[string]string
 }
 
@@ -196,11 +197,13 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 		p.Notes = append(p.Notes, rp.Notes...)
 		if lr := ls.Radios[rl.Primary]; lr != nil {
 			line := "radio " + rl.Band + ": " + twtStatus(rl.Primary, lr.TWT, !a.o.NoTWT, rp.TWTSet)
-			p.Notes = append(p.Notes, line)
+			dline := "radio " + rl.Band + ": " + rp.Driver
+			p.Notes = append(p.Notes, line, dline)
 			if p.twt == nil {
 				p.twt = map[string]string{}
 			}
 			p.twt[rl.Band] = line
+			p.twt[rl.Band+" driver"] = dline
 		}
 		p.Foreign = append(p.Foreign, rp.Foreign...)
 		p.disruptive = p.disruptive || rp.Reconcile
@@ -303,19 +306,20 @@ func (a *Applier) vlanDownSteps(vid int) []Step {
 // radioProfile re-asserts TP-Link's post-wlconf radio tweaks
 // (tplink_brcm.sh wifi_features_set) while the radio is down. They persist
 // in the driver, so this only matters if something reset them; failures are
-// tolerated. TWT is the exception: on (twt enab 1, as a U6 Pro) unless the
-// config turns it off, which is TP-Link's `twt 0` (twt.go). Both X20
-// radios are HE (`he 1` here), so both get it.
-func radioProfile(primary, band string, twt bool) []Step {
+// tolerated. TWT and the settings a U6 Pro holds differently are the
+// exceptions: TWT on (twt enab 1, as a U6 Pro) unless the config turns it
+// off, which is TP-Link's `twt 0` (twt.go), and drv, the U6 Pro's driver
+// settings (parity.go planDriver: BSS Load on instead of TP-Link's
+// `bssload 0`, no implicit beamforming, no 2.4 GHz vendor VHT instead of
+// TP-Link's `vht_features 0x7`, power save off). Both X20 radios are HE
+// (`he 1` here), so both get it.
+func radioProfile(primary, band string, twt bool, drv []Step) []Step {
 	wl := func(args ...string) Step {
 		return optStep("radio profile "+args[0], append([]string{"wl", "-i", primary}, args...)...)
 	}
-	st := []Step{wl("he", "1")}
-	if band == "ng" {
-		st = append(st, wl("vht_features", "0x7"))
-	}
-	return append(st, twtStep(primary, twt), wl("tpc_report_ie", "0"), wl("pwr_const_ie", "0"),
-		wl("bssload", "0"), wl("sgi_tx", "-1"))
+	st := []Step{wl("he", "1"), twtStep(primary, twt), wl("tpc_report_ie", "0"), wl("pwr_const_ie", "0"),
+		wl("sgi_tx", "-1")}
+	return append(st, drv...)
 }
 
 // radioPlan is planRadio's result.
@@ -324,7 +328,10 @@ type radioPlan struct {
 	Notes     []string
 	Foreign   []string
 	Reconcile bool // hostapd restarted, BSSes cycled
-	TWTSet    bool // TWT written inside one of the plan's radio down/ups (twt.go)
+	// TWTSet: TWT and the other radio-down driver settings are written
+	// inside one of the plan's radio down/ups (twt.go, parity.go)
+	TWTSet bool
+	Driver string // the radio's driver-parity line (parity.go driverStatus)
 }
 
 // macDrift returns the steps that put a vif's driver MAC filter to mode/list
@@ -426,6 +433,37 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	// (twt.go); an unreadable state is left alone there.
 	twtWant := !a.o.NoTWT
 	twtPending := lr.TWT >= 0 && lr.TWT != b2i(twtWant)
+	// The U6 Pro's radio-wide driver settings (parity.go): the radio-down
+	// ones ride along with TWT, the live ones run with the radio up.
+	bssload, bn := radioBSSLoad(rl)
+	if bn != "" {
+		note(bn)
+	}
+	dp := planDriver(p, rl.Band, lr.Drv, bssload, a.o.KeepDesense)
+	// rideAlong: what a radio down/up made for something else also writes
+	// (once per plan).
+	rideAlong := func() []Step {
+		if rp.TWTSet {
+			return nil
+		}
+		var st []Step
+		if twtPending {
+			st = append(st, twtStep(p, twtWant))
+		}
+		st = append(st, dp.down...)
+		rp.TWTSet = len(st) > 0
+		return st
+	}
+	liveDrv := func(profiled bool) []Step {
+		var st []Step
+		for _, s := range dp.live {
+			if profiled && s.Argv[3] == "bssload" {
+				continue // radioProfile wrote it
+			}
+			st = append(st, s)
+		}
+		return st
+	}
 
 	// hostapd conf, ACL files and driver state for the used vifs.
 	maxSta := rl.Radio.MaxClients
@@ -523,11 +561,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 				if lv.DWDS != d.DWDS {
 					// Refused by the driver unless the radio is down. A TWT
 					// state that differs rides along (twt.go).
-					var extra []Step
-					if twtPending && !rp.TWTSet {
-						extra, rp.TWTSet = []Step{twtStep(p, twtWant)}, true
-					}
-					st = append(st, radioDownSteps(p, []vifDriver{d}, extra...)...)
+					st = append(st, radioDownSteps(p, []vifDriver{d}, rideAlong()...)...)
 					foreign(fmt.Sprintf("%s: dwds %d on a client vif, set to %d", v, lv.DWDS, d.DWDS))
 				}
 				ms, f := macDrift(v, lv.MAC, d.Macmode, d.Maclist, false)
@@ -564,7 +598,9 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 		st = append(st, stale...)
 		st = append(st, acl.Steps()...)
+		st = append(st, liveDrv(false)...)
 		rp.Steps = st
+		rp.Driver = driverStatus(dp, rp.TWTSet)
 		return rp, nil
 	}
 
@@ -604,7 +640,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		st = append(st, wl("radio down", "down"))
 		st = append(st, phy...)
 		st = append(st, txStep)
-		st = append(st, radioProfile(p, rl.Band, twtWant)...)
+		st = append(st, radioProfile(p, rl.Band, twtWant, dp.profile)...)
 		st = append(st, wl("radio up", "up"))
 		rp.TWTSet = true
 	} else {
@@ -652,6 +688,8 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		rp.Steps = append(st,
 			Step{Kind: StepRemove, Desc: "remove hostapd conf", Path: confPath(a.o.RunDir, p)},
 			Step{Kind: StepRemove, Desc: "remove driver state", Path: drvPath(a.o.RunDir, p)})
+		rp.Steps = append(rp.Steps, liveDrv(len(phy) > 0)...)
+		rp.Driver = driverStatus(dp, rp.TWTSet)
 		return rp, nil
 	}
 	// Start hostapd and wait for its BSS setup: it creates the bss= vifs
@@ -681,9 +719,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	if lv, ok := ls.Vifs[ph]; ok && isBackhaul(ph) && lv.DWDS != 0 {
 		extra = append(extra, onVif(ph, optStep("backhaul "+ph+" dwds off (audit D8)", "wl", "-i", ph, "dwds", "0")))
 	}
-	if twtPending && !rp.TWTSet {
-		extra, rp.TWTSet = append(extra, twtStep(p, twtWant)), true
-	}
+	extra = append(extra, rideAlong()...)
 	st = append(st, radioDownSteps(p, ds, extra...)...)
 	// Then what TP-Link's wifi script does per enabled vap (F3), with the
 	// other driver iovars first while the fresh BSS is down (F6).
@@ -697,7 +733,8 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 			cmdStep("netdev up "+u.Vif, "ifconfig", u.Vif, "up"),
 			cmdStep("raise "+u.Vif, "wl", "-i", u.Vif, "bss", "up"))
 	}
-	rp.Steps = st
+	rp.Steps = append(st, liveDrv(len(phy) > 0)...)
+	rp.Driver = driverStatus(dp, rp.TWTSet)
 	return rp, nil
 }
 
