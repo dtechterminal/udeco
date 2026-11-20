@@ -63,10 +63,14 @@ Status key:
 
 | Feature | Status | Notes |
 |---|---|---|
-| 802.11k, 802.11v | Verified | Neighbour reports list the other units. |
+| 802.11k, 802.11v | Verified | Neighbour reports list the other units. 802.11k (RRM) is on for every SSID as on a U6 Pro, and 802.11v (WNM) is turned off in the driver where the controller turns BSS transition off. The driver bits are built, not checked on a unit ([radio-parity](docs/deco/features/radio-parity.md)). |
 | 802.11r (FT-PSK) | Built | On for every SSID. The units exchange FT key holders over signed announcements on the LAN. A client doing a fast transition has not been observed yet. |
 | 802.11r for WPA3 (FT-SAE) | Off | Advertising FT-SAE stopped WPA3 phones (iPhone, Apple Watch, Pixel, Samsung) from joining at all. Keep `"ft_sae": false`. |
-| Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | |
+| Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | Proxy ARP is now applied on SSIDs without client isolation too, as a U6 Pro does it (Built: [proxy-arp](docs/deco/features/proxy-arp.md)). |
+| Intelligent DHCP (unicast DHCP replies) | Built | `wl dhcp_unicast 1` on every served SSID, live, as a U6 Pro. The hand-back puts back 0 ([radio-parity](docs/deco/features/radio-parity.md)). |
+| BSS Load element | Built | On by default, as a U6 Pro. Off only where the controller sends `qbssload=disabled` for every SSID on the radio, because the element is radio-wide in this driver ([radio-parity](docs/deco/features/radio-parity.md)). |
+| BPDU filter (bridge group address) | Built | Frames to 01:80:c2:00:00:00 are dropped into and out of every served SSID, in an ebtables chain of the agent's own. The controller's `bga_filter` decides per WLAN ([bga-filter](docs/deco/features/bga-filter.md)). |
+| IGMP/MLD snooping | Built | The agent's VLAN bridges snoop as a U6 Pro's bridges do. `br-lan` keeps TP-Link's snooping ([igmp-snooping](docs/deco/features/igmp-snooping.md)). |
 | Band steering, minimum RSSI, max clients | Built | Band steering uses 802.11v nudges. |
 | Minimum data rates | Built | Off by default (`"min_rates": true`). `wl rateset` runs inside a radio down/up, which drops that radio's clients. |
 | Target Wake Time (TWT) | Built | On by default (`"twt": false` turns it off), as a U6 Pro. Turned on by hand on one unit (`wl twt enab 1` after `wl down`): a Pixel's station info then shows TWT capable; an iPhone showed no TWT. |
@@ -76,11 +80,13 @@ Status key:
 | Feature | Status | Notes |
 |---|---|---|
 | Channel, width, transmit power | Verified | Includes 80 MHz on 5 GHz. |
-| Country | Verified | The driver's India table (IN/0) has no 80 MHz channel. Stock TP-Link runs these units as US/0, and so does the agent with `"driver_country": "US"`: all three units run 80 MHz on 5 GHz. |
-| Power presets (low/medium/high) | Verified | Low, Medium and High set the driver's power reduction to 6 dB, 3 dB and none, without a radio restart. |
+| Auto channel | Built | A radio left on auto gets one channel when a provision restarts a radio anyway, for example the takeover at boot. 2.4 GHz uses only 1, 6 or 11. 5 GHz never uses DFS. Channels in the controller's blocked list are never taken. The pick favours the quietest channel by neighbours and spectrum use. It is never re-picked periodically ([auto-channel](docs/deco/features/auto-channel.md)). |
+| Country | Verified (US) / Built (IN) | The driver's India table IN/0 has no 80 MHz channel. India now runs as IN/288, which should have 80 MHz and DFS; this is not yet checked on a unit. If the driver refuses IN/288, the agent falls back to IN. `"driver_country": "US"` (what stock TP-Link runs) still works as an override, but it is no longer recommended ([dfs](docs/deco/features/dfs.md)). |
+| Power presets (low/medium/high) | Built | These match the U6 Pro: Low is the 5 dBm floor, Medium is halfway, and High and Auto are the radio's ceiling. Custom is clamped to that range. All of them apply without a radio restart. UniFi shows the real preset and dBm, not "custom". The earlier fixed 6 dB / 3 dB steps were Verified ([tx-power](docs/deco/features/tx-power.md)). |
+| Radio driver defaults | Built | U6 Pro values are used. Implicit beamforming is off, 2.4 GHz has no vendor VHT, power save is off, and the glitch-based receiver desense is off. `"rx_desense": true` keeps TP-Link's desense. The radio-down settings ride a restart the agent makes anyway ([radio-parity](docs/deco/features/radio-parity.md)). |
 | Neighbour and rogue-AP list | Verified | Refreshed every minute by a passive listen on the AP's own channel. A full scan from UniFi adds the other channels. |
 | Spectrum scan | Partial | 2.4 GHz is complete; 5 GHz covers 36–48. Channels 149–165 are reported as unmeasured, not as clean. |
-| DFS channels | Not yet | No radar or CAC handling, so the units stay on 36–48 and 149–165. |
+| DFS channels | Built | The controller's DFS channel gets 802.11h and the driver's CAC, and Tick and the health check leave the radio alone during the CAC. On radar the driver's move is followed and reported as `EVT_AP_RadarDetected`. The controller's nightly dfs-reset goes back once the non-occupancy period is over. `has_dfs` is reported. Not yet run on a unit ([dfs](docs/deco/features/dfs.md)). |
 
 ### Clients
 
@@ -126,7 +132,7 @@ while it has any limit, and back on when none are left. Details are in
 | Streams | 2×2 on each band | 2×2 on each band |
 | Widest channel | 80 MHz on 5 GHz | 80 MHz on 5 GHz, 40 MHz on 2.4 GHz |
 | Transmit power | 20 dBm (2.4 GHz), 25 dBm (5 GHz) | 24 dBm (2.4 GHz), 23.5 dBm (5 GHz) target |
-| 5 GHz channels | All for the country, DFS included | 36–48 and 149–165 |
+| 5 GHz channels | All for the country, DFS included | All the driver allows for the country, DFS included (not yet run on a unit; verified so far: 36–48 and 149–165) |
 | SSIDs per band | 8 | 5 (one driver slot is hostapd's hidden anchor) |
 | Ethernet | 1 × GbE | 2 × GbE |
 | Power | PoE | DC adapter |
@@ -166,7 +172,6 @@ You need root SSH on each unit; how to get it is out of scope here.
      "takeover": true,
      "apply": true,
      "egress": true,
-     "driver_country": "US",
      "ft_sae": false
    }
    ```
@@ -175,7 +180,11 @@ You need root SSH on each unit; how to get it is out of scope here.
    With `"takeover": false` the agent only reports to UniFi and changes
    nothing. With `"apply": false` it logs its plans without applying them.
    Optional keys, all off by default: `wpa3`, `min_rates`, `mdns_bridge`,
-   `hotspot2`, `mgmt_sources`. One optional key is on by default: `twt`
+   `hotspot2`, `mgmt_sources`, `rx_desense` (keep TP-Link's glitch-based
+   receiver desense, which a U6 Pro runs off) and `driver_country`.
+   `driver_country` runs the radios in another country's table than the
+   site's. It was needed while India ran as IN/0, which has no 80 MHz. The
+   agent now runs India as IN/288, so the override is no longer recommended. One optional key is on by default: `twt`
    (802.11ax Target Wake Time on both radios, as a real U6 Pro runs it;
    `"twt": false` keeps TP-Link's off). The driver takes it only while the
    radio is down, so the agent sets it inside a radio restart it makes

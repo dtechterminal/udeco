@@ -25,11 +25,11 @@ func argvOf(st []Step) string {
 // (config twt false) it is TP-Link's value, 0.
 func TestRadioProfileTWT(t *testing.T) {
 	for _, band := range []string{"ng", "na"} {
-		on := argvOf(radioProfile("wl1", band, true))
+		on := argvOf(radioProfile("wl1", band, true, nil))
 		if !strings.Contains(on, "wl -i wl1 twt enab 1\n") || strings.Contains(on, "twt 0") {
 			t.Errorf("%s on:\n%s", band, on)
 		}
-		off := argvOf(radioProfile("wl1", band, false))
+		off := argvOf(radioProfile("wl1", band, false, nil))
 		if !strings.Contains(off, "wl -i wl1 twt enab 0\n") || strings.Contains(off, "twt enab 1") {
 			t.Errorf("%s off:\n%s", band, off)
 		}

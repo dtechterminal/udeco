@@ -31,6 +31,10 @@ type baseRadio struct {
 	Macmode  string   `json:"macmode,omitempty"` // the primary's driver MAC filter
 	Maclist  []string `json:"maclist,omitempty"`
 	TWT      string   `json:"twt,omitempty"` // wl twt enab ("0"/"1"; "" = unreadable or an older agent's baseline)
+	// Iovars: the radio-wide driver settings the agent holds at a U6 Pro's
+	// value, as TP-Link left them (parity.go; absent = unreadable, or an
+	// older agent's baseline: TP-Link's known values are restored).
+	Iovars [][2]string `json:"iovars,omitempty"`
 }
 
 // tplinkTWT is TP-Link's TWT state (tplink_brcm.sh runs `wl twt 0`; the
@@ -51,7 +55,9 @@ type baseVif struct {
 
 // baseIovars are the per-vif iovars the agent changes, in restore order.
 // dwds first: the driver takes it only while the BSS is down.
-var baseIovars = []string{"dwds", "closednet", "ap_isolate", "bss_maxassoc", "wmf_bss_enable", "rrm", "rrm_nbr_scan", "fbt", "fbt_mdid", "fbt_ap"}
+// wnm goes back with dwds and rrm (radio down); dhcp_unicast is live.
+var baseIovars = []string{"dwds", "closednet", "ap_isolate", "bss_maxassoc", "wmf_bss_enable", "rrm", "rrm_nbr_scan", "fbt", "fbt_mdid", "fbt_ap",
+	"wnm", "dhcp_unicast"}
 
 // backhaulDefaults are TP-Link's settings of its backhaul vif wlN1 (read on
 // .205: dwds 1, closednet 1, bss_maxassoc 16). The hand-back restores them
@@ -114,6 +120,7 @@ func (a *Applier) captureBaseline(ctx context.Context) error {
 		if n := a.readTWT(ctx, p); n >= 0 {
 			r.TWT = itoa(n)
 		}
+		r.Iovars = a.captureDriver(ctx, p, band)
 		b.Radios = append(b.Radios, r)
 		for i := 1; i <= maxVifIndex; i++ {
 			v := fmt.Sprintf("%s%d", p, i)
@@ -281,6 +288,8 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		s.Optional = true
 		st = append(st, s)
 	}
+	bst, _ := a.bgaSteps(nil, a.readBGA(ctx)) // the BGA filter too (bga.go)
+	st = append(st, bst...)
 	st = append(st, a.shapingTeardownSteps()...)
 	backhaul := func(v string, have [][2]string) {
 		for _, d := range backhaulDefaults {
@@ -313,9 +322,20 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		}
 		br := baseRadioOf(r.p)
 		twt := a.twtRestore(ctx, r.p, br)
+		band := "na"
+		if r.p == bandPrimary["ng"] {
+			band = "ng"
+		}
+		// TP-Link's driver settings (parity.go): the radio-down ones with
+		// TWT, the live ones once the radio is up again.
+		drvDown, drvLive := a.driverRestore(ctx, r.p, band, br)
 		if br == nil || a.radioMatches(ctx, *br) {
-			if twt != nil {
-				st = append(st, optStep("radio down to restore TWT", "wl", "-i", r.p, "down"), *twt)
+			if twt != nil || len(drvDown) > 0 {
+				st = append(st, optStep("radio down to restore TWT and driver settings", "wl", "-i", r.p, "down"))
+				if twt != nil {
+					st = append(st, *twt)
+				}
+				st = append(st, drvDown...)
 			}
 			st = append(st, ensureUp(r.p))
 		} else {
@@ -326,6 +346,7 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 			if twt != nil {
 				st = append(st, *twt)
 			}
+			st = append(st, drvDown...)
 			if br.Country != "" {
 				st = append(st, wl("restore country", "country", br.Country))
 			}
@@ -335,6 +356,7 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 			}
 			st = append(st, wl("restore tx power", "txpwr_degrade", itoa(br.Degrade)), wl("radio up", "up"))
 		}
+		st = append(st, drvLive...)
 		if br != nil && br.Macmode != "" && (br.Macmode != "0" || len(br.Maclist) > 0) {
 			for _, s := range macSteps(r.p, 0, br.Maclist) {
 				if s.Argv[3] == "macmode" {
@@ -417,7 +439,7 @@ func (a *Applier) handbackSteps(ctx context.Context) ([]Step, *baseline, error) 
 		}
 		for _, io := range v.Iovars {
 			s := onVif(v.Vif, optStep("restore "+v.Vif+" "+io[0], "wl", "-i", v.Vif, io[0], io[1]))
-			if io[0] == "dwds" || io[0] == "rrm" {
+			if io[0] == "dwds" || io[0] == "rrm" || io[0] == "wnm" {
 				r := radioOf(v.Vif)
 				if _, seen := downOnly[r]; !seen {
 					downOrder = append(downOrder, r)

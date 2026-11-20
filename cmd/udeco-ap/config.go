@@ -120,6 +120,13 @@ type Config struct {
 	// change), never by a restart of its own; the hand-back restores
 	// TP-Link's state (internal/bcmwifi/twt.go).
 	TWT *bool `json:"twt,omitempty"`
+	// RxDesense (takeover, Deco only) keeps TP-Link's glitch-based receiver
+	// desense (bit 0x1 of the radios' interference mitigation mode, 361 on
+	// the X20). Absent or false clears it, as a U6 Pro runs ani_enable 0
+	// (bcmwifi.Options.KeepDesense, internal/bcmwifi/parity.go): the opt-out
+	// is there because desense also protects against adjacent-channel
+	// interference, and which way edge clients fare is not measured.
+	RxDesense bool `json:"rx_desense,omitempty"`
 }
 
 func (c *Config) portsConfirm() time.Duration {
@@ -205,7 +212,7 @@ func (c *Config) validate() error {
 		// wpa3: SAE on the 5 GHz radio only (the MT7663 driver has it);
 		// min_rates: the 2.4 GHz radio's BasicRate (mtkwifi minRate)
 		for name, on := range map[string]bool{"mdns_bridge": c.MdnsBridge,
-			"hotspot2": c.Hotspot2, "egress": c.Egress, "twt": c.TWT != nil} {
+			"hotspot2": c.Hotspot2, "egress": c.Egress, "twt": c.TWT != nil, "rx_desense": c.RxDesense} {
 			if on {
 				return fmt.Errorf("config: %s is not supported on platform %s", name, c.Platform)
 			}
@@ -242,6 +249,9 @@ func (c *Config) validate() error {
 	}
 	if c.TWT != nil && !c.Takeover {
 		return errors.New("config: twt needs takeover (observe mode never changes the unit)")
+	}
+	if c.RxDesense && !c.Takeover {
+		return errors.New("config: rx_desense needs takeover (observe mode never changes the unit)")
 	}
 	if c.SiteSurvey && !c.Takeover {
 		return errors.New("config: site_survey needs takeover (observe mode runs no scans and claims no RF scan)")

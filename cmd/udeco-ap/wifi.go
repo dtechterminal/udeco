@@ -36,6 +36,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -83,6 +84,9 @@ type workerState struct {
 	lastSum   string               // last summary logged
 	evented   map[string]time.Time // foreign finding -> when it last went to the event ring
 	tickFails int                  // bcmwifi.Tick errors in a row (logged on change)
+
+	dfsReset   *translate.DailyTime // the controller's dfs-reset cron time (dfs.go); nil = none
+	dfsResetAt time.Time            // the last dfs-reset check
 }
 
 // rebuildWarning starts the decosys Report warning for a TP-Link Wi-Fi
@@ -165,7 +169,10 @@ func (a *agent) workerLoop(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
-			a.runJob(ctx, job{"schedules", a.scheduleTick})
+			a.runJob(ctx, job{"schedules", func(ctx context.Context) {
+				a.scheduleTick(ctx)
+				a.dfsResetTick(ctx) // the controller's nightly dfs-reset (dfs.go)
+			}})
 		}
 	}
 	a.logf("wifi worker: stopped (observe mode)")
@@ -310,6 +317,7 @@ func (a *agent) wifiTick(ctx context.Context) {
 	a.count("wifi-repair", r.Steps)
 	a.count("rate-limit", r.RateLimitChanges)
 	a.count("wifi-11k-neighbor", r.NeighborChanges)
+	a.radarIn(r.Radar) // EVT_AP_RadarDetected (dfs.go)
 	for _, p := range r.Problems {
 		a.logf("wifi: tick: %s", p)
 	}
@@ -347,6 +355,7 @@ func (a *agent) provision(ctx context.Context, pv provision) {
 	a.portsPrepare(pv)
 	defer a.portsApply(ctx, "system_cfg "+pv.hash)
 	w.users, w.usersSet = in.Users, true
+	w.dfsReset = in.DFSReset
 	a.syncUsers(w.users, true)
 	full = a.radsecProvision(ctx, full, in) // RADIUS over TLS through the local proxy (radsec.go)
 	// WLAN schedules: the SSIDs off now are applied disabled (schedule.go).
@@ -361,6 +370,21 @@ func (a *agent) provision(ctx context.Context, pv provision) {
 	}
 	for _, n := range p.Notes {
 		a.logf("wifi: note: %s", n)
+	}
+	// the auto channel rides a radio restart the plan makes anyway
+	// (autochan.go)
+	if p.RadioRestart() {
+		if pd, notes := a.autoChannels(ctx, d, in); !reflect.DeepEqual(pd.Radios, d.Radios) {
+			for _, n := range notes {
+				a.logf("wifi: %s", n)
+			}
+			if pp, err := a.wifi.Plan(ctx, pd); err == nil {
+				pf, _ := a.autoChannels(ctx, full, in) // the same picks (autoPick)
+				d, full, p = pd, pf, pp
+			} else {
+				a.logf("wifi: auto channel: plan: %v (the live channels kept)", err)
+			}
+		}
 	}
 	if p.Empty() {
 		a.logf("wifi: system_cfg %s (%s) is already live", pv.hash, pv.why)
@@ -637,7 +661,9 @@ func desiredFrom(in translate.Intent) (bcmwifi.Desired, []string) {
 			// when it sends one (bcmwifi ftsae.go)
 			FTSAE: wl.FTSAE, FTKey: wl.FTKey, FTOverDS: wl.FTOverDS, MobilityDomain: wl.MobilityDomain,
 			UAPSD: wl.UAPSD, ProxyARP: wl.ProxyARP, MulticastToUnicast: wl.MulticastToUnicast,
-			DTIM: wl.DTIM, MinRateKbps: wl.MinRateKbps, Schedule: wl.Schedule}
+			DTIM: wl.DTIM, MinRateKbps: wl.MinRateKbps, Schedule: wl.Schedule,
+			NoBSSLoad:   wl.NoBSSLoad,   // per radio in bcmwifi (parity.go)
+			NoBGAFilter: wl.NoBGAFilter} // bcmwifi bga.go
 		s.MinRateOpts = minRateOpts(wl.MinRateOpts)
 		for band, b := range wl.PerBand {
 			if s.PerBand == nil {

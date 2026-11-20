@@ -23,6 +23,9 @@ type TickReport struct {
 	// RateLimitChanges is the number of stations whose tc limit was added,
 	// changed or removed.
 	RateLimitChanges int
+	// Radar lists the radar moves found since the last Tick (dfs.go):
+	// each is reported once.
+	Radar []RadarEvent
 	// NeighborChanges is the number of 802.11k neighbor list entries added
 	// or removed (neighbors.go).
 	NeighborChanges int
@@ -72,6 +75,14 @@ func (a *Applier) Tick(ctx context.Context) (TickReport, error) {
 		return r, err
 	}
 	r.Foreign = p.Foreign
+	r.Radar = a.takeRadar()
+	if len(p.cac) > 0 {
+		// A radio in its channel availability check does not beacon for
+		// about a minute: no repair (a radio down/up would start it over)
+		// and no full apply until it ends.
+		a.o.Logf("bcmwifi: tick: %v in a DFS channel availability check: no repair until it ends", p.cac)
+		return r, nil
+	}
 	if p.disruptive {
 		r.NeedsApply = true
 		r.Problems = append(r.Problems, "live Wi-Fi state differs in a way only a full apply fixes")

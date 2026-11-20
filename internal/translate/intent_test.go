@@ -332,6 +332,8 @@ func TestIntentU6Pro(t *testing.T) {
 		Security: "wpa2", Passphrase: "iot-secret-pass", PMF: "disabled",
 		VLAN: 2, Isolation: true, UAPSD: true, DTIM: map[string]int{"ng": 1},
 		Devnames: map[string]string{"ng": "wifi0ap0"},
+		// the enhanced-IoT WLAN: the controller turns its BSS Load element off
+		NoBSSLoad: true,
 	}, {
 		ID: "1", SSID: "Example Network", Bands: []string{"na"}, Enabled: true,
 		Security: "wpa2wpa3", Passphrase: "home-secret-pass", PMF: "optional", GroupRekey: 3600,
@@ -731,7 +733,7 @@ func TestIntentRadios(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			in, notes := IntentFromCfg(tc.cfg)
-			if got := in.Radios[tc.band]; got != tc.want {
+			if got := in.Radios[tc.band]; !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("got %+v, want %+v (notes %q)", got, tc.want, notes)
 			}
 			if tc.note != "" && !hasNote(notes, tc.note) {
@@ -916,6 +918,34 @@ func TestIntentSameBandTwice(t *testing.T) {
 		}
 		if !hasNote(notes, "wireless."+openN+` ("cafe" on na): another VAP of WLAN w1 on this band (wireless.`+oweN+") is used: left off") {
 			t.Errorf("%s: notes %q", order, notes)
+		}
+	}
+}
+
+// qbssload and bga_filter are carried: absent or enabled is the default
+// (BSS Load advertised, BPDUs filtered), disabled turns them off.
+func TestIntentQBSSLoadBGA(t *testing.T) {
+	for _, c := range []struct {
+		lines           []string
+		nobss, nofilter bool
+	}{
+		{nil, false, false},
+		{[]string{"wireless.1.qbssload=disabled"}, true, false},
+		{[]string{"wireless.1.bga_filter=disabled"}, false, true},
+		{[]string{"wireless.1.bga_filter=enabled", "wireless.1.qbssload=enabled"}, false, false},
+	} {
+		in, notes := IntentFromCfg(wlan(append([]string{"aaa.1.wpa=2", "aaa.1.wpa.key.1.mgmt=WPA-PSK", "aaa.1.wpa.psk=good-pass-1"}, c.lines...)...))
+		if len(in.WLANs) != 1 {
+			t.Fatalf("%v: %v %q", c.lines, in.WLANs, notes)
+		}
+		w := in.WLANs[0]
+		if w.NoBSSLoad != c.nobss || w.NoBGAFilter != c.nofilter {
+			t.Errorf("%v: nobssload %t nobga %t", c.lines, w.NoBSSLoad, w.NoBGAFilter)
+		}
+		for _, n := range notes {
+			if strings.Contains(n, "qbssload") || strings.Contains(n, "bga_filter") {
+				t.Errorf("%v: note %q", c.lines, n)
+			}
 		}
 	}
 }

@@ -56,6 +56,7 @@ type Radio struct {
 	Channel     int
 	Width       int // MHz
 	TxPower     int
+	TxPowerMode string `json:",omitempty"` // auto, high, medium, low, custom; "" = not known (reported as custom)
 	TxMin       int
 	TxMax       int
 	Noise       int

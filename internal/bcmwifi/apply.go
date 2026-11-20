@@ -299,7 +299,21 @@ func absentErr(err error) bool {
 func (a *Applier) doStep(ctx context.Context, s Step) error {
 	switch s.Kind {
 	case StepCmd:
-		return a.run(ctx, s.Argv...)
+		err := a.run(ctx, s.Argv...)
+		if err == nil || len(s.Alts) == 0 {
+			return err
+		}
+		for _, alt := range s.Alts {
+			if aerr := a.run(ctx, alt...); aerr == nil {
+				a.o.Logf("bcmwifi: %q refused (%v): %q instead", strings.Join(s.Argv, " "), err, strings.Join(alt, " "))
+				if a.refused == nil {
+					a.refused = map[string]bool{}
+				}
+				a.refused[strings.Join(s.Argv, " ")] = true
+				return nil
+			}
+		}
+		return err
 	case StepWrite:
 		return writeFileAtomic(a.fsPath(s.Path), s.Data, s.Mode)
 	case StepRemove:
@@ -509,7 +523,13 @@ func (a *Applier) verify(ctx context.Context, d Desired) error {
 				continue
 			}
 			if err != nil || bss != "up" {
-				bad("%s bss is %q, want up", v, bss)
+				if rl.Band == "na" && a.inCAC(ctx, p) {
+					// the DFS channel availability check (dfs.go): no
+					// beacons for about a minute
+					a.o.Logf("bcmwifi: %s bss is %q during the DFS channel availability check", v, bss)
+				} else {
+					bad("%s bss is %q, want up", v, bss)
+				}
 			}
 			if out, err := a.wlGet(ctx, v, "ssid"); err != nil || !ssidMatches(out, u.SSID.SSID) {
 				bad("%s does not carry SSID %q", v, u.SSID.SSID)

@@ -30,6 +30,9 @@ type Intent struct {
 	LED     *bool                  // ledbar.status; nil = not sent (mgmt_cfg led_enabled decides)
 	Syslog  *SyslogIntent          // remote syslog; nil = off
 	SSHD    *SSHDIntent            // the device SSH server switch (sshd.*); nil = not sent (sshd.go)
+	// DFSReset: the controller's nightly dfs-reset cron job (cron.go);
+	// nil = not sent.
+	DFSReset *DailyTime
 }
 
 // RadioIntent is one radio (radio.N plus its stamgr and bandsteering
@@ -43,6 +46,10 @@ type RadioIntent struct {
 	MinRSSI     int    // dBm (negative); 0 = off
 	MaxClients  int    // per radio (stamgr load balance); 0 = no limit
 	BandSteer   string // "prefer_5g", "equal"; "" = off for this radio's WLANs
+	// Blocked: radio.N.blklst, the channels the radio's automatic channel
+	// must not take (comma or space separated, as the U6 Pro's
+	// block_acs_channel takes them)
+	Blocked []int
 }
 
 // WLANIntent is one controller WLAN across the bands it is on (the
@@ -66,17 +73,25 @@ type WLANIntent struct {
 	PMF        string // disabled, optional, required
 	GroupRekey int    // seconds; 0 = never (the controller's default)
 
-	VLAN               int    // 802.1Q id; 0 = untagged (the AP's own LAN)
-	Isolation          bool   // client (L2) isolation
-	FT                 bool   // 802.11r
-	MobilityDomain     string // 802.11r mobility domain (4 hex digits); "" = backend's choice
-	FTSAE              bool   // with FT, WPA3 (SAE) clients fast-roam too (aaa.N.wpa3.ft.status)
-	FTKey              string // with FT: the WLAN's iapp_key, UniFi's key for PMK-R1 transfers between APs; secret
-	FTOverDS           bool   // 802.11r over the DS (aaa.N.ft_over_ds); off = over the air
-	BSSTransition      bool   // 802.11v
-	RRM                bool   // 802.11k
-	UAPSD              bool
-	ProxyARP           bool
+	VLAN           int    // 802.1Q id; 0 = untagged (the AP's own LAN)
+	Isolation      bool   // client (L2) isolation
+	FT             bool   // 802.11r
+	MobilityDomain string // 802.11r mobility domain (4 hex digits); "" = backend's choice
+	FTSAE          bool   // with FT, WPA3 (SAE) clients fast-roam too (aaa.N.wpa3.ft.status)
+	FTKey          string // with FT: the WLAN's iapp_key, UniFi's key for PMK-R1 transfers between APs; secret
+	FTOverDS       bool   // 802.11r over the DS (aaa.N.ft_over_ds); off = over the air
+	BSSTransition  bool   // 802.11v
+	RRM            bool   // 802.11k
+	UAPSD          bool
+	ProxyARP       bool
+	// NoBSSLoad: wireless.N.qbssload=disabled on a VAP of the WLAN (the
+	// controller sends it for an enhanced-IoT WLAN); absent = on, as a U6
+	// Pro advertises the BSS Load element by default.
+	NoBSSLoad bool
+	// NoBGAFilter: wireless.N.bga_filter=disabled on every VAP of the WLAN;
+	// the controller's default (enabled; a U6 Pro has it too) drops frames
+	// to the bridge group address (STP BPDUs) on the WLAN's VAPs.
+	NoBGAFilter        bool
 	MulticastToUnicast bool // multicast enhancement
 	// PerBand holds each band's own security and roaming settings when the
 	// controller sends them differently per radio (e.g. WPA2/WPA3 on 5 GHz
@@ -171,6 +186,7 @@ func IntentFrom(cfg Cfg) (Intent, []string) {
 	in.LED = intentLED(cfg, &nb)
 	in.Syslog = intentSyslog(cfg, &nb)
 	in.SSHD = SSHD(cfg)
+	in.DFSReset = intentDFSReset(cfg, &nb)
 	classifyKeys(cfg, phyBand, skipped, &nb)
 	devnameNotes(cfg, &nb) // devname.go
 	sectionNotes(cfg, &nb)
@@ -226,6 +242,13 @@ func intentRadios(cfg Cfg, in *Intent, nb *noteList) map[string]string {
 			r.Width, _ = strconv.Atoi(m[1])
 		} else if mode != "" {
 			nb.addf("radio.%s (%s): ieee_mode %q has no channel width: width left to the backend", n, band, mode)
+		}
+		for _, f := range strings.FieldsFunc(cfg[p+"blklst"], func(c rune) bool { return c == ',' || c == ' ' }) {
+			if v, err := strconv.Atoi(f); err == nil && v > 0 {
+				r.Blocked = append(r.Blocked, v)
+			} else {
+				nb.addf("radio.%s (%s): blklst entry %q is not a channel: ignored", n, band, f)
+			}
 		}
 		r.TxPowerMode, r.TxPower = txPower(cfg[p+"txpower_mode"], cfg[p+"txpower"], func(s string) {
 			nb.addf("radio.%s (%s): %s", n, band, s)
@@ -466,6 +489,8 @@ func intentVAP(cfg Cfg, n, w, a, band, ssid string, vlanNet map[string]string, l
 		UAPSD:              cfg[w+"uapsd"] == "enabled",
 		ProxyARP:           cfg[a+"proxy_arp"] == "enabled",
 		MulticastToUnicast: isOn(cfg[w+"mcast.enhance"]),
+		NoBSSLoad:          cfg[w+"qbssload"] == "disabled",
+		NoBGAFilter:        cfg[w+"bga_filter"] == "disabled",
 		Devnames:           map[string]string{},
 	}
 	if x.ID == "" {
@@ -874,6 +899,8 @@ func mergeVAPs(vaps []WLANIntent, nb *noteList) WLANIntent {
 			x.Devnames[k] = d
 		}
 		x.RoamAssist = mergeBandInts(x.RoamAssist, v.RoamAssist)
+		x.NoBSSLoad = x.NoBSSLoad || v.NoBSSLoad       // the backend's element is per radio anyway
+		x.NoBGAFilter = x.NoBGAFilter && v.NoBGAFilter // filtered unless every VAP turns it off
 		diff := differing(vaps[0], v)
 		var other []string
 		perBand := false
@@ -908,7 +935,7 @@ func differing(a, b WLANIntent) []string {
 	var out []string
 	for i := 0; i < t.NumField(); i++ {
 		switch name := t.Field(i).Name; name {
-		case "Bands", "Enabled", "DTIM", "MinRateKbps", "MinRateOpts", "Devnames", "RoamAssist", "PerBand":
+		case "Bands", "Enabled", "DTIM", "MinRateKbps", "MinRateOpts", "Devnames", "RoamAssist", "PerBand", "NoBSSLoad", "NoBGAFilter":
 		default:
 			if !reflect.DeepEqual(va.Field(i).Interface(), vb.Field(i).Interface()) {
 				out = append(out, strings.ToLower(name))
@@ -1077,8 +1104,8 @@ var wirelessRules = map[string]rule{
 
 	"mode": rNeutral("master"), "wmm": rNeutral("enabled"), "wds": rOff, "autowds": rOff,
 	"authmode": rNeutral("1"), "puren": rNeutral("0"), "pureg": rNeutral("0"),
-	"addmtikie": rOff, "no2ghz_oui": rOff, "qbssload": rOff, "advertise_ap_name": rOff,
-	"mcastrate": rNeutral("auto"), "bga_filter": rNeutral("enabled"),
+	"addmtikie": rOff, "no2ghz_oui": rOff, "qbssload": rRead, "advertise_ap_name": rOff,
+	"mcastrate": rNeutral("auto"), "bga_filter": rRead,
 	"multicast.suppressor": rOff, "iot": rOff, "btm_disassoc.status": rRead, "btm_disassoc.threshold": rRead,
 
 	"multicast.inspect": rQuiet, // the UAP's own mDNS/multicast inspection for its statistics
@@ -1111,7 +1138,7 @@ var aaaRules = map[string]rule{
 
 var radioRules = map[string]rule{
 	"phyname": rRead, "ieee_mode": rRead, "channel": rRead, "txpower": rRead, "txpower_mode": rRead,
-	"countrycode": rRead, "status": rRead,
+	"countrycode": rRead, "status": rRead, "blklst": rRead,
 
 	// Ubiquiti driver tuning, or settings the backend derives from its own caps
 	"ack.auto": rQuiet, "acktimeout": rQuiet, "ampdu.status": rQuiet, "clksel": rQuiet,
@@ -1294,6 +1321,8 @@ func sectionNotes(cfg Cfg, nb *noteList) {
 			}
 		case "pathmon":
 			pathmonNotes(cfg, nb) // run by the agent (internal/pathmon)
+		case "cron":
+			// the dfs-reset job is run by the agent, the rest noted (cron.go)
 		case "snmp", "mdns_sd":
 			// run by the agent, which logs its own notes: the SNMP agent
 			// (internal/snmpagent, cmd/udeco-ap/snmp.go) and the mDNS
@@ -1412,6 +1441,8 @@ func (w WLANIntent) String() string {
 	opt(w.UAPSD, "uapsd")
 	opt(w.ProxyARP, "proxy-arp")
 	opt(w.MulticastToUnicast, "mcast-enhance")
+	opt(w.NoBSSLoad, "no-bssload")
+	opt(w.NoBGAFilter, "no-bga-filter")
 	opt(len(w.DTIM) > 0, fmt.Sprintf("dtim=%v", w.DTIM))
 	opt(len(w.MinRateKbps) > 0, fmt.Sprintf("minrate=%v", w.MinRateKbps))
 	opt(len(w.RoamAssist) > 0, fmt.Sprintf("roam-assist=%v", w.RoamAssist))

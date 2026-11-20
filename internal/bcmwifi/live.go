@@ -25,6 +25,9 @@ type liveRadio struct {
 	TargetMax float64
 	MAC       liveMAC // the primary's driver MAC filter
 	TWT       int     // wl twt enab: 0 or 1, -1 when unreadable (twt.go)
+	// Drv: the radio-wide driver settings the agent holds at a U6 Pro's
+	// value, by iovar (unread when a getter failed; parity.go).
+	Drv map[string]int
 }
 
 // liveMAC is a driver MAC filter as read back (wl macmode, wl mac).
@@ -57,6 +60,9 @@ type liveVif struct {
 	MAC    liveMAC
 	DWDS   int    // -1 when unreadable
 	Rates  string // canonical legacy rateset (Options.MinRates only)
+	// DHCPUnicast: wl dhcp_unicast, -1 when unreadable (hostapd.go
+	// dhcpUnicastStep)
+	DHCPUnicast int
 }
 
 // liveState is what Plan diffs against.
@@ -371,13 +377,12 @@ func (a *Applier) readLive(ctx context.Context, l *layout) (*liveState, error) {
 		if lr.BWCap, err = parseIntOut(out); err != nil {
 			return nil, fmt.Errorf("%s bw_cap %q: %w", p, out, err)
 		}
-		if strings.EqualFold(rl.Radio.TxPowerMode, "custom") {
-			if out, err = a.wlGet(ctx, p, "txpwr_target_max"); err == nil {
-				lr.TargetMax = parseTargetMax(out)
-			}
+		if out, err = a.wlGet(ctx, p, "txpwr_target_max"); err == nil {
+			lr.TargetMax = parseTargetMax(out)
 		}
 		lr.MAC = a.readMAC(ctx, p)
 		lr.TWT = a.readTWT(ctx, p)
+		lr.Drv = a.readDriver(ctx, p, rl.Band)
 		ls.Radios[p] = lr
 		for _, v := range rl.Vifs {
 			if !a.netdevExists(v) {
@@ -385,10 +390,15 @@ func (a *Applier) readLive(ctx context.Context, l *layout) (*liveState, error) {
 				continue
 			}
 			out, err := a.wlGet(ctx, v, "bss")
-			lv := liveVif{Exists: true, Up: err != nil || out != "down", Bridge: a.bridgeOf(v), MAC: a.readMAC(ctx, v), DWDS: -1}
+			lv := liveVif{Exists: true, Up: err != nil || out != "down", Bridge: a.bridgeOf(v), MAC: a.readMAC(ctx, v), DWDS: -1, DHCPUnicast: -1}
 			if out, err := a.wlGet(ctx, v, "dwds"); err == nil {
 				if n, err := parseIntOut(out); err == nil {
 					lv.DWDS = n
+				}
+			}
+			if out, err := a.wlGet(ctx, v, "dhcp_unicast"); err == nil {
+				if n, err := parseIntOut(out); err == nil {
+					lv.DHCPUnicast = n
 				}
 			}
 			if a.o.MinRates {

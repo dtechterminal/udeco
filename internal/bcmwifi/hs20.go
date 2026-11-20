@@ -56,11 +56,11 @@ func normalizeHotspot2(s *SSID, notes *[]string) string {
 		*notes = append(*notes, fmt.Sprintf("ssid %s: Hotspot 2.0: PMF raised to optional (Passpoint release 2+ stations need it)", s.ID))
 		s.PMF = "optional"
 	}
-	if c.DisableDGAF && !(s.Isolation && s.ProxyARP) {
+	if c.DisableDGAF && !s.ProxyARP {
 		// hostapd's own proxy_arp cannot run on the vifs it creates here
 		// (live fact F5); only the bridge's proxyarp_wifi answers ARP for
-		// stations, and only on an isolated SSID with proxy ARP.
-		*notes = append(*notes, fmt.Sprintf("ssid %s: Hotspot 2.0: group-addressed frames are not delivered to stations (DGAF disabled) and no proxy ARP answers for them: turn on client isolation and proxy ARP", s.ID))
+		// stations, on an SSID with proxy ARP.
+		*notes = append(*notes, fmt.Sprintf("ssid %s: Hotspot 2.0: group-addressed frames are not delivered to stations (DGAF disabled) and no proxy ARP answers for them: turn on proxy ARP", s.ID))
 	}
 	return ""
 }

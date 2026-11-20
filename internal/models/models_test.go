@@ -123,6 +123,11 @@ func TestDecoAgentProfile(t *testing.T) {
 		ng.RadioCaps2 != 0 || na.RadioCaps2 != 0 || na.HasDFS || na.HasFCCDFS || ng.NSS != 2 || na.NSS != 2 {
 		t.Errorf("radios ng %+v na %+v", ng, na)
 	}
+	// has_dfs/has_fccdfs on 5 GHz with the DFS feature (takeover on the
+	// Deco: bcmwifi dfs.go), never on 2.4 GHz
+	if d, _ := DecoAgentProfileWith(m, nil, DecoAgentFeatures{DFS: true}); !d.Radios["na"].HasDFS || !d.Radios["na"].HasFCCDFS || d.Radios["ng"].HasDFS {
+		t.Errorf("DFS feature: radios %+v", d.Radios)
+	}
 	// radio_caps2 WPA3 only with the wpa3 feature (config wpa3, takeover)
 	if all.Radios["ng"].RadioCaps2 != RadioCap2WPA3 || all.Radios["na"].RadioCaps2 != RadioCap2WPA3 {
 		t.Errorf("WPA3 feature: radios %+v", all.Radios)

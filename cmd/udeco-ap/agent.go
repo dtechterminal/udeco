@@ -294,6 +294,13 @@ type agent struct {
 
 	scans *scanner
 	sta   staEvents // station events for the controller (staevents.go); loop goroutine
+	// radarQ: radar moves from the Wi-Fi worker for the controller
+	// (dfs.go)
+	// autoPick: band -> the auto channel picked this run (autochan.go,
+	// worker goroutine)
+	autoPick map[string]int
+	radarMu  sync.Mutex
+	radarQ   []bcmwifi.RadarEvent
 	// hapd follows the hostapd control sockets' station events (nil: not
 	// running; staevents.go); readAt: when the reading in use started
 	hapd   staSource
@@ -578,7 +585,8 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 		a.wifi = a.o.newWifi(bcmwifi.Options{Root: a.o.root, Run: a.o.run,
 			StateDir: filepath.Join(a.o.base, wifiStateSub), RunDir: a.o.runDir,
 			Uplink: a.uplink, DryRun: !a.cfg.Apply, Logf: a.logf, Caps: a.o.col.Caps,
-			MinRates: a.cfg.MinRates, WPA3: a.cfg.WPA3, FTSAE: a.cfg.ftSAE(), NoTWT: !a.cfg.twt()})
+			MinRates: a.cfg.MinRates, WPA3: a.cfg.WPA3, FTSAE: a.cfg.ftSAE(), NoTWT: !a.cfg.twt(),
+			KeepDesense: a.cfg.RxDesense})
 		if a.uplink == "" {
 			a.logf("uplink port: not found from the gateway's FDB entry (bcmwifi picks the only br-lan port with carrier)")
 		}
@@ -613,7 +621,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 		MinRate: own && a.cfg.MinRates, PPSK: deco, LockAP: own, RoamAssist: own && canRoam,
 		RadiusFilter: deco, MulticastInspect: deco, WPA3: own && a.cfg.WPA3, WPA3FT: own && a.cfg.WPA3 && canFTSAE,
 		RadSec: deco, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2,
-		PortVLAN: own && portVLAN})
+		PortVLAN: own && portVLAN, DFS: deco})
 	if !ok {
 		return fmt.Errorf("model %s has no agent capability words", a.cfg.Model)
 	}
@@ -905,6 +913,7 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 		info.Authorized = a.guestAuthorized(&c, time.Now()) // a copy: a.info stays as read
 	}
 	a.ctr.Begin(c.Uptime)
+	a.txPowerFields(&c)
 	f := c.FieldsWith(a.prev, info, a.radioCaps, a.ctr)
 	// Uptime runs from the session's boot time, which is the unit's boot
 	// until the controller's upgrade or (observe-mode) restart is faked.
@@ -940,8 +949,9 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 		a.x.FWCaps &^= models.DecoAgentTakeoverFWCaps
 		a.x.FW2Caps &^= models.DecoAgentTakeoverFW2Caps
 		a.x.FW3Caps &^= models.DecoAgentTakeoverFW3Caps
-		for b, rc := range a.radioCaps { // SAE (wpa3) is served by bcmwifi only
+		for b, rc := range a.radioCaps { // SAE (wpa3) and DFS are served by bcmwifi only
 			rc.RadioCaps2 &^= models.RadioCap2WPA3 | models.RadioCap2WPA3FT
+			rc.HasDFS, rc.HasFCCDFS = false, false
 			a.radioCaps[b] = rc
 		}
 	}
@@ -954,6 +964,7 @@ func (a *agent) fields(ctx context.Context) map[string]any {
 	// a queued station event rides this inform; the changes this reading
 	// shows are queued for the next ones (staevents.go)
 	if a.x.S.Adopted {
+		a.radarEvents() // radar moves ride the station-event queue (dfs.go)
 		a.sta.attach(f)
 	}
 	if !a.stale {
@@ -1124,5 +1135,28 @@ func (a *agent) wakeLoop() {
 	select {
 	case a.wake <- struct{}{}:
 	default:
+	}
+}
+
+// txPowerer is a Wi-Fi backend that knows the tx power it set: the
+// controller's preset and the resulting dBm (bcmwifi txpower.go).
+type txPowerer interface {
+	TxPower(band string) (mode string, dbm int, ok bool)
+}
+
+// txPowerFields reports each radio's tx power as the backend set it,
+// instead of the reading's target maximum and "custom". s is the inform's
+// copy: its radios are copied before they change.
+func (a *agent) txPowerFields(s *apstate.Snapshot) {
+	tp, ok := a.wifi.(txPowerer)
+	if !ok || !a.takeover.Load() {
+		return
+	}
+	s.Radios = append([]apstate.Radio(nil), s.Radios...)
+	for i := range s.Radios {
+		r := &s.Radios[i]
+		if m, dbm, ok := tp.TxPower(r.Band); ok {
+			r.TxPowerMode, r.TxPower = m, dbm
+		}
 	}
 }

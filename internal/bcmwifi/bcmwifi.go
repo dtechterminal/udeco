@@ -125,6 +125,11 @@ type Options struct {
 	// state is written only inside a radio down/up the plan makes anyway
 	// (twt.go).
 	NoTWT bool
+	// KeepDesense keeps TP-Link's glitch-based receiver desense (the
+	// interference mitigation mode's bit 0x1). Off in a zero Options: the
+	// agent clears it, as a U6 Pro runs ani_enable 0 (parity.go); the agent
+	// sets it from its config (rx_desense true).
+	KeepDesense bool
 	// Ctrl sends one command to the hostapd control socket of vif
 	// (CtrlDir/<vif>) and returns the reply. nil = a unix datagram socket
 	// under Root. Used for the commands that carry a secret (SET r0kh/r1kh
@@ -168,6 +173,18 @@ type Applier struct {
 	fcNote string
 	// twtSeen: band -> the TWT line Tick logged last (twt.go)
 	twtSeen map[string]string
+	// txCeil: radio+chanspec -> tx power ceiling (dBm), txRep: band -> the
+	// last planned tx power (txpower.go)
+	// refused: StepCmd argv a driver refused and an Alts stood in for
+	// (country IN/288); dfsMoved: primary -> a radar move followed,
+	// radarQ: radar moves Tick has not reported yet (dfs.go)
+	refused  map[string]bool
+	dfsMoved map[string]dfsMove
+	radarQ   []RadarEvent
+	txMu     sync.Mutex
+	txCeil   map[string]float64
+	txRep    map[string]txReport
+	liveCh   map[string]int // band -> live control channel (LiveChannel)
 
 	sleep func(time.Duration)
 	poll  time.Duration

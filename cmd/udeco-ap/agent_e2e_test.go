@@ -276,8 +276,11 @@ func (u *e2eUnit) mutating() []string {
 				continue
 			}
 			// getters the captures lack: `wl -i <vif> macmode|mac|dwds` with
-			// no value read the driver's ACL and WDS state
-			if len(c) == 4 && c[1] == "-i" && slices.Contains([]string{"macmode", "mac", "dwds"}, c[3]) {
+			// no value read the driver's ACL and WDS state; the radio-wide
+			// driver settings bcmwifi holds at a U6 Pro's value (parity.go)
+			if len(c) == 4 && c[1] == "-i" && slices.Contains([]string{"macmode", "mac", "dwds",
+				"bssload", "txbf_imp", "vht_features", "rxchain_pwrsave_enable", "radio_pwrsave_enable",
+				"interference", "interference_override", "dhcp_unicast", "wnm", "spect", "dfs_status", "chan_info"}, c[3]) {
 				continue
 			}
 		case "ebtables":

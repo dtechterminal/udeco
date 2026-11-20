@@ -41,6 +41,10 @@ type Step struct {
 	Port     string      `json:",omitempty"`
 	Proc     string      `json:",omitempty"`
 	Optional bool        `json:",omitempty"` // a failure is logged and Apply goes on
+	// Alts (StepCmd) are run in turn when Argv fails; the first that
+	// works stands in for it, and Argv is remembered as refused
+	// (Applier.refused) so later plans use the alternative.
+	Alts [][]string `json:",omitempty"`
 	// IfPresent names the vif a lower or unbridge step acts on: when that
 	// netdev does not exist (a hostapd that exited deleted it, live fact
 	// F2), there is nothing to do and the step succeeds.
@@ -122,12 +126,30 @@ type Plan struct {
 
 	takeover   bool // a TP-Link hostapd was running: Apply captures a baseline first
 	disruptive bool // a radio is reconciled in full (hostapd restarted)
-	// twt: band -> the radio's TWT line, also in Notes (Tick logs changes)
+	// cac: the radios in a DFS channel availability check (Tick leaves
+	// them alone, dfs.go)
+	cac []string
+	// twt: band -> the radio's TWT line, band+" driver" -> its driver-parity
+	// line (parity.go), also in Notes (Tick logs changes)
 	twt map[string]string
 }
 
 // Empty reports whether the plan changes nothing.
 func (p Plan) Empty() bool { return len(p.Steps) == 0 }
+
+// RadioRestart: the plan takes a radio down (a full reconcile, a PHY
+// change, a dwds repair), so a channel change in it costs no extra outage.
+func (p Plan) RadioRestart() bool {
+	if p.disruptive {
+		return true
+	}
+	for _, s := range p.Steps {
+		if s.Kind == StepCmd && len(s.Argv) == 4 && s.Argv[0] == "wl" && s.Argv[3] == "down" {
+			return true
+		}
+	}
+	return false
+}
 
 // String lists the notes and steps, one per line, without secrets.
 func (p Plan) String() string {
@@ -187,6 +209,10 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 	gst, gforeign := a.guestSteps(l.Guest, l.guestVifs(), a.readGuest(ctx))
 	p.Steps = append(p.Steps, gst...)
 	p.Foreign = append(p.Foreign, gforeign...)
+	// The bridge group address filter on every served vif (bga.go).
+	bst, bforeign := a.bgaSteps(l.bgaVifs(), a.readBGA(ctx))
+	p.Steps = append(p.Steps, bst...)
+	p.Foreign = append(p.Foreign, bforeign...)
 	for _, rl := range l.Radios {
 		rp, err := a.planRadio(ctx, rl, ls, blocked, d.Country, caps)
 		if err != nil {
@@ -196,14 +222,20 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 		p.Notes = append(p.Notes, rp.Notes...)
 		if lr := ls.Radios[rl.Primary]; lr != nil {
 			line := "radio " + rl.Band + ": " + twtStatus(rl.Primary, lr.TWT, !a.o.NoTWT, rp.TWTSet)
-			p.Notes = append(p.Notes, line)
+			dline := "radio " + rl.Band + ": " + rp.Driver
+			p.Notes = append(p.Notes, line, dline)
 			if p.twt == nil {
 				p.twt = map[string]string{}
 			}
 			p.twt[rl.Band] = line
+			p.twt[rl.Band+" driver"] = dline
 		}
 		p.Foreign = append(p.Foreign, rp.Foreign...)
 		p.disruptive = p.disruptive || rp.Reconcile
+		if rl.Band == "na" && a.inCAC(ctx, rl.Primary) {
+			p.cac = append(p.cac, rl.Primary)
+			p.Notes = append(p.Notes, "radio na: DFS channel availability check in progress (no beacons until it ends)")
+		}
 	}
 	for _, vid := range ls.VBridges {
 		if !containsInt(l.VLANs, vid) {
@@ -278,8 +310,36 @@ func (a *Applier) vlanUpSteps(uplink string, vid int) []Step {
 				cmdStep("delete VLAN device "+p, "ip", "link", "del", p))
 		}
 	}
+	st = append(st, a.snoopSteps(br, !a.netdevExists(br))...)
 	if !a.netdevExists(br) || !a.ifUp(br) {
 		st = append(st, cmdStep("bring "+br+" up", "ip", "link", "set", br, "up"))
+	}
+	return st
+}
+
+// bridgeSnoop are the IGMP/MLD snooping knobs of the agent's VLAN bridges,
+// as a U6 Pro's mcsd sets them on every bridge (mcsd.conf snooping 1,
+// policy flood; plugin_stop's multicast_querier 0; bridge.conf hash_max
+// 2048): the bridge learns which ports want a group and floods unknown
+// groups (Linux floods while no querier is seen), without querying itself.
+// br-lan is TP-Link's imsnoop's and left alone; Multicast Enhancement stays
+// the driver's wmf_bss_enable.
+var bridgeSnoop = [][2]string{{"hash_max", "2048"}, {"multicast_snooping", "1"}, {"multicast_querier", "0"}}
+
+// snoopSteps sets br's snooping knobs where they read otherwise (all of
+// them for a bridge created by the plan). Optional: a kernel without
+// multicast snooping has no such files, and the bridge forwards anyway.
+func (a *Applier) snoopSteps(br string, created bool) []Step {
+	var st []Step
+	for _, k := range bridgeSnoop {
+		p := "/sys/class/net/" + br + "/bridge/" + k[0]
+		if !created {
+			b, err := a.readFile(p)
+			if err != nil || strings.TrimSpace(string(b)) == k[1] {
+				continue
+			}
+		}
+		st = append(st, Step{Kind: StepPut, Desc: "IGMP/MLD snooping on " + br, Path: p, Data: []byte(k[1] + "\n"), Optional: true})
 	}
 	return st
 }
@@ -303,19 +363,20 @@ func (a *Applier) vlanDownSteps(vid int) []Step {
 // radioProfile re-asserts TP-Link's post-wlconf radio tweaks
 // (tplink_brcm.sh wifi_features_set) while the radio is down. They persist
 // in the driver, so this only matters if something reset them; failures are
-// tolerated. TWT is the exception: on (twt enab 1, as a U6 Pro) unless the
-// config turns it off, which is TP-Link's `twt 0` (twt.go). Both X20
-// radios are HE (`he 1` here), so both get it.
-func radioProfile(primary, band string, twt bool) []Step {
+// tolerated. TWT and the settings a U6 Pro holds differently are the
+// exceptions: TWT on (twt enab 1, as a U6 Pro) unless the config turns it
+// off, which is TP-Link's `twt 0` (twt.go), and drv, the U6 Pro's driver
+// settings (parity.go planDriver: BSS Load on instead of TP-Link's
+// `bssload 0`, no implicit beamforming, no 2.4 GHz vendor VHT instead of
+// TP-Link's `vht_features 0x7`, power save off). Both X20 radios are HE
+// (`he 1` here), so both get it.
+func radioProfile(primary, band string, twt bool, drv []Step) []Step {
 	wl := func(args ...string) Step {
 		return optStep("radio profile "+args[0], append([]string{"wl", "-i", primary}, args...)...)
 	}
-	st := []Step{wl("he", "1")}
-	if band == "ng" {
-		st = append(st, wl("vht_features", "0x7"))
-	}
-	return append(st, twtStep(primary, twt), wl("tpc_report_ie", "0"), wl("pwr_const_ie", "0"),
-		wl("bssload", "0"), wl("sgi_tx", "-1"))
+	st := []Step{wl("he", "1"), twtStep(primary, twt), wl("tpc_report_ie", "0"), wl("pwr_const_ie", "0"),
+		wl("sgi_tx", "-1")}
+	return append(st, drv...)
 }
 
 // radioPlan is planRadio's result.
@@ -324,7 +385,10 @@ type radioPlan struct {
 	Notes     []string
 	Foreign   []string
 	Reconcile bool // hostapd restarted, BSSes cycled
-	TWTSet    bool // TWT written inside one of the plan's radio down/ups (twt.go)
+	// TWTSet: TWT and the other radio-down driver settings are written
+	// inside one of the plan's radio down/ups (twt.go, parity.go)
+	TWTSet bool
+	Driver string // the radio's driver-parity line (parity.go driverStatus)
 }
 
 // macDrift returns the steps that put a vif's driver MAC filter to mode/list
@@ -381,12 +445,23 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		return cmdStep(desc, append([]string{"wl", "-i", p}, args...)...)
 	}
 	cs := lr.Chanspec
+	a.setLiveChannel(rl.Band, cs.Ctrl)
 	cc := lr.Country.Code
 	if wantCountry != "" {
 		arg, same := countryArg(wantCountry, lr.Country)
 		cc = strings.ToUpper(wantCountry)
+		fb := countryFallback[cc]
+		if fb != "" && a.refused["wl -i "+p+" country "+arg] {
+			note(fmt.Sprintf("country %s refused by the driver: running %s (the driver's own rev)", arg, fb))
+			arg, same = fb, lr.Country.Code == cc
+			fb = ""
+		}
 		if !same {
-			phy = append(phy, wl("set country "+arg, "country", arg))
+			cst := wl("set country "+arg, "country", arg)
+			if fb != "" {
+				cst.Alts = [][]string{{"wl", "-i", p, "country", fb}}
+			}
+			phy = append(phy, cst)
 			if cc != "US" {
 				note("country " + cc + ": TP-Link also writes boardflags4/ED thresholds to kernel nvram for non-US; the agent never does")
 			}
@@ -407,6 +482,17 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 		want, change, n := desiredChanspec(rl.Band, rl.Radio, lr.Chanspec, bc)
 		rp.Notes = append(rp.Notes, n...)
+		if rl.Band == "na" && want != lr.Chanspec && want.dfs() {
+			// radar: follow the driver's move (dfs.go)
+			if moved, n := a.followRadar(ctx, p, want, lr.Chanspec); moved {
+				note(n)
+				change, want = false, lr.Chanspec
+			}
+		}
+		if change && want.dfs() && lr.Drv["spect"] != 1 {
+			// 802.11h before the DFS chanspec (dfs.go)
+			phy = append(phy, wl("802.11h on for DFS", "spect", "1"))
+		}
 		if change {
 			if bw := bwCap(want.Width); bw != lr.BWCap {
 				phy = append(phy, wl("set bw_cap", "bw_cap", bandArg(rl.Band), itoa(bw)))
@@ -414,11 +500,17 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 			phy = append(phy, wl("set chanspec "+want.String(), "chanspec", want.String()))
 			cs = want
 		}
-		q, n2 := txpwrDegrade(rl.Radio, lr.TargetMax)
+		ceil, n1 := a.txCeiling(p, lr.Chanspec, cs, lr.Degrade, lr.TargetMax)
+		if n1 != "" {
+			note(n1)
+		}
+		q, n2 := txpwrDegrade(rl.Radio, ceil)
 		if n2 != "" {
 			note(n2)
 		}
 		degrade = q
+		mode, dbm := txReportFor(rl.Radio, ceil, q)
+		a.setTxReport(rl.Band, txReport{Mode: mode, DBm: dbm})
 	}
 	txStep := wl("set tx power", "txpwr_degrade", itoa(degrade))
 	txChange := degrade != lr.Degrade
@@ -426,6 +518,37 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	// (twt.go); an unreadable state is left alone there.
 	twtWant := !a.o.NoTWT
 	twtPending := lr.TWT >= 0 && lr.TWT != b2i(twtWant)
+	// The U6 Pro's radio-wide driver settings (parity.go): the radio-down
+	// ones ride along with TWT, the live ones run with the radio up.
+	bssload, bn := radioBSSLoad(rl)
+	if bn != "" {
+		note(bn)
+	}
+	dp := planDriver(p, rl.Band, lr.Drv, bssload, a.o.KeepDesense)
+	// rideAlong: what a radio down/up made for something else also writes
+	// (once per plan).
+	rideAlong := func() []Step {
+		if rp.TWTSet {
+			return nil
+		}
+		var st []Step
+		if twtPending {
+			st = append(st, twtStep(p, twtWant))
+		}
+		st = append(st, dp.down...)
+		rp.TWTSet = len(st) > 0
+		return st
+	}
+	liveDrv := func(profiled bool) []Step {
+		var st []Step
+		for _, s := range dp.live {
+			if profiled && s.Argv[3] == "bssload" {
+				continue // radioProfile wrote it
+			}
+			st = append(st, s)
+		}
+		return st
+	}
 
 	// hostapd conf, ACL files and driver state for the used vifs.
 	maxSta := rl.Radio.MaxClients
@@ -523,11 +646,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 				if lv.DWDS != d.DWDS {
 					// Refused by the driver unless the radio is down. A TWT
 					// state that differs rides along (twt.go).
-					var extra []Step
-					if twtPending && !rp.TWTSet {
-						extra, rp.TWTSet = []Step{twtStep(p, twtWant)}, true
-					}
-					st = append(st, radioDownSteps(p, []vifDriver{d}, extra...)...)
+					st = append(st, radioDownSteps(p, []vifDriver{d}, rideAlong()...)...)
 					foreign(fmt.Sprintf("%s: dwds %d on a client vif, set to %d", v, lv.DWDS, d.DWDS))
 				}
 				ms, f := macDrift(v, lv.MAC, d.Macmode, d.Maclist, false)
@@ -544,6 +663,9 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 				}
 				if !lv.Up {
 					st = append(st, cmdStep("raise "+v, "wl", "-i", v, "bss", "up"))
+				}
+				if lv.DHCPUnicast == 0 { // live-settable: re-asserted in place
+					st = append(st, dhcpUnicastStep(v))
 				}
 			default:
 				// The placeholder wlN1 (or a vif no hostapd serves) stays
@@ -564,7 +686,9 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		}
 		st = append(st, stale...)
 		st = append(st, acl.Steps()...)
+		st = append(st, liveDrv(false)...)
 		rp.Steps = st
+		rp.Driver = driverStatus(dp, rp.TWTSet)
 		return rp, nil
 	}
 
@@ -604,7 +728,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		st = append(st, wl("radio down", "down"))
 		st = append(st, phy...)
 		st = append(st, txStep)
-		st = append(st, radioProfile(p, rl.Band, twtWant)...)
+		st = append(st, radioProfile(p, rl.Band, twtWant, dp.profile)...)
 		st = append(st, wl("radio up", "up"))
 		rp.TWTSet = true
 	} else {
@@ -652,6 +776,8 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		rp.Steps = append(st,
 			Step{Kind: StepRemove, Desc: "remove hostapd conf", Path: confPath(a.o.RunDir, p)},
 			Step{Kind: StepRemove, Desc: "remove driver state", Path: drvPath(a.o.RunDir, p)})
+		rp.Steps = append(rp.Steps, liveDrv(len(phy) > 0)...)
+		rp.Driver = driverStatus(dp, rp.TWTSet)
 		return rp, nil
 	}
 	// Start hostapd and wait for its BSS setup: it creates the bss= vifs
@@ -681,9 +807,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 	if lv, ok := ls.Vifs[ph]; ok && isBackhaul(ph) && lv.DWDS != 0 {
 		extra = append(extra, onVif(ph, optStep("backhaul "+ph+" dwds off (audit D8)", "wl", "-i", ph, "dwds", "0")))
 	}
-	if twtPending && !rp.TWTSet {
-		extra, rp.TWTSet = append(extra, twtStep(p, twtWant)), true
-	}
+	extra = append(extra, rideAlong()...)
 	st = append(st, radioDownSteps(p, ds, extra...)...)
 	// Then what TP-Link's wifi script does per enabled vap (F3), with the
 	// other driver iovars first while the fresh BSS is down (F6).
@@ -697,16 +821,20 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 			cmdStep("netdev up "+u.Vif, "ifconfig", u.Vif, "up"),
 			cmdStep("raise "+u.Vif, "wl", "-i", u.Vif, "bss", "up"))
 	}
-	rp.Steps = st
+	rp.Steps = append(st, liveDrv(len(phy) > 0)...)
+	rp.Driver = driverStatus(dp, rp.TWTSet)
 	return rp, nil
 }
 
 // proxyARPWanted: hostapd's proxy_arp cannot be used here (F5), so an
-// isolated SSID asking for proxy ARP gets the bridge port's proxyarp_wifi:
-// the bridge answers ARP for stations from its neighbour table. There is no
-// hostapd DHCP/ND snooping table behind it, so only addresses the AP has
-// already seen are answered; others are flooded as usual.
-func proxyARPWanted(s SSID) bool { return s.ProxyARP && s.Isolation }
+// SSID asking for it gets the bridge port's proxyarp_wifi: the bridge
+// answers ARP for stations from its neighbour table, and an ARP request it
+// answered is not flooded onto the air. There is no hostapd DHCP/ND
+// snooping table behind it, so only addresses the AP has already seen are
+// answered; others are flooded as usual. A U6 Pro runs proxyarp 1 on a
+// non-isolated SSID too (aaa.conf with l2_isolation disabled), and the
+// bridge port attribute has no isolation precondition.
+func proxyARPWanted(s SSID) bool { return s.ProxyARP }
 
 func proxyARPPath(vif string) string { return "/sys/class/net/" + vif + "/brport/proxyarp_wifi" }
 

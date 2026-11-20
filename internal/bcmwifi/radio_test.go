@@ -68,18 +68,34 @@ func TestDesiredChanspec(t *testing.T) {
 }
 
 func TestTxpwrDegrade(t *testing.T) {
+	// U6 Pro presets over the radio's ceiling (the target maximum at no
+	// degrade): low = the floor (5 dBm), medium = halfway between floor and
+	// ceiling, high and auto = the ceiling, custom clamped to [floor, ceiling].
 	for _, c := range []struct {
 		r    Radio
 		max  float64
 		want int
+		mode string
+		dbm  int
+		note bool
 	}{
-		{Radio{TxPowerMode: "auto"}, 0, 0}, {Radio{TxPowerMode: "medium"}, 0, 12}, {Radio{TxPowerMode: "low"}, 0, 24},
-		{Radio{TxPowerMode: "custom", TxPower: 20}, 24, 16},
-		{Radio{TxPowerMode: "custom", TxPower: 30}, 24, 0},
-		{Radio{TxPowerMode: "custom", TxPower: 1}, 23.5, 48},
+		{Radio{TxPowerMode: "auto"}, 23.5, 0, "auto", 24, false},
+		{Radio{TxPowerMode: "high"}, 23.5, 0, "high", 24, false},
+		{Radio{TxPowerMode: "medium"}, 23.5, 37, "medium", 14, false}, // 14.25 dBm
+		{Radio{TxPowerMode: "low"}, 23.5, 74, "low", 5, false},
+		{Radio{TxPowerMode: "custom", TxPower: 20}, 24, 16, "custom", 20, false},
+		{Radio{TxPowerMode: "custom", TxPower: 30}, 24, 0, "custom", 24, true},
+		{Radio{TxPowerMode: "custom", TxPower: 1}, 23.5, 74, "custom", 5, true},
+		{Radio{TxPowerMode: "medium"}, 0, 12, "medium", 0, true}, // ceiling unknown: the old fixed steps
+		{Radio{TxPowerMode: "low"}, 0, 24, "low", 0, true},
+		{Radio{TxPowerMode: "bogus"}, 24, 0, "high", 24, true},
 	} {
-		if got, _ := txpwrDegrade(c.r, c.max); got != c.want {
-			t.Errorf("%+v max %.2f: got %d, want %d", c.r, c.max, got, c.want)
+		got, n := txpwrDegrade(c.r, c.max)
+		if got != c.want || (n != "") != c.note {
+			t.Errorf("%+v max %.2f: got %d %q, want %d", c.r, c.max, got, n, c.want)
+		}
+		if m, d := txReportFor(c.r, c.max, got); m != c.mode || d != c.dbm {
+			t.Errorf("%+v max %.2f: report %s %d, want %s %d", c.r, c.max, m, d, c.mode, c.dbm)
 		}
 	}
 	b, _ := os.ReadFile(filepath.Join(fixtures, "wl_-i_wl1_txpwr_target_max.txt"))
@@ -99,7 +115,7 @@ func TestCountry(t *testing.T) {
 	if arg, same := countryArg("CA", c); arg != "CA/2" || same {
 		t.Errorf("CA: %q %t", arg, same)
 	}
-	if arg, same := countryArg("IN", c); arg != "IN" || same {
+	if arg, same := countryArg("IN", c); arg != "IN/288" || same {
 		t.Errorf("IN: %q %t", arg, same)
 	}
 }

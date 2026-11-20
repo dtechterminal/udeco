@@ -103,6 +103,15 @@ type SSID struct {
 	RoamAssist map[string]int
 	// Hotspot2 is the Hotspot 2.0 / Passpoint advertisement (hs20.go); nil = off.
 	Hotspot2 *Hotspot2 `json:",omitempty"`
+	// NoBSSLoad: the controller turned this WLAN's BSS Load element off
+	// (wireless.N.qbssload=disabled, an enhanced-IoT WLAN). The element is
+	// per radio in this driver: off only when every SSID on the radio
+	// says so (parity.go radioBSSLoad).
+	NoBSSLoad bool `json:",omitempty"`
+	// NoBGAFilter: the controller turned the WLAN's bridge group address
+	// filter off (wireless.N.bga_filter=disabled): its vifs are left out
+	// of UDECO-BGA (bga.go).
+	NoBGAFilter bool `json:",omitempty"`
 }
 
 // MACFilter is a per-SSID station filter.
@@ -608,10 +617,6 @@ func normalizeSSID(s SSID) (SSID, []string, bool) {
 		return skip(why)
 	}
 	s, notes = normalizeFT(s, notes) // 802.11r, FT-SAE: ftsae.go
-	if s.ProxyARP && !s.Isolation {
-		notes = append(notes, fmt.Sprintf("ssid %s: proxy ARP needs client isolation in hostapd, not applied", s.ID))
-		s.ProxyARP = false
-	}
 	if s.VLAN < 0 || s.VLAN > 4094 {
 		return skip(fmt.Sprintf("VLAN %d out of range", s.VLAN))
 	}
