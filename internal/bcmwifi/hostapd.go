@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/bits"
 	"path"
 	"sort"
 	"strconv"
@@ -501,7 +502,13 @@ func driverFor(u vifAssign, bssid string, maxSta int, blocked []string, minRates
 	}
 	if s.FT {
 		d.FBT = 1
-		d.MDID = int(ssidMDID(s, u.Band))
+		// wl puts fbt_mdid on air little-endian (fbt_mdid 0xd530 beacons the
+		// MDIE bytes 30 d5), while hostapd's mobility_domain=d530 is the bytes
+		// d5 30, as on a UniFi AP. hostapd checks a forwarded association's
+		// MDIE (every FT-SAE initial association) against its own and refused
+		// all of them with status 54 (Invalid MDE) until the driver got the
+		// byte-swapped value; the 2026-11-20 KVM test then joined FT-SAE.
+		d.MDID = int(bits.ReverseBytes16(ssidMDID(s, u.Band)))
 		if s.FTSAE {
 			d.FTKeyID = ftpeer.KeyID(s.FTKey)
 		}

@@ -162,7 +162,16 @@ Without the controller's WPA3 fast roaming or without a usable key: a transition
 only, a WPA3-only one no 802.11r, with a plan note (the key is never in a note, a log, an
 announcement, `drv-wlN.json` or the public last-good; it lives in the 0600 hostapd conf and
 last-good.secrets.json). Driver: the same `wl fbt/fbt_ap/fbt_mdid/fbt_r0kh_id/fbt_reassoc_time` as
-FT-PSK (`fbt_mdid` is the band's domain), plus `wl fbtoverds 1` only with FT over the DS.
+FT-PSK (`fbt_mdid` is the band's domain, byte-swapped), plus `wl fbtoverds 1` only with FT over the DS.
+
+**`fbt_mdid` is byte-swapped (2026-11-20).** The driver beacons `fbt_mdid` little-endian: `fbt_mdid
+0xd530` puts MDIE bytes `30 d5` on air, while hostapd's `mobility_domain=d530` (and a UniFi AP's) is
+`d5 30`. The driver forwards every FT-SAE initial association (STA AKM FT-SAE, auth alg SAE) to
+hostapd, which checks the request's MDIE against its own and refused them all with status 54
+(Invalid MDE). That is why WPA3 phones failed to join on 2026-11-19 after a good SAE exchange. The
+agent writes `bits.ReverseBytes16(mdid)`; a GL.iNet KVM (wpa_supplicant 2.10) then joined FT-SAE
+and got its PMK-R0/R1, the assoc response and msg 3/4 carrying MDIE `d5 30` and the FTIE. Its
+full-MAC driver (aicwf) cannot do an FT roam from wpa_supplicant, so the roam is verified with phones.
 
 The agent claims radio_caps2 0x2 only in takeover with `wpa3` and `ft_sae` not false, and a backend
 that builds FT-SAE (`DecoAgentFeatures.WPA3FT`, bcmwifi `ServesFTSAE`: `Options.WPA3 &&
