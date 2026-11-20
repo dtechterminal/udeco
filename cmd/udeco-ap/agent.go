@@ -516,10 +516,12 @@ func (a *agent) run(parent context.Context) error {
 		a.provisionIfNew("startup")
 	}
 	a.loop(ctx)
+	// no login lock left behind (loginlock.go): released at once, not
+	// after the wait below, which a hung job can make endless
+	a.lockStop()
 	a.mdnsShutdown() // the vifs get their native mDNS back (mdnsbr.go)
 	a.bg.Wait()
-	a.releaseLED()              // no uplink-loss blink left behind (uplink.go)
-	a.lockRelease("agent stop") // no login lock left behind (loginlock.go)
+	a.releaseLED() // no uplink-loss blink left behind (uplink.go)
 	a.logf("udeco-ap: stopped (Wi-Fi left as it is)")
 	if c := context.Cause(ctx); errors.Is(c, errResources) {
 		return c
@@ -1109,13 +1111,15 @@ func (a *agent) informOnce(ctx context.Context) (device.Outcome, bool) {
 		a.logf("reply did not decode: %v", err)
 		return device.Outcome{}, false
 	}
-	a.lockAnswered(a.o.now())                   // the controller answers (loginlock.go)
 	a.noteControllerTime(plain, sent, answered) // clock.go
 	o, err := x.Handle(plain, time.Now())
 	if err != nil {
 		a.logf("%v", err)
 		return o, false
 	}
+	// the controller answers, if the reply is a new one (loginlock.go):
+	// only now, as a random CBC frame can decode but never be handled
+	a.lockReply(plain, a.o.now())
 	a.portsInformed(start)
 	for _, e := range o.Events {
 		if !strings.HasPrefix(e, "noop ") || o.Immediate {

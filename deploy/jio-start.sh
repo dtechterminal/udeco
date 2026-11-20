@@ -165,6 +165,8 @@ nohup sh $D/start.sh guard >/dev/null 2>&1 </dev/null &
 exec 9>$R/loop.lock
 flock -n 9 || exit 0
 while [ -f $D/start.sh ]; do
+	# first: nothing below (a gunzip that waits and retries) skips it
+	unlock
 	if [ ! -x $R/udeco-ap ]; then
 		gunzip -c $D/udeco-ap.gz > $R/udeco-ap.tmp && chmod 755 $R/udeco-ap.tmp && mv $R/udeco-ap.tmp $R/udeco-ap || { sleep 60; continue; }
 	fi
@@ -172,7 +174,6 @@ while [ -f $D/start.sh ]; do
 	if [ -f $R/agent.log ] && [ $(wc -c < $R/agent.log) -gt 2097152 ]; then
 		tail -c 262144 $R/agent.log > $R/agent.log.1; : > $R/agent.log
 	fi
-	unlock
 	$R/udeco-ap -config $D/udeco-ap.json >> $R/agent.log 2>&1 &
 	echo $! > $R/agent.pid
 	wait $!

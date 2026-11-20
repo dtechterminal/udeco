@@ -20,16 +20,25 @@ const LockChain = "UDECO-LOCK"
 // ErrNoIptables: the unit has no iptables, so there is no lock.
 var ErrNoIptables = errors.New("login lock: iptables not found")
 
+// ErrLockUnchanged: locking failed before it had changed anything (a read
+// that failed, say, with another process holding the xtables lock), so
+// the unit's lock is exactly as it was: a complete lock stays complete,
+// and none stays none. Set returns it wrapped and removes nothing.
+var ErrLockUnchanged = errors.New("login lock: nothing changed")
+
 // LockRules are the lock's rules for ports, in 'iptables -S' form after
 // "-A UDECO-LOCK". Loopback and established sessions RETURN first (an
 // open session is never cut, and RETURN, not ACCEPT, leaves them to the
 // rest of INPUT: the Deco's UDECO-IN still drops TP-Link's ports for
 // established sessions too); only then the DROPs, so a chain that fails
-// half-way never drops what it should have let through.
+// half-way never drops what it should have let through. ESTABLISHED
+// alone: an open session needs nothing else, and RELATED would let in a
+// new connection to a login port that a conntrack helper (FTP's, say)
+// expects.
 func LockRules(ports []int) [][]string {
 	rules := [][]string{
 		{"-i", "lo", "-j", "RETURN"},
-		{"-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "RETURN"},
+		{"-m", "conntrack", "--ctstate", "ESTABLISHED", "-j", "RETURN"},
 	}
 	for _, p := range ports {
 		rules = append(rules, []string{"-p", "tcp", "-m", "tcp", "--dport", strconv.Itoa(p), "-j", "DROP"})
@@ -99,10 +108,12 @@ func (l LoginLock) mutateRaw(ctx context.Context, bin string, args ...string) er
 // Set locks (on) or unlocks. Locking makes the chain hold exactly the
 // rules and be jumped first from INPUT, in each family; it is idempotent
 // and reports whether anything had to change (a lock lost and put back).
-// It fails open: when anything goes wrong the lock is taken out of every
-// family again and the error is returned, so a unit is never left half
-// locked. Unlocking removes every jump, then the chain; nothing there
-// costs two reads per family.
+// It fails open: when anything goes wrong after a change was made, the
+// lock is taken out of every family again and the error is returned, so a
+// unit is never left half locked. An error before any change leaves the
+// unit as it was (ErrLockUnchanged): tearing a complete lock down over a
+// failed read would open it for nothing. Unlocking removes every jump,
+// then the chain; nothing there costs two reads per family.
 func (l LoginLock) Set(ctx context.Context, on bool) (bool, error) {
 	if !strings.HasPrefix(l.IPv4, "/") {
 		if on {
@@ -119,6 +130,9 @@ func (l LoginLock) Set(ctx context.Context, on bool) (bool, error) {
 		c, err := l.install(ctx, bin, rules)
 		changed = changed || c
 		if err != nil {
+			if !changed {
+				return false, fmt.Errorf("%w: %w", ErrLockUnchanged, err)
+			}
 			msg := "left open"
 			if oerr := l.off(ctx); oerr != nil {
 				msg = fmt.Sprintf("removing it again: %v", oerr)
@@ -129,31 +143,39 @@ func (l LoginLock) Set(ctx context.Context, on bool) (bool, error) {
 	return changed, nil
 }
 
-// install builds the chain in full, then jumps to it first from INPUT.
+// install builds the chain in full, then jumps to it first from INPUT. It
+// reports whether any change went through, on an error too (iptables
+// commits each command whole or not at all).
 func (l LoginLock) install(ctx context.Context, bin string, rules [][]string) (bool, error) {
-	changed := false
+	n := 0
+	mut := func(ctx context.Context, bin string, args ...string) error {
+		err := l.mutateRaw(ctx, bin, args...)
+		if err == nil {
+			n++
+		}
+		return err
+	}
 	out, err := l.read(ctx, bin, "-S", LockChain)
 	if err != nil {
-		if err := l.mutate(ctx, bin, "-N", LockChain); err != nil {
-			return true, err
+		if err := mut(ctx, bin, l.args("-N", LockChain)...); err != nil {
+			return n > 0, err
 		}
 		out = nil
 	}
 	if out == nil || !sameRules(out, LockChain, rules) {
-		changed = true
 		if out != nil {
-			if err := l.mutate(ctx, bin, "-F", LockChain); err != nil {
-				return true, err
+			if err := mut(ctx, bin, l.args("-F", LockChain)...); err != nil {
+				return n > 0, err
 			}
 		}
 		for _, r := range rules {
-			if err := l.mutate(ctx, bin, append([]string{"-A", LockChain}, r...)...); err != nil {
-				return true, err
+			if err := mut(ctx, bin, l.args(append([]string{"-A", LockChain}, r...)...)...); err != nil {
+				return n > 0, err
 			}
 		}
 	}
-	moved, err := jumpFirst(ctx, l.Run, l.mutateRaw, bin, l.args(), "INPUT", LockChain)
-	return changed || moved, err
+	_, err = jumpFirst(ctx, l.Run, mut, bin, l.args(), "INPUT", LockChain)
+	return n > 0, err
 }
 
 // off removes every jump from INPUT to the chain, then the chain, in each
@@ -209,7 +231,7 @@ func (m *Manager) loginLock(ctx context.Context, on bool) error {
 	if on && err == nil && changed && m.locked {
 		m.o.Logf("decosys: login lock: %s had to be put back", LockChain)
 	}
-	if !m.o.DryRun {
+	if !m.o.DryRun && !errors.Is(err, ErrLockUnchanged) {
 		m.locked = on && err == nil
 	}
 	return err

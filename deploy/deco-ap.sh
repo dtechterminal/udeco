@@ -421,6 +421,14 @@ cat >$START.tmp <<'LAUNCH'
 # runs. A gzip-shipped agent is unpacked to ramfs ($RAMDIR) and checked
 # against the md5 of the binary that was deployed before it is started.
 pidof udeco-ap >/dev/null 2>&1 && exit 0
+# no login lock outlives an agent that died without its SIGTERM path
+# (docs/deco/features/login-lock.md): removed first, before anything that
+# can end this run without a start, errors ignored (no lock, no iptables)
+for T in iptables ip6tables; do
+	for i in 1 2 3; do \$T -w -D INPUT -j UDECO-LOCK 2>/dev/null || break; done
+	\$T -w -F UDECO-LOCK 2>/dev/null
+	\$T -w -X UDECO-LOCK 2>/dev/null
+done
 B=$BIN
 if [ -f $GZ ]; then
 	B=$RAMDIR/udeco-ap
@@ -445,14 +453,6 @@ L=$RAMDIR/agent.log
 if [ -f \$L ] && [ \$(wc -c <\$L) -gt 2097152 ]; then
 	tail -c 262144 \$L >\$L.1; : >\$L
 fi
-# no login lock outlives an agent that died without its SIGTERM path
-# (docs/deco/features/login-lock.md): removed before every start, errors
-# ignored (no lock, no iptables)
-for T in iptables ip6tables; do
-	for i in 1 2 3; do \$T -w -D INPUT -j UDECO-LOCK 2>/dev/null || break; done
-	\$T -w -F UDECO-LOCK 2>/dev/null
-	\$T -w -X UDECO-LOCK 2>/dev/null
-done
 logger -t udeco "starting udeco-ap" 2>/dev/null
 echo \$\$ >$RAMDIR/agent.pid
 exec \$B -config $CFG </dev/null >>\$L 2>&1

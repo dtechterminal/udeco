@@ -13,7 +13,7 @@ import (
 // The Deco's lock: :22 (dropbear) only.
 var lockRules22 = []string{
 	"-A UDECO-LOCK -i lo -j RETURN",
-	"-A UDECO-LOCK -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN",
+	"-A UDECO-LOCK -m conntrack --ctstate ESTABLISHED -j RETURN",
 	"-A UDECO-LOCK -p tcp -m tcp --dport 22 -j DROP",
 }
 
@@ -44,7 +44,7 @@ func TestLoginLockInstall(t *testing.T) {
 	diff(t, calls, append(lockInstallCmds(ipt, lockRules22), lockInstallCmds(ip6t, lockRules22)...))
 	// established before the drop, and the jump only once the chain is whole
 	for _, bin := range []string{ipt, ip6t} {
-		est := slices.Index(calls, bin+" -w -A UDECO-LOCK -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN")
+		est := slices.Index(calls, bin+" -w -A UDECO-LOCK -m conntrack --ctstate ESTABLISHED -j RETURN")
 		drop := slices.Index(calls, bin+" -w -A UDECO-LOCK -p tcp -m tcp --dport 22 -j DROP")
 		jump := slices.Index(calls, bin+" -w -I INPUT 1 -j UDECO-LOCK")
 		if est < 0 || drop < est || jump < drop {
@@ -62,7 +62,7 @@ func TestLockRules(t *testing.T) {
 	}
 	want := []string{
 		"-i lo -j RETURN",
-		"-m conntrack --ctstate RELATED,ESTABLISHED -j RETURN",
+		"-m conntrack --ctstate ESTABLISHED -j RETURN",
 		"-p tcp -m tcp --dport 23 -j DROP",
 		"-p tcp -m tcp --dport 22 -j DROP",
 	}
@@ -153,7 +153,7 @@ func TestLoginLockLeavesIngressRules(t *testing.T) {
 // out again, in both families, and the error is returned.
 func TestLoginLockFailsOpen(t *testing.T) {
 	for _, fail := range []string{
-		ipt + " -w -A UDECO-LOCK -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN",
+		ipt + " -w -A UDECO-LOCK -m conntrack --ctstate ESTABLISHED -j RETURN",
 		ip6t + " -w -I INPUT 1 -j UDECO-LOCK",
 		ip6t + " -w -N UDECO-LOCK",
 	} {
@@ -283,5 +283,47 @@ func TestCanonStateMatch(t *testing.T) {
 	b := canonRule(strings.Fields("-m conntrack --ctstate RELATED,ESTABLISHED -j RETURN"))
 	if a != b {
 		t.Errorf("%q != %q", a, b)
+	}
+}
+
+// A re-check that fails before anything was changed (the Garage runs
+// iptables without -w, so another holder of the xtables lock makes '-S'
+// fail, and '-N' then finds the chain) leaves a complete lock as it was:
+// nothing is removed, and the error says so (ErrLockUnchanged).
+func TestLoginLockReadErrorKeepsLock(t *testing.T) {
+	r := newFakeRun()
+	busy := errors.New("exit status 4: Another app is currently holding the xtables lock")
+	r.on(ipt+" -S UDECO-LOCK", "", busy)
+	r.on(ipt+" -N UDECO-LOCK", "", errors.New("exit status 1: iptables: Chain already exists."))
+	for _, b := range []string{ipt, ip6t} {
+		r.on(b+" -S INPUT", "-P INPUT DROP\n-A INPUT -j UDECO-LOCK\n", nil)
+	}
+	r.on(ip6t+" -S UDECO-LOCK", "-N UDECO-LOCK\n", nil)
+	l := LoginLock{Run: r, IPv4: ipt, IPv6: ip6t, Ports: []int{23, 22}}
+	_, err := l.Set(context.Background(), true)
+	if !errors.Is(err, ErrLockUnchanged) {
+		t.Errorf("err %v, want ErrLockUnchanged", err)
+	}
+	for _, c := range r.take() {
+		if strings.Contains(c, " -D ") || strings.Contains(c, " -F ") || strings.Contains(c, " -X ") {
+			t.Errorf("a complete lock was torn down: %q", c)
+		}
+	}
+
+	// the Deco's Manager still counts itself locked
+	u := newUnit(t, "205")
+	r2 := newFakeRun()
+	freshLock(r2)
+	m := ingressManager(u, r2)
+	if err := m.LoginLock(context.Background(), true); err != nil {
+		t.Fatal(err)
+	}
+	r2.set(ipt+" -w -S UDECO-LOCK", "", busy)
+	r2.set(ipt+" -w -N UDECO-LOCK", "", errors.New("exit status 1: iptables: Chain already exists."))
+	if err := m.LoginLock(context.Background(), true); !errors.Is(err, ErrLockUnchanged) {
+		t.Errorf("err %v, want ErrLockUnchanged", err)
+	}
+	if !m.locked {
+		t.Error("the Manager forgot its lock")
 	}
 }

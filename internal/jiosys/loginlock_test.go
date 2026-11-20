@@ -102,7 +102,7 @@ func TestGarageLoginLockInstall(t *testing.T) {
 			b+" -S UDECO-LOCK",
 			b+" -N UDECO-LOCK",
 			b+" -A UDECO-LOCK -i lo -j RETURN",
-			b+" -A UDECO-LOCK -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN",
+			b+" -A UDECO-LOCK -m conntrack --ctstate ESTABLISHED -j RETURN",
 			b+" -A UDECO-LOCK -p tcp -m tcp --dport 23 -j DROP",
 			b+" -A UDECO-LOCK -p tcp -m tcp --dport 22 -j DROP",
 			b+" -S INPUT",
@@ -151,7 +151,7 @@ func TestGarageLoginLockFailsOpen(t *testing.T) {
 		r.on(b+" -S UDECO-LOCK", "", errExit1)
 		r.on(b+" -S INPUT", garageInput, nil)
 	}
-	r.on(jipt+" -A UDECO-LOCK -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN", "", errExit1)
+	r.on(jipt+" -A UDECO-LOCK -m conntrack --ctstate ESTABLISHED -j RETURN", "", errExit1)
 	r.on(jipt+" -S UDECO-LOCK", "-N UDECO-LOCK\n-A UDECO-LOCK -i lo -j RETURN\n", nil)
 	m := New(Options{Root: root, Run: r})
 	if err := m.LoginLock(context.Background(), true); err == nil {

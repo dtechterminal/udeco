@@ -11,9 +11,17 @@ package main
 // LOCKED exactly when all hold: takeover with apply (and login_lock not
 // false); adopted; the saved system_cfg's sshd section is there and lets
 // no site login in from the LAN (translate.SSHDIntent.LANLogins false);
-// the last controller reply that decoded with the device key (an
-// encrypted reply, so the real controller sent it) is younger than
+// the last controller reply that counts is younger than
 // login_lock_failopen_s (600 s). Anything else is OPEN.
+//
+// A reply counts (lockReply) only once the agent has handled it in full
+// (decoded with the device key and accepted by device.Session.Handle: a
+// random CBC frame can pass the padding check, never Handle) and only when
+// its server_time_in_utc is later than every one counted before in this
+// run: inform is plain HTTP, so someone on the path can send a sealed
+// reply again. A replayed reply neither keeps the controller "answering"
+// nor changes the lock's view of Device SSH (lockFromCfg keeps the view it
+// had); its other effects are the agent's as before.
 //
 // Who acts: the loop goroutine looks after every inform (cheap: it acts
 // only when the decision changed, so the 10-minute fail-open lands within
@@ -21,14 +29,18 @@ package main
 // (rules can be lost); the agent's stop and the hand-back to TP-Link
 // remove it. decosys/jiosys build the chain (UDECO-LOCK) and fail open:
 // a lock that cannot be installed in full is taken out again. Each
-// transition is an event (events.log): LOGIN LOCKED / LOGIN OPEN.
+// transition is an event (events.log): LOGIN LOCKED / LOGIN OPEN. The
+// agent's stop releases the lock as soon as the inform loop ends
+// (lockStop), and nothing locks again after that.
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/antoniocosta/unifi-openwrt/internal/decosys"
 	"github.com/antoniocosta/unifi-openwrt/internal/translate"
 )
 
@@ -43,7 +55,11 @@ type loginLockState struct {
 	mu        sync.Mutex
 	adopted   bool                  // from the last refreshCreds
 	sshd      *translate.SSHDIntent // the saved system_cfg's sshd section (nil: none)
-	lastReply time.Time             // the last controller reply that decoded (zero: none since start)
+	lastReply time.Time             // the last controller reply that counted (zero: none since start)
+	srvLast   int64                 // its server_time_in_utc (ms)
+	stale     bool                  // the last reply handled did not count (a replay?)
+	staleLog  bool                  // the ignored Device SSH change was logged
+	stopped   bool                  // the agent's stop released it: nothing locks again
 	init      bool                  // the first look was taken (it clears a crash's leftover)
 	want      bool                  // the decision at the last look
 	locked    bool                  // the lock is in (the last change succeeded)
@@ -97,15 +113,51 @@ func (a *agent) locker() loginLocker {
 }
 
 // lockFromCfg takes the adoption state and the saved system_cfg's sshd
-// section (refreshCreds, loop goroutine).
+// section (refreshCreds, loop goroutine). A Device SSH change right after
+// a reply that did not count (lockReply: not newer than the last one, so
+// perhaps a replay) is not taken: the lock keeps the view it had until a
+// reply that counts brings the change.
 func (a *agent) lockFromCfg(adopted bool, sshd *translate.SSHDIntent) {
-	a.login.mu.Lock()
-	a.login.adopted, a.login.sshd = adopted, sshd
-	a.login.mu.Unlock()
+	st := &a.login
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.adopted = adopted
+	if st.stale && !sameSSHD(st.sshd, sshd) {
+		if !st.staleLog {
+			st.staleLog = true
+			a.logf("login lock: a Device SSH change from a reply that is not newer than the last one (server_time_in_utc; a replay?) is not taken")
+		}
+		return
+	}
+	st.sshd = sshd
 }
 
-// lockAnswered records a controller reply that decoded with the device
-// key (informOnce, loop goroutine).
+// sameSSHD: both unknown, or both let site logins in from the LAN or not.
+func sameSSHD(x, y *translate.SSHDIntent) bool {
+	if x == nil || y == nil {
+		return x == y
+	}
+	return x.LANLogins() == y.LANLogins()
+}
+
+// lockReply records a controller reply the agent handled (informOnce,
+// loop goroutine, after device.Session.Handle accepted it). It counts as
+// the controller answering only when its server_time_in_utc is later than
+// that of every reply counted before; it reports whether it counted.
+func (a *agent) lockReply(plain []byte, now time.Time) bool {
+	ms, ok := serverTimeMS(plain)
+	st := &a.login
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if !ok || ms <= st.srvLast {
+		st.stale = true
+		return false
+	}
+	st.srvLast, st.lastReply, st.stale, st.staleLog = ms, now, false, false
+	return true
+}
+
+// lockAnswered records a reply that counts at t.
 func (a *agent) lockAnswered(t time.Time) {
 	a.login.mu.Lock()
 	a.login.lastReply = t
@@ -123,6 +175,9 @@ func (a *agent) lockEval(ctx context.Context, force bool) {
 	st := &a.login
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	if st.stopped {
+		return
+	}
 	want, why := lockDecision(lockInputs{takeover: a.takeover.Load(), adopted: st.adopted, sshd: st.sshd,
 		lastReply: st.lastReply, now: a.o.now(), failOpen: a.cfg.loginLockFailOpen()})
 	first := !st.init
@@ -144,16 +199,21 @@ func (a *agent) lockSet(ctx context.Context, l loginLocker, on bool, why string)
 	defer cancel()
 	if err := l.LoginLock(cctx, on); err != nil {
 		st.dirty = true
+		kept := on && errors.Is(err, decosys.ErrLockUnchanged)
 		if e := err.Error(); e != st.errNoted {
 			st.errNoted = e
-			if on {
+			switch {
+			case kept:
+				a.logf("login lock: %v (left as it was; tried again at the next tick)", err)
+			case on:
 				a.logf("login lock: %v (the unit stays open; tried again at the next tick)", err)
-			} else {
+			default:
 				a.logf("login lock: removing it (%s): %v (tried again at the next look)", why, err)
 			}
 		}
-		// a failed lock takes itself out again (fail open)
-		if on && st.locked {
+		// a failed lock takes itself out again (fail open); one that
+		// failed before changing anything is as it was
+		if on && st.locked && !kept {
 			st.locked = false
 			a.event("LOGIN OPEN: lock failed: " + err.Error())
 		}
@@ -169,6 +229,16 @@ func (a *agent) lockSet(ctx context.Context, l loginLocker, on bool, why string)
 	} else {
 		a.event("LOGIN OPEN: " + why)
 	}
+}
+
+// lockStop is the agent's stop: the lock goes as soon as the inform loop
+// has ended (before the wait for background jobs, one of which may hang),
+// and nothing locks again, not even a tick still running.
+func (a *agent) lockStop() {
+	a.login.mu.Lock()
+	a.login.stopped = true
+	a.login.mu.Unlock()
+	a.lockRelease("agent stop")
 }
 
 // lockRelease removes the lock for good (the agent's stop, the hand-back

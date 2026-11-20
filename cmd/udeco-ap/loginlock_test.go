@@ -297,6 +297,7 @@ func TestLoginLockFollowsDeviceSSH(t *testing.T) {
 	h := newHarness(t, func(c *Config, o *options) { c.Takeover, c.Apply = true, true })
 	s := newLockSys(h.sys)
 	h.a.o.newSys = func(decosys.Options) sysManager { return s }
+	h.ctl.stamp = 1_700_000_000_000 // a real controller's replies carry its time
 	h.ctl.queue(adoptReply, cfgReplyVersion(usersCfg+sshdOffCfg, "00000000000000c1"))
 	h.start()
 	eventually(t, "locked", func() bool { return h.rec.index("lock:true") >= 0 })
@@ -307,7 +308,7 @@ func TestLoginLockFollowsDeviceSSH(t *testing.T) {
 	eventually(t, "locked again", func() bool { return h.rec.count("lock:true") > n })
 	h.stop()
 	calls := h.rec.list()
-	if calls[len(calls)-1] != "lock:false" {
+	if lastIndex(h.rec, "lock:true") > lastIndex(h.rec, "lock:false") {
 		t.Errorf("the stop left it locked: %v", calls)
 	}
 	ev, _ := os.ReadFile(filepath.Join(h.root, "tp_data/udeco", eventsFile))
@@ -325,6 +326,7 @@ func TestLoginLockHandBack(t *testing.T) {
 	h := newHarness(t, func(c *Config, o *options) { c.Takeover, c.Apply = true, true })
 	s := newLockSys(h.sys)
 	h.a.o.newSys = func(decosys.Options) sysManager { return s }
+	h.ctl.stamp = 1_700_000_000_000 // a real controller's replies carry its time
 	h.ctl.queue(adoptReply, cfgReplyVersion(usersCfg+sshdOffCfg, "00000000000000c1"))
 	h.start()
 	eventually(t, "locked", func() bool { return h.rec.index("lock:true") >= 0 })
