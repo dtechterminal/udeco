@@ -14,8 +14,9 @@ Third-party material
 ====================
 
 0. unifi-openwrt (https://github.com/antoniocosta/unifi-openwrt),
-   GPL-2.0-or-later, by abmc (antoniocosta) and its contributors.
-   udeco is a fork of it: the UniFi inform protocol, adoption, reply
+   GPL-2.0-or-later, by abmc (antoniocosta) and its contributors;
+   dohun0310's commits are also in this history. udeco is a fork of it
+   (taken 2026-11-17): the UniFi inform protocol, adoption, reply
    handling, the reading model and its inform rendering, the model
    catalogue and their tests (internal/inform, internal/device,
    internal/apstate, internal/translate, internal/models and others) began
