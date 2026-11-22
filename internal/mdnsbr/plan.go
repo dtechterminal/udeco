@@ -4,6 +4,7 @@ package mdnsbr
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,20 +21,42 @@ type Env struct {
 	Bridges map[string][]string // local bridge (br-lan, br-v<vid>) -> its ports
 	Uplink  string              // the uplink port, for VLANs without a bridge here ("" = none)
 	MACs    [][6]byte           // the unit's interface MACs
+	// LANBridge is the unit's untagged LAN bridge: "" = the Deco's
+	// unit.LANBridge (br-lan); the JCOW414's is unit.JioLANBridge (bdg2).
+	// The VLAN bridges are unit.VLANBridge on both (bcmwifi and mtkwifi
+	// build them).
+	LANBridge string
 }
 
-// LocalBridge is the bridge bcmwifi builds for a VLAN (1 = untagged).
-func LocalBridge(vlan int) string {
+// lan is the untagged LAN bridge of env.
+func (env Env) lan() string {
+	if env.LANBridge != "" {
+		return env.LANBridge
+	}
+	return unit.LANBridge
+}
+
+// LocalBridge is the bridge bcmwifi builds for a VLAN (1 = untagged) on a
+// Deco.
+func LocalBridge(vlan int) string { return localBridge(unit.LANBridge, vlan) }
+
+// localBridge is the bridge for a VLAN (1 = untagged) with lan the
+// untagged LAN's bridge.
+func localBridge(lan string, vlan int) string {
 	if vlan <= 1 {
-		return unit.LANBridge
+		return lan
 	}
 	return unit.VLANBridge(vlan)
 }
 
-// localVLAN is the VLAN of a local bridge name (ok false for other names:
-// a VLAN bridge counts only as LocalBridge names it, for VLANs 2-4094).
-func localVLAN(br string) (int, bool) {
-	if br == unit.LANBridge {
+// localVLAN is the VLAN of a local bridge name on a Deco (ok false for
+// other names: a VLAN bridge counts only as LocalBridge names it, for
+// VLANs 2-4094).
+func localVLAN(br string) (int, bool) { return localVLANOf(unit.LANBridge, br) }
+
+// localVLANOf is localVLAN with lan the untagged LAN's bridge.
+func localVLANOf(lan, br string) (int, bool) {
+	if br == lan {
 		return 1, true
 	}
 	if v, ok := unit.ParseVLANBridge(br); ok && v >= 2 && v <= 4094 && unit.VLANBridge(v) == br {
@@ -41,6 +64,15 @@ func localVLAN(br string) (int, bool) {
 	}
 	return 0, false
 }
+
+// mtkWifiRE: a MediaTek SoftAP driver's Wi-Fi netdev (the JCOW414's BSSes
+// ra0-ra3 and rai0-rai3, its AP-client and WDS links).
+var mtkWifiRE = regexp.MustCompile(`^(ra|rai|apcli|apclii|wds|wdsi)[0-9]+$`)
+
+// wifiPort: x is a Wi-Fi interface (Broadcom wl*, MediaTek ra*/rai*,
+// apcli*, wds*): a bridge port that is one and serves no SSID is never
+// tapped as a wired port.
+func wifiPort(x string) bool { return strings.HasPrefix(x, "wl") || mtkWifiRE.MatchString(x) }
 
 // BuildPlan turns the controller's mdns_sd section into an engine plan for
 // this unit. Filters on VAPs the unit does not serve, guest VAPs and
@@ -55,8 +87,9 @@ func BuildPlan(c Config, env Env) (Plan, []string) {
 	}
 	// the VLAN of every vif, from the bridge holding it
 	vifVLAN := map[string]int{}
+	lan := env.lan()
 	for br, ports := range env.Bridges {
-		v, ok := localVLAN(br)
+		v, ok := localVLANOf(lan, br)
 		if !ok {
 			continue
 		}
@@ -145,7 +178,7 @@ func BuildPlan(c Config, env Env) (Plan, []string) {
 	}
 	sort.Ints(vlans)
 	for _, v := range vlans {
-		br := LocalBridge(v)
+		br := localBridge(lan, v)
 		ports, ok := env.Bridges[br]
 		if !ok {
 			switch {
@@ -164,8 +197,8 @@ func BuildPlan(c Config, env Env) (Plan, []string) {
 				continue
 			case env.Vifs[x]:
 				addPort(Port{Name: x, VLAN: v, Vif: true})
-			case strings.HasPrefix(x, "wl"):
-				continue // a Wi-Fi interface serving no SSID (TP-Link's backhaul vif)
+			case wifiPort(x):
+				continue // a Wi-Fi interface serving no SSID (TP-Link's backhaul vif, an idle MediaTek slot)
 			default:
 				addPort(Port{Name: x, VLAN: v})
 			}

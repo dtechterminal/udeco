@@ -46,7 +46,8 @@ func TestObserveRestoresFlowCache(t *testing.T) {
 }
 
 // jio-mtk has no flow cache: neither the observe-mode start nor the drop
-// to observe touches it, record or not.
+// to observe touches it, record or not (and with no udeco_rl loaded
+// nothing runs: TestObserveRemovesRateLimiter).
 func TestFlowCacheUntouchedOnJio(t *testing.T) {
 	h := newHarness(t, func(c *Config, o *options) { c.Platform, c.Model = PlatformJio, "U7LT" })
 	fw := fcWifi{h.wifi}
@@ -62,6 +63,34 @@ func TestFlowCacheUntouchedOnJio(t *testing.T) {
 	h.a.cfg.Platform = ""
 	h.a.restoreFlowCache(ctx, fw)
 	if h.rec.count("fc-restore") != 1 {
+		t.Errorf("deco: calls %v", h.rec.list())
+	}
+}
+
+// jio-mtk: the observe-mode start and the drop to observe remove a
+// udeco_rl module an earlier takeover run left loaded (its table cleared
+// first); the Deco never touches it.
+func TestObserveRemovesRateLimiter(t *testing.T) {
+	h := newHarness(t, func(c *Config, o *options) { c.Platform, c.Model = PlatformJio, "U7LT" })
+	proc := filepath.Join(h.root, "proc/udeco_rl")
+	if err := os.MkdirAll(filepath.Dir(proc), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(proc, []byte("udeco_rl 1 entries=1 hwnat=live\n"), 0o600)
+	ctx := context.Background()
+	h.a.observeFlowCacheRestore(ctx)
+	if b, _ := os.ReadFile(proc); string(b) != "clear\n" || h.rec.count("run:rmmod udeco_rl") != 1 {
+		t.Errorf("observe start: proc %q, calls %v", b, h.rec.list())
+	}
+	os.Remove(proc) // rmmod removed it
+	h.a.restoreFlowCache(ctx, h.wifi)
+	if h.rec.count("run:rmmod udeco_rl") != 1 {
+		t.Errorf("nothing loaded: calls %v", h.rec.list())
+	}
+	h.a.cfg.Platform = ""
+	os.WriteFile(proc, []byte("udeco_rl 1 entries=1 hwnat=live\n"), 0o600)
+	h.a.observeFlowCacheRestore(ctx)
+	if h.rec.count("run:rmmod udeco_rl") != 1 {
 		t.Errorf("deco: calls %v", h.rec.list())
 	}
 }

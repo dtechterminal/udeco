@@ -22,9 +22,11 @@ Rules the items share:
 - **Opt-out keys only where a behaviour could cut off management.**
 
 New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
-`uplink_loss`, `uplink_loss_ssid`, `bss_pinning`, `proxy_arp`, `proxy_arp_driver`, `dfs`.
+`uplink_loss`, `uplink_loss_ssid`, `bss_pinning`, `proxy_arp`, `proxy_arp_driver`, `dfs`, `rate_limits`, `enterprise`, `garage_ft`.
 The login lock's keys (`login_lock`, `login_lock_failopen_s`, section 16)
-apply to both platforms.
+apply to both platforms, as do the Deco keys this platform now takes:
+`mdns_bridge` (section 19), `sta_snoop` (section 20) and `assoc_garp`
+(section 15).
 
 ## 1. Minimum RSSI
 
@@ -82,6 +84,11 @@ apply to both platforms.
   multicast-to-unicast. 2.4 GHz has one value per radio and stays on when
   any SSID wants it.
 - **Unverified:** that the MT7663 honours the per-BSS list.
+- **Found (2026-11-22):** the rebuilt MT7603 module (the WPA3 build) has no
+  IGMP snooping code: `IgmpSnEnable` does not occur in its strings, where
+  the vendor's `mt7603eap.ko` has it. So on 2.4 GHz the written value is
+  read by nothing and 2.4 GHz multicast goes out as broadcast. The 2.4 GHz
+  BSSes on a VLAN still get the bridge's snooping (section 23).
 
 ## 7. Transmit power
 
@@ -303,6 +310,10 @@ apply to both platforms.
   for the stations of the agent's first reading, nor while the radios
   restart (`internal/mtkwifi/garp.go`, `cmd/udeco-ap/garage.go`). Joins
   come from the readings, so the GARP follows within one reading.
+- **Opt-out:** `assoc_garp` false (the Deco's key, default true) stops
+  it; the proxy ARP responder still gets the stations. Unlike the Deco it
+  does not need `sta_snoop`: with `sta_snoop` on, an address the
+  connection-event taps saw on the BSS's bridge is used too (section 20).
 - **Unverified:** on-air capture of the GARP; the upstream switch's MAC
   move.
 
@@ -323,3 +334,257 @@ apply to both platforms.
 - **Unverified:** `-m conntrack` and `ip6tables` on this kernel; an open
   telnet session surviving the lock. A failed rule leaves the unit open,
   and the log says why.
+
+## 17. 802.11r, 802.11k, 802.11v on 5 GHz (`garage_ft`, off by default)
+
+- **U6:** FT-PSK and FT-SAE with the other APs (hostapd, `iapp_key`),
+  neighbour reports, BTM requests.
+- **Garage:** the MT7663 driver has 802.11r but no daemon (iappd is a
+  `tf1Main` link without IAPP). `internal/mtkft` has what the agent needs
+  to take the daemon's place: the driver's KDP signals and key OIDs, the
+  FT key hierarchy, hostapd 2.9's RRB-OUI push and sequence frames, the
+  neighbour report and BTM bodies. With `garage_ft` the agent writes the
+  FT profile keys in the Decos' mobility domains (`mtkwifi/ftplan.go`) and
+  relays FT-SAE keys between the driver and the Decos' hostapd
+  (`mtkwifi/roam.go`); details in [garage-ft](garage-ft.md).
+- **Off by default** until the roaming test passes: the FT AKMs change
+  every FT SSID's beacon (some old clients refuse them) and turning it on
+  restarts the radio.
+- **FT-PSK, Deco to Garage:** the agent pre-installs the keys hostapd
+  derives, for each station that joined here and on a refused attempt;
+  only on WLANs with FT-SAE (the Decos announce holders for no others).
+- **802.11v:** band steering and the Roaming Assistant are claimed with
+  `garage_ft` (BTM requests; 5 GHz never with a disconnect timer, since
+  the driver does not check the station's BTM support there).
+- **802.11k:** answered by the drivers from their scan tables; the agent
+  writes no lists.
+- **Verified on the unit (2026-11-23):** the profile keys (MDIE of the
+  Decos' 5 GHz domain, FT AKMs, R0KH-ID length 24); the KDP channel
+  (`iwpriv rai0 set ft=0`); `KEY_REQ` for an FT-PSK station, whose
+  PMK-R1 matched hostapd's derivation. **Open:** the FT_ASSOCIATION
+  signal (none seen on an initial FT-PSK association; the agent asks on
+  the 4-way completion event instead); all roams.
+
+## 18. 802.11r/k/v and U-APSD on 2.4 GHz (driver only, `mt7603roam`)
+
+- **U6:** FT-PSK and FT-SAE with the WLAN's fast roaming, 802.11k
+  neighbour reports, 802.11v BSS transition, U-APSD.
+- **Garage:** a rebuilt MT7603 module (`mt7603roam.ko`, module name
+  `mt76x3_ap`) has FT-PSK by itself (hostapd `ft_psk_generate_local`
+  semantics, R0KH-ID = BSSID hex, `FtMdId<N>` in hostapd's
+  `mobility_domain` byte order), FT-SAE through three driver OIDs for the
+  agent's RRB relay, a per-BSS neighbour list (`NrAdd`), a one-station
+  BTM request (`BtmReq`), U-APSD (`APSDCapable`) and the vendor's
+  `ApOffChanScan`. The keys, OIDs and commands:
+  [garage-ft](garage-ft.md). With `garage_ft` the agent writes the FT
+  keys (only when the module is loaded: `FT_UDFT_GetEvents` in
+  `/proc/kallsyms`) and relays FT-SAE keys through the three OIDs; the
+  neighbour list, BTM and U-APSD are not used yet. The module was
+  live-swapped on the unit on 2026-11-23 (not persistent).
+- **Not on this unit:** FT-1X (no MSK in the driver), FT over the DS,
+  RIC, Hotspot 2.0 (the padavan tree lacks the WAPP sources it needs; see
+  garage-ft).
+- **Unverified:** all of it on air. Open risks: the R1 table and the
+  R0 cache are emptied by every radio restart; a pull must land within
+  about 400 ms (mac80211's FT auth retries); BTM to a PMF station not
+  checked as a protected frame.
+
+## 19. mDNS service bridge (`mdns_bridge`, off by default)
+
+- **U6:** mdns-bridge between the site's VLANs (the controller's fw2_caps
+  mDNS).
+- **Garage:** the Deco's `internal/mdnsbr`, with the LAN bridge `bdg2`
+  (the agent's `br-v<vid>` bridges as on the Deco). Its wired members
+  (`eth0.<port>.1`) and served BSSes are tapped; idle BSS slots, the
+  AP-client and WDS netdevs are skipped. A VLAN without a local bridge is
+  reached tagged on the uplink's parent `eth0.4`. The Wi-Fi interception
+  is the same `UDECO-MDNS` ebtables chain; there is no Broadcom flow cache
+  to flush (`cmd/udeco-ap/mdnsbr.go`, `NoFlowCache`).
+- **Unverified:** ebtables `--ip-dport`/`--ip6-dport` matches in the
+  Garage's ebtables build; sending tagged frames on `eth0.4`.
+
+## 20. Connection-timing events (`sta_snoop`, on by default)
+
+- **U6:** STA_ASSOC_TRACKER events (success, failure, soft failure, fixup)
+  with the join's timing.
+- **Garage:** the Deco's tracker and its read-only ARP/DHCP/DNS taps on
+  each served BSS (`ra0`-`ra3`, `rai0`-`rai3`). There is no hostapd, so the
+  join steps come from the drivers' events (`cmd/udeco-ap/staconn_jio.go`,
+  `mtkwifi.EventsOptions.Steps`): the Insert (MAC entry made at
+  authentication) starts the attempt; on 5 GHz the MT7663's system-log
+  events (IWEVCUSTOM on `rai0`, `STA(<mac>) ...`: 0x200 associated,
+  0x20D/0x20E key done, 0x207 MIC different, 0x20B handshake timeout) and
+  the WAPP authorized event give association and authorization; ECNT
+  reasons 14 (wrong passphrase) and 15 (4-way timeout) count as failures,
+  once when two sources report the same step within 5 s. A key done that
+  belongs to no open attempt (a group rekey) is ignored.
+- **Not filled:** on 2.4 GHz the rebuilt MT7603 reports only the Insert,
+  so its stations are authorized at their first frame on the tap:
+  `assoc_delta` and `wpa_auth_delta` are 0 and a wrong 2.4 GHz passphrase
+  is never reported as a failure. `auth_delta` and RADIUS fields stay out
+  (no 802.1X here).
+- **Unverified:** the MT7663 system-log flags and their netdev on the unit
+  (from the mt7615 source; the texts are in the kernel's strings); that
+  `WirelessEvent=1` is enough for them.
+
+## 21. Multicast inspect
+
+- **Garage:** the platform-independent `internal/mcinspect`, as on the
+  Deco; claimed on both platforms.
+
+## 22. Bridge group address filter (controller `bga_filter`)
+
+- **U6:** ebtables drops of the 802.1D bridge group address on its VAPs.
+- **Garage:** the Deco's filter: `UDECO-BGA` (policy RETURN), first in
+  `FORWARD`, drops `01:80:c2:00:00:00` (STP BPDUs; EAPOL and LLDP pass) in
+  and out of each served BSS whose WLAN does not disable it. Live ebtables
+  only, built after the radios are applied and checked each Tick after the
+  settle time (a deleted chain is rebuilt); the hand-back removes it
+  (`internal/mtkwifi/bga.go`).
+- **Unverified:** on the unit.
+
+## 23. IGMP/MLD snooping on the VLAN bridges
+
+- **U6:** mcsd: snooping on every bridge, no querier, `hash_max 2048`.
+- **Garage:** the Deco's values on each `br-v<vid>` the agent makes, set
+  through sysfs where they read otherwise, at creation and each Tick
+  (`internal/mtkwifi/snoop.go`). The 3.18.21 kernel has bridge multicast
+  snooping and floods a group while no querier is seen. `bdg2` is the
+  vendor's and left alone.
+- **Unverified:** on the unit.
+
+## 24. Nothing to change, or not possible
+
+- **BSS Load element:** both drivers advertise it on every BSS of a radio
+  while WMM (forced on by HT) or 802.11k is on (MT7603
+  `ap_qload.c` QBSS_LoadInit). A WLAN with it disabled is noted as not
+  applied: the drivers have no key or command to turn it off.
+- **Intelligent DHCP (DHCP broadcast to unicast):** neither driver has it
+  for an AP's clients (the MT7663 `dhcp_uc` belongs to the repeater's MAC
+  translation). Not served; DHCP is left alone.
+- **5 GHz minimum rates:** the MT7663 forces 6, 12 and 24 Mb/s basic, so
+  `min_rates` applies to 2.4 GHz only (noted).
+- **Max clients:** served (`MaxStaNum`/`MbssMaxStaNum`, at most 32).
+- **TWT:** 802.11ax only. The MT7603 is 802.11n and the MT7663 802.11ac,
+  so `twt` stays a Deco-only key.
+
+## 25. SNMP
+
+- **Garage:** the same agent (`internal/snmpagent`) as on the Deco. The
+  MediaTek netdevs (`ra*`, `rai*`, `apcli*`, `wds*`) report ifType
+  ieee80211 by name, as their drivers may have no sysfs `wireless`
+  directory. The engine boots counter is under `/flash2/udeco/session`.
+- **Unverified:** that UDP 161 is free on the unit and that Jio's
+  firewall lets the controller's queries in.
+
+## 26. Speed limits (`rate_limits`, off by default)
+
+- **U6:** a client's user group (cmd rate-update) and the WLAN's user
+  group are shaped per station, both directions.
+- **Garage:** the kernel has no traffic control (`CONFIG_NET_SCHED` off),
+  so the agent's own module polices instead: `udeco_rl.ko`
+  (`tools/udeco_rl`, built against the unit's 3.18.21 layout), a token
+  bucket per station and direction on the bridge's FORWARD hook. The
+  agent loads it from `/flash2/udeco/udeco_rl.ko.gz` only when a limit is
+  set and writes the whole table to `/proc/udeco_rl` in one write
+  (`internal/mtkwifi/ratelimit.go`). The table merges the client's own
+  entry (by MAC: any SSID, either radio) with the SSID's limit in the
+  directions the entry leaves open, like bcmwifi. SSID limits follow the
+  stations of each reading.
+  - **Never a cut-off:** a frame is dropped only while its bucket is in
+    debt. ARP, DHCP, DHCPv6 and IPv6 neighbour discovery always pass.
+    Only frames forwarded to or from a Wi-Fi port (`ra*`, `rai*`) of a
+    listed station are looked at; the unit's own traffic (management,
+    telnet, inform) is never forwarded, so it is never policed.
+  - **Hardware NAT:** Jio's `hw_nat` binds flows into the PPE, past the
+    bridge. The module clears the FOE tag of each limited station's
+    frames so they are never bound, and a table that adds or changes a
+    limit carries `flush` (hw_nat's `PpeCleanTableHandler`) for flows
+    bound before.
+  - **Restarts:** the module keeps its table across agent restarts. The
+    agent keeps the per-client list in `/tmp/udeco/mtk-client-rates.json`
+    and the session's `state.json`, and writes the table again once. A
+    reboot loses both; the startup hand-over writes it again.
+  - **Hand-back:** the table is cleared and the module removed (`rmmod
+    udeco_rl`). The observe-mode start and the drop to observe remove one
+    an earlier run left loaded.
+  - **Notes:** with `rate_limits` off, or a module that does not load or
+    answers in another version, each limited SSID keeps the plan note
+    "per-client rate limit ... not applied" with the reason; the module is
+    tried again after 10 min. No capability bit claims limits on either
+    platform (the controller sends rate-update regardless).
+- **VERIFIED on the unit 2026-11-23** (the Garage live test in
+  [client-rate-limit](client-rate-limit.md), steps 1-4): the kernel takes
+  the module (`insmod`/`rmmod` clean, no oops); bridged Wi-Fi traffic passes
+  the FORWARD hook (the `/proc/udeco_rl` counters rose); 512 down / 768 up
+  held at 502/698 kbit/s on 2.4 GHz and 504/699 on 5 GHz with ping, DHCP and
+  telnet unaffected; a 5 GHz flow bound in hw_nat before the limit bypasses
+  FORWARD until a write with `flush`, so the agent's flush on a new or
+  tighter limit is required. Still to run: the path through UniFi (user
+  group, band move, agent restart, hand-back). `rate_limits` stays off by
+  default until that run: it loads a kernel module. Not covered: traffic
+  between two stations of the same BSS that the driver forwards itself, and
+  a station's traffic to the unit itself.
+
+## 27. WPA2/WPA3-Enterprise (`enterprise`, on by default)
+
+- **U6:** hostapd runs 802.1X against the WLAN's RADIUS servers (RadSec
+  too), with RADIUS MAC authentication, Filter-Id, accounting and
+  Hotspot 2.0 where the controller sets them.
+- **Garage:** the vendor's split. The driver advertises the RSNE
+  (`AuthMode=WPA2`, AES), keeps each station's port closed until it has
+  a PMK and passes EAPOL up the BSS netdev; Jio's
+  `/userfs/bin/rtdot1xd` runs EAP with the RADIUS server and hands the
+  PMK to the driver (`internal/mtkwifi/dot1x.go`). 5 GHz always; 2.4 GHz
+  only with the rebuilt MT7603 module (`mt76x3_ap`): the vendor
+  `mt7603eap`'s RADIUS profile format is unverified, so there the SSID is
+  noted and left off.
+  - The profile carries the client: `RADIUS_Server`/`RADIUS_Port` per
+    slot; the secret in `RADIUS_Key1` as a ;-list of every slot on the
+    MT7603 (its parser's "prev format"; the other slots get a
+    placeholder, never empty), in `RADIUS_Key<n>` per slot on the MT7663;
+    `NasId<n>` with the controller's NAS-Identifier (16 characters at
+    most); `EAPifname`/`PreAuthifname` the distinct bridges of the
+    enterprise BSSes padded with `lo` (the drivers keep entries a later
+    profile drops, and rtdot1xd opens a socket per entry);
+    `session_timeout_interval=0` (rtdot1xd adds no deauth timer of its
+    own; the server's Session-Timeout still applies); the vendor's
+    `own_ip_addr` (NAS-IP-Address; 127.0.0.1 if it is 0). A radio without
+    an enterprise BSS keeps every vendor RADIUS key, so this changes
+    nothing on today's WLANs. Any change is a profile change: one radio
+    restart.
+  - WPA3-Enterprise is WPA2 with PMF required (`PMFMFPR=1`,
+    `PMFSHA256=1`): both RSNE builders then advertise AKM 00-0f-ac:5
+    only. 192-bit (Suite B) is refused by translate on every platform.
+  - rtdot1xd is the agent's: `sh -c 'exec /userfs/bin/rtdot1xd -p <ra|rai>
+    -i <first BSS netdev> </dev/null >/dev/null 2>&1'`, one per radio with
+    an enterprise BSS, started by the first Apply or Tick after the
+    restart's settle time (its first ioctls are driver reads), at most
+    once a minute while it keeps exiting. Each radio restart stops that
+    radio's copy first (SIGTERM, SIGKILL at the next pass: what it read is
+    stale and the driver never tells it); any copy the agent did not start
+    (the vendor's, `rtdot1xd_AC`) is stopped; the hand-back stops the
+    agent's. `rtdot1xd` is in jiosys's dumb-AP keep list (it forks to
+    init). Without it the enterprise BSS beacons and admits nobody.
+  - Not served (the SSID stays off, noted): RADIUS MAC authentication
+    (neither driver nor rtdot1xd has it), a Filter-Id (rtdot1xd cannot
+    send it, and without it the server could admit users meant to be kept
+    off), a server that is not an IPv4 literal, a secret the profile cannot
+    carry (empty, over 64 characters, `;`, control characters, spaces at
+    either end). Noted and served: accounting servers (rtdot1xd has no
+    accounting client), auth servers after the first (no failover), the
+    controller's own IP, a NAS-Identifier over 16 characters, Hotspot 2.0.
+  - RadSec: the agent's proxy as on the Deco (`cmd/udeco-ap/radsec.go`
+    rewrites the servers to 127.0.0.1 before the plan); fw2_caps RadSec
+    is claimed on the Garage only while some radio serves 802.1X
+    (`Applier.ServesDot1X`). PPSK, the RADIUS filter, Hotspot 2.0 and
+    RADIUS-assigned VLANs are not claimed: not possible with these
+    drivers and this rtdot1xd (the feature docs' Garage sections).
+  - `enterprise: false` never starts rtdot1xd and leaves the enterprise
+    WLANs off, as before this item, with RadSec unclaimed.
+- **Unverified:** everything on the unit. `/userfs/bin/rtdot1xd` on this
+  firmware; the MT7663's EAPifname parse (it is gated by a driver flag at
+  `pAd+0x111885`, read but not identified); EAPOL from a VLAN bridge;
+  `lo` entries; a PEAP or EAP-TLS join on each band; WPA3-Enterprise
+  (AKM 5) on each band; that rtdot1xd survives a radio restart's
+  SIGTERM/SIGKILL cleanly; the RadSec path end to end.

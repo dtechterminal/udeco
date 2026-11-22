@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -211,6 +212,12 @@ func operStatus(state string, flags int64) int {
 	return 2
 }
 
+// mtkWifiRE: the MediaTek SoftAP drivers' netdevs on the JCOW414 (BSSes
+// ra0-ra3/rai0-rai3, AP-client and WDS links). Their wireless-extensions
+// drivers may have no sysfs wireless directory, so they are IEEE 802.11 by
+// name, as the Broadcom wl* are.
+var mtkWifiRE = regexp.MustCompile(`^(ra|rai|apcli|apclii|wds|wdsi)[0-9]+$`)
+
 func (h *host) ifType(name, sys string) int {
 	t, _ := h.readInt(sys + "/type")
 	switch {
@@ -224,7 +231,7 @@ func (h *host) ifType(name, sys string) int {
 	if _, err := os.Stat(h.path(sys + "/bridge")); err == nil {
 		return ifTypeBridge
 	}
-	if _, err := os.Stat(h.path(sys + "/wireless")); err == nil || strings.HasPrefix(name, "wl") {
+	if _, err := os.Stat(h.path(sys + "/wireless")); err == nil || strings.HasPrefix(name, "wl") || mtkWifiRE.MatchString(name) {
 		return ifTypeIEEE80211
 	}
 	if strings.Contains(name, ".") {

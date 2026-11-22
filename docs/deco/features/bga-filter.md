@@ -40,3 +40,11 @@ UDECO-BGA -o <vif> -d BGA -j DROP
   ebtables 2.0.10's man page but has not been run on the X20.
 - That `-o <vif>` matches frames the bridge floods to a wireless port on
   this kernel.
+
+## Garage (platform jio-mtk)
+
+`internal/mtkwifi/bga.go` builds the same `UDECO-BGA` chain on the served
+`ra*`/`rai*` BSSes, with the address written out (`-d 01:80:c2:00:00:00`)
+rather than the `BGA` keyword. It is live ebtables only (never a radio
+restart), rebuilt by Tick after the settle time if the chain is gone, and
+removed at the hand-back. Unverified on the unit.

@@ -78,6 +78,34 @@ func TestGarageStationsGARP(t *testing.T) {
 	}
 }
 
+// TestGarageGARPOptOut: assoc_garp false (the Deco's key) stops the
+// Garage's station GARP, the responder still gets the stations; with the
+// connection-event taps on, an address they saw on the BSS's bridge is
+// announced too.
+func TestGarageGARPOptOut(t *testing.T) {
+	f := false
+	a := &agent{cfg: &Config{Platform: "jio-mtk", Takeover: true, AssocGARP: &f}}
+	a.takeover.Store(true)
+	w := &netWifi{neigh: map[string]string{"aa:bb:cc:dd:ee:03": "192.168.0.83"}}
+	a.wifi = w
+	ctx := context.Background()
+	a.garageReading(ctx, garageSnap(nil, nil))
+	a.garageReading(ctx, garageSnap(nil, map[string][]string{"rai0": {"aa:bb:cc:dd:ee:03"}}))
+	if len(w.garps) != 0 || len(w.stations) != 2 || len(w.stations[1]["rai0"]) != 1 {
+		t.Errorf("assoc_garp false: garps %v, stations %v", w.garps, w.stations)
+	}
+	a = &agent{cfg: &Config{Platform: "jio-mtk", Takeover: true}, conn: &connState{t: newConnTracker()}}
+	a.takeover.Store(true)
+	w = &netWifi{}
+	a.wifi = w
+	a.conn.t.setIP("aa:bb:cc:dd:ee:04", "192.168.0.84", a.bridgeName("rai0"), time.Now())
+	a.garageReading(ctx, garageSnap(nil, nil))
+	a.garageReading(ctx, garageSnap(nil, map[string][]string{"rai0": {"aa:bb:cc:dd:ee:04"}}))
+	if len(w.garps) != 1 || w.garps[0] != "rai0 aa:bb:cc:dd:ee:04 192.168.0.84" {
+		t.Errorf("tap address: garps %v", w.garps)
+	}
+}
+
 func TestProxyARPConfig(t *testing.T) {
 	base := `{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","platform":"jio-mtk","model":"U7LT","takeover":true`
 	c, err := parseConfig([]byte(base + `}`))
@@ -160,6 +188,20 @@ func TestGarageRadar(t *testing.T) {
 		if e := a.sta.queue[0]; !reflect.DeepEqual(e, want) {
 			t.Errorf("%s: payload %v, want %v", tc.naming, e, want)
 		}
+	}
+}
+
+// rate_limits: jio-mtk only, off by default, reaching mtkwifi.
+func TestRateLimitsConfig(t *testing.T) {
+	base := `{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","platform":"jio-mtk","model":"U7LT","takeover":true`
+	if c, err := parseConfig([]byte(base + `}`)); err != nil || c.RateLimits {
+		t.Errorf("default: on=%v, %v", c.RateLimits, err)
+	}
+	if c, err := parseConfig([]byte(base + `,"rate_limits":true}`)); err != nil || !c.RateLimits {
+		t.Errorf("jio: %v", err)
+	}
+	if _, err := parseConfig([]byte(`{"inform_url":"http://192.168.1.1:8080/inform","console_ip":"192.168.1.2","takeover":true,"rate_limits":true}`)); err == nil {
+		t.Error("Deco accepted rate_limits")
 	}
 }
 

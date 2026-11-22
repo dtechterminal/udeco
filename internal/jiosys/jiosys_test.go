@@ -113,6 +113,10 @@ func TestKeepOnly(t *testing.T) {
 	proc(9126, 1, "sh", "/flash2/udeco/start.sh")
 	proc(9134, 9126, "/tmp/udeco-bin/udeco-ap", "-config", "/flash2/udeco/udeco-ap.json")
 	proc(9200, 9134, "iwpriv", "ra0", "show", "stainfo")
+	// the agent's 802.1X authenticator, forked away to init: kept; the
+	// vendor's 5 GHz copy is not
+	proc(9300, 1, "/userfs/bin/rtdot1xd", "-p", "rai", "-i", "rai0")
+	proc(9301, 1, "/userfs/bin/rtdot1xd_AC")
 	var got []string
 	m := New(Options{Root: root, self: 9134, KeepOnly: DefaultKeepOnly, kill: func(pid int, sig syscall.Signal) error {
 		got = append(got, strconv.Itoa(pid))
@@ -122,10 +126,10 @@ func TestKeepOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "119 1033 4411 6204 8000"; strings.Join(got, " ") != want {
+	if want := "119 1033 4411 6204 8000 9301"; strings.Join(got, " ") != want {
 		t.Errorf("stopped %q, want %q", strings.Join(got, " "), want)
 	}
-	if len(rep.Steps) != 5 || !strings.Contains(rep.Steps[0].Reason, "dumb AP") {
+	if len(rep.Steps) != 6 || !strings.Contains(rep.Steps[0].Reason, "dumb AP") {
 		t.Errorf("steps %+v", rep.Steps)
 	}
 }

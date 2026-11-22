@@ -150,7 +150,14 @@ func TestJioPlatformConfig(t *testing.T) {
 			t.Errorf("jio %s min_rates refused: %v", model, err)
 		}
 	}
-	for _, bad := range []string{`}`, `,"model":"U7LT","egress":true}`, `,"model":"U7LT","mdns_bridge":true}`, `,"model":"U7LT","hotspot2":true}`, `,"model":"UAL6"}`} {
+	// mdns_bridge, sta_snoop and assoc_garp: served on the Garage too
+	for _, ok := range []string{`,"model":"U7LT","mdns_bridge":true}`, `,"model":"U7LT","sta_snoop":false}`,
+		`,"model":"U7LT","assoc_garp":false}`, `,"model":"U7LT","sta_snoop":false,"assoc_garp":true}`} {
+		if _, err := parseConfig([]byte(base + ok)); err != nil {
+			t.Errorf("refused %s: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{`}`, `,"model":"U7LT","egress":true}`, `,"model":"U7LT","twt":true}`, `,"model":"U7LT","hotspot2":true}`, `,"model":"UAL6"}`} {
 		if _, err := parseConfig([]byte(base + bad)); err == nil {
 			t.Errorf("accepted %s", bad)
 		}

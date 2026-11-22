@@ -19,7 +19,8 @@
   60 bytes; `internal/stasnoop` GARP) is sent on each wired member of the station's bridge
   (sysfs `brport/bridge` and `brif`; never a wl port): eth1 for br-lan, eth1.20 for a VLAN bridge.
 - At most once per station per 10 s; a send failure is logged once.
-- `assoc_garp` false turns it off. Takeover only; refused on jio-mtk.
+- `assoc_garp` false turns it off. Takeover only. On jio-mtk it is the opt-out of the Garage's own
+  station GARP (garage-parity.md section 15), which does not need `sta_snoop`.
 
 ## Unverified on hardware
 

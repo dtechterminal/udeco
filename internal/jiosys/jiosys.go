@@ -49,7 +49,11 @@ var DefaultKeepDown = []string{"omci", "ponmgr", "ont_dc", "ont_stb_bind", "dms"
 // kernel state. syslogd stays because init respawns it (inittab). The
 // supervisor is kept by its whole path, as deploy/jio-start.sh starts
 // itself (sh $D/start.sh) under its default directory, unit.JioDir.
-var DefaultKeepOnly = []string{"init", "telnetd", "getty", "syslogd", "udeco-ap", unit.JioDir + "/" + unit.Launcher, "customInit"}
+// rtdot1xd is the 802.1X authenticator the agent starts for its
+// WPA2/WPA3-Enterprise SSIDs (mtkwifi dot1x.go): it forks away from the
+// agent, so it is kept by name, and the agent itself stops any copy it
+// did not start (the vendor's rtdot1xd_AC is not kept at all).
+var DefaultKeepOnly = []string{"init", "telnetd", "getty", "syslogd", "udeco-ap", unit.JioDir + "/" + unit.Launcher, "customInit", "rtdot1xd"}
 
 // protected are never signalled, whatever the patterns say.
 var protected = []string{"telnetd", "getty", "init", "udeco-ap", "cfg.svc", "dnsmasq"}

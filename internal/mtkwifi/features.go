@@ -43,7 +43,7 @@ func ssidNotes(ssids []bcmwifi.SSID, note func(string, ...any)) map[string]bool 
 			note("SSID %q: private pre-shared keys (PPSK) are not supported: only the WLAN passphrase is served", s.SSID)
 		}
 		if r := s.RateLimit; r != nil && (r.DownKbps > 0 || r.UpKbps > 0) {
-			note("SSID %q: per-client rate limit (down %d, up %d kbit/s) not applied (no traffic shaping on this unit)", s.SSID, r.DownKbps, r.UpKbps)
+			note("SSID %q: per-client rate limit (down %d, up %d kbit/s) not applied"+rlOffSuffix, s.SSID, r.DownKbps, r.UpKbps)
 		}
 		if s.ProxyARP {
 			note("SSID %q: proxy ARP not applied", s.SSID)
@@ -57,18 +57,17 @@ func ssidNotes(ssids []bcmwifi.SSID, note func(string, ...any)) map[string]bool 
 
 // bssNotes notes what of s the BSS b on rd does not carry.
 func bssNotes(s bcmwifi.SSID, b BSS, rd RadioDef, note func(string, ...any)) {
-	if s.FT {
-		if rd.Band == "ng" {
-			note("%s: SSID %q: 802.11r is not supported by the %s driver: clients roam with a full association", rd.Band, s.SSID, rd.HWName)
-		} else {
-			note("%s: SSID %q: 802.11r is not applied (no IAPP daemon on this unit to share keys with other APs): clients roam with a full association", rd.Band, s.SSID)
-		}
-	}
 	if s.UAPSD && !rd.UAPSD {
 		note("%s: SSID %q: U-APSD is not supported by the %s driver", rd.Band, s.SSID, rd.HWName)
 	}
 	if want := pmfLevel(s.PMF); b.Auth != "OPEN" && want > b.PMF {
 		note("%s: SSID %q: PMF %s not applied: served with PMF %s", rd.Band, s.SSID, s.PMF, translate.PMFWord(b.PMF))
+	}
+	// The BSS Load element: the drivers' QBSS load is radio-wide, on while
+	// any BSS has WMM (forced on by HT) or 802.11k (MT7603 ap_qload.c
+	// QBSS_LoadInit), with no profile key or command to turn it off
+	if s.NoBSSLoad {
+		note("%s: SSID %q: BSS Load element off is not applied: the %s driver advertises it on every BSS of the radio", rd.Band, s.SSID, rd.HWName)
 	}
 }
 
@@ -99,8 +98,10 @@ func radioFeatures(rp *RadioPlan, rd RadioDef, ri bcmwifi.Radio, served []bcmwif
 	}
 
 	for _, b := range rp.BSS {
-		if b.RRM {
-			note("%s: 802.11k is advertised, but no neighbour list is configured (the driver has no command to add entries)", band)
+		if b.RRM && !rd.FT {
+			// with FT served the agent keeps the neighbour lists (roam.go:
+			// NrAdd on the MT7603, its own answers on the MT7663)
+			note("%s: 802.11k is advertised; neighbour reports come from the driver's own scan table (the agent's neighbour lists need garage_ft%s)", band, ft2GWhy(rd))
 			break
 		}
 	}
@@ -283,6 +284,7 @@ func profileFeatures(kv map[string]string, base []byte, rd RadioDef, rp RadioPla
 			kv["IgmpSnEnable"] = "1"
 		}
 	}
+	ftKeys(kv, base, rd, rp) // roam.go
 	u6Defaults(kv, base, rd, rp)
 }
 

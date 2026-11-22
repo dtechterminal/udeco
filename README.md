@@ -56,7 +56,7 @@ Status key:
 | SSID per AP group | Verified | An SSID is broadcast only by the APs of its group. |
 | MAC allow/deny lists | Verified | The driver's macmode together with hostapd's ACL. |
 | WLAN schedules | Verified | An SSID goes off within seconds of its off-window starting. |
-| WPA2/WPA3 Enterprise, RADIUS MAC auth, private PSK, Hotspot 2.0 | Built | Not tested against a RADIUS server. An SSID whose server is unusable is refused, never brought up open. |
+| WPA2/WPA3 Enterprise, RADIUS MAC auth, private PSK, Hotspot 2.0 | Built | Not tested against a RADIUS server. An SSID whose server is unusable is refused, never brought up open. The Garage serves WPA2/WPA3-Enterprise only (built, not run on the unit: [garage-parity](docs/deco/features/garage-parity.md) section 27). |
 | Enhanced Open (OWE) | Not possible | This hostapd build has no OWE; such an SSID is refused. |
 | RADIUS-assigned VLANs | Not possible | No dynamic VLAN support in this hostapd. |
 
@@ -65,8 +65,8 @@ Status key:
 | Feature | Status | Notes |
 |---|---|---|
 | 802.11k, 802.11v | Verified | Neighbour reports list the other units. 802.11k (RRM) is on for every SSID as on a U6 Pro, and 802.11v (WNM) is turned off in the driver where the controller turns BSS transition off. The driver bits are built, not checked on a unit ([radio-parity](docs/deco/features/radio-parity.md)). |
-| 802.11r (FT-PSK) | Built | On for every SSID. The units exchange FT key holders over signed announcements on the LAN. A client doing a fast transition has not been observed yet. |
-| 802.11r for WPA3 (FT-SAE) | Built | On with `wpa3` (`"ft_sae": false` turns it off). On 2026-11-19 it stopped WPA3 phones joining: the driver beacons the mobility domain byte-swapped, so hostapd refused every FT-SAE association (status 54). Fixed 2026-11-20; since then all three units run it, and an iPhone, an Apple Watch and a Pixel join (seen 2026-11-21). An FT-SAE roam between units has not been observed yet ([ft-sae](docs/deco/features/ft-sae.md)). |
+| 802.11r (FT-PSK) | Built | On for every SSID. The units exchange FT key holders over signed announcements on the LAN. A client doing a fast transition has not been observed yet. The Garage joins the same mobility domains with `garage_ft` (off; built, not run on air). |
+| 802.11r for WPA3 (FT-SAE) | Built | On with `wpa3` (`"ft_sae": false` turns it off). On 2026-11-19 it stopped WPA3 phones joining: the driver beacons the mobility domain byte-swapped, so hostapd refused every FT-SAE association (status 54). Fixed 2026-11-20; since then all three units run it, and an iPhone, an Apple Watch and a Pixel join (seen 2026-11-21). An FT-SAE roam between units has not been observed yet ([ft-sae](docs/deco/features/ft-sae.md)). The Garage takes part with `garage_ft` (off; its agent relays the keys; built, not run on air). |
 | Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | Proxy ARP is now applied on SSIDs without client isolation too, as a U6 Pro does it (Built: [proxy-arp](docs/deco/features/proxy-arp.md)). |
 | Intelligent DHCP (unicast DHCP replies) | Verified | `wl dhcp_unicast 1` on every served SSID, live, as a U6 Pro. The hand-back puts back 0 ([radio-parity](docs/deco/features/radio-parity.md)). Read live 2026-11-20 (`wl dhcp_unicast` = 1 on the served SSIDs); clients (Galaxy S20 FE, the KVM) get their leases with it on. |
 | BSS Load element | Built | On by default, as a U6 Pro. Off on a radio where the controller sends `qbssload=disabled` for any SSID, with a note when other SSIDs share that radio, because the element is radio-wide in this driver ([radio-parity](docs/deco/features/radio-parity.md)). |
@@ -102,8 +102,8 @@ Status key:
 | Per-client TX retries | Verified | Attempts, retries and retry % on each client's page. |
 | Reconnect, block, unblock | Verified | |
 | Lock client to AP | Verified | Every other unit denies a locked client. Its deny lists are updated live, without a hostapd restart. |
-| Per-client speed limits | Verified | A client's own user group. A 512/768 kbit/s limit held at 460/652 kbit/s, and full speed returned when the client went back to the default group. The limit survives restarts and follows the client to any SSID of the unit. |
-| SSID and user-group speed limits | Built | Same shaping path as per-client limits. |
+| Per-client speed limits | Verified | A client's own user group. A 512/768 kbit/s limit held at 460/652 kbit/s, and full speed returned when the client went back to the default group. The limit survives restarts and follows the client to any SSID of the unit. On the Garage (jio-mtk): built, not run on the unit, `"rate_limits": true` (off by default): a per-station policer module, see the second platform below. |
+| SSID and user-group speed limits | Built | Same shaping path as per-client limits. The same on the Garage, with `rate_limits`: its policer module held 512/768 kbit/s at 502/698 (2.4 GHz) and 504/699 (5 GHz) on the unit; not yet driven through UniFi there. |
 
 Speed limits have one cost. Flows that the Deco's Broadcom flow cache
 accelerates bypass Linux traffic shaping, so a unit turns its flow cache off
@@ -286,7 +286,28 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   stopped, and telnet is kept.
 - **Partial:** WPA3 on 5 GHz only (the 2.4 GHz driver has no SAE). The driver
   accepts the profile, but no SAE client has been seen yet.
-- **Not on this platform:** speed limits.
+- **Speed limits (`"rate_limits": true`, off by default; the module was
+  proven on the unit on both bands, 512/768 kbit/s held at 502/698 and
+  504/699, the agent-driven path through UniFi not yet run):** the kernel has no traffic control, so the agent loads its
+  own module (`tools/udeco_rl`, put in `/flash2/udeco` by hand) that polices
+  each limited station on the bridge, both directions, and never cuts a
+  client off. It keeps the limited stations out of Jio's hardware NAT.
+  Off, the limits are noted as not applied.
+- **Not on this platform:** TWT (no 802.11ax radio);
+  intelligent DHCP; turning the BSS Load element off; 5 GHz minimum rates.
+- **802.11r with the Decos (`"garage_ft": true`, off by default; built,
+  not yet run on air):** FT-PSK and FT-SAE in the Decos' mobility domains,
+  the agent standing in for the missing IAPP daemon and moving the FT-SAE
+  keys with the Decos' hostapd; 2.4 GHz needs the rebuilt `mt7603roam`
+  module. The 5 GHz profile keys were checked on the unit (the Decos'
+  mobility domain on air) and the driver's key export matched hostapd's
+  derivation. For a 5 GHz FT-PSK roam from a Deco the agent pre-installs
+  the keys, but only on WLANs that also have FT-SAE (the Decos announce
+  no others). Band steering and the Roaming Assistant send 802.11v
+  requests there too (5 GHz never with a disconnect timer). 802.11k
+  answers stay the drivers' own
+  ([garage-ft](docs/deco/features/garage-ft.md)). Off, a roam to or from
+  the Garage is a full association.
 - **U6 parity** ([docs/deco/features/garage-parity.md](docs/deco/features/garage-parity.md);
   none of it run on the unit yet except the login lock, whose live run is
   in the Login lock row above):
@@ -307,8 +328,18 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   | Guest WLANs | the Deco's fail-closed ebtables rules, portal | controller |
   | Proxy ARP | agent responder + ebtables drops on both radios (MT7663 driver flag `hs_flag=3` only with `proxy_arp_driver`) | controller, `proxy_arp` (on), `proxy_arp_driver` (off) |
   | DFS | 52-64, CAC, radar followed and reported | `dfs` (off) |
-  | Station GARP | on association when the address is known | always |
+  | Station GARP | on association when the address is known | `assoc_garp` (on) |
+  | Speed limits | per-station policer module on the bridge, hw NAT kept off the limited stations | controller, `rate_limits` (off) |
+  | WPA2/WPA3-Enterprise, RadSec | 802.1X through Jio's rtdot1xd, started and supervised per radio (2.4 GHz with the rebuilt MT7603 module only); RadSec through the agent's proxy. MAC auth, Filter-Id, PPSK, Hotspot 2.0, RADIUS VLANs: not possible, such SSIDs stay off or are noted | controller, `enterprise` (on) |
+  | mDNS bridge | the Deco's bridge over `bdg2` and the VLAN bridges | `mdns_bridge` (off) |
+  | Connection events | the Deco's timing events from driver events and the taps (2.4 GHz: no association or handshake timing) | `sta_snoop` (on) |
+  | Multicast inspect | as on the Deco | always |
+  | BPDU filter | the Deco's ebtables BGA drops per BSS | controller |
+  | IGMP/MLD snooping | on the agent's VLAN bridges | always |
+  | SNMP | the Deco's agent; MediaTek netdevs as ieee80211 | controller |
   | Login lock | new telnet (:23) and SSH (:22) connections dropped while Device SSH is off and the controller answers; open after 10 min of silence | `login_lock` (on), `login_lock_failopen_s` |
+  | 802.11r/k/v with the Decos | FT-PSK and FT-SAE in the Decos' mobility domains, PMK-R1s moved over hostapd's RRB (5 GHz: the MT7663's KDP; 2.4 GHz: the rebuilt `mt7603roam`), ([garage-ft](docs/deco/features/garage-ft.md)); built, not yet run on air; 802.11v requests for band steering and the Roaming Assistant; 802.11k answered by the drivers from their scan tables; no FT-1X or Hotspot 2.0 | controller, `garage_ft` (off) |
+  | U-APSD on 2.4 GHz | `mt7603roam` driver built and live-swapped on the unit; the agent does not write `APSDCapable` there yet | none yet |
 
   Profile changes are batched into one restart per radio; live driver
   settings wait for a restart's settle time; the hand-back restores the
@@ -341,10 +372,12 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   channels, and a sweep run by the agent itself (the visits were verified
   with a probe; the agent confirms each visit's end from the driver's
   "time_diff" log line, which the unit prints at its default debug level,
-  and from iwconfig that the radio was not restarted or moved; `iwpriv ra0
-  set Debug=0` or `1` silences that line and every 2.4 GHz sweep then
-  stops). A sweep waits for, or stops on, an off-channel scan it did not
-  start, and does not trust a visit another running scan took over when
+  and from iwconfig that the radio was not restarted or moved; with the
+  rebuilt 2.4 GHz driver only `iwpriv ra0 set Debug=0` silences that line,
+  `Debug=1` still prints it (on the unit 2026-11-23; Jio's original driver
+  prints it from level 2 only, so there `Debug=1` silences it too), and
+  every 2.4 GHz sweep then stops). A sweep waits for, or stops on, an
+  off-channel scan it did not start, and does not trust a visit another running scan took over when
   that scan's end comes before the visit's could; an ACS scan (400 ms a
   channel) can still end one later, unseen. Check these before turning it
   on.
@@ -413,6 +446,7 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
 | `CHANGELOG.md`, `.github/release-notes.sh` | release notes, one section per tag; the script prints a tag's section for its release |
 | `packaging/deco` | what a persistent install on a Deco consists of |
 | `tools/wifi-inet-monitor` | per-client internet monitor that runs on the gateway |
+| `tools/udeco_rl` | the Garage's speed-limit kernel module (GPL; `build.sh` cross-builds it against the unit's 3.18.21 tree) |
 | `docs/deco/` | [design](docs/deco/agent-design.md), [device capabilities](docs/deco/device-capabilities.md), [interference audit](docs/deco/interference-audit.md), [feature notes](docs/deco/features/) |
 
 ## Legal

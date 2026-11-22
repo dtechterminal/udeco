@@ -144,6 +144,45 @@ func TestPlansSAE(t *testing.T) {
 	}
 }
 
+// TestWithDriverSAE: SAE on 2.4 GHz only with the rebuilt MT7603 module
+// loaded; the plan then serves the WPA2/WPA3 and WPA3 SSIDs there as on
+// 5 GHz, and the 2.4 GHz profile gets the PMF keys.
+func TestWithDriverSAE(t *testing.T) {
+	root := t.TempDir()
+	if l := WithDriverSAE(root, JCOW414); l[0].SAE || !l[1].SAE {
+		t.Fatalf("vendor module: SAE ng=%v na=%v", l[0].SAE, l[1].SAE)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "sys/module", SAEModule2G), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	l := WithDriverSAE(root, JCOW414)
+	if !l[0].SAE || !l[1].SAE || JCOW414[0].SAE {
+		t.Fatalf("rebuilt module: SAE ng=%v na=%v (JCOW414 ng %v)", l[0].SAE, l[1].SAE, JCOW414[0].SAE)
+	}
+	d := home()
+	d.SSIDs = append(d.SSIDs, bcmwifi.SSID{ID: "f", SSID: "wpa3 5", Bands: []string{"5g"}, Enabled: true, Security: "wpa3", Passphrase: "secret-y123"})
+	ps, notes := plans(d, l, true)
+	ng := ps["ng"]
+	if len(ng.BSS) != 4 || ng.BSS[0].Auth != "WPA2PSKWPA3PSK" || ng.BSS[0].PMF != 1 {
+		t.Fatalf("ng %+v", ng.BSS)
+	}
+	j := strings.Join(notes, "\n")
+	if strings.Contains(j, "ng: SSID \"wpa3 only\": security wpa3 is not supported") || strings.Contains(j, "ng: SSID \"Example Network\": served as WPA2") {
+		t.Errorf("notes %q", notes)
+	}
+	p := profile([]byte(baseDat), l[0], ng)
+	if got, _ := getKey(p, "AuthMode"); !strings.HasPrefix(got, "WPA2PSKWPA3PSK;") || !strings.Contains(got, "WPA3PSK") {
+		t.Errorf("ng AuthMode = %q", got)
+	}
+	if got, ok := getKey(p, "PMFMFPC"); !ok || !strings.HasPrefix(got, "1;") {
+		t.Errorf("ng PMFMFPC = %q (ok %v)", got, ok)
+	}
+	a := New(Options{Root: root, WPA3: true})
+	if !a.ServesSAE("ng") || !a.ServesSAE("na") || New(Options{Root: root}).ServesSAE("ng") || New(Options{Root: t.TempDir(), WPA3: true}).ServesSAE("ng") {
+		t.Errorf("ServesSAE")
+	}
+}
+
 const baseDat = `Default
 CountryCode=IN
 AutoChannelSelect=3
@@ -200,8 +239,9 @@ type fakeDev struct {
 	fail map[string]bool // command prefixes that fail
 	// na: the 5 GHz channel iwconfig shows (0: 157); `iwpriv rai0 set
 	// Channel=N` moves it unless noMove
-	na     int
-	noMove bool
+	na        int
+	noMove    bool
+	ifindexes int
 }
 
 func newFakeDev(t *testing.T) *fakeDev {
@@ -237,6 +277,14 @@ func (f *fakeDev) mkdev(name string, flags int) {
 	d := filepath.Join(f.root, "sys/class/net", name)
 	os.MkdirAll(d, 0o755)
 	os.WriteFile(filepath.Join(d, "flags"), []byte(fmt.Sprintf("0x%x\n", 0x1000|flags)), 0o644)
+	f.ifindexes++
+	os.WriteFile(filepath.Join(d, "ifindex"), []byte(fmt.Sprintf("%d\n", f.ifindexes)), 0o644)
+}
+
+// remake gives name a new ifindex (a driver reload).
+func (f *fakeDev) remake(name string) {
+	f.ifindexes++
+	os.WriteFile(filepath.Join(f.root, "sys/class/net", name, "ifindex"), []byte(fmt.Sprintf("%d\n", f.ifindexes)), 0o644)
 }
 
 func (f *fakeDev) setUp(name string, up bool) {
@@ -523,6 +571,37 @@ func TestLockToAP(t *testing.T) {
 	b.SetBlocked(ctx, []string{"aa:bb:cc:dd:ee:ff"}) // the agent stores it before planning
 	if p, _ := b.Plan(ctx, locked); !p.Empty() {
 		t.Errorf("restart with a lock planned steps: %+v", p.Steps)
+	}
+	// a driver reload under the agent (a module swap): ra0's netdev is
+	// remade with empty lists; a restarted agent rewrites them at once
+	f.remake("ra0")
+	c := newApplier(f)
+	c.SetBlocked(ctx, []string{"aa:bb:cc:dd:ee:ff"})
+	if p, _ := c.Plan(ctx, locked); len(p.Steps) != 1 || !strings.Contains(p.Steps[0].Desc, "station ACLs") {
+		t.Fatalf("remade netdev, restarted agent: %+v", p.Steps)
+	}
+	// the running agent finds it on its tick and rewrites only the lists
+	f.remake("ra0")
+	a.quietUntil.Store(0)
+	n = len(f.log)
+	if _, err := a.Tick(ctx); err != nil {
+		t.Fatal(err)
+	}
+	j = strings.Join(f.log[n:], "\n")
+	if !strings.Contains(j, "iwpriv ra0 set ACLAddEntry=C8:5C:CC:D1:2E:C7") || strings.Contains(j, "ifconfig") {
+		t.Fatalf("tick after a reload: %v", f.log[n:])
+	}
+	n = len(f.log)
+	a.Tick(ctx)
+	if strings.Contains(strings.Join(f.log[n:], "\n"), "ACLAddEntry") {
+		t.Fatalf("rewritten again on an unchanged netdev: %v", f.log[n:])
+	}
+	// a record without indexes (an older agent's): rewritten once
+	os.WriteFile(filepath.Join(f.root, "tmp/udeco", aclFile), []byte(`{"ra0":{"Policy":2,"MACs":["AA:BB:CC:DD:EE:FF","C8:5C:CC:D1:2E:C7"]}}`), 0o600)
+	c = newApplier(f)
+	c.SetBlocked(ctx, []string{"aa:bb:cc:dd:ee:ff"})
+	if p, _ := c.Plan(ctx, locked); len(p.Steps) != 1 {
+		t.Fatalf("old record: %+v", p.Steps)
 	}
 	// unlock: back to the block list only, still no restart
 	p, _ = a.Plan(ctx, d)

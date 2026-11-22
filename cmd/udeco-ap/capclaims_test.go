@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dtechterminal/udeco/internal/bcmwifi"
 	"github.com/dtechterminal/udeco/internal/models"
 )
 
@@ -104,5 +105,40 @@ func TestRFScanFollowsCollector(t *testing.T) {
 			t.Errorf("ScanSupported %v: RF_SCAN claimed %v", can, got)
 		}
 		h.stop()
+	}
+}
+
+// dot1xWifi is a Garage applier that says whether it serves 802.1X
+// (mtkwifi.Applier.ServesDot1X: rtdot1xd there, enterprise on).
+type dot1xWifi struct {
+	wifiApplier
+	serves bool
+}
+
+func (w dot1xWifi) ServesDot1X() bool { return w.serves }
+
+// TestJioRadSecFollowsDot1X: on the Garage RadSec (fw2_caps 0x80000) is
+// claimed only when some radio serves WPA2/WPA3-Enterprise, the only
+// security that uses RADIUS servers there.
+func TestJioRadSecFollowsDot1X(t *testing.T) {
+	for _, serves := range []bool{false, true} {
+		h := newHarness(t, func(c *Config, o *options) {
+			c.Takeover, c.Platform, c.Model = true, PlatformJio, "U7LT"
+		})
+		w := dot1xWifi{wifiApplier: h.wifi, serves: serves}
+		h.a.o.newWifi = func(bcmwifi.Options) wifiApplier { h.built++; return w }
+		h.start()
+		eventually(t, "takeover claims", func() bool {
+			m := h.ctl.last()
+			return m != nil && int(num(m["wifi_caps"]))&models.WifiCapLockAP != 0
+		})
+		h.stop()
+		m := h.ctl.last()
+		if got := int(num(m["fw2_caps"]))&models.FW2CapRadSec != 0; got != serves {
+			t.Errorf("ServesDot1X %v: RadSec claimed %v (fw2 %v)", serves, got, m["fw2_caps"])
+		}
+		if int(num(m["fw_caps"]))&(models.FWCapRadiusFilter|models.FWCapHotspot2) != 0 {
+			t.Errorf("RADIUS filter or Hotspot 2.0 claimed on the Garage: fw %v", m["fw_caps"])
+		}
 	}
 }

@@ -31,6 +31,17 @@
 # Actions go to $D/guard.events (persistent, last 50 lines) and the guard's
 # log to $R/guard.log. A kernel hang is left to the kernel's own watchdog: a
 # shell can't run then.
+#
+# The 2.4 GHz driver (drv2g): with $D/mt7603wpa3.ko.gz present, once per
+# boot before the first agent start (a vendor module still in use: again
+# before the next start, 3 tries), the vendor's mt7603eap.ko (loaded by
+# /usr/script/wlan_load.sh) is replaced by that rebuilt MT7603 module (SAE,
+# PMF; mtkwifi WithDriverSAE), and the ra* netdevs that were up come back up
+# in the same bridges. Any failure puts the vendor module back and writes
+# $D/mt7603wpa3.failed, which turns the swap off until it is removed (a
+# vendor module that won't load back reboots the unit, whose next boot then
+# keeps the vendor driver). Steps go to $D/guard.events. Off for one boot
+# with $D/force-observe; for good: rm $D/mt7603wpa3.ko.gz.
 D=${UDECO_D:-/flash2/udeco}
 R=${UDECO_R:-/tmp/udeco-bin}
 UP=${UDECO_UPTIME:-/proc/uptime}
@@ -48,7 +59,21 @@ unlock() {
 	return 0
 }
 
+# termed: SIGTERM is logged, not obeyed. At every boot so far (11-19, 11-20,
+# 11-22; uptime 281-300 s, as the agent's jiosys first stopped the Jio
+# services) the supervisor, the guard and the agent got one SIGTERM at once,
+# and nothing restarted them. jiosys signals single PIDs and customInit no
+# longer kills; dms and ras, which ignore SIGTERM, lived, and telnetd in its
+# own process group was spared, so a stopping Jio process most likely
+# signalled its process group, which start.sh shares (busybox has no
+# setsid). The agent may still stop: the loop starts it again. To stop the
+# shells: rm $D/start.sh (both end on their own) or kill -9.
+termed() {
+	trap "echo \"\$(date '+%Y-%m-%d %H:%M:%S') up=\$(cut -d. -f1 $UP) ${1:-supervisor}: SIGTERM ignored (rm $D/start.sh or kill -9 to stop)\" >> $D/guard.events" TERM
+}
+
 guard() {
+	termed guard
 	GW=192.168.0.1
 	ROLLBACK_AFTER=180
 	REBOOT_AFTER=480
@@ -156,7 +181,85 @@ guard() {
 	log "guard stop: $D/start.sh removed"
 }
 
+# drv2g swaps the 2.4 GHz driver for the rebuilt MT7603 module (see the top).
+drv2g() {
+	K=$D/mt7603wpa3.ko.gz
+	OLD=${UDECO_MT7603_VENDOR:-/lib/modules/mt7603eap.ko}
+	EVT=${UDECO_WL_EVT:-/pfrm2.0/lib/modules/wl_evt_driver.ko}
+	[ -f $K ] && [ ! -f $D/mt7603wpa3.failed ] && [ ! -f $D/force-observe ] && [ ! -f $R/drv2g.done ] || return 0
+	: > $R/drv2g.done
+	grep -q "^mt7603eap " ${UDECO_PROC_MODULES:-/proc/modules} || return 0
+	ev() { echo "$(date '+%Y-%m-%d %H:%M:%S') up=$(cut -d. -f1 $UP) drv2g: $*" >> $D/guard.events; }
+	fail() {
+		echo "$(date '+%Y-%m-%dT%H:%M:%S') $*" > $D/mt7603wpa3.failed
+		ev "FAILED ($*): back to the vendor driver; $D/mt7603wpa3.failed turns the swap off"
+	}
+	gunzip -c $K > $R/mt7603wpa3.ko || { fail "gunzip"; rm -f $R/mt7603wpa3.ko; return 0; }
+	# the BSS netdevs that are up, with their bridges
+	st=""
+	N=${UDECO_SYSNET:-/sys/class/net}
+	for i in ra0 ra1 ra2 ra3; do
+		f=$(cat $N/$i/flags 2>/dev/null) || continue
+		[ $((f & 1)) -eq 1 ] || continue
+		b=$(readlink $N/$i/brport/bridge 2>/dev/null)
+		st="$st $i:${b##*/}"
+	done
+	restore() {
+		for e in $st; do
+			ifconfig ${e%%:*} up
+			[ -n "${e#*:}" ] && brctl addif ${e#*:} ${e%%:*} 2>/dev/null
+		done
+	}
+	for i in ra3 ra2 ra1 ra0 apcli0 wds0; do ifconfig $i down 2>/dev/null; done
+	# wl_notifier (Jio) keeps /dev/wl_evt_device open, and wl_evt_driver uses
+	# mt7603eap: at boot, before jiosys stops it, neither would unload
+	# (2026-11-22, up=286). The agent's dumb-AP mode stops it anyway.
+	killall wl_notifier 2>/dev/null && sleep 1 && killall -9 wl_notifier 2>/dev/null
+	rmmod wl_evt_driver 2>/dev/null
+	if ! rmmod mt7603eap; then
+		# still in use: nothing changed, so try again before the next agent
+		# start (at most 3 times a boot) rather than turning the swap off
+		insmod $EVT; restore
+		n=$(($(cat $R/drv2g.busy 2>/dev/null || echo 0) + 1))
+		echo $n > $R/drv2g.busy
+		use=$(grep -E "^(mt7603eap|wl_evt_driver) " ${UDECO_PROC_MODULES:-/proc/modules} | cut -d' ' -f1,3 | tr '\n' ' ')
+		if [ $n -ge 3 ]; then
+			fail "rmmod mt7603eap, $n tries (in use: $use)"
+		else
+			rm -f $R/drv2g.done
+			ev "rmmod mt7603eap: in use ($use), try $n of 3; again before the next agent start"
+		fi
+		return 0
+	fi
+	if insmod $R/mt7603wpa3.ko; then
+		insmod $EVT
+		if ifconfig ra0 up; then
+			restore
+			ev "mt7603wpa3 loaded (was up:$st)"
+			rm -f $R/mt7603wpa3.ko
+			return 0
+		fi
+		ifconfig ra0 down
+		rmmod wl_evt_driver 2>/dev/null
+		if ! rmmod mt76x3_ap; then
+			fail "ra0 up, then rmmod mt76x3_ap"
+			ev "REBOOT: the vendor driver can't be loaded back"
+			sync; reboot; sleep 60; reboot -f
+			return 0
+		fi
+		why="ra0 up"
+	else
+		why="insmod"
+	fi
+	insmod $OLD; insmod $EVT; restore
+	fail "$why"
+	rm -f $R/mt7603wpa3.ko
+	return 0
+}
+
 [ "$1" = guard ] && { guard; exit 0; }
+# "start.sh drv2g": the swap alone (tests; by hand, after rm $R/drv2g.done)
+[ "$1" = drv2g ] && { mkdir -p $R; drv2g; exit 0; }
 
 [ -f $D/udeco-ap.json ] && [ -f $D/udeco-ap.gz ] || exit 0
 mkdir -p $R && chmod 700 $R
@@ -164,9 +267,12 @@ mkdir -p $R && chmod 700 $R
 nohup sh $D/start.sh guard >/dev/null 2>&1 </dev/null &
 exec 9>$R/loop.lock
 flock -n 9 || exit 0
+termed
 while [ -f $D/start.sh ]; do
 	# first: nothing below (a gunzip that waits and retries) skips it
 	unlock
+	# once a boot (a busy vendor module: again, up to 3 times), never under a running agent
+	drv2g
 	if [ ! -x $R/udeco-ap ]; then
 		gunzip -c $D/udeco-ap.gz > $R/udeco-ap.tmp && chmod 755 $R/udeco-ap.tmp && mv $R/udeco-ap.tmp $R/udeco-ap || { sleep 60; continue; }
 	fi
@@ -175,7 +281,10 @@ while [ -f $D/start.sh ]; do
 		tail -c 262144 $R/agent.log > $R/agent.log.1; : > $R/agent.log
 	fi
 	$R/udeco-ap -config $D/udeco-ap.json >> $R/agent.log 2>&1 &
-	echo $! > $R/agent.pid
-	wait $!
+	a=$!
+	echo $a > $R/agent.pid
+	# a trapped SIGTERM ends wait early: wait again while the agent runs
+	wait $a
+	while kill -0 $a 2>/dev/null; do wait $a; done
 	sleep 10
 done

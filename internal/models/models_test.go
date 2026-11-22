@@ -201,6 +201,16 @@ func TestU7LTAgentProfile(t *testing.T) {
 	if p.Radios["na"].RadioCaps2&RadioCap2WPA3 == 0 || p.Radios["ng"].RadioCaps2&RadioCap2WPA3 != 0 {
 		t.Errorf("WPA3 radio caps: ng %#x na %#x", p.Radios["ng"].RadioCaps2, p.Radios["na"].RadioCaps2)
 	}
+	// ... unless the rebuilt MT7603 module serves it on 2.4 GHz (WPA3NG),
+	// which needs WPA3 itself
+	p, _ = DecoAgentProfileWith(m, heAX, DecoAgentFeatures{WPA3: true, WPA3NG: true})
+	if p.Radios["na"].RadioCaps2&RadioCap2WPA3 == 0 || p.Radios["ng"].RadioCaps2&RadioCap2WPA3 == 0 {
+		t.Errorf("WPA3NG radio caps: ng %#x na %#x", p.Radios["ng"].RadioCaps2, p.Radios["na"].RadioCaps2)
+	}
+	p, _ = DecoAgentProfileWith(m, heAX, DecoAgentFeatures{WPA3NG: true})
+	if p.WifiCaps&WifiCapWPA3 != 0 || p.Radios["ng"].RadioCaps2 != 0 || p.Radios["na"].RadioCaps2 != 0 {
+		t.Errorf("WPA3NG without WPA3: wifi_caps %#x ng %#x na %#x", p.WifiCaps, p.Radios["ng"].RadioCaps2, p.Radios["na"].RadioCaps2)
+	}
 }
 
 // TestUHDIWAgentProfile: the JCOW414 reported as a UAP-IW-HD keeps the

@@ -13,7 +13,9 @@ package main
 // it already turned the cache on). A plain stop (SIGTERM) leaves the cache
 // as it is, like the rest of Wi-Fi: the tc trees stay built and only hold
 // while the cache is off; the next start decides again, and a reboot turns
-// the cache back on. jio-mtk has no flow cache: nothing is done there.
+// the cache back on. jio-mtk has no flow cache; its speed limiter (the
+// udeco_rl module, mtkwifi ratelimit.go) takes the same two paths:
+// removeRateLimiter.
 
 import (
 	"context"
@@ -21,6 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/mtkwifi"
 )
 
 // flowCacheRestorer is bcmwifi's RestoreFlowCache. Optional: mtkwifi has
@@ -34,7 +37,11 @@ var _ flowCacheRestorer = (*bcmwifi.Applier)(nil)
 // restoreFlowCache turns the flow cache back on through w when bcmwifi
 // recorded that the agent turned it off (it runs nothing otherwise).
 func (a *agent) restoreFlowCache(ctx context.Context, w wifiApplier) {
-	if a.cfg.jio() || w == nil {
+	if a.cfg.jio() {
+		a.removeRateLimiter(ctx)
+		return
+	}
+	if w == nil {
 		return
 	}
 	r, ok := w.(flowCacheRestorer)
@@ -51,6 +58,7 @@ func (a *agent) restoreFlowCache(ctx context.Context, w wifiApplier) {
 // record (RunDir/fc-off) is there; nothing else on the unit changes.
 func (a *agent) observeFlowCacheRestore(ctx context.Context) {
 	if a.cfg.jio() {
+		a.removeRateLimiter(ctx)
 		return
 	}
 	if _, err := os.Stat(a.dev(filepath.Join(a.o.runDir, bcmwifi.FlowCacheOffFile))); err != nil {
@@ -60,4 +68,13 @@ func (a *agent) observeFlowCacheRestore(ctx context.Context) {
 	w := a.o.newWifi(bcmwifi.Options{Root: a.o.root, Run: a.o.run, StateDir: filepath.Join(a.o.base, wifiStateSub),
 		RunDir: a.o.runDir, Logf: a.logf})
 	a.restoreFlowCache(ctx, w)
+}
+
+// removeRateLimiter (jio-mtk) removes a udeco_rl module a takeover run
+// left loaded (it crashed, or was stopped with limits set): observe mode
+// polices nothing. Nothing runs without the module.
+func (a *agent) removeRateLimiter(ctx context.Context) {
+	if err := mtkwifi.RemoveRateLimiter(ctx, a.o.root, a.o.run, a.logf); err != nil {
+		a.logf("speed limits: removing udeco_rl: %v (reboot the unit to remove it)", err)
+	}
 }

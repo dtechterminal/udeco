@@ -23,6 +23,9 @@ type Options struct {
 	Rates  Rates            // zero = DefaultRates
 	Now    func() time.Time // nil = time.Now
 	Retry  time.Duration    // a port that failed to open waits this long (0 = 15 s)
+	// NoFlowCache: no Broadcom flow cache to flush (the JCOW414;
+	// Interceptor.NoFlowCache)
+	NoFlowCache bool
 }
 
 // Service is the running bridge.
@@ -63,7 +66,7 @@ func NewService(ctx context.Context, o Options) *Service {
 		o.Retry = 15 * time.Second
 	}
 	c, end := context.WithCancel(ctx)
-	return &Service{o: o, eng: NewEngine(o.Rates), x: &Interceptor{Run: o.Run, DryRun: o.DryRun, Logf: o.Logf},
+	return &Service{o: o, eng: NewEngine(o.Rates), x: &Interceptor{Run: o.Run, DryRun: o.DryRun, Logf: o.Logf, NoFlowCache: o.NoFlowCache},
 		ctx: c, end: end, conns: map[string]Conn{}, stop: map[string]context.CancelFunc{},
 		failed: map[string]time.Time{}, done: make(chan string, 64)}
 }

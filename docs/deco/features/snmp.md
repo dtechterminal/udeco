@@ -75,7 +75,7 @@ the engine-boots file described below.
   - `snmpEngineID` is `80 00 a0 98 03` followed by the br-lan MAC (RFC 3411, enterprise 41112,
     MAC format).
   - `snmpEngineBoots` is read, incremented and saved (0600) in
-    `/tp_data/udeco/session/snmp-engine-boots`. That happens once per agent run, and only when v3
+    `/tp_data/udeco/session/snmp-engine-boots` (Garage: `/flash2/udeco/session/snmp-engine-boots`). That happens once per agent run, and only when v3
     is first wanted.
   - If the file cannot be read or written, v3 stays off. v1/v2c still runs (fail closed).
   - `snmpEngineTime` counts from the server's start.
@@ -174,3 +174,10 @@ says. The list is kept as the record of what was asked.
 7. Turn SNMP off in the site: the log should say `snmp: off` and :161 should be closed.
 8. Over 10 minutes of `snmpbulkwalk` every 5 s, RSS and CPU in `top` must stay flat. Compare
    ifHCInOctets on eth1 with `/proc/net/dev` across a counter wrap if one happens.
+
+## Garage (platform jio-mtk)
+
+The same agent. The MediaTek netdevs (`ra*`, `rai*`, `apcli*`, `wds*`) report
+ifType ieee80211 by name, `bdg2` bridge, `eth0.<port>.1` l2vlan. Unverified on
+the unit: that UDP 161 is free and that Jio's INPUT firewall lets the
+controller's queries in (`netstat -lnu`, then an `snmpwalk` from the LAN).

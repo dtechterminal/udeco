@@ -103,6 +103,19 @@ socket sees received frames only). Options evaluated:
   `aaa.N.mobility_domain` it is used on both bands, with a plan note: SAE clients then try FT
   across one unit's radios, are refused at once ("unknown R0KH"), and fall back to a full SAE.
 
+### The Garage as a peer
+
+With `garage_ft` the Garage (platform `jio-mtk`) announces its FT-SAE BSSs
+over the same signed announcements: R0KH-ID `<bssid hex>-mt7663-r0kh` on
+5 GHz (24 characters: the MT7663 keeps that length whatever the profile
+says), the BSSID's 12 hex digits on 2.4 GHz, R1KH-ID = BSSID, and the
+mobility domain a Deco computes for the SSID and band. The Decos list it in
+their `r0kh`/`r1kh` lines like any unit; no Deco change is needed. Its
+agent answers their PUSH, PULL and SEQ_REQ frames and pushes the keys of
+an SAE done at the Garage (docs/deco/features/garage-ft.md). It assumes
+the Decos run the same `wpa3` and `ft_sae` as its own config; with other
+values the mobility domains differ and roams are a full SAE.
+
 ## What the controller sends
 
 Network 10.6.109, decompiled (`XHjguBsIf`, the UAP builder the MediaTek builder `iqHfwSoIdFucUE`

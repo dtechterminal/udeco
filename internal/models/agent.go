@@ -323,6 +323,10 @@ type DecoAgentFeatures struct {
 	// WPA3 fast roaming (RadioCap2WPA3FT), so the controller keeps
 	// wpa3_fast_roaming and sends wpa3.ft.status enabled.
 	WPA3FT bool
+	// WPA3NG: the JCOW414's 2.4 GHz driver serves SAE too (the rebuilt
+	// MT7603 module, mtkwifi.WithDriverSAE). With WPA3 it adds radio_caps2
+	// WPA3 on its ng radio; without it the JCOW414 claims WPA3 on na only.
+	WPA3NG bool
 	// RadSec: the agent's RadSec proxy serves RADIUS/TLS servers: fw2_caps
 	// RadSec.
 	RadSec bool
@@ -368,9 +372,10 @@ func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (i
 		WifiCaps: DecoAgentWifiCaps, FWCaps: DecoAgentFWCaps, FW3Caps: DecoAgentFW3Caps,
 		Radios: map[string]inform.RadioProfile{}}
 	if jcow {
-		// the JCOW414 (UAP-AC-Lite or UAP-IW-HD profile): SAE only in its
-		// 5 GHz driver, so WPA3 is claimed only when the feature says so,
-		// and on na only
+		// the JCOW414 (UAP-AC-Lite or UAP-IW-HD profile): SAE in its 5 GHz
+		// driver, and in its 2.4 GHz one only with the rebuilt MT7603
+		// module (WPA3NG), so WPA3 is claimed only when the feature says
+		// so, and on ng only with WPA3NG
 		p.WifiCaps = 0
 		if f.WPA3 {
 			p.WifiCaps = WifiCapWPA3
@@ -405,7 +410,7 @@ func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (i
 		}
 		rp.HasDFS = f.DFS && r.Band == "na"
 		rp.HasFCCDFS = rp.HasDFS
-		wpa3 := f.WPA3 && !(jcow && r.Band == "ng")
+		wpa3 := f.WPA3 && !(jcow && r.Band == "ng" && !f.WPA3NG)
 		set(wpa3, &rp.RadioCaps2, DecoAgentRadioCaps2)
 		set(wpa3 && f.WPA3FT, &rp.RadioCaps2, RadioCap2WPA3FT)
 		ax := heAX == nil || heAX[r.Band]

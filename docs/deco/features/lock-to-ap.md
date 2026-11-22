@@ -89,6 +89,24 @@ Verified on .205 (read-only, 2026-11-19): `/sbin/hostapd` is v2.9 with `DENY_ACL
 `hostapd_disassoc_accept_mac`, `deny_mac_file`, `accept_mac_file`; `/sbin/hostapd_cli` has
 the `deny_acl` / `accept_acl` commands.
 
+### The Garage (platform jio-mtk, `internal/mtkwifi`)
+
+The MediaTek drivers hold each BSS's list in memory only (`iwpriv <if> set
+AccessPolicy=`, `ACLClearAll=1`, `ACLAddEntry=`; nothing in the profile), so
+the agent writes them live, with no restart, and records what it wrote in
+`/tmp/udeco/mtk-acl.json`. A driver reload the agent did not do (a module
+swap, a crash) makes new netdevs with empty lists: on 2026-11-23 a locked
+client joined the Garage's `ra0` after a manual 2.4 GHz module swap, because
+the record still said the list was there. Each record now carries the
+netdev's ifindex (sysfs) when it was written. A record whose netdev is up
+with another index, or with none recorded (an older agent's file), counts
+as unknown: a restarted agent plans the rewrite at once, and the running
+agent's periodic tick rewrites the lists (outside a restart's settle time;
+the agent's own restarts rewrite them anyway). `ifconfig down/up` keeps the
+index. The drivers have no read-back the agent could use (`ACLShowAll`
+only prints to the kernel log), so the index is the only check. Tested in
+`TestLockToAP` (`internal/mtkwifi/mtkwifi_test.go`).
+
 ## Capability bit
 
 `wifi_caps` bit 24 (0x1000000, `supportLockAp`): **takeover only**, like RF_SCAN. Observe

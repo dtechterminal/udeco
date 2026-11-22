@@ -124,3 +124,6 @@ kernel module; what it suppresses is not stated anywhere in the controller or
 the captures. Not claimed (the agent's wifi_caps2 word, sent for the Roaming
 Assistant in takeover, never has this bit); translate keeps noting
 `multicast.suppressor` when it is on.
+
+The inspector itself (`internal/mcinspect`) is platform-independent and is
+claimed on the Garage (platform jio-mtk) too.

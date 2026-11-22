@@ -91,6 +91,7 @@ func TestNotCarriedNotes(t *testing.T) {
 	s.FT = true
 	s.UAPSD = true
 	s.PMF = "optional"
+	s.NoBSSLoad = true
 	ps, notes := plans(d, JCOW414, false)
 	if len(ps["ng"].BSS) != 2 || len(ps["na"].BSS) != 1 {
 		t.Fatalf("SSID not served: ng %+v na %+v", ps["ng"].BSS, ps["na"].BSS)
@@ -101,14 +102,20 @@ func TestNotCarriedNotes(t *testing.T) {
 		`SSID "home": per-client rate limit (down 5000, up 1000 kbit/s) not applied`,
 		`SSID "home": proxy ARP not applied`,
 		`SSID "home": Hotspot 2.0 is not advertised`,
-		`ng: SSID "home": 802.11r is not supported by the MT7603E driver`,
-		`na: SSID "home": 802.11r is not applied`,
+		`ng: SSID "home": 802.11r not served: the MT7603E driver has no 802.11r`,
 		`ng: SSID "home": U-APSD is not supported by the MT7603E driver`,
 		`ng: SSID "home": PMF optional not applied: served with PMF disabled`,
+		`ng: SSID "home": BSS Load element off is not applied: the MT7603E driver advertises it on every BSS of the radio`,
+		`na: SSID "home": BSS Load element off is not applied`,
 	} {
 		if !strings.Contains(j, want) {
 			t.Errorf("missing note %q in\n%s", want, j)
 		}
+	}
+	// 802.11r is served on 5 GHz (FT-PSK in the SSID's mobility domain,
+	// as a Deco's): no note there (ftplan_test.go has the rest)
+	if b := ps["na"].BSS[0]; !b.FT || b.FTSAE || b.MDID == 0 || strings.Contains(j, `na: SSID "home": 802.11r`) {
+		t.Errorf("na FT %+v", b)
 	}
 	// WPA2 with PMF optional is served as asked on 5 GHz (the MT7663 has
 	// PMF): no note there
@@ -165,7 +172,7 @@ func TestRRMAndWNM(t *testing.T) {
 	}
 	wantKeys(t, "ng", profile(baseNG(), JCOW414[0], ng), map[string]string{"RRMEnable": "1;0;0;0", "WNMEnable": "0;1;1;1"})
 	wantKeys(t, "na", profile(baseNA(), JCOW414[1], ps["na"]), map[string]string{"RRMEnable": "1;1;0;0", "WNMEnable": "0;1;1;1"})
-	if !strings.Contains(joined(notes), "ng: 802.11k is advertised, but no neighbour list is configured") {
+	if !strings.Contains(joined(notes), "ng: 802.11k is advertised; neighbour reports come from the driver's own scan table") {
 		t.Errorf("notes %q", notes)
 	}
 	// all off: slot 2 (served) no longer advertises RRM

@@ -38,7 +38,10 @@ import (
 //     ApSiteSurveyNew_by_wdev prints "ApSiteSurveyNew_by_wdev
 //     channel_index:<i> channel:<ch> time:<ms>" (at any level) when the
 //     request is queued, and at the end of the dwell UpdateChannelInfo
-//     prints "time_diff:<t> Busytime:<x> AvgNF:<dBm>" (level 2 and up),
+//     prints "time_diff:<t> Busytime:<x> AvgNF:<dBm>" (level 2 and up
+//     in the vendor's mt7603eap; level 1 and up in mt7603roam, live
+//     2026-11-23: it printed at the module's default level and at
+//     Debug=1, more than 1 s after the request, and Debug=0 silenced it),
 //     t = ms since ScanNextChannel armed the dwell timer, + 1, as a u8
 //     (live: 44 for 50 ms: the timer is armed for ms/10 jiffies at HZ 100;
 //     Busytime is the CCA/NAV/TX register, not the score's unit). It
@@ -509,10 +512,12 @@ type visitResult struct {
 }
 
 // errNoEnd: a visit started and no end of its dwell was logged. The
-// time_diff line needs the driver's debug level 2 or more (the module's
-// default; `iwpriv ra0 set Debug=0` or 1 silences it, and every band then
-// stops here).
-var errNoEnd = errors.New("mtkwifi: no \"time_diff\" line (UpdateChannelInfo, the end of the dwell) after an off-channel visit's start: its end is not confirmed (the line needs the driver's debug level 2, the module's default)")
+// time_diff line needs the driver's debug level 2 or more in the vendor's
+// mt7603eap, 1 or more in mt7603roam (each module's default). With
+// mt7603roam only `iwpriv ra0 set Debug=0` silences it (Debug=1 still
+// prints it, live 2026-11-23); with mt7603eap Debug=0 or 1 does. Every band
+// then stops here.
+var errNoEnd = errors.New("mtkwifi: no \"time_diff\" line (UpdateChannelInfo, the end of the dwell) after an off-channel visit's start: its end is not confirmed (the line needs the driver's default debug level: Debug=0 silences it)")
 
 // logTail is the end of a kernel-log read that anchors the next read
 // (newLogAnchored compares no more).

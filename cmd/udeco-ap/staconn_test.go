@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -496,8 +495,10 @@ func dnsPayload(id uint16, resp bool) []byte {
 	return b
 }
 
-// The keys: sta_snoop and assoc_garp (both default on) need takeover, are
-// refused on the Garage, and assoc_garp true needs sta_snoop.
+// The keys: sta_snoop and assoc_garp (both default on) need takeover, and
+// assoc_garp true needs sta_snoop on the Deco; the Garage takes both, its
+// GARP without the taps (its addresses come from the ARP table and the
+// proxy ARP responder too).
 func TestConnConfig(t *testing.T) {
 	f, tr := false, true
 	base := func() Config {
@@ -523,8 +524,12 @@ func TestConnConfig(t *testing.T) {
 	}
 	c = base()
 	c.Platform, c.Model, c.AssocGARP = PlatformJio, "U7LT", &f
-	if err := c.validate(); err == nil || !strings.Contains(err.Error(), "assoc_garp") {
-		t.Errorf("jio: %v", err)
+	if err := c.validate(); err != nil || c.assocGARPOn() {
+		t.Errorf("jio assoc_garp false: %v", err)
+	}
+	c.StaSnoop, c.AssocGARP = &f, &tr
+	if err := c.validate(); err != nil || c.staSnoopOn() || !c.assocGARPOn() {
+		t.Errorf("jio sta_snoop false, assoc_garp true: %v", err)
 	}
 }
 

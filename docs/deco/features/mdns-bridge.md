@@ -134,3 +134,11 @@ bridge would forward it); only the payload (and checksums) change.
   delivered (guest frames are not tapped; the guest chains drop them anyway).
 - Not tested on the unit: AF_PACKET send on a Broadcom vif and on the uplink with
   an in-band 802.1Q header, and the metadata VLAN tag in BPF on kernel 4.1.52.
+
+## Garage (platform jio-mtk)
+
+The same bridge with `bdg2` as the LAN bridge: its wired `eth0.<port>.1`
+members and served `ra*`/`rai*` BSSes are tapped (idle slots, AP-client and WDS
+netdevs are skipped), a VLAN with no local bridge is reached tagged on `eth0.4`,
+and no flow cache is flushed (none on this unit). Unverified: the `--ip-dport`
+matches in the Garage's ebtables and tagged sends on `eth0.4`.

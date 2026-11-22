@@ -167,3 +167,11 @@ one unit. Apply's verify-and-rollback covers a hostapd that will not start.
 - Passpoint (`supportsHotspot2Passpoint`) also needs RadSec (fw2_caps
   0x80000), which takeover now claims, so a unit with `hotspot2` on is
   Passpoint-capable for the controller.
+
+## Garage (platform jio-mtk)
+
+Not claimed: `hotspot2` is refused on jio-mtk. The MT7663 has the driver
+half (Interworking/HS2.0 IEs, GAS to a userland ANQP responder), Jio ships
+no responder, and the rebuilt MT7603 would need `CONFIG_MT7603E_HOTSPOT`
+(`-DDOT11U_INTERWORKING -DCONFIG_HOTSPOT -DWAPP_SUPPORT`, gas.o,
+hotspot.o, wapp.o). Details: radius-macauth-hs20-radsec.md, Garage.

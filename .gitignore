@@ -1,5 +1,6 @@
 # Build output
 dist/
+/tools/udeco_rl/out/
 
 # Runtime state, keys, controller backups and secrets
 /state/

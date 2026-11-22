@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dtechterminal/udeco/internal/hapdmon"
+	"github.com/dtechterminal/udeco/internal/mtkft"
 )
 
 // Driver events: what the MediaTek drivers announce on their own, read by
@@ -36,6 +37,25 @@ import (
 //   - the kernel log (/dev/kmsg, its own reader position: the collector's
 //     klogctl reads are untouched): the MT7603 always prints "Del Sta:%pM"
 //     in MacTableDeleteEntry, a second source for 2.4 GHz leaves.
+//   - the MT7663's system log events (SYSTEM_LOG_SUPPORT, sent only with
+//     the profile's WirelessEvent=1, which the agent writes on 5 GHz):
+//     IWEVCUSTOM on the radio's main netdev with the event flag as flags
+//     and "STA(<mac>) <text>" as data: 0x200 "had associated successfully",
+//     0x207 "occurred MIC different in Key Handshaking" (a wrong
+//     passphrase), 0x20B "Pairwise Key Handshaking timeout", 0x20D/0x20E
+//     "set key done in WPA/WPA2" (the 4-way handshake completed). The
+//     texts are in the running kernel (vmlinux2.bin strings, the
+//     MT7613_JCO4032_MESH V6.0.2.0 sys_log.c); the flags and the netdev
+//     (pAd->net_dev) are mt_wifi's (padavan mt7615 sys_log.c,
+//     RtmpDrvSendWirelessEvent; ap_assoc.c, cmm_wpa.c), the nearest open
+//     relative. The rebuilt MT7603 module has no SYSTEM_LOG_SUPPORT (none of
+//     the texts in mt76x3_ap.ko): its only join step is the Insert.
+//
+// The join steps (Insert, the system log events, the WAPP authorization,
+// the ECNT failures) go to EventsOptions.Steps as they arrive, for the
+// connection-timing events (cmd/udeco-ap staconn.go); an authorization
+// two sources report is passed once, and an ECNT failure the system log
+// already reported (or the reverse) once.
 //
 // A Delete becomes a Disconnected hapdmon.Event after leaveHold, unless
 // its BSS (for a kernel log Del Sta, any 2.4 GHz BSS) had more than
@@ -61,7 +81,46 @@ const (
 	DrvFailure                        // ECNT: a failed join (Reason)
 	DrvClientLeave                    // ECNT: the client left (Reason)
 	DrvAPLeave                        // ECNT: the AP made the client leave
+	DrvAssoc                          // the association completed (MT7663 system log 0x200)
+	DrvKeyDone                        // the 4-way handshake completed (MT7663 system log 0x20D/0x20E)
+	DrvHSTimeout                      // the 4-way handshake timed out (MT7663 system log 0x20B)
+	DrvMICDiff                        // a 4-way handshake message with a wrong MIC: a wrong passphrase (MT7663 0x207)
+	DrvFT                             // a roaming event: UDFT 0x0961, RRM 0x094D, BTM 0x093a/0x0929 (EventsOptions.FT)
 )
+
+// The MT7663's system log event flags (IW_*_EVENT_FLAG, mt_wifi rtmp_def.h).
+const (
+	iwAssocEvent      = 0x200
+	iwMICDiffEvent    = 0x207
+	iwPairwiseTimeout = 0x20B
+	iwKeyDoneWPA1     = 0x20D
+	iwKeyDoneWPA2     = 0x20E
+)
+
+// sysLogSTA is the station of a system log event's text: "STA(<mac>) ".
+var sysLogSTA = regexp.MustCompile(`^STA\(([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})\) `)
+
+// sysLogEvent reads one system log event ("STA(<mac>) <text>").
+func sysLogEvent(ifname string, flags uint16, d []byte) (DrvEvent, bool) {
+	var kind DrvKind
+	switch flags {
+	case iwAssocEvent:
+		kind = DrvAssoc
+	case iwMICDiffEvent:
+		kind = DrvMICDiff
+	case iwPairwiseTimeout:
+		kind = DrvHSTimeout
+	case iwKeyDoneWPA1, iwKeyDoneWPA2:
+		kind = DrvKeyDone
+	default:
+		return DrvEvent{}, false
+	}
+	m := sysLogSTA.FindSubmatch(bytes.TrimRight(d, "\x00"))
+	if m == nil {
+		return DrvEvent{}, false
+	}
+	return DrvEvent{Kind: kind, Ifname: ifname, MAC: strings.ToLower(string(m[1]))}, true
+}
 
 // AnyNG is the Ifname of a kernel log Del Sta: some 2.4 GHz BSS (the line
 // names none).
@@ -76,6 +135,9 @@ type DrvEvent struct {
 	Reason int    // ECNT failures and leaves
 	ARP    *ProxyARPRequest
 	At     time.Time
+	// DrvFT: the IWEVCUSTOM flags and data (roam.go)
+	FTFlags uint16
+	FTData  []byte
 }
 
 // ProxyARPRequest is the MT7663's 0x93b event: an ARP request the driver
@@ -169,13 +231,15 @@ func customEvent(ifname string, flags uint16, d []byte) (DrvEvent, bool) {
 		e.Kind, e.MAC, e.BSSID = DrvAuthorized, macStr(d[6:12]), macStr(d[12:18])
 	case flags == 0x953 && len(d) >= 12 && d[5] == 7:
 		e.Kind, e.MAC = DrvMboLeave, macStr(d[6:12])
+	case flags == mtkft.OIDUDFTEvents || flags == mtkft.EvRRM || flags == mtkft.EvBTMRsp || flags == mtkft.EvBTMQuery:
+		e.Kind, e.FTFlags, e.FTData = DrvFT, flags, append([]byte(nil), d...)
 	case flags == 0x93b && len(d) >= 27:
 		r := &ProxyARPRequest{Ifindex: int(binary.LittleEndian.Uint32(d[0:])), IPv6: d[4] != 0, FromDS: d[5] != 0,
 			DAD: d[6] != 0, ReqMAC: append(net.HardwareAddr{}, d[7:13]...), StaMAC: append(net.HardwareAddr{}, d[13:19]...),
 			ReqIP: net.IP(append([]byte{}, d[19:23]...)), StaIP: net.IP(append([]byte{}, d[23:27]...))}
 		e.Kind, e.MAC, e.ARP = DrvProxyARP, r.StaMAC.String(), r
 	default:
-		return e, false
+		return sysLogEvent(ifname, flags, d)
 	}
 	return e, true
 }
@@ -257,7 +321,24 @@ type EventsOptions struct {
 	Down func()
 	// NG2 follows the kernel log for the MT7603's Del Sta lines.
 	NG2 bool
-	Now func() time.Time
+	// Steps gets the join steps as they arrive (from a listener's
+	// goroutine; At set): Insert, Assoc, KeyDone, Authorized, HSTimeout,
+	// MICDiff and the ECNT Failure (Reason 14 a wrong passphrase, 15 a
+	// handshake timeout). Unlike the leaves, steps are passed while the
+	// radios restart too: the joins after a restart are real attempts (the
+	// connection tracker drops the ones its taps missed).
+	Steps func(DrvEvent)
+	// FT gets the roaming IWEVCUSTOM events (from the listener's
+	// goroutine): the MT7603's UDFT key events (0x0961), the MT7663's
+	// neighbour report requests (0x094D), BTM responses (0x093a) and
+	// queries (0x0929) (mtkwifi roam.go)
+	FT func(ifname string, flags uint16, data []byte)
+	// Joined gets each 4-way completion (DrvAuthorized, DrvKeyDone; from
+	// the listener's goroutine; bssid "" when the event has none): the
+	// roaming runtime's trigger for the 5 GHz driver's keys (roam.go
+	// FTJoined)
+	Joined func(ifname, mac, bssid string)
+	Now    func() time.Time
 	// test hooks: the sources (nil = the real sockets, drvevents_linux.go)
 	openRTNL, openECNT, openKmsg func() (packetSource, error)
 }
@@ -284,6 +365,16 @@ type Events struct {
 	dropped  int
 	rtnlUp   bool
 	failSeen map[string]time.Time // ECNT failures logged, per station
+	// stepSeen: per station and step class ("auth": an authorization,
+	// "psk"/"eapol": a failure), the last one passed to Steps and its
+	// source, so a second source's report of the same step is passed once
+	stepSeen map[string]stepMark
+}
+
+// stepMark is the last join step of a class passed for a station.
+type stepMark struct {
+	at  time.Time
+	src DrvKind
 }
 
 // NewEvents returns a monitor; nothing is opened until Run.
@@ -297,7 +388,7 @@ func NewEvents(o EventsOptions) *Events {
 	if o.Busy == nil {
 		o.Busy = func() bool { return false }
 	}
-	return &Events{o: o, reported: map[string]time.Time{}, failSeen: map[string]time.Time{}}
+	return &Events{o: o, reported: map[string]time.Time{}, failSeen: map[string]time.Time{}, stepSeen: map[string]stepMark{}}
 }
 
 // Take returns the released leaves (oldest first) and how many were
@@ -335,8 +426,18 @@ func (m *Events) handle(e DrvEvent) {
 		}
 		return
 	}
+	if e.Kind == DrvFT {
+		if m.o.FT != nil {
+			m.o.FT(e.Ifname, e.FTFlags, e.FTData)
+		}
+		return
+	}
 	now := m.o.Now()
 	e.At = now
+	m.step(e, now)
+	if (e.Kind == DrvAuthorized || e.Kind == DrvKeyDone) && m.o.Joined != nil {
+		m.o.Joined(e.Ifname, e.MAC, e.BSSID)
+	}
 	switch e.Kind {
 	case DrvFailure:
 		m.logFailure(e, now)
@@ -372,6 +473,59 @@ func (m *Events) dropFallback(mac string) {
 		}
 	}
 	m.staged = kept
+}
+
+// stepClass is the class of a join step whose report two sources can
+// make ("" for the others: each is passed).
+func stepClass(e DrvEvent) string {
+	switch {
+	case e.Kind == DrvKeyDone || e.Kind == DrvAuthorized:
+		return "auth"
+	case e.Kind == DrvMICDiff || e.Kind == DrvFailure && e.Reason == 14:
+		return "psk"
+	case e.Kind == DrvHSTimeout || e.Kind == DrvFailure && e.Reason == 15:
+		return "eapol"
+	}
+	return ""
+}
+
+// step passes a join step to Options.Steps: an authorization once per
+// station within dedupWindow (the WAPP event and the system log's both
+// report it), a failure that the other source (ECNT or the system log)
+// reported within dedupWindow not again; one source's repeats (a station's
+// retried handshake messages) pass, as hostapd reports each.
+func (m *Events) step(e DrvEvent, now time.Time) {
+	switch e.Kind {
+	case DrvInsert, DrvAssoc, DrvKeyDone, DrvAuthorized, DrvHSTimeout, DrvMICDiff:
+	case DrvFailure:
+		if e.Reason != 14 && e.Reason != 15 {
+			return
+		}
+	default:
+		return
+	}
+	if m.o.Steps == nil || e.MAC == "" {
+		return
+	}
+	if c := stepClass(e); c != "" {
+		k := e.MAC + "/" + c
+		m.mu.Lock()
+		last, seen := m.stepSeen[k]
+		dup := seen && now.Sub(last.at) < dedupWindow && (c == "auth" || last.src != e.Kind)
+		if !dup {
+			m.stepSeen[k] = stepMark{at: now, src: e.Kind}
+		}
+		for x, t := range m.stepSeen {
+			if now.Sub(t.at) > time.Minute {
+				delete(m.stepSeen, x)
+			}
+		}
+		m.mu.Unlock()
+		if dup {
+			return
+		}
+	}
+	m.o.Steps(e)
 }
 
 // flush releases the staged events whose hold is over.

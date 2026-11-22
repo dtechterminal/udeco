@@ -179,10 +179,56 @@ unit is accelerated** (fc and Archer HW forwarding off, every packet on the
 with none keeps full acceleration. Limits for clients that are not associated
 on this unit, and SSID limits with no station, keep the cache on.
 
-**jio-mtk (Garage AP)**: unchanged. The MediaTek backend has no
-`SetClientRates`; the agent logs once "per-client speed limits (...): not
-supported on platform jio-mtk; not applied" and keeps the list in the
-session. No tc or other command runs there.
+## Garage (jio-mtk)
+
+The JCOW414's kernel (EcoNet 3.18.21) has `CONFIG_NET_SCHED` off: no tc,
+no qdisc can be loaded. Jio's own modules do not fit either:
+`soft_rate_limit.ko` only queues what `hw_nat` hands it (an aggregate per
+SSID through `/proc/tc3162/wlan_ssid_ratelimit`, or a few MAC queues),
+`swqos.ko` is WAN-upstream QoS by mark, and `accesslimit.ko` counts
+devices. The kernel's `xt_limit` counts packets, and there is no
+`hashlimit`.
+
+So with `"rate_limits": true` (off by default; the module's policing was
+proven on the unit on both bands, "Live test, Garage" below) mtkwifi takes the same
+list as bcmwifi (`SetClientRates`) and polices it with the agent's own
+module, `udeco_rl.ko` (`tools/udeco_rl`, GPL; `build.sh` builds it in the
+docker cross toolchain against the unit's sk_buff layout):
+
+- **How:** a token bucket per station and direction, in bytes, on the
+  bridge's FORWARD hook. Download is what leaves on a Wi-Fi port to the
+  station's MAC, upload what arrives from it. The bucket holds 250 ms of
+  the rate (at least 32 KB) and may go into debt by one frame. A frame is
+  dropped only while the bucket is in debt, so the station is slowed and
+  never cut off. ARP, DHCP, DHCPv6 and neighbour discovery always pass. A
+  limit below 64 kbit/s is held at 64.
+- **What is limited:** the merge is bcmwifi's. A client's own entry holds by
+  MAC on any SSID of the unit, from its first frame. The SSID's limit covers
+  the directions the entry leaves open and every other station associated
+  on it, from the reading that shows it there.
+- **Hardware NAT:** Jio's `hw_nat` (the PPE) forwards bound flows past
+  the bridge. The 5 GHz driver hands its frames to it; the rebuilt 2.4 GHz
+  driver has no hooks. The module clears the FOE tag of each limited
+  station's frames, so the PPE never binds them, and a table that adds or
+  changes a limit carries `flush`, which drops what was bound before.
+  Other stations stay accelerated: there is no flow-cache trade-off here.
+- **Lifecycle:** the module is loaded (`insmod`, from
+  `/flash2/udeco/udeco_rl.ko.gz`, unpacked into `/tmp/udeco`) only when a
+  limit applies and the agent owns Wi-Fi. The table is rewritten only when
+  it changes, and checked at each Tick (a module that lost its table is
+  rewritten). It is cleared and the module removed at the hand-back, the
+  observe-mode start and the drop to observe. A plain stop leaves it
+  policing, like the Deco's tc trees.
+- **Failure:** a module that does not load, or answers in another version,
+  is noted on each limited SSID ("not applied (the station limiter is not
+  working: ...)") and logged once. It is tried again after 10 min.
+  Nothing else on the unit depends on it.
+- **Off:** with `rate_limits` off, the limits are noted as before
+  ("... not applied (rate_limits is off on this unit)") and logged once.
+  A module an earlier run left loaded is removed.
+- **Not covered:** traffic the driver forwards between two stations of
+  one BSS, and a station's traffic to the unit itself. The Deco's IFB
+  ingress shaping limits those too.
 
 The other users of `internal/device` apply nothing either: `cmd/udeco` (the
 app-API Deco runner) logs the action as ignored, upstream's `uow` (OpenWrt) drops it
@@ -212,7 +258,18 @@ in their state.json instead of noting the cmd as unhandled.
   logged once; dry run flips nothing.
 - `cmd/udeco-ap/flowcache_test.go`: an observe-mode start with
   `/tmp/udeco/fc-off` restores the cache (one handle built, nothing else);
-  jio-mtk builds and restores nothing.
+  jio-mtk builds and restores nothing, and removes a udeco_rl an earlier
+  run left loaded (observe start, drop to observe).
+- `internal/mtkwifi/ratelimit_test.go` (fake module): nothing loaded
+  before the takeover or with no station to limit; the table and its
+  `flush` at the apply; by MAC on any SSID; no rewrite without a change; one
+  direction, clear; SSID limits follow the readings' stations, the entry
+  overriding per direction, unserved netdevs ignored; agent restart (one
+  rewrite, a lost table rewritten); hand-back removes it; `rate_limits` off
+  (note, one log line, leftover module removed); load failure (note with
+  the reason, retry after 10 min, notes clear); another module version
+  refused; no `flush` without hw_nat; the /proc, insmod and rmmod side on
+  files.
 - `cmd/udeco-ap/ratelimit_test.go`: rate-update reaches the Wi-Fi backend as
   the whole list; a limited client that leaves and re-joins triggers a
   hand-over; -1/-1 clears; restart hands the saved list over; a backend
@@ -250,6 +307,42 @@ in their state.json instead of noting the cmd as unhandled.
    log says `... need the slow path (it had been turned back on)`.
 10. Hand-back (force a rollback with no last-good, or drop to observe) with a
     limit set: `fc status` "enabled." afterwards.
+
+## Live test, Garage
+
+Steps 1-4 VERIFIED on the unit 2026-11-23 (module md5 545a96a8..., test
+client a GL KVM on each band, iperf3 to the gateway): `insmod` clean,
+`/proc/udeco_rl` "entries=0 hwnat=live"; 512 down / 768 up held at
+502/698 kbit/s on 2.4 GHz (ra0, baseline 8665/7544) and 504/699 on 5 GHz
+(rai0); ping 0% loss, DHCP renew and telnet to the unit fine while
+saturated; drop counters rose; `rmmod` clean, the /proc entry gone, no
+oops. Step 4: a 5 GHz entry added mid-stream WITHOUT `flush` left the
+stream at ~12 Mbit/s (the module saw 80 download packets: the bound hw_nat
+flow bypasses the bridge's FORWARD hook), and after a write with `flush`
+new streams held the limit, so the agent's flush on a new or tighter limit
+is required. Each write() replaces the whole table: by hand, send the
+entries and `flush` in one write (`printf '...\nflush\n' | dd bs=4096`;
+busybox printf writes line by line and left the table empty). The agent
+writes once (`ratelimit.go`). Step 5 (through UniFi) is still to do.
+
+One test client, a quiet window, one step at a time; `rmmod udeco_rl`
+undoes any step.
+
+1. Read only: `cat /proc/modules`, `cat /proc/tc3162/hwnat_off`.
+2. Agent stopped: unpack `/flash2/udeco/udeco_rl.ko.gz` to `/tmp`,
+   `insmod`, `cat /proc/udeco_rl` (`entries=0`, `hwnat=live` with Jio's
+   hw_nat), `dmesg | tail`. Nothing is policed with an empty table.
+3. `printf '<mac> 512 768\nflush\n' | dd of=/proc/udeco_rl bs=4096`; iperf3 from the
+   client to a wired host, both directions, on each band. Expect at most
+   512/768 kbit/s; the counters in `/proc/udeco_rl` show passes and drops.
+   Ping and DHCP renew from the client, and telnet to the unit from the
+   LAN, still work while saturated.
+4. A 5 GHz stream started before the entry: with `flush` it drops to the
+   limit within a few seconds.
+5. `clear`, `rmmod udeco_rl`; then with `"rate_limits": true` the same
+   through UniFi (a user group): the agent's log, a band/SSID move, an
+   agent restart, a WLAN user group, back to the default group, and a
+   hand-back (the module is gone afterwards).
 
 ## Open questions
 

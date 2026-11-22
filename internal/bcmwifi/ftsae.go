@@ -145,6 +145,20 @@ func ssidMDID(s SSID, band string) uint16 {
 	return mobilityDomain(s.SSID)
 }
 
+// SSIDMDID is the mobility domain the Decos serve s with on band ("ng",
+// "na"): the Garage (mtkwifi) uses it too, so clients roam between them
+// with 802.11r.
+func SSIDMDID(s SSID, band string) uint16 { return ssidMDID(s, band) }
+
+// NormalizeFT is what a Deco makes of s's 802.11r (s.Security already
+// one of the Sec* words): FT off where it builds none, FT-SAE only with a
+// usable key, the controller's mobility domain kept when valid. The notes
+// say what is not built (never the key).
+func NormalizeFT(s SSID) (SSID, []string) { return normalizeFT(s, nil) }
+
+// ValidFTKey: k is a usable iapp_key (32 or 64 hex digits).
+func ValidFTKey(k string) bool { return validFTKey(k) }
+
 // bandMobilityDomain derives a per-band MDID from the SSID; the two bands
 // never share one.
 func bandMobilityDomain(ssid, band string) uint16 {

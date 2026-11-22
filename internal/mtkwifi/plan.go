@@ -15,8 +15,14 @@
 //   - iwpriv <bss> set SSID / HideSSID / NoForwarding / MaxStaNum work live.
 //   - VLAN N reaches the gateway as <port>.N on the switch port device
 //     (eth0.4.N), not on the bridge member eth0.4.1 (which is VID 1).
-//   - The MT7603 module (2.4 GHz) has no WPA3/SAE: WPA2/WPA3 WLANs are
-//     served there as WPA2-PSK, WPA3-only ones are not served.
+//   - The vendor MT7603 module (2.4 GHz, mt7603eap.ko) has no WPA3/SAE:
+//     WPA2/WPA3 WLANs are served there as WPA2-PSK, WPA3-only ones are not
+//     served. The rebuilt MT7603 module (padavan 4.1.2.0 with SAE and PMF,
+//     cross-built for the unit's EcoNet kernel; loaded as mt76x3_ap) has
+//     the MT7663's AuthMode words and PMF keys: with it loaded the 2.4 GHz
+//     radio serves SAE too (WithDriverSAE). Verified on the unit
+//     2026-11-22: a WPA3-only BSS on ra3 took an SAE client (group 19,
+//     PMF required, BIP).
 //   - The MT7663 driver (5 GHz, built into the kernel) has SAE: AuthMode
 //     WPA2PSKWPA3PSK (transition, needs PMFMFPC=1) and WPA3PSK (PMF
 //     required). It is used only when the agent claims WPA3 (config wpa3).
@@ -28,6 +34,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,7 +62,7 @@ type RadioDef struct {
 	// (its `set TxPower` only stores the value)
 	TxLive string
 	HWName string
-	SAE    bool // the driver serves WPA3-Personal (SAE)
+	SAE    bool // the driver serves WPA3-Personal (SAE) and has the PMF keys
 	UAPSD  bool // the driver has U-APSD (APSDCapable, per BSS)
 	// DFS: the agent may serve 52-64 on this radio (Options.DFS; dfs.go)
 	DFS bool
@@ -65,6 +73,28 @@ type RadioDef struct {
 	// MT7603's ApOffChanScan sweep, offchan.go), or "" for none (the band's
 	// spectrum commands run the neighbour survey: SpectrumBySurvey)
 	Spectrum string
+	// Dot1X: the driver serves WPA2/WPA3-Enterprise with Jio's rtdot1xd
+	// (802.1X authenticator in userland, the driver holding the keys and
+	// the port; dot1x.go). The MT7663 always; the MT7603 only as the
+	// rebuilt module (WithDriverSAE). Cleared when rtdot1xd is missing
+	// or the agent's enterprise key is off (New).
+	Dot1X bool
+	// RadiusKeyList: the driver reads every BSS's RADIUS secret from one
+	// ;-list in RADIUS_Key1 (the MT7603's "prev format",
+	// rtmp_read_radius_parms_from_file); else RADIUS_Key<n> per BSS (the
+	// MT7663, ReadRadiusParameterFromFile)
+	RadiusKeyList bool
+	// FT: the agent serves 802.11r on this radio (roam.go,
+	// docs/deco/features/garage-ft.md): the MT7663 always has it (built
+	// into the kernel); the MT7603 only as the rebuilt mt7603roam module
+	// (WithDriverFT). Cleared by New when the agent's garage_ft key is
+	// off; NoFTWhy then says why.
+	FT      bool
+	NoFTWhy string `json:"-"`
+	// FTSAE: the agent's wpa3 and ft_sae keys are on (the Decos' view of
+	// the mobility domain, bcmwifi.SSIDMDID, and FT-SAE where the radio
+	// serves SAE and FT)
+	FTSAE bool
 }
 
 // JCOW414 is the JioFiber JCOW414 layout: two 2x2 radios with four BSS
@@ -78,7 +108,64 @@ var JCOW414 = []RadioDef{
 		Spectrum: SpectrumOffChan},
 	{Band: "na", Ifaces: []string{"rai0", "rai1", "rai2", "rai3"}, Dat: "/etc/Wireless/RT2860AP_AC/RT2860AP.dat",
 		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: models.JCOW414MaxTx("na"), MinTxDBm: 5, NSS: 2, TxLive: "PowerDropCtrl", HWName: "MT7663",
-		SAE: true, UAPSD: true, HSFlag: true},
+		SAE: true, UAPSD: true, HSFlag: true, Dot1X: true, FT: true},
+}
+
+// SAEModule2G is the rebuilt 2.4 GHz module's name in /sys/module: the
+// MT7603 driver that serves SAE (the vendor's mt7603eap does not).
+const SAEModule2G = "mt76x3_ap"
+
+// WithDriverSAE returns layout with SAE, PMF and 802.1X (Dot1X, with
+// the MT7603's RADIUS_Key1 list) on the 2.4 GHz radio when the rebuilt
+// MT7603 module (SAEModule2G) is loaded under root; else layout itself.
+// The vendor's mt7603eap is never given enterprise SSIDs: its RADIUS
+// profile format is unverified.
+func WithDriverSAE(root string, layout []RadioDef) []RadioDef {
+	if _, err := os.Stat(filepath.Join(root, "sys/module", SAEModule2G)); err != nil {
+		return layout
+	}
+	l := append([]RadioDef(nil), layout...)
+	for i := range l {
+		if l[i].Band == "ng" {
+			l[i].SAE, l[i].Dot1X, l[i].RadiusKeyList = true, true, true
+		}
+	}
+	return l
+}
+
+// FTSymbol2G is a function only the rebuilt MT7603 module with the
+// agent's FT interface has (mt7603roam, drv2g ft_udft.c): the SAE-only
+// build (mt7603wpa3) has the same module name and no 802.11r.
+const FTSymbol2G = "FT_UDFT_GetEvents"
+
+// WithDriverFT returns layout with FT on the 2.4 GHz radio when the
+// loaded MT7603 module has the FT interface (FTSymbol2G among its
+// symbols in /proc/kallsyms under root); else layout itself. A read of
+// /proc/kallsyms only: nothing is sent to the driver.
+func WithDriverFT(root string, layout []RadioDef) []RadioDef {
+	b, err := os.ReadFile(filepath.Join(root, "proc/kallsyms"))
+	if err != nil || !kallsymsHas(b, FTSymbol2G, SAEModule2G) {
+		return layout
+	}
+	l := append([]RadioDef(nil), layout...)
+	for i := range l {
+		if l[i].Band == "ng" {
+			l[i].FT = true
+		}
+	}
+	return l
+}
+
+// kallsymsHas: /proc/kallsyms lists sym in module mod ("<addr> <type>
+// <sym>\t[<mod>]").
+func kallsymsHas(b []byte, sym, mod string) bool {
+	for _, l := range bytes.Split(b, []byte("\n")) {
+		f := strings.Fields(string(l))
+		if len(f) >= 4 && f[2] == sym && f[3] == "["+mod+"]" {
+			return true
+		}
+	}
+	return false
 }
 
 // Channels the units' country (IN, CountryRegion 0 / CountryRegionABand 10)
@@ -94,7 +181,7 @@ const maxStaDefault = 32 // per BSS when the controller sets no limit
 type BSS struct {
 	ID      string
 	SSID    string
-	Auth    string // OPEN, WPA2PSK, WPA2PSKWPA3PSK, WPA3PSK
+	Auth    string // OPEN, WPA2PSK, WPA2PSKWPA3PSK, WPA3PSK, WPA2 (802.1X: Radius set)
 	Encr    string // NONE, AES
 	PMF     int    // 0 off, 1 capable (PMFMFPC), 2 required (PMFMFPR too)
 	PSK     string `json:",omitempty"`
@@ -122,6 +209,20 @@ type BSS struct {
 	// ProxyARP: the controller's proxy ARP (proxyarp.go; live, never a
 	// restart)
 	ProxyARP bool `json:",omitempty"`
+	// NoBGA: the controller's bga_filter=disabled; the agent's BPDU
+	// filter (bga.go; ebtables, never a restart) leaves the BSS alone
+	NoBGA bool `json:",omitempty"`
+	// Radius: WPA2/WPA3-Enterprise through rtdot1xd (dot1x.go); its
+	// Secret is a secret (as PSK)
+	Radius *Dot1X `json:",omitempty"`
+	// FT: 802.11r (FT-PSK; with FTSAE also FT-SAE) in mobility domain
+	// MDID, the Decos' (bcmwifi.SSIDMDID). R0KHID is the 5 GHz BSS's
+	// R0KH-ID (mtkft.R0KHID of its netdev's address, filled by ftIDs);
+	// the 2.4 GHz driver uses its BSSID's 12 hex digits itself (roam.go).
+	FT     bool   `json:",omitempty"`
+	FTSAE  bool   `json:",omitempty"`
+	MDID   uint16 `json:",omitempty"`
+	R0KHID string `json:",omitempty"`
 }
 
 // RadioPlan is what one radio serves. The zero value of each per-radio
@@ -177,7 +278,7 @@ func (r RadioPlan) structural() string {
 	c.BSS = nil
 	c.TxPct, c.MinRSSI, c.TxMode = 0, 0, "" // live (applyLive), reported only
 	for _, b := range r.BSS {
-		b.Hidden, b.Isolate, b.MaxSta = false, false, 0
+		b.Hidden, b.Isolate, b.MaxSta, b.NoBGA = false, false, 0, false
 		c.BSS = append(c.BSS, b)
 	}
 	j, _ := json.Marshal(c)
@@ -269,7 +370,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			s = s.ForBand(rd.Band) // the controller's own values for this radio
 			b := BSS{ID: s.ID, SSID: s.SSID, Hidden: s.Hidden, Isolate: s.Isolation, MaxSta: maxSta, VLAN: s.VLAN,
 				RRM: s.RRM, BTM: s.BSSTransition, UAPSD: s.UAPSD && rd.UAPSD, M2U: s.MulticastToUnicast,
-				Sched: len(s.Schedule) > 0, ProxyARP: s.ProxyARP}
+				Sched: len(s.Schedule) > 0, ProxyARP: s.ProxyARP, NoBGA: s.NoBGAFilter}
 			switch s.Security {
 			case translate.SecOpen, "":
 				b.Auth, b.Encr = "OPEN", "NONE"
@@ -297,6 +398,23 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 				case s.PMF == translate.PMFOptional:
 					b.PMF = 1
 				}
+			case translate.SecWPA2Ent, translate.SecWPA3Ent:
+				// 802.1X through rtdot1xd (dot1x.go): AuthMode WPA2 on both
+				// drivers; WPA3-Enterprise is WPA2 with PMF required, whose
+				// RSNE then carries 802.1X-SHA256 only
+				why := ""
+				if b.Radius, why = dot1xOf(s, rd); b.Radius == nil {
+					note("%s: SSID %q: %s: not served", rd.Band, s.SSID, why)
+					continue
+				}
+				b.Auth, b.Encr = "WPA2", "AES"
+				switch {
+				case s.Security == translate.SecWPA3Ent || s.PMF == translate.PMFRequired:
+					b.PMF = 2
+				case s.PMF == translate.PMFOptional:
+					b.PMF = 1
+				}
+				dot1xNotes(s, rd, note)
 			default:
 				note("%s: SSID %q: security %s is not supported by this driver: not served", rd.Band, s.SSID, s.Security)
 				continue
@@ -323,7 +441,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			// they come here, not to WPA3-only ones). Applying it here would
 			// stop serving such an SSID: left to the owner.
 			// TestPassphraseLengthOnly shows the difference.
-			if b.Auth != "OPEN" && (len(b.PSK) < 8 || len(b.PSK) > 64) {
+			if b.Auth != "OPEN" && b.Radius == nil && (len(b.PSK) < 8 || len(b.PSK) > 64) {
 				note("%s: SSID %q: no valid passphrase: not served", rd.Band, s.SSID)
 				continue
 			}
@@ -338,6 +456,7 @@ func plans(d bcmwifi.Desired, layout []RadioDef, sae bool) (map[string]RadioPlan
 			if s.Security == translate.SecWPA2WPA3 && b.Auth == "WPA2PSK" {
 				note("%s: SSID %q: served as WPA2 only (no SAE in this driver)", rd.Band, s.SSID)
 			}
+			ftPlan(&b, s, rd, sae, note) // roam.go
 			bssNotes(s, b, rd, note)
 			rp.BSS = append(rp.BSS, b)
 			served = append(served, s)
@@ -551,7 +670,7 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 	if rd.Band == "na" && isDFS(rp.Channel) {
 		kv[regionA] = dfsRegA // the only region with 52-64 (dfs.go)
 	}
-	var auth, encr, hide, nofw, maxsta, mfpc, mfpr []string
+	var auth, encr, hide, nofw, maxsta, mfpc, mfpr, sha []string
 	for i, b := range rp.BSS {
 		kv[fmt.Sprintf("SSID%d", rp.slot(i)+1)] = b.SSID
 		if b.PSK != "" {
@@ -561,6 +680,8 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 		hide, nofw = append(hide, b01(b.Hidden)), append(nofw, b01(b.Isolate))
 		maxsta = append(maxsta, strconv.Itoa(b.MaxSta))
 		mfpc, mfpr = append(mfpc, b01(b.PMF >= 1)), append(mfpr, b01(b.PMF == 2))
+		// 802.1X with PMF required: AKM 802.1X-SHA256 only (dot1x.go)
+		sha = append(sha, b01(b.Radius != nil && b.PMF == 2))
 	}
 	kv["AuthMode"] = slotKey(base, "AuthMode", n, rp, auth, "WPA2PSK")
 	kv["EncrypType"] = slotKey(base, "EncrypType", n, rp, encr, "AES")
@@ -571,10 +692,11 @@ func profile(base []byte, rd RadioDef, rp RadioPlan) []byte {
 		// per-BSS lists; the slots not served keep PMF off
 		kv["PMFMFPC"] = slotKey(nil, "PMFMFPC", n, rp, mfpc, "0")
 		kv["PMFMFPR"] = slotKey(nil, "PMFMFPR", n, rp, mfpr, "0")
-		kv["PMFSHA256"] = listKey(nil, "PMFSHA256", n, nil, "0")
+		kv["PMFSHA256"] = slotKey(nil, "PMFSHA256", n, rp, sha, "0")
 	}
 	kv["IEEE8021X"] = slotKey(base, "IEEE8021X", n, rp, []string{"0", "0", "0", "0"}[:len(rp.BSS)], "0")
 	profileFeatures(kv, base, rd, rp)
+	dot1xKeys(kv, base, rd, rp)
 	return setKeys(base, kv)
 }
 

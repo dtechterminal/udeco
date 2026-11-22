@@ -87,6 +87,11 @@ func (a *Applier) driverChange(ctx context.Context, quiet time.Duration, name st
 		defer a.changingRadios()()
 	}
 	a.quietFor(quiet)
+	// the MT7663's BSSes restart (dfs.go is its only caller): its R1KH
+	// table may be emptied, so the runtime installs its SAs again (an
+	// SA already there is replaced, never doubled: KEY_RSP deletes the
+	// entry of the same name first)
+	a.roam.radioRestarted("na")
 	return a.run(ctx, name, args...)
 }
 

@@ -333,9 +333,12 @@ type agent struct {
 	// running; staevents.go); readAt: when the reading in use started
 	hapd staSource
 	// drv: the Garage's driver leave events (mtkwifi.Events; garage.go)
-	drv    leaveSource
-	gnet   garageNetState // garage.go: stations seen, addresses, GARPs
-	readAt time.Time
+	drv leaveSource
+	// drvSteps: the Garage's driver join steps for the connection-timing
+	// events (staconn_jio.go; nil: sta_snoop off or not the Garage)
+	drvSteps *anchorRing
+	gnet     garageNetState // garage.go: stations seen, addresses, GARPs
+	readAt   time.Time
 	// stale: the reading in use is the last one again (it failed): no new
 	// look at the clients (station events, Roaming Assistant)
 	stale  bool
@@ -394,7 +397,8 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 			o.newWifi = func(bo bcmwifi.Options) wifiApplier {
 				return mtkwifi.New(mtkwifi.Options{Root: bo.Root, Run: bo.Run, StateDir: bo.StateDir, RunDir: bo.RunDir,
 					Uplink: bo.Uplink, DryRun: bo.DryRun, WPA3: bo.WPA3, Logf: bo.Logf, KeepSSID: cfg.UplinkLossSSID,
-					PinSlots: cfg.BSSPinning, ProxyARP: cfg.proxyARP(), ProxyARPDriver: cfg.ProxyARPDriver, DFS: cfg.DFS})
+					PinSlots: cfg.BSSPinning, ProxyARP: cfg.proxyARP(), ProxyARPDriver: cfg.ProxyARPDriver, DFS: cfg.DFS,
+					RateLimits: cfg.RateLimits, NoDot1X: !cfg.enterprise(), GarageFT: cfg.GarageFT, FTSAE: bo.FTSAE})
 			}
 		}
 	}
@@ -644,15 +648,30 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	portVLAN := a.portsSetup()            // LAN ports (jio-mtk as UHDIW: ports.go)
 	_, canSteer := a.wifi.(steerer)
 	_, canRoam := a.wifi.(roamer)
+	// the Garage's 802.11v requests only with its roaming runtime
+	// (garage_ft; mtkwifi roam.go)
+	if rs, ok := a.wifi.(interface{ ServesRoaming() bool }); ok && !rs.ServesRoaming() {
+		canSteer, canRoam = false, false
+	}
 	ft, canFTSAE := a.wifi.(ftSAEServer)
 	canFTSAE = canFTSAE && ft.ServesFTSAE()
+	// the Garage's 2.4 GHz SAE: only with the rebuilt MT7603 module
+	// (mtkwifi.WithDriverSAE)
+	sb, saeNG := a.wifi.(interface{ ServesSAE(band string) bool })
+	saeNG = saeNG && sb.ServesSAE("ng")
+	// RadSec on the Garage: rtdot1xd reaches the agent's proxy as
+	// hostapd does on the Deco, so it is claimed when some radio serves
+	// WPA2/WPA3-Enterprise (mtkwifi dot1x.go)
+	ds, dot1x := a.wifi.(interface{ ServesDot1X() bool })
+	dot1x = dot1x && ds.ServesDot1X()
 	// The takeover features (RF_SCAN, minimum rates, PPSK, Lock to AP,
 	// Roaming Assistant, RADIUS filter, multicast inspect, RadSec, mDNS
 	// bridge, Hotspot 2.0) need the agent to own Wi-Fi: observe mode
 	// claims none of them, and a drop to observe clears them (fields).
 	own := a.takeover.Load()
-	// hostapd/wl features (PPSK, RADIUS filter, multicast inspect, RadSec)
-	// exist on the Deco only
+	// hostapd/wl features (PPSK, RADIUS filter) exist on the Deco only;
+	// RadSec also on the Garage with rtdot1xd (above). Multicast inspection is passive AF_PACKET taps on the BSS
+	// netdevs (internal/mcinspect), served on both platforms.
 	deco := own && !a.cfg.jio()
 	// RF_SCAN: wl scans on the Deco; a collector that says whether it can
 	// scan (jio-mtk: only with fresh site surveys enabled) decides itself
@@ -662,8 +681,9 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	}
 	p, ok := models.DecoAgentProfileWith(m, heAX, models.DecoAgentFeatures{BandSteer: canSteer, RFScan: rfScan,
 		MinRate: own && a.cfg.MinRates, PPSK: deco, LockAP: own, RoamAssist: own && canRoam,
-		RadiusFilter: deco, MulticastInspect: deco, WPA3: own && a.cfg.WPA3, WPA3FT: own && a.cfg.WPA3 && canFTSAE,
-		RadSec: deco, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2,
+		RadiusFilter: deco, MulticastInspect: own, WPA3: own && a.cfg.WPA3, WPA3FT: own && a.cfg.WPA3 && canFTSAE,
+		WPA3NG: own && a.cfg.WPA3 && saeNG,
+		RadSec: deco || own && a.cfg.jio() && dot1x, MdnsBridge: own && a.cfg.Apply && a.cfg.MdnsBridge, Hotspot2: own && a.cfg.Hotspot2,
 		PortVLAN: own && portVLAN, DFS: deco})
 	if !ok {
 		return fmt.Errorf("model %s has no agent capability words", a.cfg.Model)

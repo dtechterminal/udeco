@@ -184,6 +184,10 @@ type connIn struct {
 	anchor *staAnchor
 	sock   *hapdmon.Event
 	frame  *stasnoop.Obs
+	// drv: a driver's step (the Garage, staconn_jio.go): its Connected
+	// only authorizes an open attempt (the drivers also report the end of
+	// each group rekey), never starts one
+	drv bool
 }
 
 // connReading is what the tracker needs from a reading.
@@ -203,8 +207,11 @@ type connReading struct {
 	snoopSince map[string]time.Time
 	signal     map[string]int  // station -> signal (dBm)
 	assoc      map[string]bool // stations associated in the reading
-	gwMAC      string
-	gwIP       string
+	// staVif: station -> the BSS it is on in the reading (a driver step
+	// that names no BSS is put there: staconn_jio.go)
+	staVif map[string]string
+	gwMAC  string
+	gwIP   string
 }
 
 // assocPending: a's association event waits for the next reading
@@ -238,6 +245,10 @@ type connAttempt struct {
 	dnsQueries int
 	dnsResp    int
 	dot        bool // a DNS-over-TLS server accepted its connection
+	// byFrame: authorized taken from its first frame on the tap (the
+	// Garage's 2.4 GHz driver reports no 4-way handshake): its
+	// wpa_auth_delta is not known
+	byFrame    bool
 	wpaFails   int
 	assocFails int
 	rssi       int // the first signal seen (auth_rssi)
@@ -261,6 +272,12 @@ type connTracker struct {
 	brCache  map[string]string
 	in       []connIn
 	gone     []*connAttempt // authorized attempts that ended, to judge
+	// frameAuth (the Garage): a station's first frame on its BSS's tap
+	// authorizes an attempt no driver event authorized (a PSK station's
+	// data frames pass only after the 4-way handshake)
+	frameAuth bool
+	// staVif: the judge's reading's station -> BSS (connReading.staVif)
+	staVif map[string]string
 }
 
 type staIP struct {
@@ -337,10 +354,30 @@ func (c *connTracker) open(mac, vif string, at time.Time) *connAttempt {
 	return a
 }
 
+// vifOf is the BSS of a step that names none (a radio-wide driver event):
+// the station's open attempt's, else the reading's; "" when neither.
+func (c *connTracker) vifOf(mac, vif string) string {
+	if vif != "" {
+		return vif
+	}
+	if a := c.att[mac]; a != nil {
+		return a.vif
+	}
+	return c.staVif[mac]
+}
+
 func (c *connTracker) apply(in connIn, gwMAC, gwIP string) {
 	switch {
 	case in.anchor != nil:
 		x := in.anchor
+		if x.Vif == "" {
+			y := *x
+			y.Vif = c.vifOf(x.MAC, "")
+			if y.Vif == "" {
+				return // no BSS to put it on
+			}
+			x = &y
+		}
 		a := c.att[x.MAC]
 		switch x.Kind {
 		case anchorAuth, anchorAssoc:
@@ -381,9 +418,20 @@ func (c *connTracker) apply(in connIn, gwMAC, gwIP string) {
 		}
 	case in.sock != nil:
 		ev := in.sock
+		if ev.Vif == "" {
+			e := *ev
+			e.Vif = c.vifOf(ev.MAC, "")
+			if e.Vif == "" {
+				return
+			}
+			ev = &e
+		}
 		a := c.att[ev.MAC]
 		switch ev.Kind {
 		case hapdmon.Connected:
+			if in.drv && (a == nil || a.authorized || a.vif != ev.Vif) {
+				break // a group rekey's end, or a step of an attempt not seen
+			}
 			if a == nil || a.authorized || a.vif != ev.Vif {
 				c.retire(ev.MAC)
 				a = c.open(ev.MAC, ev.Vif, in.at)
@@ -447,6 +495,9 @@ func (c *connTracker) frame(o stasnoop.Obs, at time.Time, gwMAC, gwIP string) {
 		c.setIP(mac, o.SrcIP, c.bridge(o.Vif), at)
 	}
 	a := c.att[mac]
+	if c.frameAuth && a != nil && a.vif == o.Vif && !a.authorized && !o.Out {
+		a.authorized, a.byFrame, a.wpa, a.sockAt = true, true, at, at
+	}
 	if a == nil || a.vif != o.Vif || !a.authorized {
 		return
 	}
@@ -519,6 +570,7 @@ func (c *connTracker) judge(r connReading, push func(map[string]any)) {
 	in := c.in
 	c.in = nil
 	c.brCache = nil
+	c.staVif = r.staVif
 	sort.SliceStable(in, func(i, j int) bool { return in[i].at.Before(in[j].at) })
 	for _, x := range in {
 		c.apply(x, r.gwMAC, r.gwIP)
@@ -678,6 +730,9 @@ func (c *connTracker) event(a *connAttempt, typ, vap string, r connReading) map[
 	if a.ft {
 		ev["auth_algo"] = "ft"
 	}
+	if a.byFrame {
+		ev["wpa_auth_delta"] = int64(0) // the handshake's end is not known
+	}
 	if a.radius != "" {
 		// 802.1X (deco-crosscheck): auth_delta EAP-STARTED -> EAP-SUCCESS,
 		// wpa_auth_delta from the end of EAP-SUCCESS; EAP-FAILURE or
@@ -782,17 +837,30 @@ func (r *anchorRing) take() ([]connIn, int) {
 func (c *Config) staSnoopOn() bool { return c.StaSnoop == nil || *c.StaSnoop }
 
 // startConnEvents starts the syslog anchor follower (takeover on the
-// Deco, sta_snoop on). The taps follow the readings (connReading).
+// Deco, sta_snoop on). The taps follow the readings (connReading). On the
+// Garage (platform jio-mtk) the anchors are the drivers' join steps
+// (startDriverEvents feeds a.drvSteps; staconn_jio.go) and there is no
+// hostapd log to follow; its GARP is garage.go's.
 func (a *agent) startConnEvents(ctx context.Context) {
-	if a.cfg.jio() || !a.cfg.staSnoopOn() {
+	if !a.cfg.staSnoopOn() {
 		return
 	}
 	t := newConnTracker()
 	t.bridgeOf = a.bridgeName
-	a.conn = &connState{t: t, anchors: &anchorRing{}, ring: stasnoop.NewRing(snoopMax),
+	anchors := &anchorRing{}
+	if a.cfg.jio() {
+		t.frameAuth = true
+		if a.drvSteps != nil {
+			anchors = a.drvSteps
+		}
+	}
+	a.conn = &connState{t: t, anchors: anchors, ring: stasnoop.NewRing(snoopMax),
 		open: a.o.snoopOpen, readers: map[string]context.CancelFunc{}, failed: map[string]time.Time{},
 		died: map[string]time.Time{}, since: map[string]time.Time{},
 		done: make(chan string, 16), logged: map[string]bool{}}
+	if a.cfg.jio() {
+		return
+	}
 	a.startGARP(ctx) // garp.go: on the socket event, not the reading
 	a.sta.algo = a.authAlgo
 	r := a.conn.anchors
@@ -869,7 +937,7 @@ func (a *agent) connReading(ctx context.Context, s *apstate.Snapshot, f map[stri
 	served := map[string]bool{}
 	if a.takeover.Load() && !a.shed.Load() {
 		for vif := range feed.vifs {
-			if strings.HasPrefix(vif, "wl") {
+			if strings.HasPrefix(vif, "wl") || a.cfg.jio() && mtkBSS(vif) {
 				served[vif] = true
 			}
 		}
@@ -877,7 +945,7 @@ func (a *agent) connReading(ctx context.Context, s *apstate.Snapshot, f map[stri
 	a.snoopReconcile(ctx, cs, served, now)
 	in, dropped := cs.anchors.take()
 	if dropped > 0 {
-		a.logf("connection events: %d hostapd log lines dropped", dropped)
+		a.logf("connection events: %d hostapd log lines (Garage: driver steps) dropped", dropped)
 	}
 	for i := range feed.evs {
 		ev := feed.evs[i]
@@ -896,7 +964,8 @@ func (a *agent) connReading(ctx context.Context, s *apstate.Snapshot, f map[stri
 	for _, x := range in {
 		cs.t.add(x)
 	}
-	r := connReading{now: now, read: feed.read, vifs: feed.vifs, snooped: map[string]bool{}, snoopSince: map[string]time.Time{}, signal: map[string]int{}, assoc: map[string]bool{}}
+	r := connReading{now: now, read: feed.read, vifs: feed.vifs, snooped: map[string]bool{}, snoopSince: map[string]time.Time{},
+		signal: map[string]int{}, assoc: map[string]bool{}, staVif: map[string]string{}}
 	r.up, _ = toInt64(f["uptime"])
 	for vif := range cs.readers {
 		r.snooped[vif] = true
@@ -907,6 +976,7 @@ func (a *agent) connReading(ctx context.Context, s *apstate.Snapshot, f map[stri
 			for _, st := range v.Stations {
 				m := strings.ToLower(st.MAC)
 				r.assoc[m] = true
+				r.staVif[m] = v.Iface
 				if st.Signal != 0 {
 					r.signal[m] = st.Signal
 				}

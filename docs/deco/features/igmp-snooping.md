@@ -34,3 +34,12 @@ That matches mcsd's `policy flood` for unknown groups.
 
 - The three files on the X20's 4.1 kernel, and how snooping interacts with
   the Broadcom flow cache and WMF on a VLAN bridge.
+
+## Garage (platform jio-mtk)
+
+The same three values on each `br-v<vid>` the agent makes on the JCOW414,
+written through sysfs at creation and re-asserted by Tick
+(`internal/mtkwifi/snoop.go`). The 3.18.21 kernel has bridge multicast
+snooping (`br_multicast_*` in its symbols) and floods a group while no querier
+is seen. `bdg2` is left to the vendor. The rebuilt MT7603 module has no
+IGMP snooping of its own (garage-parity.md section 6). Unverified on the unit.

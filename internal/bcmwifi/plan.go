@@ -340,21 +340,22 @@ func (a *Applier) vlanUpSteps(uplink string, vid int) []Step {
 	return st
 }
 
-// bridgeSnoop are the IGMP/MLD snooping knobs of the agent's VLAN bridges,
+// BridgeSnoop are the IGMP/MLD snooping knobs of the agent's VLAN bridges,
 // as a U6 Pro's mcsd sets them on every bridge (mcsd.conf snooping 1,
 // policy flood; plugin_stop's multicast_querier 0; bridge.conf hash_max
 // 2048): the bridge learns which ports want a group and floods unknown
 // groups (Linux floods while no querier is seen), without querying itself.
 // br-lan is TP-Link's imsnoop's and left alone; Multicast Enhancement stays
-// the driver's wmf_bss_enable.
-var bridgeSnoop = [][2]string{{"hash_max", "2048"}, {"multicast_snooping", "1"}, {"multicast_querier", "0"}}
+// the driver's wmf_bss_enable. The Garage's VLAN bridges take the same
+// (mtkwifi snoop.go).
+var BridgeSnoop = [][2]string{{"hash_max", "2048"}, {"multicast_snooping", "1"}, {"multicast_querier", "0"}}
 
 // snoopSteps sets br's snooping knobs where they read otherwise (all of
 // them for a bridge created by the plan). Optional: a kernel without
 // multicast snooping has no such files, and the bridge forwards anyway.
 func (a *Applier) snoopSteps(br string, created bool) []Step {
 	var st []Step
-	for _, k := range bridgeSnoop {
+	for _, k := range BridgeSnoop {
 		p := "/sys/class/net/" + br + "/bridge/" + k[0]
 		if !created {
 			b, err := a.readFile(p)

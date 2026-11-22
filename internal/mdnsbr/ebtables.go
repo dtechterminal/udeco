@@ -47,6 +47,9 @@ type Interceptor struct {
 	Run    Runner
 	DryRun bool
 	Logf   func(string, ...any)
+	// NoFlowCache: the unit has no Broadcom flow cache (the JCOW414): no
+	// `fc flush` after a jump changes
+	NoFlowCache bool
 }
 
 func (x *Interceptor) logf(f string, a ...any) {
@@ -175,7 +178,7 @@ func (x *Interceptor) Set(ctx context.Context, vifs []string) error {
 // flush drops the Broadcom flow cache's flows through the vifs whose path
 // changed (audit R21); best effort, as bcmwifi's: a missing fc is no error.
 func (x *Interceptor) flush(ctx context.Context, vifs map[string]bool) {
-	if x.DryRun {
+	if x.DryRun || x.NoFlowCache {
 		return
 	}
 	for _, v := range sortedSet(vifs) {

@@ -94,9 +94,10 @@ type Config struct {
 	// re-associates at once instead of ~300 s later; false leaves such a
 	// station to recover by itself. jio-mtk with takeover only.
 	DownlinkWatchdog *bool `json:"downlink_watchdog,omitempty"`
-	// MdnsBridge (takeover with apply only) claims fw2_caps mDNS service
-	// bridge and runs internal/mdnsbr (mdnsbr.go). Off by default until
-	// AF_PACKET sends on the wl vifs are verified on the X20: the
+	// MdnsBridge (takeover with apply only, both platforms) claims fw2_caps
+	// mDNS service bridge and runs internal/mdnsbr (mdnsbr.go; on jio-mtk
+	// over bdg2 and the br-v<vid> bridges, the ra/rai BSSes). Off by default
+	// until AF_PACKET sends on the vifs are verified on the units: the
 	// controller puts every "auto" WLAN in mDNS auto mode once the bit is
 	// claimed, and an intercepted vif whose re-injection did not reach the
 	// air would lose all mDNS (docs/deco/features/mdns-bridge.md).
@@ -165,15 +166,19 @@ type Config struct {
 	// UplinkGatewayDown (default off; needs uplink_ssid_down) also counts a
 	// gateway that answers no ICMP echo for 60 s as a lost uplink.
 	UplinkGatewayDown bool `json:"uplink_gateway_down,omitempty"`
-	// StaSnoop (takeover, Deco only): absent or true sends the controller
-	// the connection-timing events (success, failure, soft failure, fixup)
-	// from hostapd's log and control sockets and a read-only AF_PACKET tap
-	// per served BSS (ARP, DHCP, DNS; staconn.go); false sends none.
+	// StaSnoop (takeover, both platforms): absent or true sends the
+	// controller the connection-timing events (success, failure, soft
+	// failure, fixup) from hostapd's log and control sockets (Deco) or the
+	// MediaTek drivers' station events (jio-mtk: mtkwifi Events steps) and a
+	// read-only AF_PACKET tap per served BSS (ARP, DHCP, DNS; staconn.go);
+	// false sends none.
 	StaSnoop *bool `json:"sta_snoop,omitempty"`
-	// AssocGARP (takeover, Deco only; needs sta_snoop for the addresses):
-	// absent or true sends a gratuitous ARP for a station that is
-	// authorized and whose address is known, on the wired ports of its
-	// bridge, so the switches learn where it is at once (garp.go).
+	// AssocGARP (takeover, both platforms; on the Deco it needs sta_snoop
+	// for the addresses): absent or true sends a gratuitous ARP for a
+	// station that is authorized and whose address is known, on the wired
+	// ports of its bridge, so the switches learn where it is at once
+	// (garp.go). On jio-mtk it is the Garage's station GARP on the uplink
+	// (garage.go garageStations, mtkwifi AnnounceStation); false turns it off.
 	AssocGARP *bool `json:"assoc_garp,omitempty"`
 	// UplinkLoss (platform jio-mtk, takeover with apply) is the U6's
 	// uplink-loss behaviour: absent or true, after 15 s without carrier on
@@ -214,6 +219,30 @@ type Config struct {
 	// default until the region check of docs/deco/features/garage-parity.md
 	// passed on the unit.
 	DFS bool `json:"dfs,omitempty"`
+	// RateLimits (platform jio-mtk) polices the controller's speed limits
+	// (a client's user group by cmd rate-update, the WLANs' user groups)
+	// per station with the agent's udeco_rl kernel module, loaded from
+	// /flash2/udeco only while a limit is set and removed at the hand-back
+	// (mtkwifi ratelimit.go, docs/deco/features/client-rate-limit.md).
+	// Off by default until the test of garage-parity.md passed on the
+	// unit: the limits are then noted as not applied.
+	RateLimits bool `json:"rate_limits,omitempty"`
+	// Enterprise (platform jio-mtk) serves the controller's WPA2/WPA3-
+	// Enterprise WLANs through Jio's rtdot1xd, which the agent starts and
+	// supervises per radio (mtkwifi dot1x.go; 2.4 GHz with the rebuilt
+	// MT7603 module only). On by default; false never starts rtdot1xd and
+	// leaves those WLANs off (noted), as before, and RadSec unclaimed.
+	Enterprise *bool `json:"enterprise,omitempty"`
+	// GarageFT (platform jio-mtk) serves the controller's 802.11r on the
+	// Garage with the Decos' mobility domains and key holders (FT-PSK;
+	// FT-SAE with wpa3 and ft_sae), the agent's 802.11k neighbour lists and
+	// 802.11v requests (band steering, Roaming Assistant), and claims those
+	// (mtkwifi ftplan.go, roam.go; docs/deco/features/garage-ft.md). Off by
+	// default until the roaming test there passed on the unit: the FT AKMs
+	// in the RSNE change every SSID's beacon (some old clients refuse them)
+	// and turning it on restarts each radio once; off, the controller's FT
+	// is noted as not served, as before.
+	GarageFT bool `json:"garage_ft,omitempty"`
 	// LoginLock (takeover with apply, both platforms): absent or true
 	// drops new connections to the unit's root login ports (Deco :22;
 	// Garage :23 and :22) while the controller's Device SSH Authentication
@@ -304,13 +333,17 @@ func keyNames(ks []keySet) string {
 }
 
 // decoOnlyKeys are the keys platform jio-mtk refuses. Not among them:
-// wpa3 (SAE on the 5 GHz radio only: the MT7663 driver has it) and
-// min_rates (the 2.4 GHz radio's BasicRate, mtkwifi minRate).
+// wpa3 (SAE on the 5 GHz radio only: the MT7663 driver has it), min_rates
+// (the 2.4 GHz radio's BasicRate, mtkwifi minRate), mdns_bridge
+// (internal/mdnsbr on bdg2 and the br-v<vid> bridges), sta_snoop (the
+// connection-timing events from the MediaTek drivers' own events and the
+// same taps: staconn.go) and assoc_garp (the Garage's station GARP,
+// garage.go). twt stays here: neither the MT7603 (802.11n) nor the MT7663
+// (802.11ac) has Target Wake Time, an 802.11ax feature.
 func (c *Config) decoOnlyKeys() []keySet {
-	return []keySet{{"mdns_bridge", c.MdnsBridge}, {"hotspot2", c.Hotspot2}, {"egress", c.Egress},
+	return []keySet{{"hotspot2", c.Hotspot2}, {"egress", c.Egress},
 		{"twt", c.TWT != nil}, {"uplink_ssid_down", c.UplinkSSIDDown != nil},
-		{"uplink_gateway_down", c.UplinkGatewayDown}, {"sta_snoop", c.StaSnoop != nil},
-		{"assoc_garp", c.AssocGARP != nil}, {"rx_desense", c.RxDesense}}
+		{"uplink_gateway_down", c.UplinkGatewayDown}, {"rx_desense", c.RxDesense}}
 }
 
 // jioOnlyKeys are the keys only platform jio-mtk takes
@@ -319,7 +352,8 @@ func (c *Config) decoOnlyKeys() []keySet {
 func (c *Config) jioOnlyKeys() []keySet {
 	return []keySet{{"uplink_loss", c.UplinkLoss != nil}, {"uplink_loss_ssid", c.UplinkLossSSID != ""},
 		{"bss_pinning", c.BSSPinning}, {"proxy_arp", c.ProxyARP != nil},
-		{"proxy_arp_driver", c.ProxyARPDriver}, {"dfs", c.DFS}}
+		{"proxy_arp_driver", c.ProxyARPDriver}, {"dfs", c.DFS}, {"rate_limits", c.RateLimits},
+		{"enterprise", c.Enterprise != nil}, {"garage_ft", c.GarageFT}}
 }
 
 // The LAN ports' keys (platform jio-mtk as the model with LAN ports):
@@ -357,6 +391,9 @@ func (c *Config) uplinkLoss() bool { return c.jio() && (c.UplinkLoss == nil || *
 // proxyARP: the controller's proxy ARP is served (platform jio-mtk; on
 // unless proxy_arp is false).
 func (c *Config) proxyARP() bool { return c.jio() && (c.ProxyARP == nil || *c.ProxyARP) }
+
+// enterprise: jio-mtk serves WPA2/WPA3-Enterprise (rtdot1xd).
+func (c *Config) enterprise() bool { return c.jio() && (c.Enterprise == nil || *c.Enterprise) }
 
 func (c *Config) portsConfirm() time.Duration { return portsConfirmKey.of(c.PortsConfirmS) }
 
@@ -512,7 +549,9 @@ func (c *Config) validate() error {
 	if (c.StaSnoop != nil || c.AssocGARP != nil) && !c.Takeover {
 		return errors.New("config: sta_snoop and assoc_garp need takeover (the BSSes are the agent's only then)")
 	}
-	if c.AssocGARP != nil && *c.AssocGARP && !c.staSnoopOn() {
+	// the Garage's GARP takes the addresses from the unit's ARP table and
+	// the proxy ARP responder, not only from the taps
+	if c.AssocGARP != nil && *c.AssocGARP && !c.staSnoopOn() && !c.jio() {
 		return errors.New("config: assoc_garp needs sta_snoop (the stations' addresses come from it)")
 	}
 	if c.UplinkGatewayDown && !c.uplinkSSIDDown() {

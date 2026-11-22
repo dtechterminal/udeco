@@ -94,7 +94,7 @@ func TestClientRateUpdate(t *testing.T) {
 	h2.stop()
 }
 
-// A Wi-Fi backend without per-client limits (jio-mtk) logs the cmd as not
+// A Wi-Fi backend without per-client limits logs the cmd as not
 // supported, once; the session still keeps the list.
 func TestClientRateUpdateUnsupported(t *testing.T) {
 	h := newHarness(t, func(c *Config, o *options) { c.Takeover, c.Apply = true, true })

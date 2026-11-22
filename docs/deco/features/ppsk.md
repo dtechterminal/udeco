@@ -113,3 +113,11 @@ are refused, and a note in the event log says so.
    handshake.
 4. Change a key in the controller. Expect a hostapd restart on that radio,
    after which the old key fails and the new one works.
+
+## Garage (platform jio-mtk)
+
+Not possible: neither driver has more than one passphrase per BSS (no
+multi-PSK or per-station PSK in the MT7603 source or the MT7663 kernel;
+`WPAPSK<n>` is the only key), and rtdot1xd serves only 802.1X. A WLAN
+with private keys is served with its own passphrase only, noted
+(`internal/mtkwifi/features.go`); `PPSK` stays unclaimed there.

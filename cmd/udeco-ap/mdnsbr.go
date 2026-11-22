@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/dtechterminal/udeco/internal/apstate"
+	"github.com/dtechterminal/udeco/internal/jioports"
 	"github.com/dtechterminal/udeco/internal/mdnsbr"
 	"github.com/dtechterminal/udeco/internal/translate"
 	"github.com/dtechterminal/udeco/internal/unit"
@@ -55,7 +56,7 @@ func (a *agent) mdnsReconcile(ctx context.Context, s *apstate.Snapshot, info aps
 	if !m.cleaned && m.svc == nil {
 		if _, err := os.Stat(a.mdnsMarker()); err != nil {
 			m.cleaned = true // never intercepted since boot (or stopped cleanly)
-		} else if err := mdnsbr.Cleanup(ctx, a.o.run); err != nil {
+		} else if err := (&mdnsbr.Interceptor{Run: a.o.run, NoFlowCache: a.cfg.jio()}).Clear(ctx); err != nil {
 			a.logf("mdns bridge: removing an earlier run's interception: %v", err)
 		} else {
 			os.Remove(a.mdnsMarker())
@@ -89,7 +90,7 @@ func (a *agent) mdnsReconcile(ctx context.Context, s *apstate.Snapshot, info aps
 			a.logf("mdns bridge: not started: %v", err)
 			return
 		}
-		m.svc = mdnsbr.NewService(ctx, mdnsbr.Options{Open: m.open, Run: a.o.run, Logf: a.logf})
+		m.svc = mdnsbr.NewService(ctx, mdnsbr.Options{Open: m.open, Run: a.o.run, Logf: a.logf, NoFlowCache: a.cfg.jio()})
 		a.logf("mdns bridge: started")
 	}
 	err := m.svc.Update(ctx, plan)
@@ -154,10 +155,19 @@ func (a *agent) mdnsNotes(notes []string) {
 }
 
 // mdnsEnv reads what the planner needs: VAP names from the reading and the
-// saved system_cfg, bridges and MACs from /sys.
+// saved system_cfg, bridges and MACs from /sys. On platform jio-mtk the
+// LAN bridge is bdg2 (unit.JioLANBridge), the VLAN bridges are mtkwifi's
+// br-v<vid>, and a VLAN without a bridge here is reached tagged on the
+// uplink's switch port device (eth0.4: its VLAN N devices are eth0.4.N,
+// mtkwifi vlanParent), not on the untagged eth0.4.1 the agent's uplink is.
 func (a *agent) mdnsEnv(s *apstate.Snapshot, info apstate.CfgInfo) mdnsbr.Env {
 	env := mdnsbr.Env{VAPs: s.IfnamesByDevname(info), Vifs: map[string]bool{}, Guest: map[string]bool{},
 		Bridges: map[string][]string{}, Uplink: a.uplink}
+	lan := unit.LANBridge
+	if a.cfg.jio() {
+		lan = unit.JioLANBridge
+		env.LANBridge, env.Uplink = lan, jioports.Parent(jioports.UplinkPhys)
+	}
 	for _, r := range s.Radios {
 		for _, v := range r.VAPs {
 			if v.Iface != "" {
@@ -179,7 +189,7 @@ func (a *agent) mdnsEnv(s *apstate.Snapshot, info apstate.CfgInfo) mdnsbr.Env {
 				env.MACs = append(env.MACs, mac)
 			}
 		}
-		if n != unit.LANBridge && !strings.HasPrefix(n, unit.VLANBridgePrefix) {
+		if n != lan && !strings.HasPrefix(n, unit.VLANBridgePrefix) {
 			continue
 		}
 		ports, err := os.ReadDir(path.Join(sys, n, "brif"))

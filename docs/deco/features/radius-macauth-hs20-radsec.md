@@ -83,3 +83,27 @@ docs/deco/features/hotspot2.md.
 
 Superseded: the agent runs a local UDP-to-RadSec proxy (`internal/radsec`)
 and claims the bit in takeover mode. See docs/deco/features/radsec.md.
+
+## Garage (platform jio-mtk)
+
+- **RADIUS MAC authentication: not possible.** Neither driver has a
+  RADIUS ACL (no `RADIUS_MAC_ACL_SUPPORT` anywhere in the MT7603 source;
+  no `Set_RADIUS_MacAuth_Enable_Proc`, `RadiusFindAclEntry` or
+  `RADIUS_MacAuth` string in the MT7663 kernel), and Jio's rtdot1xd has
+  no MAC-ACL client and its `DOT1X_CMM_CONF` (0xd79 bytes, the same in
+  both drivers) has no field for it. An SSID asking for it is not served
+  (`internal/mtkwifi/features.go` ssidNotes). An agent-side gate
+  (ebtables drop until a PAP Access-Request for the MAC is accepted) would
+  be possible but is not built.
+- **Hotspot 2.0: not claimed** (`hotspot2` is refused on jio-mtk). The
+  MT7663 kernel has the driver half (`HotSpotEnable`, `MakeHotSpotIE`,
+  `ReceiveGASInitReq`, `SendAnqpReqEvent`/`wext_send_anqp_req_event`,
+  `Send_ANQP_Rsp`): in MediaTek's design a userland daemon answers each
+  ANQP query that arrives as a wireless event (OID 0x0924
+  `OID_802_11_HS_ANQP_RSP` back). Jio ships no such daemon, so the agent
+  would have to be the ANQP responder, against a closed build whose
+  structs are unverified; the rebuilt MT7603 has it only with
+  `CONFIG_MT7603E_HOTSPOT` (not set). An enterprise SSID with Hotspot 2.0
+  is served without it, noted.
+- **RadSec:** served through the agent's proxy for the WPA2/WPA3-Enterprise
+  WLANs rtdot1xd serves (garage-parity.md section 27, radsec.md).

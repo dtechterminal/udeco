@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/dtechterminal/udeco/internal/atomicfile"
@@ -40,7 +41,7 @@ type Options struct {
 	Bridge   string // the LAN bridge (bdg2)
 	Uplink   string // the uplink bridge port (eth0.4.1); VLAN devices go on its parent
 	DryRun   bool
-	WPA3     bool // serve SAE where the driver has it (5 GHz); the agent claims WPA3 on that radio only
+	WPA3     bool // serve SAE where the driver has it (RadioDef.SAE); the agent claims WPA3 on those radios only (ServesSAE)
 	Logf     func(string, ...any)
 	Layout   []RadioDef // nil = JCOW414
 	// KeepSSID is the SSID kept up while the uplink is down
@@ -60,6 +61,32 @@ type Options struct {
 	// path; off by default (garage-final proxyarp: with no responder the
 	// flag black-holes inbound ARP to the BSS)
 	ProxyARPDriver bool
+	// RateLimits polices the controller's speed limits (per-client
+	// rate-update and the SSIDs' user groups) with the udeco_rl module
+	// (ratelimit.go); off = they are noted as not applied
+	RateLimits bool
+	// RateModule is the module's file (DefaultRateModule; .gz unpacked)
+	RateModule string
+	// rlKern is the module's kernel side (nil: /proc/udeco_rl, insmod,
+	// rmmod; tests fake it)
+	rlKern rlKernel
+	// NoDot1X: never serve WPA2/WPA3-Enterprise (config enterprise false):
+	// rtdot1xd is never started, enterprise SSIDs are noted, not served
+	NoDot1X bool
+	// Dot1xd is rtdot1xd (Dot1xdPath); missing under Root = no enterprise
+	Dot1xd string
+	// GarageFT serves 802.11r, the agent's 802.11k neighbour lists and
+	// 802.11v BSS transition requests (ftplan.go, roam.go; config
+	// garage_ft); off = the controller's FT is noted as not served
+	GarageFT bool
+	// FTSAE: the agent's ft_sae key (with WPA3): FT-SAE with the Decos'
+	// key holders (roam.go)
+	FTSAE bool
+	// roamIO is the roaming runtime's sockets and driver ioctls (nil:
+	// AF_PACKET and the private ioctls, roam_linux.go; tests fake it)
+	roamIO roamIO
+	// kill signals a process (rtdot1xd; nil = syscall.Kill)
+	kill func(pid int, sig syscall.Signal) error
 	// sendFrame sends one Ethernet frame on a netdev (nil: an AF_PACKET
 	// socket; tests record them)
 	sendFrame func(dev string, frame []byte) error
@@ -137,6 +164,13 @@ type Applier struct {
 	parpEb    string
 	// dfs: the 5 GHz region, the DFS channel, NOPs, radar (dfs.go)
 	dfs dfsState
+	// rl: the speed limits (ratelimit.go)
+	rl rlState
+	// d1x: the rtdot1xd supervisor (dot1x.go)
+	d1x dot1xState
+	// roam: 802.11r key transfers, neighbour lists, BSS transition
+	// (roam.go); its own lock
+	roam *roam
 }
 
 const (
@@ -163,14 +197,37 @@ func New(o Options) *Applier {
 		o.Logf = func(string, ...any) {}
 	}
 	if o.Layout == nil {
-		o.Layout = JCOW414
+		o.Layout = WithDriverFT(o.Root, WithDriverSAE(o.Root, JCOW414))
 	}
+	o.Layout = ftLayout(o)
 	if o.DFS {
 		l := append([]RadioDef(nil), o.Layout...)
 		for i := range l {
 			l[i].DFS = l[i].HSFlag // the MT7663
 		}
 		o.Layout = l
+	}
+	if o.Dot1xd == "" {
+		o.Dot1xd = Dot1xdPath
+	}
+	if o.kill == nil {
+		o.kill = func(pid int, sig syscall.Signal) error { return syscall.Kill(pid, sig) }
+	}
+	// WPA2/WPA3-Enterprise only with rtdot1xd there and not turned off
+	// (dot1x.go)
+	why := ""
+	if o.NoDot1X {
+		why = "enterprise is off"
+	} else if fi, err := os.Stat(filepath.Join(o.Root, o.Dot1xd)); err != nil || fi.Mode()&0o111 == 0 {
+		why = o.Dot1xd + " is missing"
+	}
+	if why != "" && slices.ContainsFunc(o.Layout, func(rd RadioDef) bool { return rd.Dot1X }) {
+		l := append([]RadioDef(nil), o.Layout...)
+		for i := range l {
+			l[i].Dot1X = false
+		}
+		o.Layout = l
+		o.Logf("mtkwifi: WPA2/WPA3-Enterprise not served: %s", why)
 	}
 	if o.VerifyTimeout <= 0 {
 		o.VerifyTimeout = 20 * time.Second
@@ -201,6 +258,7 @@ func New(o Options) *Applier {
 		o.wall = time.Now
 	}
 	a := &Applier{o: o, uplink: o.Uplink, ledOn: true}
+	a.roam = newRoam(a)
 	if o.ProxyARP && !o.DryRun {
 		a.parp = newResponder(o.Logf, func() { a.ProxyARPDown(context.Background()) })
 	}
@@ -266,7 +324,9 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 	if a.o.ProxyARP {
 		notes = slices.DeleteFunc(notes, func(n string) bool { return strings.HasSuffix(n, "proxy ARP not applied") })
 	}
+	notes = a.rateNotes(notes)
 	full, _ = a.pinned(full)
+	notes = append(notes, a.ftIDs(full)...)
 	want := a.effective(full)
 	p := bcmwifi.Plan{Desired: d, Notes: notes}
 	cur := a.live
@@ -393,6 +453,9 @@ func (a *Applier) planACL(p *bcmwifi.Plan, want map[string]RadioPlan) {
 		if b, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, aclFile))); err == nil {
 			_ = json.Unmarshal(b, &a.acl)
 		}
+		if st := a.aclStale(); len(st) > 0 {
+			a.o.Logf("mtkwifi: station ACLs of %s not known to the driver (a new netdev since they were written, or an older record): rewritten", strings.Join(st, ", "))
+		}
 	}
 	if w := wantACLs(a.desired, want, a.o.Layout, a.blocked); !sameACLs(w, a.acl) {
 		p.Steps = append(p.Steps, bcmwifi.Step{Kind: bcmwifi.StepCmd,
@@ -414,6 +477,7 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	defer a.mu.Unlock()
 	full, _ := plans(p.Desired, a.o.Layout, a.o.WPA3)
 	full, pins := a.pinned(full)
+	a.ftIDs(full)
 	want := a.effective(full)
 	h := plansHash(full)
 	if h == a.failed {
@@ -449,8 +513,11 @@ func (a *Applier) Apply(ctx context.Context, p bcmwifi.Plan) error {
 	a.savePins(pins)
 	a.saveLastGood(full, p.Desired)
 	a.flushLive(ctx)
+	a.dot1xSync(ctx)
 	a.dfsStep(ctx)
 	a.syncProxyARP(ctx)
+	a.tickRates(ctx)
+	a.roamSync()
 	return nil
 }
 
@@ -482,6 +549,7 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 	if err := a.syncGuest(ctx, &a.desired, want, true); err != nil {
 		return fmt.Errorf("guest isolation: %w", err)
 	}
+	a.syncBGA(ctx, want) // bga.go
 	if err := a.cleanVLANs(ctx, want); err != nil {
 		a.o.Logf("mtkwifi: removing unused VLAN bridges: %v", err)
 	}
@@ -499,9 +567,13 @@ func (a *Applier) applyRadio(ctx context.Context, rd RadioDef, rp RadioPlan) err
 	if err != nil {
 		return fmt.Errorf("baseline profile: %w", err)
 	}
-	defer a.restarted() // the collector leaves the driver alone a while longer
+	defer a.restarted()            // the collector leaves the driver alone a while longer
+	a.roam.radioRestarted(rd.Band) // its R1KH table is emptied (roam.go)
 	a.parpRestarted(rd)
 	a.dfsRestarted(rd)
+	// what rtdot1xd read from the driver goes stale: started again after
+	// the settle time (dot1x.go)
+	a.dot1xStopBand(ctx, rd)
 	for i := len(rd.Ifaces) - 1; i >= 0; i-- {
 		if err := a.run(ctx, "ifconfig", rd.Ifaces[i], "down"); err != nil {
 			return err
@@ -637,6 +709,7 @@ func (a *Applier) ensureVLAN(ctx context.Context, vid int) (string, error) {
 			return "", err
 		}
 	}
+	a.snoop(br) // snoop.go
 	return br, nil
 }
 
@@ -867,6 +940,8 @@ func (a *Applier) rollback(ctx context.Context) error {
 }
 
 func (a *Applier) restoreBaseline(ctx context.Context) error {
+	a.rateHandBack(ctx) // the speed limiter (ratelimit.go): the vendor has none
+	a.roamHandBack(ctx) // neighbour lists, the 5 GHz report flag, key transfers (roam.go)
 	dir := a.dev(filepath.Join(a.o.RunDir, baselineDir))
 	j, err := os.ReadFile(filepath.Join(dir, "state.json"))
 	if err != nil {
@@ -877,11 +952,13 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 		return err
 	}
 	a.clearLive(ctx)    // what only the agent sets live (live.go)
+	a.dot1xStopAll(ctx) // rtdot1xd (dot1x.go)
 	a.parpOff(ctx)      // proxy ARP (proxyarp.go)
 	a.stopStuck()       // downlink watchdog (stuckps.go)
 	defer a.restarted() // the collector leaves the driver alone a while longer
 	for _, rd := range a.o.Layout {
 		a.dfsRestarted(rd)
+		a.roam.radioRestarted(rd.Band)
 		for i := len(rd.Ifaces) - 1; i >= 0; i-- {
 			_ = a.run(ctx, "ifconfig", rd.Ifaces[i], "down")
 		}
@@ -912,6 +989,7 @@ func (a *Applier) restoreBaseline(ctx context.Context) error {
 	}
 	_ = a.cleanVLANs(ctx, nil)
 	_ = a.syncGuest(ctx, nil, nil, true)
+	a.removeBGA(ctx)
 	a.live, a.want = nil, nil
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, ownedFile)))
 	_ = os.Remove(a.dev(filepath.Join(a.o.RunDir, appliedFile)))
@@ -976,13 +1054,24 @@ func (a *Applier) Tick(ctx context.Context) (bcmwifi.TickReport, error) {
 		return r, nil
 	}
 	a.flushLive(ctx)
+	a.dot1xSync(ctx) // rtdot1xd per enterprise radio (dot1x.go)
 	// the guest chains (an ebtables flush by something else is rebuilt)
 	if err := a.syncGuest(ctx, &a.desired, a.live, true); err != nil {
 		r.Problems = append(r.Problems, err.Error())
 	}
 	a.dfsStep(ctx)
 	a.syncProxyARP(ctx)
+	a.tickRates(ctx)
+	a.tickACL(ctx, &r)
+	a.roamSync()
+	if a.roam != nil {
+		a.roam.logStatus()
+	}
 	ssids := !a.settling()
+	if ssids {
+		a.syncBGA(ctx, a.live) // bga.go (Apply built it: nothing while settling)
+	}
+	a.snoopVLANs() // snoop.go (sysfs only)
 	for _, rd := range a.o.Layout {
 		rp := a.live[rd.Band]
 		served := bssOf(rd, rp)
@@ -1087,6 +1176,11 @@ func (a *Applier) SetBlocked(ctx context.Context, macs []string) error {
 type ifaceACL struct {
 	Policy int
 	MACs   []string
+	// Ifindex is the netdev's ifindex when the list was written: a driver
+	// reload (a module swap, a crash) makes new netdevs with empty lists
+	// and new indexes, so a record whose index is not the netdev's is
+	// unknown (aclStale). sameACLs ignores it.
+	Ifindex int `json:",omitempty"`
 }
 
 // aclUnknown: a BSS whose list could not be written (applyACL).
@@ -1202,6 +1296,8 @@ func (a *Applier) applyACL(ctx context.Context, want map[string]RadioPlan) error
 		for _, m := range keptOut(a.acl[ifc], acl) {
 			_ = a.run(ctx, "iwpriv", ifc, "set", "DisConnectSta="+m)
 		}
+		acl.Ifindex = a.ifindex(ifc)
+		w[ifc] = acl
 	}
 	a.acl = w
 	if b, err := json.Marshal(w); err == nil {
@@ -1211,6 +1307,54 @@ func (a *Applier) applyACL(ctx context.Context, want map[string]RadioPlan) error
 		return errors.New(strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+// ifindex is ifc's ifindex (sysfs; 0 when it cannot be read).
+func (a *Applier) ifindex(ifc string) int {
+	b, err := os.ReadFile(a.dev("/sys/class/net/" + ifc + "/ifindex"))
+	if err != nil {
+		return 0
+	}
+	n, _ := strconv.Atoi(strings.TrimSpace(string(b)))
+	return n
+}
+
+// aclStale marks unknown each recorded list (not off) of an up netdev whose
+// ifindex is not the one it was written to, or was not recorded, and
+// returns those netdevs (a.mu held). The driver has no read-back of its
+// lists for the agent (ACLShowAll only prints them to the kernel log), so
+// the index is the check: an ifconfig down/up keeps it, a driver reload
+// does not.
+func (a *Applier) aclStale() []string {
+	var out []string
+	for ifc, x := range a.acl {
+		if x.Policy == 0 || x.Policy == aclUnknown || !a.isUp(ifc) {
+			continue
+		}
+		if cur := a.ifindex(ifc); cur == 0 || cur != x.Ifindex {
+			a.acl[ifc] = ifaceACL{Policy: aclUnknown}
+			out = append(out, ifc)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// tickACL rewrites the lists when a netdev was remade under the agent (a.mu
+// held; Tick, not while a restart settles: the agent's own restart rewrites
+// them after it).
+func (a *Applier) tickACL(ctx context.Context, r *bcmwifi.TickReport) {
+	if a.acl == nil || a.settling() {
+		return
+	}
+	st := a.aclStale()
+	if len(st) == 0 {
+		return
+	}
+	a.o.Logf("mtkwifi: station ACLs lost on %s (the netdev was remade: a driver reload): rewritten", strings.Join(st, ", "))
+	if err := a.applyACL(ctx, a.live); err != nil {
+		r.Problems = append(r.Problems, "station ACLs: "+err.Error())
+	}
 }
 
 // keptOut lists the MACs that next keeps out and prev let in: newly denied,
@@ -1254,4 +1398,19 @@ func (a *Applier) SetUplink(port string) {
 	a.mu.Lock()
 	a.uplink = port
 	a.mu.Unlock()
+}
+
+// ServesSAE reports that the radio on band serves WPA3-Personal: the wpa3
+// option is on and its driver has SAE (RadioDef.SAE; on the 2.4 GHz radio
+// only with the rebuilt MT7603 module loaded, WithDriverSAE).
+func (a *Applier) ServesSAE(band string) bool {
+	if !a.o.WPA3 {
+		return false
+	}
+	for _, rd := range a.o.Layout {
+		if rd.Band == band {
+			return rd.SAE
+		}
+	}
+	return false
 }

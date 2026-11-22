@@ -95,7 +95,8 @@
   send no `auth_rssi` on association) keeps the detector from writing each roam twice; roams
   then come from the controller's inform-based path. `sta_snoop` false keeps the old association
   event (with `auth_rssi`).
-- `sta_snoop` false: no follower, no taps, no timing events. Takeover only; refused on jio-mtk.
+- `sta_snoop` false: no follower, no taps, no timing events. Takeover only. On jio-mtk the steps
+  come from the MediaTek drivers' events instead of hostapd (section "Garage" below).
 
 ## Unverified on hardware
 
@@ -112,3 +113,24 @@
   IPv6 resolver (RA RDNSS / DHCPv6), and which clients (Android Private DNS) use DoT here.
 - DoH-only clients (deferred): still a soft failure on every connection; nothing on the wire
   tells their DNS apart.
+
+## Garage (platform jio-mtk)
+
+The same tracker, taps and events; the anchors are the drivers' events
+(`cmd/udeco-ap/staconn_jio.go`; garage-parity.md section 20):
+
+| Driver event | Tracker input |
+|---|---|
+| Insert (MAC entry, at authentication) | authenticated, on its BSS |
+| MT7663 system log 0x200 (associated) | associated |
+| MT7663 0x20D/0x20E (key done), WAPP authorized | authorized (only for an open attempt; a group rekey's key done is ignored) |
+| MT7663 0x207 (MIC different), ECNT reason 14 | PSK mismatch |
+| MT7663 0x20B (handshake timeout), ECNT reason 15 | EAPOL-Key timeout |
+| Delete (released leave) | disconnected |
+
+The MT7663 system-log events name `rai0` for every BSS of the radio: the step
+goes on the station's open attempt's BSS, else the BSS the reading lists it on.
+The 2.4 GHz driver reports only the Insert, so a 2.4 GHz station is authorized
+at its first frame on the tap: `assoc_delta` and `wpa_auth_delta` are 0 (not
+measured) and a failed 2.4 GHz join is never reported. Unverified on the unit:
+the MT7663 flags and netdev (from the mt7615 source).

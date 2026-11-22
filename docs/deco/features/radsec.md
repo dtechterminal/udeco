@@ -188,3 +188,23 @@ it. A drop to observe clears it with the other takeover bits.
      the server.
 7. If the server is off the LAN with `egress=true`, check
    `iptables -S UDECO-OUT` for the `-p tcp -m tcp --dport 2083` RETURN rule.
+
+## Garage (platform jio-mtk)
+
+The proxy is the same; the RADIUS client is Jio's rtdot1xd
+(`internal/mtkwifi/dot1x.go`, garage-parity.md section 27). radsecRoute
+rewrites the WLAN's servers to `127.0.0.1:<port>` with the local secret
+(32 hex characters, which the profile can carry) before the plan, and
+mtkwifi writes them as `RADIUS_Server`/`RADIUS_Port`/`RADIUS_Key`.
+rtdot1xd sends from UDP sockets it neither binds nor connects
+(`Radius_client_init`: `socket(AF_INET, SOCK_DGRAM)` per BSS with a
+non-zero server; `Radius_client_send` @0x0040d26c: `sendto`), so a request
+to 127.0.0.1 leaves from 127.0.0.1 and passes the proxy's loopback check,
+and every request goes through `Radius_msg_finish`, which in hostapd's
+radius.c, which rtdot1xd derives from, adds the Message-Authenticator the
+proxy requires (the body of the Jio build's function was not read:
+INFERRED). Only the first auth
+server is used and accounting is not sent. fw2_caps RadSec is claimed
+only while some radio serves 802.1X (`ServesDot1X`; `enterprise: false`
+clears it). jiosys has no egress firewall, so there is no egress hole to
+keep. Unverified on the unit.

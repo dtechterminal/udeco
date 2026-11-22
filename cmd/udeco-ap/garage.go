@@ -14,6 +14,7 @@ import (
 	"github.com/dtechterminal/udeco/internal/apstate"
 	"github.com/dtechterminal/udeco/internal/hapdmon"
 	"github.com/dtechterminal/udeco/internal/jioports"
+	"github.com/dtechterminal/udeco/internal/mtkft"
 	"github.com/dtechterminal/udeco/internal/mtkwifi"
 )
 
@@ -25,6 +26,14 @@ import (
 type weakKicker interface {
 	KickWeak(context.Context, *apstate.Snapshot) []string
 }
+
+// rateStations is the applier's speed limiter (mtkwifi ratelimit.go): the
+// SSID-wide limits follow the stations of each reading.
+type rateStations interface {
+	RateStations(context.Context, *apstate.Snapshot)
+}
+
+var _ rateStations = (*mtkwifi.Applier)(nil)
 
 // stuckKicker is the applier's downlink watchdog (mtkwifi stuckps.go).
 type stuckKicker interface {
@@ -42,6 +51,9 @@ func (a *agent) garageReading(ctx context.Context, s *apstate.Snapshot) {
 		a.sta.kicked(k.KickWeak(ctx, s))
 	}
 	a.kickStuck(ctx, s)
+	if r, ok := a.wifi.(rateStations); ok {
+		r.RateStations(ctx, s)
+	}
 	if g, ok := a.wifi.(garageNet); ok {
 		a.garageStations(ctx, g, s)
 	}
@@ -116,7 +128,10 @@ const (
 // garageStations gives the responder this reading's stations and
 // announces each station new on a BSS whose address is known (U6: a GARP
 // for a client that roamed in), not for the first reading's nor while
-// the radios restart (its stations come back to the same unit).
+// the radios restart (its stations come back to the same unit), nor with
+// assoc_garp false (the Deco's key, the same opt-out here). The address:
+// the unit's ARP table, an address seen before, the proxy ARP responder's,
+// else the connection-event taps' on the BSS's bridge (sta_snoop).
 func (a *agent) garageStations(ctx context.Context, g garageNet, s *apstate.Snapshot) {
 	st := &a.gnet
 	if st.ips == nil {
@@ -142,7 +157,7 @@ func (a *agent) garageStations(ctx context.Context, g garageNet, s *apstate.Snap
 		}
 	}
 	now := time.Now()
-	if st.seeded && !a.radiosBusy() {
+	if st.seeded && a.cfg.assocGARPOn() && !a.radiosBusy() {
 		macs := make([]string, 0, len(cur))
 		for m := range cur {
 			macs = append(macs, m)
@@ -157,6 +172,11 @@ func (a *agent) garageStations(ctx context.Context, g garageNet, s *apstate.Snap
 			if ip == nil {
 				if n, ok := g.Neighbor(m); ok {
 					ip = n.To4()
+				}
+			}
+			if ip == nil && a.conn != nil {
+				if v, ok := a.conn.t.ipOf(m, a.bridgeName(vif), now); ok {
+					ip = net.ParseIP(v).To4()
 				}
 			}
 			if ip == nil {
@@ -201,7 +221,32 @@ func (a *agent) startDriverEvents(ctx context.Context) {
 		ProxyARPDown(context.Context)
 		SetEventsHealthy(func() bool)
 	}
-	m := mtkwifi.NewEvents(mtkwifi.EventsOptions{Logf: a.logf, Busy: a.radiosBusy, NG2: true,
+	var steps func(mtkwifi.DrvEvent)
+	if a.cfg.staSnoopOn() {
+		// the connection-timing events' anchors (staconn_jio.go)
+		ring := &anchorRing{}
+		a.drvSteps = ring
+		steps = func(e mtkwifi.DrvEvent) {
+			if in, ok := drvStep(e); ok {
+				ring.add(in)
+			}
+		}
+	}
+	type ftEvents interface {
+		FTEvent(ifname string, flags uint16, data []byte)
+		FTJoined(ifname, mac, bssid string)
+	}
+	m := mtkwifi.NewEvents(mtkwifi.EventsOptions{Logf: a.logf, Busy: a.radiosBusy, NG2: true, Steps: steps,
+		FT: func(ifname string, flags uint16, data []byte) {
+			if f, ok := a.wifi.(ftEvents); ok {
+				f.FTEvent(ifname, flags, data)
+			}
+		},
+		Joined: func(ifname, mac, bssid string) {
+			if f, ok := a.wifi.(ftEvents); ok {
+				f.FTJoined(ifname, mac, bssid)
+			}
+		},
 		ProxyARP: func(r *mtkwifi.ProxyARPRequest) {
 			if p, ok := a.wifi.(parpHooks); ok {
 				p.ProxyARPRequest(r)
@@ -224,6 +269,26 @@ func (a *agent) startDriverEvents(ctx context.Context) {
 	}
 	a.bg.Add(1)
 	go func() { defer a.bg.Done(); m.Run(ctx) }()
+	a.startRoaming(ctx)
+}
+
+// roamRunner is the Garage's roaming runtime (mtkwifi roam.go).
+type roamRunner interface {
+	ServesRoaming() bool
+	RunRoaming(ctx context.Context)
+}
+
+// startRoaming runs the Garage's 802.11r key transfers with the Decos,
+// neighbour lists and BSS transition events (garage_ft, takeover with
+// apply). Its taps follow the applied plans; the hand-back stops its work.
+func (a *agent) startRoaming(ctx context.Context) {
+	r, ok := a.wifi.(roamRunner)
+	if !ok || !a.cfg.Apply || !r.ServesRoaming() {
+		return
+	}
+	a.logf("garage_ft: 802.11r with the Decos' key holders (RRB EtherType %#04x on the SSIDs' bridges, the 5 GHz driver's KDP frames), 802.11k lists, 802.11v requests", mtkft.EtherTypeOUI)
+	a.bg.Add(1)
+	go func() { defer a.bg.Done(); r.RunRoaming(ctx) }()
 }
 
 // radiosBusy: the Wi-Fi applier is changing the radios or a restart

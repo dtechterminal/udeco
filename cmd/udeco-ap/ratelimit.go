@@ -12,7 +12,8 @@ package main
 // (bcmwifi/shape.go). The list is handed over on each rate-update, at
 // startup, and when a listed client (re)joins (rateJoins), so the limit is
 // in place within one inform interval of the association rather than at
-// the next 60 s Tick.
+// the next 60 s Tick. On jio-mtk mtkwifi takes the same list and polices
+// it with its udeco_rl module (config rate_limits; mtkwifi ratelimit.go).
 
 import (
 	"context"
@@ -20,15 +21,19 @@ import (
 	"strings"
 
 	"github.com/dtechterminal/udeco/internal/bcmwifi"
+	"github.com/dtechterminal/udeco/internal/mtkwifi"
 )
 
-// clientShaper is bcmwifi's per-client speed limits. Optional: a Wi-Fi
-// backend without it (jio-mtk) logs the cmd as not supported.
+// clientShaper is the Wi-Fi backends' per-client speed limits (bcmwifi,
+// mtkwifi). Optional: a backend without it logs the cmd as not supported.
 type clientShaper interface {
 	SetClientRates(ctx context.Context, rates map[string]bcmwifi.RateLimit) (int, error)
 }
 
-var _ clientShaper = (*bcmwifi.Applier)(nil)
+var (
+	_ clientShaper = (*bcmwifi.Applier)(nil)
+	_ clientShaper = (*mtkwifi.Applier)(nil)
+)
 
 // clientRates copies the session's per-client limits for bcmwifi (loop
 // goroutine).
@@ -41,8 +46,8 @@ func (a *agent) clientRates() map[string]bcmwifi.RateLimit {
 }
 
 // pushClientRates queues a job that applies the session's whole list (loop
-// goroutine). Without a backend that shapes per client (jio-mtk) it logs,
-// once, that the controller's limits are not applied.
+// goroutine). Without a backend that shapes per client it logs, once,
+// that the controller's limits are not applied.
 func (a *agent) pushClientRates(why string) {
 	cs, ok := a.wifi.(clientShaper)
 	if !ok {
