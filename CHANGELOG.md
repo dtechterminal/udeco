@@ -13,6 +13,74 @@ How sure each feature is:
 - **Partial:** works, with a named gap.
 - **Not possible:** this hardware or its software can't do it.
 
+## v0.3.0 (2026-11-23)
+
+The JioFiber JCOW414 release: its feature list moves close to the Deco
+X20's, including WPA3 on 2.4 GHz and 802.11r roaming between the JioFiber
+and the Decos. The Deco agent is unchanged apart from helpers the JioFiber
+now shares with it.
+
+### Downloads
+
+| File | For | Install with |
+|---|---|---|
+| `udeco-ap-deco-x20-linux-armv7` and `.gz` | TP-Link Deco X20 V2 (Broadcom, armv7) | `deploy/deco-ap.sh` |
+| `udeco-ap-jio-jcow414-linux-mipsle` and `.gz` | JioFiber JCOW414 (MediaTek, mipsle) | `deploy/jio-ap.sh` |
+| `SHA256SUMS` | checksums of all four files | |
+
+### JioFiber JCOW414: WPA3 on 2.4 GHz
+
+- **Verified:** WPA2/WPA3 transition and WPA3 (SAE) on 2.4 GHz with a
+  rebuilt MT7603 driver (padavan's MediaTek 4.1.2.0 source with SAE and
+  PMF, built for this kernel). `deploy/jio-start.sh` swaps it in at boot
+  from `/flash2/udeco/mt7603wpa3.ko.gz`; without that file the vendor
+  driver stays. The driver itself is not shipped here.
+- **Verified:** the boot swap survives the vendor's event daemon holding
+  the old driver (it is stopped first; 3 tries a boot, then the swap turns
+  itself off), and the supervisor survives the SIGTERM a Jio process sends
+  its process group about 300 s after boot.
+- **Verified:** the 2.4 GHz off-channel scan is back with the rebuilt
+  driver, so RF scans cover 2.4 GHz again.
+
+### JioFiber JCOW414: roaming with the Decos (`"garage_ft": true`)
+
+Off by default. On, the JioFiber serves the controller's 802.11r in the
+Decos' mobility domains and exchanges roaming keys with them.
+
+- **Verified:** both radios advertise FT-PSK and FT-SAE in the Decos'
+  mobility domains; the unit learns every Deco key holder from their
+  signed announcements, and announces its own.
+- **Verified:** the closed 5 GHz driver's key channel: the agent asks it
+  for a client's PMK-R1 for a Deco and gets one that matches hostapd's
+  derivation byte for byte.
+- **Verified:** WPA2 (FT-PSK) keys for roams from each Deco back to the
+  JioFiber are pre-installed in the 5 GHz driver when a client joins.
+- **Built:** FT-SAE key push and pull with the Decos' hostapd (RRB), FT on
+  2.4 GHz through the rebuilt driver, 802.11v band steering and the
+  Roaming Assistant, and 802.11k neighbour reports from the drivers' scan
+  tables. A fast roam between the JioFiber and a Deco has not been
+  observed yet: the test client available could not do FT.
+- **Partial:** a WPA2-only network gets no pre-installed keys on 5 GHz
+  (the Decos announce key holders only for networks with FT-SAE): those
+  roams to the JioFiber are full associations.
+
+### JioFiber JCOW414: other new features
+
+- **Verified:** per-client speed limits (`"rate_limits": true`, off by
+  default) through a small policer module (`tools/udeco_rl`, GPL; build it
+  with its `build.sh` and put it at `/flash2/udeco/udeco_rl.ko.gz`), on
+  both bands; it flushes the hardware NAT cache so existing flows are
+  limited too.
+- **Verified:** Lock to AP and block lists are rewritten when the driver
+  was reloaded or a radio restarted behind the agent (seen after a manual
+  driver swap left a locked client on the JioFiber).
+- **Built:** WPA2/WPA3-Enterprise through Jio's `rtdot1xd`, the mDNS
+  bridge, connection-timing events, IGMP/MLD snooping on the agent's VLAN
+  bridges, the BPDU filter, multicast inspection, and SNMP interface types.
+- **Not possible on this hardware:** Hotspot 2.0, Target Wake Time,
+  Intelligent DHCP, RADIUS MAC authentication, private PSK and
+  RADIUS-assigned VLANs.
+
 ## v0.2.0 (2026-11-21)
 
 The first udeco release. udeco makes TP-Link Deco X20 mesh units, and a
