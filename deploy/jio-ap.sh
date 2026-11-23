@@ -47,6 +47,25 @@
 #   --preflight      build and run the read-only preflight, then stop
 #   --force          install even when the unit already has this build
 #   --build-only     build dist/udeco-ap-linux-mipsle{,.gz} and stop
+#   --driver FILE    also install the optional rebuilt 2.4 GHz driver:
+#                    FILE is mt7603roam-jio-jcow414.ko.gz from a release
+#                    (or dist/modules/mt7603roam.ko.gz from
+#                    tools/econet-kernel/build-modules.sh). It goes to
+#                    /flash2/udeco/mt7603wpa3.ko.gz (the old one kept as
+#                    .prev, a drv2g failure mark cleared) and replaces
+#                    Jio's driver from the next reboot (jio-start.sh drv2g,
+#                    once per boot; it falls back to Jio's on a failure).
+#                    It brings WPA3 and 802.11r/k/v to 2.4 GHz. Without it
+#                    the unit runs Jio's driver: WPA2 only on 2.4 GHz
+#   --rate-limit-module FILE
+#                    also install the optional speed-limit module
+#                    (udeco_rl-jio-jcow414.ko.gz) as /flash2/udeco/
+#                    udeco_rl.ko.gz; the agent loads it while a limit is set
+#                    with "rate_limits": true, the new file from its next load
+#
+# With a module and the agent already this build, only the module is
+# installed (the agent is not restarted). To remove the driver for good:
+# rm /flash2/udeco/mt7603wpa3.ko.gz on the unit and reboot it.
 #
 # Login lock: while the controller is healthy and its Device SSH
 # Authentication is off, the running agent drops new telnet connections
@@ -82,6 +101,7 @@ MIN_SPARE_KB=1024 # /flash2 free after the download, beyond the new gzip
 
 host=$ALLOWED_HOST ucg=$SITE_GATEWAY port=18080
 force_host=0 force=0 preflight_only=0 build_only=0
+driver= rlmod=
 
 usage() { header_text "$0" >&2; exit 2; }
 die() { echo "jio-ap: $*" >&2; exit 1; }
@@ -95,6 +115,8 @@ while [ $# -gt 0 ]; do
 	--force) force=1 ;;
 	--preflight) preflight_only=1 ;;
 	--build-only) build_only=1 ;;
+	--driver) [ $# -ge 2 ] || usage; driver=$2; shift ;;
+	--rate-limit-module) [ $# -ge 2 ] || usage; rlmod=$2; shift ;;
 	-h | --help) usage ;;
 	*) echo "jio-ap: unknown argument $1" >&2; usage ;;
 	esac
@@ -106,6 +128,22 @@ is_ipv4 "$ucg" || die "--ucg $ucg: want an IPv4 address"
 if [ "$host" != "$ALLOWED_HOST" ] && [ "$force_host" != 1 ]; then
 	die "refusing $host: only $ALLOWED_HOST (the Garage AP) runs platform jio-mtk; pass --force-host to override"
 fi
+
+# check_module FILE NAME: FILE is a gzip of the kernel module NAME built
+# for the unit's kernel (3.18.21, MIPS32 R2; the release's and
+# build-modules.sh's)
+check_module() {
+	[ -f "$1" ] || die "$1: no such file"
+	gzip -t "$1" 2>/dev/null || die "$1: not a gzip (want the .ko.gz)"
+	local info
+	# the module's name is a string of its own (its struct module)
+	info=$(gzip -dc "$1" | strings | grep -xE "vermagic=.*|$2") || true
+	printf '%s\n' "$info" | grep -qx "$2" || die "$1: not the $2 module"
+	printf '%s\n' "$info" | grep -qx 'vermagic=3.18.21 SMP mod_unload MIPS32_R2 32BIT ' ||
+		die "$1: built for another kernel ($(printf '%s\n' "$info" | grep vermagic))"
+}
+[ -z "$driver" ] || { check_module "$driver" mt76x3_ap; driver=$(cd "$(dirname "$driver")" && pwd)/$(basename "$driver"); }
+[ -z "$rlmod" ] || { check_module "$rlmod" udeco_rl; rlmod=$(cd "$(dirname "$rlmod")" && pwd)/$(basename "$rlmod"); }
 
 cd "$(dirname "$0")/.."
 
@@ -227,12 +265,20 @@ case $arch in mips*) ;; *) die "the unit is '${arch:-unknown}', not MIPS: wrong 
 printf '%s\n' "$pre" | grep -qx "HAVE $DIR/start.sh" || die "$DIR/start.sh is missing: install the supervisor first (see the garage notes); nothing changed"
 printf '%s\n' "$pre" | grep -qx "HAVE $DIR/udeco-ap.json" || die "$DIR/udeco-ap.json is missing; nothing changed"
 [ -n "$wget_path" ] || die "no wget on the unit; nothing changed"
-[ -n "$free" ] && [ "$free" -ge $((gz_kb + MIN_SPARE_KB)) ] || die "/flash2 has ${free:-?} kB free, need $((gz_kb + MIN_SPARE_KB)); nothing changed"
+need_kb=$((gz_kb + MIN_SPARE_KB))
+[ -z "$driver" ] || need_kb=$((need_kb + $(kb_local "$driver")))
+[ -z "$rlmod" ] || need_kb=$((need_kb + $(kb_local "$rlmod")))
+[ -n "$free" ] && [ "$free" -ge $need_kb ] || die "/flash2 has ${free:-?} kB free, need $need_kb; nothing changed"
 [ "$supervised" = 1 ] || die "start.sh is not running on the unit: nothing would start the new agent; nothing changed"
 echo "  $arch, /flash2 $free kB free, agent pid ${old_pid:-none}, installed gzip ${old_md5:-none}"
+agent=1
 if [ "$old_md5" = "$gz_md5" ] && [ "$force" != 1 ]; then
-	echo "the unit already has this build (gzip md5 $gz_md5); nothing to do (--force reinstalls)"
-	exit 0
+	if [ -z "$driver$rlmod" ]; then
+		echo "the unit already has this build (gzip md5 $gz_md5); nothing to do (--force reinstalls)"
+		exit 0
+	fi
+	echo "the unit already has this agent build (gzip md5 $gz_md5): installing the module(s) only"
+	agent=0
 fi
 if [ "$preflight_only" = 1 ]; then
 	echo "preflight OK (--preflight: nothing changed)"
@@ -246,14 +292,68 @@ cleanup() {
 	ucg_sh "[ -f $srv/http.pid ] && kill \$(cat $srv/http.pid) 2>/dev/null; rm -rf $srv" || echo "jio-ap: could not clean $srv on $ucg" >&2
 }
 trap cleanup EXIT
-ucg_sh "cat > $srv/udeco-ap.gz" <"$OUT.gz"
-got=$(ucg_sh "md5sum $srv/udeco-ap.gz | cut -d' ' -f1")
-[ "$got" = "$gz_md5" ] || die "md5 on the UCG is $got, want $gz_md5"
+# serve FILE NAME: FILE to $srv/NAME on the UCG, md5 checked there
+serve() {
+	local want got
+	want=$(md5_local "$1")
+	ucg_sh "cat > $srv/$2" <"$1"
+	got=$(ucg_sh "md5sum $srv/$2 | cut -d' ' -f1")
+	[ "$got" = "$want" ] || die "md5 of $2 on the UCG is $got, want $want"
+}
+[ "$agent" = 0 ] || serve "$OUT.gz" udeco-ap.gz
+[ -z "$driver" ] || serve "$driver" mt7603wpa3.ko.gz
+[ -z "$rlmod" ] || serve "$rlmod" udeco_rl.ko.gz
 # python3's http.server, only this directory, only the LAN address, at
 # most 10 minutes even if this script dies before its cleanup
 ucg_sh "cd $srv || exit 1; nohup timeout 600 python3 -m http.server $port --bind $ucg </dev/null >/dev/null 2>&1 & echo \$! > $srv/http.pid"
-url=http://$ucg:$port/udeco-ap.gz
-echo "serving $url"
+base=http://$ucg:$port
+url=$base/udeco-ap.gz
+echo "serving $base"
+
+# --- modules (optional): download, check, install --------------------------------
+# install_module NAME FILE WHAT: NAME from the UCG to $DIR/NAME, the old
+# one kept as NAME.prev; md5 of the gzip and of the module it unpacks to
+# checked on the unit (a mismatch removes the download, nothing changes)
+install_module() {
+	local name=$1 g b
+	g=$(md5_local "$2")
+	b=$(gzip -dc "$2" | { command -v md5sum >/dev/null 2>&1 && md5sum || md5; } | cut -d' ' -f1)
+	echo "installing $3 as $DIR/$name"
+	ap "
+set -e
+rm -f $DIR/$name.new
+i=0
+until $wget_path -q -O $DIR/$name.new $base/$name; do
+	i=\$((i + 1)); [ \$i -lt 5 ] || { rm -f $DIR/$name.new; echo 'jio-ap: wget failed'; exit 1; }
+	sleep 2
+done
+g=\$(md5sum $DIR/$name.new | cut -d' ' -f1)
+b=\$(gunzip -c $DIR/$name.new | md5sum | cut -d' ' -f1)
+if [ \"\$g\" != $g ] || [ \"\$b\" != $b ]; then
+	rm -f $DIR/$name.new
+	echo \"jio-ap: md5 mismatch on the unit (gzip \$g, unpacked \$b); removed the download\"
+	exit 1
+fi
+if [ -f $DIR/$name ] && [ \"\$(md5sum $DIR/$name | cut -d' ' -f1)\" != $g ]; then cp -p $DIR/$name $DIR/$name.prev; fi
+mv $DIR/$name.new $DIR/$name
+echo \"  verified and installed (gzip \$g, module \$b)\"
+" 180 || die "installing $name failed; the installed one is unchanged"
+}
+if [ -n "$driver" ]; then
+	install_module mt7603wpa3.ko.gz "$driver" "the 2.4 GHz driver"
+	# a new driver gets drv2g's three tries again
+	ap "rm -f $DIR/mt7603wpa3.failed" 30 >/dev/null
+	echo "  in use from the next reboot of the unit (drv2g swaps the driver once per boot);"
+	echo "  rollback: cp -p $DIR/mt7603wpa3.ko.gz.prev $DIR/mt7603wpa3.ko.gz (or rm it for Jio's driver), then reboot"
+fi
+if [ -n "$rlmod" ]; then
+	install_module udeco_rl.ko.gz "$rlmod" "the speed-limit module"
+	echo "  the agent loads it the next time a limit is set with rate_limits on"
+fi
+if [ "$agent" = 0 ]; then
+	echo "done (the agent was already this build)"
+	exit 0
+fi
 
 # --- 4. download on the unit and check it -----------------------------------------
 echo "downloading on $host"

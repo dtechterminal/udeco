@@ -22,7 +22,7 @@ Rules the items share:
 - **Opt-out keys only where a behaviour could cut off management.**
 
 New agent config keys (all `platform: jio-mtk` only; an error elsewhere):
-`uplink_loss`, `uplink_loss_ssid`, `bss_pinning`, `proxy_arp`, `proxy_arp_driver`, `dfs`, `rate_limits`, `enterprise`, `garage_ft`.
+`uplink_loss`, `uplink_loss_ssid`, `bss_pinning`, `proxy_arp`, `proxy_arp_driver`, `dfs`, `rate_limits`, `enterprise`, `ft`.
 The login lock's keys (`login_lock`, `login_lock_failopen_s`, section 16)
 apply to both platforms, as do the Deco keys this platform now takes:
 `mdns_bridge` (section 19), `sta_snoop` (section 20) and `assoc_garp`
@@ -335,7 +335,7 @@ apply to both platforms, as do the Deco keys this platform now takes:
   telnet session surviving the lock. A failed rule leaves the unit open,
   and the log says why.
 
-## 17. 802.11r, 802.11k, 802.11v on 5 GHz (`garage_ft`, off by default)
+## 17. 802.11r, 802.11k, 802.11v on 5 GHz (`ft`, off by default)
 
 - **U6:** FT-PSK and FT-SAE with the other APs (hostapd, `iapp_key`),
   neighbour reports, BTM requests.
@@ -343,7 +343,7 @@ apply to both platforms, as do the Deco keys this platform now takes:
   `tf1Main` link without IAPP). `internal/mtkft` has what the agent needs
   to take the daemon's place: the driver's KDP signals and key OIDs, the
   FT key hierarchy, hostapd 2.9's RRB-OUI push and sequence frames, the
-  neighbour report and BTM bodies. With `garage_ft` the agent writes the
+  neighbour report and BTM bodies. With `ft` the agent writes the
   FT profile keys in the Decos' mobility domains (`mtkwifi/ftplan.go`) and
   relays FT-SAE keys between the driver and the Decos' hostapd
   (`mtkwifi/roam.go`); details in [garage-ft](garage-ft.md).
@@ -354,7 +354,7 @@ apply to both platforms, as do the Deco keys this platform now takes:
   derives, for each station that joined here and on a refused attempt;
   only on WLANs with FT-SAE (the Decos announce holders for no others).
 - **802.11v:** band steering and the Roaming Assistant are claimed with
-  `garage_ft` (BTM requests; 5 GHz never with a disconnect timer, since
+  `ft` (BTM requests; 5 GHz never with a disconnect timer, since
   the driver does not check the station's BTM support there).
 - **802.11k:** answered by the drivers from their scan tables; the agent
   writes no lists.
@@ -376,7 +376,7 @@ apply to both platforms, as do the Deco keys this platform now takes:
   agent's RRB relay, a per-BSS neighbour list (`NrAdd`), a one-station
   BTM request (`BtmReq`), U-APSD (`APSDCapable`) and the vendor's
   `ApOffChanScan`. The keys, OIDs and commands:
-  [garage-ft](garage-ft.md). With `garage_ft` the agent writes the FT
+  [garage-ft](garage-ft.md). With `ft` the agent writes the FT
   keys (only when the module is loaded: `FT_UDFT_GetEvents` in
   `/proc/kallsyms`) and relays FT-SAE keys through the three OIDs; the
   neighbour list, BTM and U-APSD are not used yet. The module was
@@ -483,7 +483,10 @@ apply to both platforms, as do the Deco keys this platform now takes:
   group are shaped per station, both directions.
 - **Garage:** the kernel has no traffic control (`CONFIG_NET_SCHED` off),
   so the agent's own module polices instead: `udeco_rl.ko`
-  (`tools/udeco_rl`, built against the unit's 3.18.21 layout), a token
+  (`tools/udeco_rl`, built against the unit's 3.18.21 layout by
+  `tools/econet-kernel/build-modules.sh`, released as
+  `udeco_rl-jio-jcow414.ko.gz`, installed with `deploy/jio-ap.sh
+  --rate-limit-module`), a token
   bucket per station and direction on the bridge's FORWARD hook. The
   agent loads it from `/flash2/udeco/udeco_rl.ko.gz` only when a limit is
   set and writes the whole table to `/proc/udeco_rl` in one write

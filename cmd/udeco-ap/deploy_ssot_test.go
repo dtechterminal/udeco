@@ -374,8 +374,9 @@ func TestUnitLayout(t *testing.T) {
 			flash = append(flash, n)
 		}
 	}
-	// the deploy's own download, renamed into place before it counts
-	own := []string{gz + ".new"}
+	// the deploy's own download, renamed into place before it counts, and
+	// the driver --driver replaced, kept for a rollback by hand
+	own := []string{gz + ".new", "mt7603wpa3.ko.gz.prev"}
 	onFlash, inRAM := namesUnder(ss, "$D"), namesUnder(ss, "$R")
 	if len(flash) < 5 || len(onFlash) < 5 || len(inRAM) < 3 {
 		t.Fatalf("file names read: deploy/jio-ap.sh %q, deploy/jio-start.sh %q and %q", flash, onFlash, inRAM)

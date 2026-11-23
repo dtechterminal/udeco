@@ -138,10 +138,10 @@ func TestRoamAssistGarage(t *testing.T) {
 	if err := rg.a.RoamAssist(ctx, req); !errors.Is(err, bcmwifi.ErrNoCandidate) {
 		t.Fatalf("own BSS only: %v", err)
 	}
-	// without garage_ft: nothing is served
+	// without ft: nothing is served
 	n := New(Options{Root: t.TempDir()})
 	if err := n.RoamAssist(ctx, req); err == nil {
-		t.Fatal("served without garage_ft")
+		t.Fatal("served without ft")
 	}
 }
 

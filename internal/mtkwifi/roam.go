@@ -248,9 +248,9 @@ func (a *Applier) roamSync() {
 }
 
 // roamConfig is the served BSSes the runtime works for (a.mu held): none
-// unless the agent serves 802.11r (garage_ft) and owns the radios.
+// unless the agent serves 802.11r (ft) and owns the radios.
 func (a *Applier) roamConfig() []roamBSS {
-	if !a.o.GarageFT || a.o.DryRun || a.live == nil {
+	if !a.o.FT || a.o.DryRun || a.live == nil {
 		return nil
 	}
 	ssids := map[string]bcmwifi.SSID{}
@@ -433,28 +433,28 @@ func (a *Applier) SyncFTPeers(ctx context.Context, d bcmwifi.Desired) (bcmwifi.F
 }
 
 // ServesFTSAE implements ftSAEServer: FT-SAE is built on some radio
-// (garage_ft, wpa3, ft_sae, a driver with FT and SAE).
+// (ft, wpa3, ft_sae, a driver with FT and SAE).
 func (a *Applier) ServesFTSAE() bool {
-	if !a.o.GarageFT || !a.o.WPA3 || !a.o.FTSAE {
+	if !a.o.FT || !a.o.WPA3 || !a.o.FTSAE {
 		return false
 	}
 	return slices.ContainsFunc(a.o.Layout, func(rd RadioDef) bool { return rd.FT && rd.SAE && rd.FTSAE })
 }
 
-// ServesRoaming: the agent runs the roaming runtime (garage_ft): 802.11v
+// ServesRoaming: the agent runs the roaming runtime (ft): 802.11v
 // requests and the neighbour lists. The agent claims band steering and
 // the Roaming Assistant only then.
 func (a *Applier) ServesRoaming() bool {
-	return a.o.GarageFT && slices.ContainsFunc(a.o.Layout, func(rd RadioDef) bool { return rd.FT })
+	return a.o.FT && slices.ContainsFunc(a.o.Layout, func(rd RadioDef) bool { return rd.FT })
 }
 
-// ftLayout applies the garage_ft and ft_sae keys to o's layout.
+// ftLayout applies the ft and ft_sae keys to o's layout.
 func ftLayout(o Options) []RadioDef {
 	l := append([]RadioDef(nil), o.Layout...)
 	for i := range l {
 		switch {
-		case !o.GarageFT && l[i].FT:
-			l[i].FT, l[i].NoFTWhy = false, "off in the agent's config (garage_ft)"
+		case !o.FT && l[i].FT:
+			l[i].FT, l[i].NoFTWhy = false, "off in the agent's config (ft)"
 		case !l[i].FT && l[i].NoFTWhy == "":
 			l[i].NoFTWhy = fmt.Sprintf("the %s driver has no 802.11r (2.4 GHz: the rebuilt mt7603roam module is not loaded)", l[i].HWName)
 		}

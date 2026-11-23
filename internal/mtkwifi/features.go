@@ -101,7 +101,7 @@ func radioFeatures(rp *RadioPlan, rd RadioDef, ri bcmwifi.Radio, served []bcmwif
 		if b.RRM && !rd.FT {
 			// with FT served the agent keeps the neighbour lists (roam.go:
 			// NrAdd on the MT7603, its own answers on the MT7663)
-			note("%s: 802.11k is advertised; neighbour reports come from the driver's own scan table (the agent's neighbour lists need garage_ft%s)", band, ft2GWhy(rd))
+			note("%s: 802.11k is advertised; neighbour reports come from the driver's own scan table (the agent's neighbour lists need ft%s)", band, ft2GWhy(rd))
 			break
 		}
 	}

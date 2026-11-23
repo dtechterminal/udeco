@@ -105,7 +105,7 @@ socket sees received frames only). Options evaluated:
 
 ### The Garage as a peer
 
-With `garage_ft` the Garage (platform `jio-mtk`) announces its FT-SAE BSSs
+With `ft` the Garage (platform `jio-mtk`) announces its FT-SAE BSSs
 over the same signed announcements: R0KH-ID `<bssid hex>-mt7663-r0kh` on
 5 GHz (24 characters: the MT7663 keeps that length whatever the profile
 says), the BSSID's 12 hex digits on 2.4 GHz, R1KH-ID = BSSID, and the

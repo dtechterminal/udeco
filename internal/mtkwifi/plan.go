@@ -87,7 +87,7 @@ type RadioDef struct {
 	// FT: the agent serves 802.11r on this radio (roam.go,
 	// docs/deco/features/garage-ft.md): the MT7663 always has it (built
 	// into the kernel); the MT7603 only as the rebuilt mt7603roam module
-	// (WithDriverFT). Cleared by New when the agent's garage_ft key is
+	// (WithDriverFT). Cleared by New when the agent's ft key is
 	// off; NoFTWhy then says why.
 	FT      bool
 	NoFTWhy string `json:"-"`

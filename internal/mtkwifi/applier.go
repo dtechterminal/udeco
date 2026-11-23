@@ -75,10 +75,10 @@ type Options struct {
 	NoDot1X bool
 	// Dot1xd is rtdot1xd (Dot1xdPath); missing under Root = no enterprise
 	Dot1xd string
-	// GarageFT serves 802.11r, the agent's 802.11k neighbour lists and
+	// FT serves 802.11r, the agent's 802.11k neighbour lists and
 	// 802.11v BSS transition requests (ftplan.go, roam.go; config
-	// garage_ft); off = the controller's FT is noted as not served
-	GarageFT bool
+	// ft); off = the controller's FT is noted as not served
+	FT bool
 	// FTSAE: the agent's ft_sae key (with WPA3): FT-SAE with the Decos'
 	// key holders (roam.go)
 	FTSAE bool

@@ -13,7 +13,7 @@ import (
 	"github.com/dtechterminal/udeco/internal/rf"
 )
 
-// 802.11v for the agent's band steering and Roaming Assistant (garage_ft;
+// 802.11v for the agent's band steering and Roaming Assistant (ft;
 // docs/deco/features/garage-ft.md). The policy is the agent's, as on the
 // Deco (bcmwifi steer.go, roaming.go); this sends one BSS Transition
 // Management request:
@@ -44,13 +44,13 @@ func (a *Applier) btmBSS(vif string) (roamBSS, error) {
 		return roamBSS{}, bcmwifi.ErrNotOwned
 	}
 	if !a.ServesRoaming() {
-		return roamBSS{}, errors.New("mtkwifi: 802.11v requests need garage_ft")
+		return roamBSS{}, errors.New("mtkwifi: 802.11v requests need ft")
 	}
 	a.roam.mu.Lock()
 	b, ok := a.roam.bssByIfname(vif)
 	a.roam.mu.Unlock()
 	if !ok {
-		return roamBSS{}, fmt.Errorf("mtkwifi: %q is not a BSS the agent serves with garage_ft", vif)
+		return roamBSS{}, fmt.Errorf("mtkwifi: %q is not a BSS the agent serves with ft", vif)
 	}
 	if !b.BTM {
 		return b, errBTMOff

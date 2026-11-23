@@ -41,7 +41,8 @@
 # $D/mt7603wpa3.failed, which turns the swap off until it is removed (a
 # vendor module that won't load back reboots the unit, whose next boot then
 # keeps the vendor driver). Steps go to $D/guard.events. Off for one boot
-# with $D/force-observe; for good: rm $D/mt7603wpa3.ko.gz.
+# with $D/force-observe; for good: rm $D/mt7603wpa3.ko.gz. deploy/jio-ap.sh
+# --driver installs it, keeping the one it replaces as $D/mt7603wpa3.ko.gz.prev.
 D=${UDECO_D:-/flash2/udeco}
 R=${UDECO_R:-/tmp/udeco-bin}
 UP=${UDECO_UPTIME:-/proc/uptime}

@@ -51,6 +51,9 @@ func main() {
 		log.Fatalf("udeco-ap: %v", err)
 	}
 	setupLog(cfg.Log, os.Stderr)
+	for _, d := range cfg.deprecations() {
+		log.Printf("udeco-ap: %s", d)
+	}
 	if cfg.jio() {
 		os.Setenv("PATH", jioPATH)
 	}

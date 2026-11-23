@@ -134,7 +134,7 @@ func TestFTIDsAndLocals(t *testing.T) {
 	root := t.TempDir()
 	writeNetdevAddr(t, root, "rai0", garageNA.String())
 	writeNetdevAddr(t, root, "ra0", garageNG.String())
-	a := New(Options{Root: root, GarageFT: true, FTSAE: true, WPA3: true, Layout: ftLayoutBoth(true), roamIO: &fakeRoamIO{}})
+	a := New(Options{Root: root, FT: true, FTSAE: true, WPA3: true, Layout: ftLayoutBoth(true), roamIO: &fakeRoamIO{}})
 	d := ftDesired("wpa2wpa3")
 	ps, _ := plans(d, a.o.Layout, true)
 	if n := a.ftIDs(ps); len(n) != 0 {
@@ -159,7 +159,7 @@ func TestFTIDsAndLocals(t *testing.T) {
 		t.Errorf("R0KH-IDs %q %q", ls[0].Holder.R0KHID, ls[1].Holder.R0KHID)
 	}
 	// no address: FT off on that BSS, noted
-	b := New(Options{Root: t.TempDir(), GarageFT: true, Layout: ftLayoutBoth(true)})
+	b := New(Options{Root: t.TempDir(), FT: true, Layout: ftLayoutBoth(true)})
 	ps, _ = plans(d, b.o.Layout, true)
 	n := b.ftIDs(ps)
 	if ps["na"].BSS[0].FT || len(n) != 1 || !strings.Contains(n[0], `na: SSID "home": 802.11r not served: the address of rai0`) {
@@ -168,7 +168,7 @@ func TestFTIDsAndLocals(t *testing.T) {
 }
 
 // TestWithDriverFT: only the module with the agent's FT interface turns
-// 2.4 GHz FT on; garage_ft off turns both radios' FT off with a reason.
+// 2.4 GHz FT on; ft off turns both radios' FT off with a reason.
 func TestWithDriverFT(t *testing.T) {
 	root := t.TempDir()
 	if l := WithDriverFT(root, JCOW414); l[0].FT {
@@ -188,11 +188,11 @@ func TestWithDriverFT(t *testing.T) {
 		t.Fatal("FT on the SAE-only module")
 	}
 	l := ftLayout(Options{Layout: JCOW414})
-	if l[1].FT || l[1].NoFTWhy != "off in the agent's config (garage_ft)" || !strings.Contains(l[0].NoFTWhy, "mt7603roam") {
+	if l[1].FT || l[1].NoFTWhy != "off in the agent's config (ft)" || !strings.Contains(l[0].NoFTWhy, "mt7603roam") {
 		t.Fatalf("%+v", l)
 	}
 	_, notes := plans(ftDesired("wpa2"), l, true)
-	if !strings.Contains(joined(notes), `na: SSID "home": 802.11r not served: off in the agent's config (garage_ft)`) {
+	if !strings.Contains(joined(notes), `na: SSID "home": 802.11r not served: off in the agent's config (ft)`) {
 		t.Fatalf("notes %q", notes)
 	}
 }

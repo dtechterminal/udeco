@@ -279,14 +279,14 @@ type roamRunner interface {
 }
 
 // startRoaming runs the Garage's 802.11r key transfers with the Decos,
-// neighbour lists and BSS transition events (garage_ft, takeover with
+// neighbour lists and BSS transition events (ft, takeover with
 // apply). Its taps follow the applied plans; the hand-back stops its work.
 func (a *agent) startRoaming(ctx context.Context) {
 	r, ok := a.wifi.(roamRunner)
 	if !ok || !a.cfg.Apply || !r.ServesRoaming() {
 		return
 	}
-	a.logf("garage_ft: 802.11r with the Decos' key holders (RRB EtherType %#04x on the SSIDs' bridges, the 5 GHz driver's KDP frames), 802.11k lists, 802.11v requests", mtkft.EtherTypeOUI)
+	a.logf("ft: 802.11r with the Decos' key holders (RRB EtherType %#04x on the SSIDs' bridges, the 5 GHz driver's KDP frames), 802.11k lists, 802.11v requests", mtkft.EtherTypeOUI)
 	a.bg.Add(1)
 	go func() { defer a.bg.Done(); r.RunRoaming(ctx) }()
 }

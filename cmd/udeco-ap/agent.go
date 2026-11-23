@@ -398,7 +398,7 @@ func newAgent(cfg *Config, o options) (*agent, error) {
 				return mtkwifi.New(mtkwifi.Options{Root: bo.Root, Run: bo.Run, StateDir: bo.StateDir, RunDir: bo.RunDir,
 					Uplink: bo.Uplink, DryRun: bo.DryRun, WPA3: bo.WPA3, Logf: bo.Logf, KeepSSID: cfg.UplinkLossSSID,
 					PinSlots: cfg.BSSPinning, ProxyARP: cfg.proxyARP(), ProxyARPDriver: cfg.ProxyARPDriver, DFS: cfg.DFS,
-					RateLimits: cfg.RateLimits, NoDot1X: !cfg.enterprise(), GarageFT: cfg.GarageFT, FTSAE: bo.FTSAE})
+					RateLimits: cfg.RateLimits, NoDot1X: !cfg.enterprise(), FT: cfg.FT, FTSAE: bo.FTSAE})
 			}
 		}
 	}
@@ -649,7 +649,7 @@ func (a *agent) setup(ctx context.Context, s *apstate.Snapshot) error {
 	_, canSteer := a.wifi.(steerer)
 	_, canRoam := a.wifi.(roamer)
 	// the Garage's 802.11v requests only with its roaming runtime
-	// (garage_ft; mtkwifi roam.go)
+	// (ft; mtkwifi roam.go)
 	if rs, ok := a.wifi.(interface{ ServesRoaming() bool }); ok && !rs.ServesRoaming() {
 		canSteer, canRoam = false, false
 	}

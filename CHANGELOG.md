@@ -13,6 +13,38 @@ How sure each feature is:
 - **Partial:** works, with a named gap.
 - **Not possible:** this hardware or its software can't do it.
 
+## v0.3.1 (2026-11-23)
+
+The JioFiber JCOW414's rebuilt 2.4 GHz driver and its speed-limit module
+are now released next to the agent, as optional downloads. The agent runs
+without either.
+
+### Downloads
+
+| File | For | Install with |
+|---|---|---|
+| `udeco-ap-deco-x20-linux-armv7` and `.gz` | TP-Link Deco X20 V2 (Broadcom, armv7) | `deploy/deco-ap.sh` |
+| `udeco-ap-jio-jcow414-linux-mipsle` and `.gz` | JioFiber JCOW414 (MediaTek, mipsle) | `deploy/jio-ap.sh` |
+| `mt7603roam-jio-jcow414.ko.gz` | optional: the JCOW414's 2.4 GHz driver with WPA3 and 802.11r/k/v | `deploy/jio-ap.sh --driver FILE` |
+| `udeco_rl-jio-jcow414.ko.gz` | optional: the JCOW414's speed-limit module (`"rate_limits": true`) | `deploy/jio-ap.sh --rate-limit-module FILE` |
+| `SHA256SUMS` | checksums of all six files | |
+
+### JioFiber JCOW414
+
+- **Verified:** the 2.4 GHz driver build is reproducible from public
+  sources (`tools/econet-kernel/build-modules.sh`: kernel.org's 3.18.21
+  with the unit's config and `sk_buff` layout, padavan-ng's MediaTek
+  MT7603 4.1.2.0 at a pinned commit, `tools/mt7603/mt7603roam.patch`). CI
+  builds it and the speed-limit module on every push. The driver source is
+  MediaTek's, under MediaTek's notices, not this repository's GPL
+  ([tools/mt7603](tools/mt7603/README.md)).
+- **Built:** `deploy/jio-ap.sh --driver FILE` and `--rate-limit-module
+  FILE` install them on the unit (checked for the unit's kernel, md5
+  checked on the unit, the old file kept as `.prev`). The driver replaces
+  Jio's from the next reboot; with it 2.4 GHz gets WPA3 and 802.11r/k/v.
+- **Changed:** the config key `garage_ft` is now `ft`. `garage_ft` is
+  still read, with a line in the agent's log asking for the rename.
+
 ## v0.3.0 (2026-11-23)
 
 The JioFiber JCOW414 release: its feature list moves close to the Deco

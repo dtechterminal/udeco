@@ -233,8 +233,8 @@ type Config struct {
 	// MT7603 module only). On by default; false never starts rtdot1xd and
 	// leaves those WLANs off (noted), as before, and RadSec unclaimed.
 	Enterprise *bool `json:"enterprise,omitempty"`
-	// GarageFT (platform jio-mtk) serves the controller's 802.11r on the
-	// Garage with the Decos' mobility domains and key holders (FT-PSK;
+	// FT (platform jio-mtk) serves the controller's 802.11r on the
+	// unit with the Decos' mobility domains and key holders (FT-PSK;
 	// FT-SAE with wpa3 and ft_sae), the agent's 802.11k neighbour lists and
 	// 802.11v requests (band steering, Roaming Assistant), and claims those
 	// (mtkwifi ftplan.go, roam.go; docs/deco/features/garage-ft.md). Off by
@@ -242,6 +242,9 @@ type Config struct {
 	// in the RSNE change every SSID's beacon (some old clients refuse them)
 	// and turning it on restarts each radio once; off, the controller's FT
 	// is noted as not served, as before.
+	FT bool `json:"ft,omitempty"`
+	// GarageFT is ft's name up to v0.3.0, still read: true sets FT, and
+	// the agent logs that the key was renamed (deprecated).
 	GarageFT bool `json:"garage_ft,omitempty"`
 	// LoginLock (takeover with apply, both platforms): absent or true
 	// drops new connections to the unit's root login ports (Deco :22;
@@ -353,7 +356,7 @@ func (c *Config) jioOnlyKeys() []keySet {
 	return []keySet{{"uplink_loss", c.UplinkLoss != nil}, {"uplink_loss_ssid", c.UplinkLossSSID != ""},
 		{"bss_pinning", c.BSSPinning}, {"proxy_arp", c.ProxyARP != nil},
 		{"proxy_arp_driver", c.ProxyARPDriver}, {"dfs", c.DFS}, {"rate_limits", c.RateLimits},
-		{"enterprise", c.Enterprise != nil}, {"garage_ft", c.GarageFT}}
+		{"enterprise", c.Enterprise != nil}, {"ft", c.FT}}
 }
 
 // The LAN ports' keys (platform jio-mtk as the model with LAN ports):
@@ -413,6 +416,16 @@ func (c *Config) hasLANPorts() bool {
 	return ok && m.RearUplinkPort() > 0
 }
 
+// deprecations are the renamed keys the config still uses, for the
+// agent's start-up log.
+func (c *Config) deprecations() []string {
+	var d []string
+	if c.GarageFT {
+		d = append(d, `config: "garage_ft" is now "ft" (still read; rename it)`)
+	}
+	return d
+}
+
 func loadConfig(path string) (*Config, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -437,6 +450,9 @@ func parseConfig(b []byte) (*Config, error) {
 	}
 	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return nil, errors.New("config: trailing data after the JSON object")
+	}
+	if c.GarageFT {
+		c.FT = true
 	}
 	return c, c.validate()
 }

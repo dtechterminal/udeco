@@ -1,6 +1,6 @@
 # Garage: 802.11r, 802.11k and 802.11v with the Decos
 
-**Status (2026-11-23): wired behind `garage_ft` (off by default),
+**Status (2026-11-23): wired behind `ft` (off by default),
 unit-tested; on the unit only the 5 GHz profile keys and an FT-PSK initial
 association were run (see "On-unit checks").** The Garage's radios are
 closed MediaTek drivers built into the EcoNet kernel, and its iappd cannot
@@ -265,9 +265,9 @@ All verified.
 - **Not present.** The `CONFIG_DOT11V_WNM` iwpriv commands (`WNMCertEnable`,
   `SendBTMReq`) are not in the set table, and OID 0x094A has no case.
 
-### Agent side (`garage_ft`)
+### Agent side (`ft`)
 
-1. **Config.** `garage_ft` (`jio-mtk` only, default false): off until the
+1. **Config.** `ft` (`jio-mtk` only, default false): off until the
    roaming test below passes. Off, the controller's FT is noted as not
    served and nothing below runs. On, it is a profile change (one restart
    per radio).
@@ -364,14 +364,17 @@ All verified.
   - **Result (2026-11-23, verified):** see `KEY_REQ` above; no frame for an
     unknown station.
 - **V4.** The roaming test of the final report (both directions, WPA2 and
-  WPA3 clients), with the integration build and `garage_ft: true`.
+  WPA3 clients), with the integration build and `ft: true`.
 
 ## 2.4 GHz (MT7603, driver `mt7603roam`)
 
 **Status: driver built (module `mt76x3_ap`, file `mt7603roam.ko`, md5 72ec9fa9...) and live-swapped
 on the unit 2026-11-23: beacons, RX and two stations came back, `show ftinfo` and `show nrlist`
 answer, `ApOffChanScan` works (below). FT, 802.11k and 802.11v have not run on air yet, and the
-module is not persistent (the flash still holds `mt7603wpa3.ko.gz`).** This page is the contract between the rebuilt MT7603 driver
+module is not persistent (the flash still holds `mt7603wpa3.ko.gz`).** Since 2026-11-23 it is the boot module
+(`/flash2/udeco/mt7603wpa3.ko.gz`), built reproducibly by `tools/econet-kernel/build-modules.sh` from
+`tools/mt7603/mt7603roam.patch` (same code as md5 72ec9fa9, only the build time differs), released as
+`mt7603roam-jio-jcow414.ko.gz` and installed with `deploy/jio-ap.sh --driver`. This page is the contract between the rebuilt MT7603 driver
 (padavan MediaTek 4.1.2.0 + drv2g patch) and the udeco agent on the Garage (`platform` jio-mtk).
 It covers what the driver does by itself, what it needs the agent for, and every key and command.
 "Verified" below means read in the driver source (function named) unless it says live.

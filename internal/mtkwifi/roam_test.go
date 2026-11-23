@@ -112,7 +112,7 @@ type roamRig struct {
 func newRoamRig(t *testing.T) *roamRig {
 	t.Helper()
 	io := &fakeRoamIO{}
-	a := New(Options{Root: t.TempDir(), GarageFT: true, FTSAE: true, WPA3: true, roamIO: io, Logf: t.Logf})
+	a := New(Options{Root: t.TempDir(), FT: true, FTSAE: true, WPA3: true, roamIO: io, Logf: t.Logf})
 	key, err := mtkft.RRBKey(testIAPPKey)
 	if err != nil {
 		t.Fatal(err)
@@ -606,7 +606,7 @@ func TestFTLocals(t *testing.T) {
 	}
 	n := New(Options{Root: t.TempDir(), FTSAE: true, WPA3: true})
 	if n.ServesFTSAE() || n.ServesRoaming() {
-		t.Fatal("served without garage_ft")
+		t.Fatal("served without ft")
 	}
 }
 

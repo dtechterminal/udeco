@@ -106,19 +106,21 @@ func TestConfigErrorTexts(t *testing.T) {
 		{jio + `,"ports_unlocked":[3,2,1]`, ``},
 		{jio + `,"ports_unlocked":[-1]`, `config: ports_unlocked [-1]: want distinct LAN ports 1-3 (port 4 is the uplink and is never changed)`},
 		{jio + `,"ports_unlocked":[5]`, `config: ports_unlocked [5]: want distinct LAN ports 1-3 (port 4 is the uplink and is never changed)`},
-		{base + `,"uplink_loss":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
-		{base + `,"uplink_loss":false`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
-		{base + `,"uplink_loss_ssid":"x"`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
-		{base + `,"bss_pinning":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
-		{base + `,"proxy_arp":false`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
-		{base + `,"proxy_arp":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
-		{base + `,"proxy_arp_driver":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
-		{base + `,"dfs":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
-		{base + `,"rate_limits":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
-		{base + `,"enterprise":false`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
+		{base + `,"uplink_loss":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{base + `,"uplink_loss":false`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{base + `,"uplink_loss_ssid":"x"`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{base + `,"bss_pinning":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{base + `,"proxy_arp":false`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{base + `,"proxy_arp":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{base + `,"proxy_arp_driver":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{base + `,"dfs":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{base + `,"rate_limits":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{base + `,"enterprise":false`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
 		{lt + `,"enterprise":false`, ``},
-		{base + `,"garage_ft":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and garage_ft are for platform jio-mtk only`},
+		{base + `,"ft":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
+		{lt + `,"ft":true`, ``},
 		{lt + `,"garage_ft":true`, ``},
+		{base + `,"garage_ft":true`, `config: uplink_loss, uplink_loss_ssid, bss_pinning, proxy_arp, proxy_arp_driver, dfs, rate_limits, enterprise and ft are for platform jio-mtk only`},
 		{base + `,"ports_unlocked":[1]`, `config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform jio-mtk only`},
 		{base + `,"ports_confirm_s":90`, `config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform jio-mtk only`},
 		{base + `,"ports_loss_s":300`, `config: ports_unlocked, ports_confirm_s and ports_loss_s are for platform jio-mtk only`},
@@ -598,5 +600,25 @@ func TestAgentPATH(t *testing.T) {
 	}
 	if p := "PATH is set to `" + agentPATH + "` at start"; !strings.Contains(flat(repotest.Read(t, "docs/deco/agent-design.md")), p) {
 		t.Errorf("docs/deco/agent-design.md does not have %q", p)
+	}
+}
+
+// garage_ft, ft's name up to v0.3.0, still turns ft on, and says so.
+func TestConfigGarageFTAlias(t *testing.T) {
+	for _, tc := range []struct {
+		json     string
+		ft, depr bool
+	}{
+		{cfgBase + `,"platform":"jio-mtk","model":"U7LT","garage_ft":true`, true, true},
+		{cfgBase + `,"platform":"jio-mtk","model":"U7LT","ft":true`, true, false},
+		{cfgBase + `,"platform":"jio-mtk","model":"U7LT"`, false, false},
+	} {
+		c, err := parseConfig([]byte("{" + tc.json + "}"))
+		if err != nil {
+			t.Fatalf("%s: %v", tc.json, err)
+		}
+		if c.FT != tc.ft || (len(c.deprecations()) > 0) != tc.depr {
+			t.Errorf("%s: ft %v, deprecations %q; want ft %v, a deprecation %v", tc.json, c.FT, c.deprecations(), tc.ft, tc.depr)
+		}
 	}
 }
