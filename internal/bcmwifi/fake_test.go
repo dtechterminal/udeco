@@ -38,6 +38,10 @@ type fakeDev struct {
 	stall   bool                // hostapd never finishes its BSS setup
 	nextPid int
 	eb      *fakeEbtables
+	ebr     *fakeEbtables // the broute table
+	// hapdEnv records the env assignments hostapd was started with, as
+	// "<assignments> <conf>" (BusyBox env, rrb.go).
+	hapdEnv []string
 	tc      map[string][]string // dev -> qdisc show lines
 	tcCalls [][]string
 	fcOff   bool // the flow cache is not learning (fc disable)
@@ -57,7 +61,7 @@ func newFakeDev(t *testing.T) *fakeDev { t.Helper(); return newFakeDevLayout(t, 
 func newFakeDevLayout(t *testing.T, master bool) *fakeDev {
 	t.Helper()
 	f := &fakeDev{t: t, root: t.TempDir(), state: map[string]string{}, maclist: map[string][]string{}, procs: map[int]*fakeHapd{}, nextPid: 20000,
-		eb: newFakeEbtables(), tc: map[string][]string{}}
+		eb: newFakeEbtables(), ebr: newFakeBroute(), tc: map[string][]string{}}
 	names, err := os.ReadFile(filepath.Join(fixtures, "ls_sys_class_net.txt"))
 	if err != nil {
 		t.Fatal(err)
@@ -339,6 +343,16 @@ func (f *fakeDev) Run(ctx context.Context, name string, args ...string) ([]byte,
 		return f.wl(args)
 	case "hostapd":
 		return f.hostapd(args)
+	case "env": // BusyBox env: assignments, then the command
+		i := 0
+		for i < len(args) && strings.Contains(args[i], "=") {
+			i++
+		}
+		if i == 0 || i >= len(args) || args[i] != "hostapd" {
+			return nil, fmt.Errorf("fake: env %q", args)
+		}
+		f.hapdEnv = append(f.hapdEnv, strings.Join(args[:i], " ")+" "+args[len(args)-1])
+		return f.hostapd(args[i+1:])
 	case "hostapd_cli":
 		return f.hostapdCLI(args)
 	case "kill":
@@ -404,6 +418,12 @@ func (f *fakeDev) Run(ctx context.Context, name string, args ...string) ([]byte,
 	case "fc":
 		return f.fc(args)
 	case "ebtables":
+		if len(args) >= 2 && args[0] == "-t" {
+			if args[1] != "broute" {
+				return []byte("fake: table " + args[1]), errors.New("exit status 255")
+			}
+			return f.ebr.run(args[2:])
+		}
 		return f.eb.run(args)
 	case "tc":
 		return f.tcRun(args)
@@ -729,6 +749,11 @@ func newFakeEbtables() *fakeEbtables {
 	return e
 }
 
+// newFakeBroute is the broute table: BROUTING, empty.
+func newFakeBroute() *fakeEbtables {
+	return &fakeEbtables{chains: map[string]*fakeChain{"BROUTING": {policy: "ACCEPT"}}}
+}
+
 func (e *fakeEbtables) run(args []string) ([]byte, error) {
 	fail := func(msg string) ([]byte, error) { return []byte(msg), errors.New("exit status 255") }
 	if len(args) < 2 {
@@ -829,7 +854,7 @@ func (f *fakeDev) mutating() [][]string {
 				continue
 			}
 		case "ebtables":
-			if c[1] == "-L" {
+			if c[1] == "-L" || len(c) > 3 && c[1] == "-t" && c[3] == "-L" {
 				continue
 			}
 		case "tc":

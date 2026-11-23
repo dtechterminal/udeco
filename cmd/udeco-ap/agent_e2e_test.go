@@ -284,7 +284,7 @@ func (u *e2eUnit) mutating() []string {
 				continue
 			}
 		case "ebtables":
-			if len(c) == 3 && c[1] == "-L" {
+			if len(c) == 3 && c[1] == "-L" || len(c) == 5 && c[1] == "-t" && c[3] == "-L" {
 				continue
 			}
 		case "ip":

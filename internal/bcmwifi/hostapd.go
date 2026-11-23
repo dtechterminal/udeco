@@ -204,6 +204,11 @@ func renderHostapd(r hapdRadio) (string, error) {
 	}
 	var b strings.Builder
 	w := func(k string, v any) { fmt.Fprintf(&b, "%s=%v\n", k, v) }
+	if r.usesRRB() {
+		// rrb.go: hostapd runs with the RRB shim; naming its build here
+		// restarts hostapd when the shim changes (or first comes in).
+		fmt.Fprintf(&b, "# udeco: RRB receive shim %s preloaded\n", rrbShimID())
+	}
 	w("driver", "nl80211")
 	w("ctrl_interface_group", 0)
 	w("interface", ph.Vif)

@@ -171,6 +171,56 @@ hostapd 2.9 (the Deco's `/sbin/hostapd`, which has FT-SAE, `FT OLDKEY` and RRB-O
 and newer UniFi hostapds derive the same 256-bit RRB key from the same iapp_key. RRB runs on the
 BSS's bridge (`br-lan` or `br-vN`), ethertype 0x890d / 0x88b7.
 
+### Receiving key holder frames (`internal/bcmwifi/rrb.go`, 2026-11-23)
+
+The X20's bridge drops every **unicast** frame of EtherType 0x88b7 before it reaches `br-lan`
+(TP-Link's `tpbr` module handles that EtherType itself; any OUI, any destination, also the
+bridge's own MAC). Broadcast and multicast pass, and so do other EtherTypes (0x88b5). Verified on
+.232: the frame is on `eth1` (tcpdump), absent on `br-lan`, and hostapd's socket, bound to
+`br-lan`, never sees it. hostapd sends every RRB message unicast to the peer's BSSID, so no Deco
+ever received a PMK-R1 pull, response, push or sequence message, from another Deco or from the
+Garage. Multicast is no way around it: hostapd takes a multicast RRB frame as `no_defer`, and a
+first frame from a peer must be deferred for the SEQ_REQ/SEQ_RESP handshake. Sending works; the
+Garage receives the Decos' frames.
+
+The agent hands the frames to hostapd past the bridge, only while some BSS of the unit has FT-SAE:
+
+```
+ebtables -t broute:  BROUTING -j UDECO-RRB (first; UDECO-RRB policy RETURN)
+                     UDECO-RRB -p 0x88b7 -d <FT-SAE BSSID> -j DROP     one per FT-SAE BSS
+hostapd:             env LD_PRELOAD=/tmp/udeco/udeco_rrb.so hostapd -B -P ... (radios with FT-SAE)
+hostapd conf:        "# udeco: RRB receive shim <sha256[:8]> preloaded" (first line)
+```
+
+- **broute.** A frame the broute table drops is not bridged: the kernel hands it to the stack on
+  the port it came in on (`eth0`/`eth1`). broute runs before the bridge's hooks, so `tpbr` never
+  sees it. Only frames for the FT-SAE BSSIDs are taken; TP-Link's own 0x88b7 traffic between the
+  Decos is bridged as before.
+- **Shim** (`tools/deco-rrbshim/udeco_rrb.c`, built reproducibly by `build.sh` and embedded in
+  the agent). Its `bind()` binds an `AF_PACKET` socket of protocol 0x88b7 to all interfaces
+  instead of the one asked for, and its `send()` on such a socket sends out that interface. So
+  hostapd's RRB-OUI socket receives the frames on `eth0`/`eth1` and still sends out `br-lan`.
+  hostapd drops a frame not addressed to one of its BSSes, and every message is authenticated with
+  the r0kh/r1kh key. Nothing else changes, and the stock `/sbin/hostapd` is kept.
+- The conf line names the shim's build, so the first shim, or a new one, restarts hostapd once
+  with it. The shim file is written to RunDir like the confs. The chain's BSSIDs are kept in
+  `RunDir/rrb-ebtables.txt`: a change rebuilds the chain, and one removed by something else is
+  rebuilt on the next tick without a hostapd restart. The chain and its jump go with the hand-back.
+  Every step is optional: without them FT-SAE roams fall back to a full SAE, and Wi-Fi is not held
+  back.
+
+Verified on .232 (2026-11-23), stock hostapd with the shim and the broute rule, a PMK-R1 pull from
+the Garage's 2.4 GHz BSS for a made-up station:
+
+1. hostapd received it on `eth1`, deferred it, and sent a SEQ_REQ to the Garage.
+2. The Garage answered with a SEQ_RESP; hostapd reset the peer's sequence number and processed
+   the pull.
+3. It decrypted the pull and logged `FT: No matching PMK-R0-Name found`, as expected for a made-up
+   station.
+4. It sent a RESP, which the Garage opened (nonce matched, S1KH-ID only).
+
+Without the rule, and before the shim, nothing reached hostapd.
+
 Without the controller's WPA3 fast roaming or without a usable key: a transition SSID gets FT-PSK
 only, a WPA3-only one no 802.11r, with a plan note (the key is never in a note, a log, an
 announcement, `drv-wlN.json` or the public last-good; it lives in the 0600 hostapd conf and

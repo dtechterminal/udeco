@@ -220,6 +220,7 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 	bst, bforeign := a.bgaSteps(l.bgaVifs(), a.readBGA(ctx))
 	p.Steps = append(p.Steps, bst...)
 	p.Foreign = append(p.Foreign, bforeign...)
+	var rrb []string // FT-SAE BSSIDs (rrb.go)
 	for _, rl := range l.Radios {
 		want := d.Country
 		if c := d.BandCountry[rl.Band]; c != "" {
@@ -231,6 +232,7 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 		}
 		p.Steps = append(p.Steps, rp.Steps...)
 		p.Notes = append(p.Notes, rp.Notes...)
+		rrb = append(rrb, rp.RRB...)
 		if lr := ls.Radios[rl.Primary]; lr != nil {
 			line := "radio " + rl.Band + ": " + twtStatus(rl.Primary, lr.TWT, !a.o.NoTWT, rp.TWTSet)
 			dline := "radio " + rl.Band + ": " + rp.Driver
@@ -260,6 +262,10 @@ func (a *Applier) plan(ctx context.Context, d Desired) (Plan, error) {
 			p.Notes = append(p.Notes, "radio na: DFS channel availability check in progress (no beacons until it ends)")
 		}
 	}
+	// FT-SAE key holder frames past the bridge to hostapd (rrb.go).
+	rst, rforeign := a.rrbSteps(rrb, a.readRRB(ctx))
+	p.Steps = append(p.Steps, rst...)
+	p.Foreign = append(p.Foreign, rforeign...)
 	for _, vid := range ls.VBridges {
 		if !containsInt(l.VLANs, vid) {
 			p.Steps = append(p.Steps, a.vlanDownSteps(vid)...)
@@ -413,6 +419,9 @@ type radioPlan struct {
 	// inside one of the plan's radio down/ups (twt.go, parity.go)
 	TWTSet bool
 	Driver string // the radio's driver-parity line (parity.go driverStatus)
+	// RRB are the radio's FT-SAE BSSIDs, whose key holder frames the
+	// broute chain hands to hostapd (rrb.go).
+	RRB []string
 }
 
 // macDrift returns the steps that put a vif's driver MAC filter to mode/list
@@ -628,6 +637,13 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 			FTPeers: a.peersFor(u.SSID, rl.Band, u.Bridge)}) // ftpeers.go
 		files = append(files, aclSteps(a.o.RunDir, d)...)
 		files = append(files, pskSteps(a.o.RunDir, u.Vif, u.SSID, a.exists)...)
+		if x := hr.BSS[len(hr.BSS)-1]; x.usesRRB() {
+			rp.RRB = append(rp.RRB, normMAC(x.BSSID))
+		}
+	}
+	if hr.usesRRB() {
+		// rrb.go: the shim hostapd is started with (a new one restarts it).
+		files = append(files, writeStep("write RRB shim", rrbShimPath(a.o.RunDir), 0o755, rrbShim))
 	}
 	stale := a.staleVifSteps(p, rl) // slots.go
 	var conf, drvJSON []byte
@@ -876,7 +892,7 @@ func (a *Applier) planRadio(ctx context.Context, rl *radioLayout, ls *liveState,
 		st = append(st, apResetSteps(p, false)...) // anchor.go: the master
 	}
 	st = append(st,
-		cmdStep("start hostapd on "+p, "hostapd", "-B", "-P", pidPath(a.o.RunDir, p), ConfPath(a.o.RunDir, p)),
+		cmdStep("start hostapd on "+p, hostapdArgv(a.o.RunDir, p, hr.usesRRB())...),
 		Step{Kind: StepWait, Desc: "wait for hostapd on " + p, Ifaces: vifs, Path: CtrlDir, Port: vifs[len(vifs)-1]},
 		optStep("keep placeholder "+ph+" down", "wl", "-i", ph, "bss", "down"))
 	// dwds and rrm need the radio down: one wl down / wl up for all the
