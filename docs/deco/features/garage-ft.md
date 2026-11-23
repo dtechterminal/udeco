@@ -145,7 +145,8 @@ MDIE confirms the value (on the unit: `ff 24` for `FtMdId1=24ff:H`).
 These are the Decos' frames with explicit peers and `pmk_r1_push=1`, from
 `src/ap/wpa_auth_ft.c`, all verified from the source.
 
-- **Frame.** EtherType 0x88b7, OUI 00:13:74 and a subtype octet, then
+- **Frame.** EtherType 0x88b7, OUI 00:13:74, protocol octets 00 01
+  (`eth_p_oui.c`'s `global_oui`) and a subtype octet, then
   `u16 authlen || auth TLVs || AES-SIV(enc TLVs)`. The SIV associated data
   are the source MAC, the auth TLVs and the subtype. A payload under 64
   bytes gets an empty TLV appended to the auth TLVs. The key is the r0kh/r1kh
@@ -170,7 +171,13 @@ These are the Decos' frames with explicit peers and `pmk_r1_push=1`, from
     A.1 vectors and IEEE 802.11-2016 J.4.2 for the PSK.
 
   The pushes and sequence-number frames are byte-exact against frames built
-  independently from the hostapd layouts.
+  independently from the hostapd layouts. Those layouts left out the
+  protocol octets 00 01 after the OUI until 2026-11-23, so neither side
+  caught it, and every frame failed hostapd's `eth_p_rx` OUI check. It was
+  found against a Deco's hostapd. The vectors now carry the octets, and a
+  pull, SEQ_REQ, SEQ_RESP and RESP exchange with the Deco's own hostapd
+  is verified (docs/deco/features/ft-sae.md, "Receiving key holder
+  frames").
 
 ### Roaming with the Decos
 

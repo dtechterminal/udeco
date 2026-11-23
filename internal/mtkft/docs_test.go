@@ -21,7 +21,7 @@ func TestDocsGarageFT(t *testing.T) {
 		fmt.Sprintf("which is `KeyElementLen` = %d octets", KeyElementLen),
 		fmt.Sprintf("It keeps the %d of `FT_CfgInitial`'s random", R0KHIDLen),
 		fmt.Sprintf("hostapd's `mobility_domain=d530` is `FtMdId1=%s`", MDIDValue(0xd530)),
-		fmt.Sprintf("Frame.** EtherType %#04x, OUI 00:13:74", EtherTypeOUI),
+		fmt.Sprintf("Frame.** EtherType %#04x, OUI 00:13:74, protocol octets %02x %02x", EtherTypeOUI, FTOUI[3], FTOUI[4]),
 		fmt.Sprintf("`OID_802_11_RRM_COMMAND` (0x%04X)", OIDRRMCommand),
 		fmt.Sprintf("as IWEVCUSTOM flags 0x%04X", EvRRM),
 		fmt.Sprintf("at most %d octets", maxNRRspLen),

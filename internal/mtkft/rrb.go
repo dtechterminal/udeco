@@ -12,8 +12,8 @@ import (
 // hostapd 2.9's R0KH-R1KH protocol over RRB-OUI (src/ap/wpa_auth_ft.c,
 // wpa_auth.h), what the Decos speak with explicit r0kh/r1kh peers and
 // pmk_r1_push=1 (docs/deco/features/ft-sae.md). A frame is Ethernet with
-// EtherType 0x88b7 (IEEE 802 OUI Extended), OUI 00:13:74, one subtype
-// octet, then:
+// EtherType 0x88b7 (IEEE 802 OUI Extended), OUI 00:13:74 and the protocol
+// octets 00 01 (eth_p_oui.c global_oui), one subtype octet, then:
 //
 //	u16 authlen (LE) || authenticated TLVs (authlen) || AES-SIV(encrypted TLVs)
 //
@@ -25,8 +25,9 @@ import (
 // EtherTypeOUI is ETH_P_OUI.
 const EtherTypeOUI = 0x88b7
 
-// FTOUI is hostapd's RRB-OUI OUI (eth_p_oui.c global_oui).
-var FTOUI = [3]byte{0x00, 0x13, 0x74}
+// FTOUI is hostapd's RRB-OUI header before the subtype (eth_p_oui.c
+// global_oui): the OUI 00:13:74 and the protocol octets 00 01.
+var FTOUI = [5]byte{0x00, 0x13, 0x74, 0x00, 0x01}
 
 // RRB-OUI subtypes (FT_PACKET_R0KH_R1KH_*).
 const (
@@ -62,7 +63,7 @@ const (
 const (
 	nonceLen      = 16 // FT_RRB_NONCE_LEN
 	rrbMinMsgLen  = 64 // RRB_MIN_MSG_LEN
-	ouiHeaderLen  = 4  // OUI and subtype
+	ouiHeaderLen  = 6  // FTOUI and subtype
 	tlvHeaderLen  = 4
 	seqLen        = 12 // struct ft_rrb_seq
 	seqTimeoutSec = 10 // ftRRBseqTimeout
@@ -150,10 +151,10 @@ var errRRB = errors.New("mtkft: not an RRB-OUI frame")
 // key (a receiver picks the key by the R0KH-ID / R1KH-ID in them, as
 // hostapd does), and returns the sealed rest for Open.
 func Split(payload []byte) (Frame, []byte, error) {
-	if len(payload) < ouiHeaderLen+2 || [3]byte(payload[:3]) != FTOUI {
+	if len(payload) < ouiHeaderLen+2 || [5]byte(payload[:5]) != FTOUI {
 		return Frame{}, nil, errRRB
 	}
-	sub := payload[3]
+	sub := payload[5]
 	p := payload[ouiHeaderLen:]
 	n := int(binary.LittleEndian.Uint16(p))
 	if 2+n > len(p) {
