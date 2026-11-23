@@ -65,12 +65,20 @@ FT-PSK was not affected: it derives its keys locally.
   layout. A PMK-R1 pull from the Garage to a Deco now goes through the full
   exchange: pull, SEQ_REQ, SEQ_RESP and response, with the nonce matching.
 
-### Not yet seen
+### Seen with a real client
 
-- A client completing an FT-SAE roam between two units. None of the
-  household's clients joins with FT-SAE, and the GL KVM's AIC8800 test
-  client does an FT-SAE first join but not an FT roam: on a roam its
-  firmware leaves the AP and sends a plain SAE join.
+- **Verified (2026-11-23, 19:30–19:38 IST):** a household client joined
+  with FT-SAE and roamed between Hallway (.204) and Bedroom (.232) on
+  5 GHz by FT at least four times. Each time hostapd logged
+  `authentication OK (FT)` and `FT authentication already completed - do
+  not start 4-way handshake`, and associated in the same second. Before
+  this release every such move was a full SAE join. After the first roam
+  the client stayed on the new AP for over 6 minutes.
+- **Not yet seen:** an FT roam to or from the Garage. Its keys arrive and
+  are installed in its driver, but no client has roamed there since. The
+  GL KVM's AIC8800 is no test client: it does an FT-SAE first join but not
+  an FT roam (on a roam its firmware leaves the AP and sends a plain SAE
+  join).
 
 ## v0.3.1 (2026-11-23)
 

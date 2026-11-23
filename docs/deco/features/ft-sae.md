@@ -221,6 +221,13 @@ the Garage's 2.4 GHz BSS for a made-up station:
 
 Without the rule, and before the shim, nothing reached hostapd.
 
+A real roam (2026-11-23, 19:30–19:38 IST, hostapd's `logger_syslog_level` set to 0 at runtime with
+`hostapd_cli set`): a household client that joined with FT-SAE moved between Hallway (.204) and
+Bedroom (.232) on 5 GHz at least four times by FT. Each time hostapd logged `authentication OK
+(FT)` and `FT authentication already completed - do not start 4-way handshake`, then `associated`
+in the same second. Before the receive path, every such move was a full SAE join with a 4-way
+handshake.
+
 Without the controller's WPA3 fast roaming or without a usable key: a transition SSID gets FT-PSK
 only, a WPA3-only one no 802.11r, with a plan note (the key is never in a note, a log, an
 announcement, `drv-wlN.json` or the public last-good; it lives in the 0600 hostapd conf and
