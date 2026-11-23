@@ -31,19 +31,23 @@ without either.
 
 ### JioFiber JCOW414
 
-- **Verified:** the 2.4 GHz driver build is reproducible from public
-  sources (`tools/econet-kernel/build-modules.sh`: kernel.org's 3.18.21
-  with the unit's config and `sk_buff` layout, padavan-ng's MediaTek
-  MT7603 4.1.2.0 at a pinned commit, `tools/mt7603/mt7603roam.patch`). CI
-  builds it and the speed-limit module on every push. The driver source is
-  MediaTek's, under MediaTek's notices, not this repository's GPL
-  ([tools/mt7603](tools/mt7603/README.md)).
-- **Built:** `deploy/jio-ap.sh --driver FILE` and `--rate-limit-module
+- **Verified:** both modules build reproducibly from public sources
+  (`tools/econet-kernel/build-modules.sh`: kernel.org's 3.18.21 with the
+  unit's config and `sk_buff` layout, padavan-ng's MediaTek MT7603 4.1.2.0
+  at a pinned commit, `tools/mt7603/mt7603roam.patch`). CI's build and a
+  local one of the same commit are byte-identical. The driver has the same
+  code as the one the unit has run since v0.3.0 (only its build time
+  differs), and the speed-limit module is the same bytes as the one tested
+  on the unit. The driver source is MediaTek's, under MediaTek's notices,
+  not this repository's GPL ([tools/mt7603](tools/mt7603/README.md)).
+- **Verified:** `deploy/jio-ap.sh --driver FILE` and `--rate-limit-module
   FILE` install them on the unit (checked for the unit's kernel, md5
   checked on the unit, the old file kept as `.prev`). The driver replaces
-  Jio's from the next reboot; with it 2.4 GHz gets WPA3 and 802.11r/k/v.
+  Jio's from the next reboot. A CI build installed this way loaded at
+  boot, with WPA3 and 802.11r on 2.4 GHz.
 - **Changed:** the config key `garage_ft` is now `ft`. `garage_ft` is
-  still read, with a line in the agent's log asking for the rename.
+  still read, with a line in the agent's log asking for the rename (seen
+  on the unit). A unit going back to v0.3.0 needs `garage_ft` again.
 
 ## v0.3.0 (2026-11-23)
 
