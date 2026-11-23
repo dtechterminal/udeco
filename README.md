@@ -66,7 +66,7 @@ Status key:
 |---|---|---|
 | 802.11k, 802.11v | Verified | Neighbour reports list the other units. 802.11k (RRM) is on for every SSID as on a U6 Pro, and 802.11v (WNM) is turned off in the driver where the controller turns BSS transition off. The driver bits are built, not checked on a unit ([radio-parity](docs/deco/features/radio-parity.md)). |
 | 802.11r (FT-PSK) | Built | On for every SSID. The units exchange FT key holders over signed announcements on the LAN. A client doing a fast transition has not been observed yet. The Garage joins the same mobility domains with `ft` (off; built, not run on air). |
-| 802.11r for WPA3 (FT-SAE) | Built | On with `wpa3` (`"ft_sae": false` turns it off). On 2026-11-19 it stopped WPA3 phones joining: the driver beacons the mobility domain byte-swapped, so hostapd refused every FT-SAE association (status 54). Fixed 2026-11-20; since then all three units run it, and an iPhone, an Apple Watch and a Pixel join (seen 2026-11-21). An FT-SAE roam between units has not been observed yet ([ft-sae](docs/deco/features/ft-sae.md)). The Garage takes part with `ft` (off; its agent relays the keys; built, not run on air). |
+| 802.11r for WPA3 (FT-SAE) | Built | On with `wpa3` (`"ft_sae": false` turns it off). On 2026-11-19 it stopped WPA3 phones joining: the driver beacons the mobility domain byte-swapped, so hostapd refused every FT-SAE association (status 54). Fixed 2026-11-20; since then all three units run it, and an iPhone, an Apple Watch and a Pixel join (seen 2026-11-21). Until v0.3.2 no FT-SAE key reached another unit: the X20's bridge drops unicast key holder frames, and the agent now hands them to hostapd past it. Since 2026-11-23 the keys are exchanged between all three Decos and the Garage (verified). An FT-SAE roam between units has not been observed yet: no available client roams with FT-SAE ([ft-sae](docs/deco/features/ft-sae.md)). The Garage takes part with `ft`. |
 | Client isolation, proxy ARP, multicast-to-unicast, DTIM, U-APSD | Verified | Proxy ARP is now applied on SSIDs without client isolation too, as a U6 Pro does it (Built: [proxy-arp](docs/deco/features/proxy-arp.md)). |
 | Intelligent DHCP (unicast DHCP replies) | Verified | `wl dhcp_unicast 1` on every served SSID, live, as a U6 Pro. The hand-back puts back 0 ([radio-parity](docs/deco/features/radio-parity.md)). Read live 2026-11-20 (`wl dhcp_unicast` = 1 on the served SSIDs); clients (Galaxy S20 FE, the KVM) get their leases with it on. |
 | BSS Load element | Built | On by default, as a U6 Pro. Off on a radio where the controller sends `qbssload=disabled` for any SSID, with a note when other SSIDs share that radio, because the element is radio-wide in this driver ([radio-parity](docs/deco/features/radio-parity.md)). |
@@ -303,8 +303,9 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   Off, the limits are noted as not applied.
 - **Not on this platform:** TWT (no 802.11ax radio);
   intelligent DHCP; turning the BSS Load element off; 5 GHz minimum rates.
-- **802.11r with the Decos (`"ft": true`, off by default; built,
-  not yet run on air):** FT-PSK and FT-SAE in the Decos' mobility domains,
+- **802.11r with the Decos (`"ft": true`, off by default; partial:
+  on air since 2026-11-23, keys exchanged with the Decos on both bands,
+  no client roam seen yet):** FT-PSK and FT-SAE in the Decos' mobility domains,
   the agent standing in for the missing IAPP daemon and moving the FT-SAE
   keys with the Decos' hostapd; 2.4 GHz needs the rebuilt `mt7603roam`
   module. The 5 GHz profile keys were checked on the unit (the Decos'
@@ -347,7 +348,7 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   | IGMP/MLD snooping | on the agent's VLAN bridges | always |
   | SNMP | the Deco's agent; MediaTek netdevs as ieee80211 | controller |
   | Login lock | new telnet (:23) and SSH (:22) connections dropped while Device SSH is off and the controller answers; open after 10 min of silence | `login_lock` (on), `login_lock_failopen_s` |
-  | 802.11r/k/v with the Decos | FT-PSK and FT-SAE in the Decos' mobility domains, PMK-R1s moved over hostapd's RRB (5 GHz: the MT7663's KDP; 2.4 GHz: the rebuilt `mt7603roam`), ([garage-ft](docs/deco/features/garage-ft.md)); built, not yet run on air; 802.11v requests for band steering and the Roaming Assistant; 802.11k answered by the drivers from their scan tables; no FT-1X or Hotspot 2.0 | controller, `ft` (off) |
+  | 802.11r/k/v with the Decos | FT-PSK and FT-SAE in the Decos' mobility domains, PMK-R1s moved over hostapd's RRB (5 GHz: the MT7663's KDP; 2.4 GHz: the rebuilt `mt7603roam`), ([garage-ft](docs/deco/features/garage-ft.md)); keys exchanged with the Decos (verified 2026-11-23), no client roam seen yet; 802.11v requests for band steering and the Roaming Assistant; 802.11k answered by the drivers from their scan tables; no FT-1X or Hotspot 2.0 | controller, `ft` (off) |
   | U-APSD on 2.4 GHz | `mt7603roam` driver built and live-swapped on the unit; the agent does not write `APSDCapable` there yet | none yet |
 
   Profile changes are batched into one restart per radio; live driver

@@ -13,6 +13,65 @@ How sure each feature is:
 - **Partial:** works, with a named gap.
 - **Not possible:** this hardware or its software can't do it.
 
+## v0.3.2 (2026-11-23)
+
+802.11r for WPA3 (FT-SAE) now exchanges its keys between the APs. Before
+this release no FT-SAE key holder message ever arrived where it was sent:
+the Garage's frames were malformed, and the Decos dropped every one sent
+to them. An FT-SAE roam therefore always fell back to a full SAE join.
+FT-PSK was not affected: it derives its keys locally.
+
+### Downloads
+
+| File | For | Install with |
+|---|---|---|
+| `udeco-ap-deco-x20-linux-armv7` and `.gz` | TP-Link Deco X20 V2 (Broadcom, armv7) | `deploy/deco-ap.sh` |
+| `udeco-ap-jio-jcow414-linux-mipsle` and `.gz` | JioFiber JCOW414 (MediaTek, mipsle) | `deploy/jio-ap.sh` |
+| `mt7603roam-jio-jcow414.ko.gz` | optional: the JCOW414's 2.4 GHz driver with WPA3 and 802.11r/k/v | `deploy/jio-ap.sh --driver FILE` |
+| `udeco_rl-jio-jcow414.ko.gz` | optional: the JCOW414's speed-limit module (`"rate_limits": true`) | `deploy/jio-ap.sh --rate-limit-module FILE` |
+| `SHA256SUMS` | checksums of all six files | |
+
+### Deco X20
+
+- **Verified:** the X20's bridge (TP-Link's `tpbr`) drops every unicast
+  frame of EtherType 0x88b7, the one hostapd's key holder messages use,
+  before it reaches `br-lan`. So no Deco received a PMK-R1 push, pull,
+  response or sequence message, from another Deco or from the Garage.
+  While a unit serves FT-SAE, the agent now hands those frames to hostapd
+  past the bridge:
+  - a broute chain, `UDECO-RRB`, takes 0x88b7 frames for the unit's FT-SAE
+    BSSIDs only;
+  - hostapd is started with a small preload, `udeco_rrb.so`, which lets
+    its key holder socket receive on the unit's ports and still send out
+    `br-lan`. The preload is built reproducibly from
+    `tools/deco-rrbshim`, embedded in the agent, and checked by CI. The
+    stock `/sbin/hostapd` is kept.
+
+  hostapd restarts once per radio to load it. Each client reconnects
+  within seconds. Without the chain or the preload, FT-SAE falls back to a
+  full SAE join, as before
+  ([ft-sae](docs/deco/features/ft-sae.md#receiving-key-holder-frames-internalbcmwifirrbgo-2026-11-23)).
+- **Verified on all three units:** both radios run hostapd with the
+  preload, and the chain holds both FT-SAE BSSIDs. After a WPA3 client's
+  FT-SAE join at one Deco, its pushes reached the other Decos' hostapds
+  and the Garage, whose driver installed the keys.
+
+### JioFiber JCOW414
+
+- **Verified:** the Garage's key holder frames now carry hostapd's two
+  protocol octets after the OUI (`00 01`). Without them the Decos' hostapd
+  ignored every frame the Garage sent, and the Garage counted the Decos'
+  frames as malformed. The test vectors had been built from the same wrong
+  layout. A PMK-R1 pull from the Garage to a Deco now goes through the full
+  exchange: pull, SEQ_REQ, SEQ_RESP and response, with the nonce matching.
+
+### Not yet seen
+
+- A client completing an FT-SAE roam between two units. None of the
+  household's clients joins with FT-SAE, and the GL KVM's AIC8800 test
+  client does an FT-SAE first join but not an FT roam: on a roam its
+  firmware leaves the AP and sends a plain SAE join.
+
 ## v0.3.1 (2026-11-23)
 
 The JioFiber JCOW414's rebuilt 2.4 GHz driver and its speed-limit module
