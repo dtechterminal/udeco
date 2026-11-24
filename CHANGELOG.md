@@ -13,6 +13,62 @@ How sure each feature is:
 - **Partial:** works, with a named gap.
 - **Not possible:** this hardware or its software can't do it.
 
+## v0.3.3 (2026-11-25)
+
+The Garage now measures every channel of both bands, so the UniFi
+Environment page shows its 2.4 GHz and 5 GHz charts. Before this release
+it showed neither: the 5 GHz radio had no channel measurement, and the
+2.4 GHz sweep had never once completed on the unit.
+
+### Downloads
+
+| File | For | Install with |
+|---|---|---|
+| `udeco-ap-deco-x20-linux-armv7` and `.gz` | TP-Link Deco X20 V2 (Broadcom, armv7) | `deploy/deco-ap.sh` |
+| `udeco-ap-jio-jcow414-linux-mipsle` and `.gz` | JioFiber JCOW414 (MediaTek, mipsle) | `deploy/jio-ap.sh` |
+| `mt7603roam-jio-jcow414.ko.gz` | optional: the JCOW414's 2.4 GHz driver with WPA3 and 802.11r/k/v | `deploy/jio-ap.sh --driver FILE` |
+| `udeco_rl-jio-jcow414.ko.gz` | optional: the JCOW414's speed-limit module (`"rate_limits": true`) | `deploy/jio-ap.sh --rate-limit-module FILE` |
+| `SHA256SUMS` | checksums of all six files | |
+
+### JioFiber JCOW414 (`"site_survey": true`)
+
+- **Verified, 5 GHz channel measurement:** the MT7663 visits each
+  channel the agent serves through the driver's own off-channel request
+  (OID 0x955), 200 ms each, one a second. The driver reports each visit's
+  busy time in an event, and the agent waits for that event before it
+  trusts the visit. Rows at 20, 40 and 80 MHz; the band takes about 12 s.
+  The radio stays on its own channel and keeps its clients
+  ([spectrum-design](docs/deco/spectrum-design.md#mt7663-off-channel-visit-jio-mtk-2026-11-24)).
+- **Verified, 2.4 GHz sweep fixed:** every visit used to be rejected. To
+  catch another scan taking a visit over, the sweep read the whole kernel
+  log just before the dwell could end. On the unit that read takes
+  21-135 ms, so it always finished too late to tell, and no 2.4 GHz table
+  was ever made. The sweep now uses the kernel's own timestamps on the
+  visit's start and end lines (`/dev/kmsg`). A visit that ends too soon
+  after its start was taken over and is retried.
+- **Verified:** after the 5 GHz visits the driver keeps rewriting its
+  neighbours' signal levels, so the site survey after the visits never
+  looked finished and ran to the band's 1-minute limit. It now counts as
+  finished once the list of neighbours stops changing.
+- **Verified:** a 5 GHz visit the driver cuts short is retried once.
+  Only a channel cut short twice is left unmeasured (DFS channel 52
+  always is).
+- **Seen once, not fixed:** on 2026-11-24 the 5 GHz driver got stuck. It
+  dropped every channel visit and every site survey, so the controller
+  saw only channel 149's neighbours for most of the day. Restarting the
+  5 GHz radio cleared it. A 5 GHz scan now fails with a message naming
+  this. The agent does not restart the radio itself, because that drops
+  its clients. The cause is not known.
+- A failed spectrum band now logs why each rejected visit was rejected.
+
+### Seen on the controller
+
+- **Verified (2026-11-25, 01:07 IST):** a spectrum scan from UniFi left
+  the Garage with 18 rows at 2.4 GHz (11 at 20 MHz, 7 at 40) and 15 at
+  5 GHz (9, 4 and 2), both dated from that scan. The controller's nightly
+  scan (Nightly Channel Optimization, 03:00) had been off on this site; it
+  was turned on on 2026-11-24.
+
 ## v0.3.2 (2026-11-23)
 
 802.11r for WPA3 (FT-SAE) now exchanges its keys between the APs. Before

@@ -358,39 +358,44 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   the controller's scan commands run on the unit, and it claims RF scan.
   A scan from UniFi runs the driver's site survey of both bands (`iwpriv
   <radio> set SiteSurvey=1`, the radio off its channel for a few seconds)
-  and fills the neighbour list. On 2.4 GHz the nightly quick scan and the
-  Environment page's spectrum scan measure each channel: the MT7603 visits
-  channels 1-11 one at a time (200 ms each, one a second, about 11 s for
-  the band; the radio returns to its own channel after each visit and never
-  restarts) and reads how long the channel was busy, then surveys the
-  neighbours. The unit then reports a per-channel table (utilisation from
-  the busy time, on its own channel less its own clients' estimated
-  traffic; interference from the strongest neighbour on the channel;
-  20 and 40 MHz rows), as a real AP does, so the Environment page shows
-  2.4 GHz charts; the last table is kept in `/flash2/udeco/state/` and
-  comes back after a restart. The 5 GHz radio (MT7663) has no such
-  command: its quick scan and its part of the spectrum scan run the site
-  survey and fill only the neighbour list. A quick scan reports itself
-  running until it ends, as a real AP does: UniFi then asks for the next
-  band (inferred from the real AP's logs). Scans run only on a command from
-  UniFi, one at a time, never during a Wi-Fi apply, a radio restart or the
-  20 s after it, and never on a radio that is down; a sweep that cannot
-  confirm a visit (in the kernel log) stops and keeps the previous table.
-  Off, the neighbour list comes only from the driver's cached survey. Not
-  yet measured on the unit: how long clients stall during a 5 GHz survey,
-  whether the survey's end is detected correctly on the quiet 5 GHz DFS
-  channels, and a sweep run by the agent itself (the visits were verified
-  with a probe; the agent confirms each visit's end from the driver's
-  "time_diff" log line, which the unit prints at its default debug level,
-  and from iwconfig that the radio was not restarted or moved; with the
-  rebuilt 2.4 GHz driver only `iwpriv ra0 set Debug=0` silences that line,
-  `Debug=1` still prints it (on the unit 2026-11-23; Jio's original driver
-  prints it from level 2 only, so there `Debug=1` silences it too), and
-  every 2.4 GHz sweep then stops). A sweep waits for, or stops on, an
-  off-channel scan it did not start, and does not trust a visit another running scan took over when
-  that scan's end comes before the visit's could; an ACS scan (400 ms a
-  channel) can still end one later, unseen. Check these before turning it
-  on.
+  and fills the neighbour list. The nightly quick scan and the Environment
+  page's spectrum scan measure each channel of both bands, one channel at
+  a time (200 ms each, one a second; the radio returns to its own channel
+  after each visit and never restarts), then survey the neighbours:
+  - 2.4 GHz (MT7603): channels 1-11 with `ApOffChanScan`, about 15 s for
+    the band, rows at 20 and 40 MHz;
+  - 5 GHz (MT7663): the channels the agent serves (36-48 and 149-165;
+    52-64 too with `dfs`) with the driver's own off-channel request (OID
+    0x955), each visit confirmed by the driver's result event; about 12 s,
+    rows at 20, 40 and 80 MHz.
+
+  The unit then reports a per-channel table (utilisation from the busy
+  time, on its own channel less its own clients' estimated traffic;
+  interference from the strongest neighbour on the channel), as a real AP
+  does, so the Environment page shows both bands' charts; the last table
+  is kept in `/flash2/udeco/state/` and comes back after a restart.
+  Verified on the Garage 2026-11-25: both bands' tables reached the
+  controller from a spectrum scan run by the agent. A quick scan reports
+  itself running until it ends, as a real AP does: UniFi then asks for the
+  next band (inferred from the real AP's logs). Scans run only on a command
+  from UniFi, one at a time, never during a Wi-Fi apply, a radio restart
+  or the 20 s after it, and never on a radio that is down; a band whose
+  visits cannot be confirmed stops and keeps the previous table. Off, the
+  neighbour list comes only from the driver's cached survey.
+
+  The 2.4 GHz sweep confirms each visit from the driver's log lines: the
+  start line and the "time_diff" end line, with their kernel times from
+  `/dev/kmsg` (an end too soon after the start means another running scan
+  took the visit over). The unit prints "time_diff" at its default debug
+  level; with the rebuilt 2.4 GHz driver only `iwpriv ra0 set Debug=0`
+  silences it (Jio's original driver: `Debug=1` too), and every 2.4 GHz
+  sweep then stops. An ACS scan (400 ms a channel) can still take a visit
+  over unseen. On 5 GHz the driver can get stuck so that it drops every
+  off-channel request and every site survey (seen once, 2026-11-24: the
+  survey found only the home channel's neighbours until the 5 GHz radio
+  was restarted); the band then fails saying so, and the agent does not
+  restart the radio itself, as that drops its clients. Not yet measured:
+  how long clients stall during a 5 GHz survey.
 - **LAN ports (`"model": "UHDIW"`):** the unit can instead report as a
   UAP-IW-HD: LAN ports 1-3, port 4 absent, the uplink as rear port 5. With
   Enable Port VLAN on, the controller's port VLANs apply to ports 2 and 3
