@@ -97,7 +97,8 @@ func ftKeys(kv map[string]string, base []byte, rd RadioDef, rp RadioPlan) {
 	n := len(rd.Ifaces)
 	if rd.Band == "na" {
 		// the MT7663 (mtkft.ProfileKeys: byte-swapped FtMdId, the
-		// 24-character R0KH-ID); PMKCachePeriod=720 is the vendor's
+		// 24-character R0KH-ID); PMKCachePeriod is u6Defaults'
+		// (pmkCacheMinutes: its R1KH entries must not age)
 		slots := make([]mtkft.BSSFT, n)
 		for i, b := range rp.BSS {
 			if b.FT && rp.slot(i) < n {
@@ -129,7 +130,8 @@ func ftKeys(kv map[string]string, base []byte, rd RadioDef, rp RadioPlan) {
 	kv["FtSupport"] = strings.Join(sup, ";")
 	kv["FtSae"] = strings.Join(sae, ";")
 	// the PMK-R0/R1 lifetime: the vendor's 10 minutes would end an FT
-	// session's keys long before a Deco's (hostapd r0_key_lifetime 12 h)
+	// session's keys long before a Deco's (hostapd r0_key_lifetime 12 h);
+	// mt7603roam ages its R1 table itself (the MT7663's bug is not its)
 	kv["PMKCachePeriod"] = "720"
 }
 

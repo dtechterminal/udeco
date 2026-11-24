@@ -13,6 +13,43 @@ How sure each feature is:
 - **Partial:** works, with a named gap.
 - **Not possible:** this hardware or its software can't do it.
 
+## v0.3.4 (2026-11-25)
+
+Fixes the cause of the Garage's 5 GHz radio getting stuck so that its
+scans stopped (the UniFi Environment page then showed only the home
+channel's neighbours, until a radio restart).
+
+- **Cause:** the MT7663 driver ages some of its 802.11r key holder
+  entries at random (it never initialises the flag that decides it). When
+  an entry aged while its client was still connected, the driver
+  disconnected the client in a way that left the radio's control state
+  machine waiting forever, and from then on it refused every scan.
+- **Fix:** the agent installs its 5 GHz FT keys with a driver lifetime
+  that never runs out while the radio is up (it still tracks each key's
+  real 12 h lifetime itself), and sets `PMKCachePeriod` on 5 GHz to 90
+  days instead of 12 h, since the driver uses it as the lifetime of the
+  entries it makes itself. Side effect: a 5 GHz client can resume with
+  its cached PMK for 90 days.
+- **Upgrade:** the new profile restarts the 5 GHz radio once, so its
+  clients reconnect (about 7 s). An agent upgrade whose only change is a
+  profile default now notices it: before, the same plan hash kept the old
+  profile live.
+- Keys pushed to or answered for the Decos carry at most 12 h, not the
+  driver's 90 days.
+
+**Built** (deployed on the Garage: the new profile is live and both bands
+scan; whether the stuck state stays away takes days to show). Not yet
+measured: how long a 5 GHz client stalls during a scan.
+
+### Downloads
+
+| File | For | Install with |
+|---|---|---|
+| `udeco-ap-deco-x20-linux-armv7` and `.gz` | TP-Link Deco X20 V2 (Broadcom, armv7) | `deploy/deco-ap.sh` |
+| `udeco-ap-jio-jcow414-linux-mipsle` and `.gz` | JioFiber JCOW414 (MediaTek, mipsle) | `deploy/jio-ap.sh` |
+| `mt7603roam-jio-jcow414.ko.gz` | optional: the JCOW414's 2.4 GHz driver with WPA3 and 802.11r/k/v | `deploy/jio-ap.sh --driver FILE` |
+| `udeco_rl-jio-jcow414.ko.gz` | optional: the JCOW414's speed-limit module (`"rate_limits": true`) | `deploy/jio-ap.sh --rate-limit-module FILE` |
+
 ## v0.3.3 (2026-11-25)
 
 The Garage now measures every channel of both bands, so the UniFi

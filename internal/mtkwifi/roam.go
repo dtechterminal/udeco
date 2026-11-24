@@ -46,8 +46,11 @@ import (
 // key (AES-SIV), within a per-source rate, and with a fresh sequence per
 // (BSS, peer, role) (mtkft.RxSeq). No key is ever logged.
 //
-// The MT7663's R1KH table has 64 entries for the radio, never aged and
-// emptied only by a radio stop (mtkft.R1KHTableSize): the runtime counts
+// The MT7663's R1KH table has 64 entries for the radio, emptied by a radio
+// stop and otherwise aged only at random (mtkft.R1KHTableSize: an aged
+// entry of an associated station wedges the radio's scans, so installs
+// carry mtkft.DriverKeyLife and the driver's own entries PMKCachePeriod
+// pmkCacheMinutes): the runtime counts
 // its own installs and the driver's own entries (one per FT initial
 // association) since the radio's start and stops installing at
 // r1khBudget. Installed SAs are kept (until they expire) and installed
@@ -787,7 +790,12 @@ func (r *roam) install(b roamBSS, s *sa) {
 	}
 	ran, err := r.drv(func() error {
 		if b.Band == "na" {
-			req, err := mtkft.KeyResponse(s.el)
+			// the driver's countdown must not end while the station may
+			// still be associated (mtkft.DriverKeyLife); s.exp is the
+			// SA's lifetime
+			el := s.el
+			el.KeyLifeTime = mtkft.DriverKeyLife
+			req, err := mtkft.KeyResponse(el)
 			if err != nil {
 				return err
 			}
@@ -883,11 +891,11 @@ func (r *roam) pushTo(b roamBSS, peer ftpeer.Peer, sta mtkft.MAC, r0name, r1name
 		r.count("push-bad-cipher")
 		return
 	}
-	switch {
-	case life == 0:
+	// the driver's answer carries what it was given (PMKCachePeriod for
+	// its own entries, far more than a key lives): at most hostapd's
+	// r0_key_lifetime
+	if life == 0 || life > saDefaultLife {
 		life = saDefaultLife
-	case life > 0xffff:
-		life = 0xffff
 	}
 	p := mtkft.Push{Seq: r.txSeq(pairKey{b.BSSID, bs, asR0KH}), R0KHID: b.R0KHID, R1KHID: r1kh, S1KHID: sta,
 		PMKR0Name: r0name, PMKR1: pmk, PMKR1Name: r1name, Pairwise: pw, ExpiresIn: uint16(life)}
@@ -911,7 +919,10 @@ func (r *roam) respond(b roamBSS, peer ftpeer.Peer, p mtkft.Pull, r1name [16]byt
 		pw, err := mtkft.HostapdCipher(cipher)
 		if err == nil {
 			resp.Found, resp.PMKR1, resp.PMKR1Name, resp.Pairwise = true, pmk, r1name, pw
-			resp.ExpiresIn = uint16(min(life, 0xffff))
+			if life == 0 || life > saDefaultLife {
+				life = saDefaultLife // as pushTo
+			}
+			resp.ExpiresIn = uint16(life)
 		}
 	}
 	out, err := mtkft.SealResp(b.key, b.BSSID, resp)

@@ -49,8 +49,10 @@ iappd pid.
 | `FtR0khId<n>` | up to 48 characters | **Bug:** the string is copied but `FtR0khIdLen` is not set. It keeps the 24 of `FT_CfgInitial`'s random "Ralink:xx:xx:xx:xx:xx:xx" (0x8053834c). The agent uses an R0KH-ID of exactly 24 characters, the BSSID as 12 hex digits plus `-mt7663-r0kh` (`mtkft.R0KHID`). That ID is valid in the Decos' announcements. `iwpriv <if> set ftr0khid=` (`Set_FT_R0khid`, 0x8053dd9c) does set the length. |
 | `FtOtd`, `FtRic` | per BSS | `FT_CfgInitial` clears both. They stay 0 (see Over the DS). |
 
-`PMKCachePeriod=720` (minutes), which the agent already writes, is also the
-lifetime of the PMK-R0 in the driver's PMKID cache.
+`PMKCachePeriod=129600` (minutes, 90 days), which the agent writes, is also
+the lifetime of the PMK-R0 in the driver's PMKID cache and of the R1KH entry
+the driver makes for each FT initial association (see Key holder entries
+that age).
 
 The line `FT_rtmp_read_parameters_from_file: Invalid interface number
 (24ff)(24ff).` in dmesg is the **success** print of the `<hex>:H` branch
@@ -129,8 +131,9 @@ MDIE confirms the value (on the unit: `ff 24` for `FtMdId1=24ff:H`).
     uses the station's MAC) and the signal header's station field is not
     filled (the element's station at +7 is the one). KeyLifeTime is what
     is left of the PMK-R0's life: 596 s under the vendor's
-    `PMKCachePeriod=10`; the agent's profile writes 720 (12 h). An unknown
-    station gets no answer.
+    `PMKCachePeriod=10`; the agent's profile writes 129600 (90 days), and
+    its PUSH and RESP cap it at hostapd's 12 h. An unknown station gets no
+    answer.
   - `KEY_RSP` (0x040a, `FT_KDP_KeyResponseToUs` 0x805431d4) installs an
     R1KH entry. It does not need the station to be associated.
   - Both use `FT_KDP_EVT_KEY_ELM`, which is `KeyElementLen` = 167 octets
@@ -211,6 +214,42 @@ own installs since the last radio start. Above 56 it stops pre-installing
 and notes it once. A radio restart for any other reason empties the table.
 No restart is ever forced for it (one restart per change).
 
+### Key holder entries that age (2026-11-25)
+
+[A: Ghidra of the kernel's `mt_wifi`; M: the agent's counters on the unit]
+
+- `FT_R1KHInfoMaintenance` (0x80538fa8) runs once a second
+  (`APMlmePeriodicExec`, beside the DFS countdowns). For each R1KH entry
+  whose word at 0xc has bit 0x100, it counts down the word at 4 (the
+  `KeyLifeTime` of a `KEY_RSP`, or `PMKCachePeriod` × 60 s for the
+  driver's own entry from `PeerPairMsg4Action`). At zero it frees the
+  entry, sends KDP 0x52, and if the station is in the MAC table calls
+  `cntl_disconnect_request(wdev, disassoc, sta, 8)` on that station's AP
+  wdev.
+- `FT_R1khEntryInsert` never writes the word at 0xc, and `os_alloc_mem` is
+  `kmalloc(GFP_ATOMIC)` with no zeroing. So whether an entry ages at all
+  is whatever that memory held. [M 2026-11-24: `kdp-0x52=5` with only
+  FT-PSK and FT-SAE entries; the earlier note that only FT-802.1X entries
+  age was wrong.]
+- `ap_cntl_disconnect_proc` moves the AP's CNTL machine to
+  `CNTL_WAIT_DISASSOC` and queues the disassoc; `ap_cntl_init` has no
+  disassoc-confirm handler, so it never goes back to idle. Every scan of
+  that wdev (`SiteSurvey=1`, the off-channel visit) is then refused in
+  `cntl_mlme_error_handle`, until the radio restarts [M 2026-11-24: from
+  about 06:47 the 5 GHz survey found only the home channel's neighbours].
+  The other callers of `cntl_disconnect_request` are repeater and ApCli
+  paths the Garage does not use; the agent's kicks (`DisConnectSta`) do
+  not go through it.
+- The fix keeps every entry from reaching zero while the radio runs: the
+  agent installs with `KeyLifeTime` `mtkft.DriverKeyLife` (2^31 s), and
+  its own record keeps the SA's real lifetime (nothing is installed past
+  it). The driver's own entries get `PMKCachePeriod=129600`
+  (90 days; minutes × 6000 jiffies must fit an s32). The cost: the 5 GHz
+  PMKSA cache lasts 90 days instead of 12 h, and a PMK-R1 the agent
+  installed stays usable in the driver until the radio restarts. A client
+  connected for 90 days with no 5 GHz restart would still trip it; the
+  spectrum band's error then names this.
+
 ### Over the DS, PMKSA caching
 
 - **Over the DS: stays off (verified).** The driver sends its RRB to the
@@ -285,7 +324,8 @@ All verified.
    R0KH-ID from the slot's netdev address (no address: FT off, noted).
    2.4 GHz (only with `mt7603roam`, detected by `FT_UDFT_GetEvents
    [mt76x3_ap]` in `/proc/kallsyms`): `FtSupport`, `FtSae`, `FtMdId<n>`,
-   `PMKCachePeriod=720`. No FT BSS: no FT key is written. The hand-back
+   `PMKCachePeriod=720` (on 5 GHz `u6Defaults` writes 129600). No FT
+   BSS: no FT key is written. The hand-back
    restores the vendor profile.
 3. **Announcements.** `FTLocals` gives `internal/ftpeer` one holder per
    FT-SAE BSS (R0KH-ID: 5 GHz `mtkft.R0KHID`, 2.4 GHz the BSSID's 12 hex)
@@ -305,7 +345,8 @@ All verified.
      (2.4 GHz). Kept SAs are reinstalled after a radio restart.
    - 2.4 GHz: `R0_CREATED` becomes a PUSH per Deco (`R1_GET`), `R1_MISS` a
      PULL to the station's R0KH; Deco PULLs are answered with `R1_GET`.
-   - Budget: 56 installs on 5 GHz (64 entries, never aged); a station
+   - Budget: 56 installs on 5 GHz (64 entries; the agent's never age,
+     see below); a station
      never seen here gets a pushed SA only while 24 are free. A full table
      is a problem in the FT peers' sync.
    - Deco to Garage, FT-PSK, 5 GHz: the driver has no FT-PSK derivation

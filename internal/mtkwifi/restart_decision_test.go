@@ -186,3 +186,56 @@ func TestPlanJSONWithoutNewFeatures(t *testing.T) {
 		}
 	}
 }
+
+// TestNewProfileDefaultSamePlan: the previous build wrote the same plans'
+// hash (plans unchanged, its mtk-applied the plan hash alone, as before
+// appliedHash) but rendered another 5 GHz profile (a PMKCachePeriod
+// default this build changed): the fast path is missed and the 5 GHz
+// radio alone is restarted. The same build again keeps both radios.
+func TestNewProfileDefaultSamePlan(t *testing.T) {
+	f := newFakeDev(t)
+	withVendorFeatures(t, f)
+	ctx := context.Background()
+	d := home()
+	a := newApplier(f)
+	p, _ := a.Plan(ctx, d)
+	if err := a.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	// the same build restarted: nothing to do
+	n := len(f.log)
+	same := newApplier(f)
+	if p, _ := same.Plan(ctx, d); !p.Empty() || len(radioSteps(p)) > 0 {
+		t.Errorf("same build: plan %+v", p.Steps)
+	}
+	if r := restarts(f.log[n:]); len(r) > 0 {
+		t.Errorf("same build restarted %v", r)
+	}
+	// the older build: its plan-only hash, and the 5 GHz profile it wrote
+	na := filepath.Join(f.root, JCOW414[1].Dat)
+	dat, _ := os.ReadFile(na)
+	old := strings.Replace(string(dat), "PMKCachePeriod="+pmkCacheMinutes, "PMKCachePeriod=720", 1)
+	if old == string(dat) {
+		t.Fatal("no PMKCachePeriod in the 5 GHz profile")
+	}
+	os.WriteFile(na, []byte(old), 0o600)
+	applied := filepath.Join(f.root, "tmp/udeco", appliedFile)
+	os.WriteFile(applied, []byte(plansHash(same.live)+"\n"), 0o644)
+	n = len(f.log)
+	b := newApplier(f)
+	p, _ = b.Plan(ctx, d)
+	if s := radioSteps(p); len(s) != 1 || !strings.HasPrefix(s[0], "na: profile and restart") {
+		t.Fatalf("older build's 5 GHz profile: steps %v", s)
+	}
+	if err := b.Apply(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range restarts(f.log[n:]) {
+		if strings.Contains(r, "ra0") || strings.Contains(r, "ra1") || strings.Contains(r, "ra2") || strings.Contains(r, "ra3") {
+			t.Errorf("the 2.4 GHz radio was restarted: %s", r)
+		}
+	}
+	if got, _ := os.ReadFile(na); !strings.Contains(string(got), "PMKCachePeriod="+pmkCacheMinutes) {
+		t.Error("the new PMKCachePeriod was not written")
+	}
+}

@@ -326,7 +326,7 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   |---|---|---|
   | Minimum RSSI | driver threshold per BSS, agent kick (status 16) | controller |
   | WPS | off on every BSS | always |
-  | Group rekey, PMK cache | the WLAN's rekey per BSS; 12 h PMK cache on 5 GHz | controller |
+  | Group rekey, PMK cache | the WLAN's rekey per BSS; 90-day PMK cache on 5 GHz | controller |
   | 2.4 GHz auto channel | 1/6/11 only | always |
   | Band steering flag | off | always |
   | Multicast enhancement | per SSID on 5 GHz | controller |
@@ -390,12 +390,17 @@ EN7528, MT7603 + MT7663) as a plain AP, adopted as a UAP-AC-Lite (`U7LT`).
   level; with the rebuilt 2.4 GHz driver only `iwpriv ra0 set Debug=0`
   silences it (Jio's original driver: `Debug=1` too), and every 2.4 GHz
   sweep then stops. An ACS scan (400 ms a channel) can still take a visit
-  over unseen. On 5 GHz the driver can get stuck so that it drops every
-  off-channel request and every site survey (seen once, 2026-11-24: the
-  survey found only the home channel's neighbours until the 5 GHz radio
-  was restarted); the band then fails saying so, and the agent does not
+  over unseen. On 5 GHz the driver could get stuck so that it dropped
+  every off-channel request and every site survey (seen once, 2026-11-24:
+  the survey found only the home channel's neighbours until the 5 GHz
+  radio was restarted). The cause was the driver's FT key holder entries
+  aging out while their clients were still connected; since v0.3.4 the
+  agent keeps them from aging
+  ([garage-ft](docs/deco/features/garage-ft.md#key-holder-entries-that-age-2026-11-25)).
+  If it happens anyway, the band fails saying so, and the agent does not
   restart the radio itself, as that drops its clients. Not yet measured:
-  how long clients stall during a 5 GHz survey.
+  how long clients stall during a 5 GHz survey (each off-channel visit is
+  200 ms away from the home channel, one a second).
 - **LAN ports (`"model": "UHDIW"`):** the unit can instead report as a
   UAP-IW-HD: LAN ports 1-3, port 4 absent, the uplink as rear port 5. With
   Enable Port VLAN on, the controller's port VLANs apply to ports 2 and 3

@@ -54,9 +54,14 @@ import (
 //     "cntl_mlme_error_handle [rai0 ]: [CNTL_WAIT_DISASSOC][CNTL_MLME_SCAN]
 //     ... ERR"): every visit, and every normal 5 GHz site survey, was
 //     dropped (the survey found only the home channel's neighbours) until
-//     the radio was restarted. A band with no event at all fails with
-//     errNoChanInfo saying so; the agent does not restart the radio for it
-//     (its clients would drop).
+//     the radio was restarted. The cause (Ghidra, and the agent's KDP 0x52
+//     counters of that day): FT_R1KHInfoMaintenance aged an R1KH entry of
+//     an associated station and disassociated it on the AP wdev; the AP's
+//     CNTL has no disassoc confirm, so it never left that state
+//     (mtkft.R1KHTableSize). The agent keeps entries from aging
+//     (mtkft.DriverKeyLife, pmkCacheMinutes). A band with no event at all
+//     fails with errNoChanInfo saying so; the agent does not restart the
+//     radio for it (its clients would drop).
 //
 // One band: under the collector's scan lock, the radio's channel and width,
 // the channel list (the one the agent serves: chans5, and 52-64 with DFS:
@@ -135,7 +140,7 @@ func chanInfoRequest(ifname string, ch, ms int) []byte {
 }
 
 // errNoChanInfo: no visit of the band answered.
-var errNoChanInfo = errors.New("mtkwifi: the 5 GHz driver answered no off-channel visit (no 0x955 event): its scan state machine is likely stuck (then a 5 GHz site survey finds only the home channel's neighbours too); a restart of the 5 GHz radio clears it")
+var errNoChanInfo = errors.New("mtkwifi: the 5 GHz driver answered no off-channel visit (no 0x955 event): its scan state machine is likely stuck in CNTL_WAIT_DISASSOC (an aged FT key holder entry disassociated a station: mtkft.R1KHTableSize; a 5 GHz site survey then finds only the home channel's neighbours too); a restart of the 5 GHz radio clears it")
 
 // chanInfo is the MT7663 backend of one radio.
 type chanInfo struct {

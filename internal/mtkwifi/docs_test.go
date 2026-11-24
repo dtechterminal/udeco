@@ -62,8 +62,8 @@ func TestDocsGarageThresholds(t *testing.T) {
 		{note, fmt.Sprintf("disconnects a station after %d readings in a row at least %s apart below the threshold (`DisConnectSta`), backing off %s doubling to %s per station,",
 			minRSSIConseq, s(minRSSIGap), s(kickBackoff), min(kickBackoffMax)), true},
 		// PMK cache and the automatic channel's skip list (features.go)
-		{note, fmt.Sprintf("`PMKCachePeriod=%s` (minutes, the U6's %d h) on 5 GHz.", pmkCacheMinutes, pmk/60), true},
-		{readme, fmt.Sprintf("| Group rekey, PMK cache | the WLAN's rekey per BSS; %d h PMK cache on 5 GHz | controller |", pmk/60), true},
+		{note, fmt.Sprintf("`PMKCachePeriod=%s` (minutes: %d days, not the U6's 12 h) on 5 GHz.", pmkCacheMinutes, pmk/1440), true},
+		{readme, fmt.Sprintf("| Group rekey, PMK cache | the WLAN's rekey per BSS; %d-day PMK cache on 5 GHz | controller |", pmk/1440), true},
 		{note, "## 4. 2.4 GHz automatic channel: " + keep + " only", true},
 		{note, "with channel auto, `AutoChannelSkipList=" + acsSkip24 + "`.", true},
 		{readme, "| 2.4 GHz auto channel | " + keep + " only | always |", true},

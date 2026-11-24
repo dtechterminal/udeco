@@ -286,6 +286,13 @@ func KeyRequest(tag uint32, sta, r1kh MAC) (Request, error) {
 	return keyMessage(OIDKeyReq, tag, KeyElement{STA: sta, R1KHID: r1kh, S1KHID: sta})
 }
 
+// DriverKeyLife is the KeyLifeTime the agent gives the driver for an SA it
+// installs: about 68 years of the once-a-second countdown, so the
+// countdown never ends while the radio runs (R1KHTableSize: an entry that
+// ends can wedge the radio's scans). The SA's real lifetime is kept by the
+// agent, which installs nothing past it.
+const DriverKeyLife = 1 << 31
+
 // KeyResponse installs a PMK-R1 SA in the driver's R1KH table
 // (FT_R1khEntryInsert after deleting an entry of the same PMKR1Name). The
 // station need not be associated: this is how an SA from another AP is
@@ -304,8 +311,18 @@ func KeyResponse(e KeyElement) (Request, error) {
 
 // R1KHTableSize is FT_R1KH_ENTRY_TABLE_SIZE: the driver's R1KH table holds
 // this many SAs for all BSSes of the radio, and refuses inserts beyond it.
-// An FT-PSK or FT-SAE entry never ages (FT_R1KHInfoMaintenance ages only
-// entries whose AKM map has FT-802.1X) and is freed only by an insert of
-// the same PMKR1Name or by the radio going down (FT_Release in
-// APStopByBss).
+// An entry is freed by an insert of the same PMKR1Name, by the radio going
+// down (FT_Release in APStopByBss), or by FT_R1KHInfoMaintenance (once a
+// second) when its countdown (KeyLifeTime s, or PMKCachePeriod for the
+// driver's own entries) runs out, but only if bit 0x100 of its word at
+// 0xc is set, and FT_R1khEntryInsert never writes that word: it is
+// whatever the kmalloc'd memory held (os_alloc_mem is kmalloc GFP_ATOMIC,
+// no zeroing). So some entries age and some never do (live 2026-11-24:
+// five KDP 0x52 timeouts of FT-SAE/PSK entries). An aged entry whose
+// station is still associated is disassociated with
+// cntl_disconnect_request on the AP wdev, which leaves the AP's CNTL
+// machine in CNTL_WAIT_DISASSOC for good (ap_cntl_init has no disassoc
+// confirm), and every scan of the radio is refused until it restarts
+// (internal/mtkwifi offchan5.go). DriverKeyLife keeps installed entries
+// from aging.
 const R1KHTableSize = 64

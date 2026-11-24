@@ -304,6 +304,30 @@ func plansHash(ps map[string]RadioPlan) string {
 	return hex.EncodeToString(h[:])
 }
 
+// appliedHash is what mtk-applied holds: the plans and the profile this
+// build writes for each radio on (from this boot's baseline). A new build
+// whose profiles differ for the same plans (a profile default changed)
+// then misses the fast path in Plan, and adopt restarts only the radios
+// whose installed profile is not the one it writes; one that writes the
+// same bytes keeps every radio as before.
+func (a *Applier) appliedHash(want map[string]RadioPlan) string {
+	h := sha256.New()
+	h.Write([]byte(plansHash(want)))
+	for _, rd := range a.o.Layout {
+		w, ok := want[rd.Band]
+		if !ok || !w.On {
+			continue
+		}
+		base, err := a.baseline(rd)
+		if err != nil {
+			continue
+		}
+		h.Write([]byte("\n" + rd.Band + "\n"))
+		h.Write(profile(base, rd, a.dfsProfilePlan(rd, w)))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // Owned reports whether the agent's profiles are installed (the agent uses
 // it to tell a rollback that handed Wi-Fi back from one that did not).
 func (a *Applier) Owned() bool {
@@ -332,7 +356,7 @@ func (a *Applier) Plan(ctx context.Context, d bcmwifi.Desired) (bcmwifi.Plan, er
 	cur := a.live
 	if cur == nil {
 		if h, err := os.ReadFile(a.dev(filepath.Join(a.o.RunDir, appliedFile))); err == nil &&
-			strings.TrimSpace(string(h)) == plansHash(want) && a.check(ctx, want, true) == nil {
+			strings.TrimSpace(string(h)) == a.appliedHash(want) && a.check(ctx, want, true) == nil {
 			a.live, a.want = want, full
 			a.desired = d
 			a.planACL(&p, want)
@@ -557,7 +581,7 @@ func (a *Applier) applyPlans(ctx context.Context, want, cur map[string]RadioPlan
 		a.o.Logf("mtkwifi: station ACLs: %v", err)
 	}
 	writeTxModes(a.dev(a.o.RunDir), want)
-	return os.WriteFile(a.dev(filepath.Join(a.o.RunDir, appliedFile)), []byte(plansHash(want)+"\n"), 0o644)
+	return os.WriteFile(a.dev(filepath.Join(a.o.RunDir, appliedFile)), []byte(a.appliedHash(want)+"\n"), 0o644)
 }
 
 // applyRadio writes the radio's profile and restarts its BSSes (every

@@ -57,8 +57,11 @@ apply to both platforms, as do the Deco keys this platform now takes:
 
 - **U6:** `wpa_group_rekey` from the WLAN's `group_rekey` (0 = never).
 - **Garage:** per served slot `RekeyMethod=TIME` + `RekeyInterval=<s>`, or
-  `DISABLE`/0 (always for an open WLAN); `PMKCachePeriod=720` (minutes, the
-  U6's 12 h) on 5 GHz. Unserved slots keep the vendor values.
+  `DISABLE`/0 (always for an open WLAN); `PMKCachePeriod=129600` (minutes: 90 days, not the U6's 12 h) on 5 GHz.
+  The MT7663 also uses it as the lifetime of its own FT key holder entries,
+  and an entry that ages while its client is connected can stop the
+  radio's scans until it restarts ([garage-ft](garage-ft.md#key-holder-entries-that-age-2026-11-25)).
+  Unserved slots keep the vendor values.
 - **Unverified:** on-air GTK rotation interval.
 
 ## 4. 2.4 GHz automatic channel: 1/6/11 only

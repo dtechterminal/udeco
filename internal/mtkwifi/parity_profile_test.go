@@ -42,7 +42,7 @@ func TestProfileU6Defaults(t *testing.T) {
 		"WscConfStatus": "2;2;2;2", "WirelessEvent": "0", "PMKCachePeriod": "10"})
 	wantKeys(t, "na", profile(parityBase("na"), JCOW414[1], ps["na"]), map[string]string{
 		"WscConfMode": "0;0;0;0", "BandSteering": "0;0;0;0", "ITxBfEn": "0", "ETxBfEnCond": "1",
-		"WirelessEvent": "1", "PMKCachePeriod": "720", "HT_BSSCoexistence": "0"})
+		"WirelessEvent": "1", "PMKCachePeriod": pmkCacheMinutes, "HT_BSSCoexistence": "0"})
 	if _, ok := getKey(profile(parityBase("ng"), JCOW414[0], ps["ng"]), "ITxBfEn"); ok {
 		t.Error("ITxBfEn written to the MT7603 profile")
 	}

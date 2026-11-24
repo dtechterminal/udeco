@@ -198,9 +198,11 @@ func TestRoamFTSAEGarageToDeco(t *testing.T) {
 	}
 	// the driver answers with KEY_RSP_AUTO, the PeerIP echoed
 	r0, r1 := hierarchy(t, rg.na.R0KHID, decoNA)
-	// as the MT7663 answers on the unit (2026-11-23): S1KH-ID zero
+	// as the MT7663 answers on the unit (2026-11-23): S1KH-ID zero; its
+	// lifetime the PMKCachePeriod (90 days, pmkCacheMinutes), which the
+	// push caps at hostapd's r0_key_lifetime
 	el := mtkft.KeyElement{STA: testSTA, R0KHID: rg.na.R0KHID, PMKR0Name: r0.Name, R1KHID: decoNA,
-		PMKR1Name: r1.Name, PMKR1: r1.Key, Pairwise: mtkft.CipherCCMP, AKM: mtkft.AKMFTSAE, KeyLifeTime: 43200}
+		PMKR1Name: r1.Name, PMKR1: r1.Key, Pairwise: mtkft.CipherCCMP, AKM: mtkft.AKMFTSAE, KeyLifeTime: 129600 * 60}
 	body, _ := el.MarshalBinary()
 	rg.r.onKDP("rai0", kdp(garageNA, mtkft.SigKeyRspAuto, tag+1, body)) // a tag never asked: ignored
 	if s := rg.conn.take(); len(s) != 0 {
@@ -342,7 +344,7 @@ func TestRoamFTSAEDecoToGarage(t *testing.T) {
 	}
 	if e.R1KHID != garageNA || e.STA != testSTA || e.S1KHID != testSTA || e.PMKR1 != r1.Key || e.PMKR1Name != r1.Name ||
 		e.AKM != mtkft.AKMFTSAE || e.Pairwise != mtkft.CipherCCMP || e.R0KHMAC != decoNA || string(e.R0KHID) != decoNA.Hex() ||
-		e.KeyLifeTime != 3600 || e.ReassocDeadline != reassocTU {
+		e.KeyLifeTime != mtkft.DriverKeyLife || e.ReassocDeadline != reassocTU {
 		t.Fatalf("installed %+v", e)
 	}
 	// the request the driver checks: PMKR1Name = f(PMKR0Name, its BSSID, STA)

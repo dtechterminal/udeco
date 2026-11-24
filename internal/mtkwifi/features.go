@@ -309,9 +309,14 @@ func skipList(all, keep []int) string {
 }
 
 // pmkCacheMinutes is the 5 GHz PMK cache lifetime (PMKCachePeriod,
-// minutes): hostapd's default 12 h, so an idle SAE phone resumes with
-// its PMKSA instead of a new SAE after the vendor's 10 minutes.
-const pmkCacheMinutes = "720"
+// minutes): 90 days. It is also the lifetime of the R1KH entry the MT7663
+// makes for each FT initial association (PeerPairMsg4Action: the stored
+// minutes × 6000 jiffies / 100 s), and an entry that ages while its
+// station is associated may wedge the radio's scans (mtkft.R1KHTableSize):
+// at the U6's 12 h (hostapd's default) that came every day for a client
+// that stayed on. So an idle SAE phone also resumes with its PMKSA for 90
+// days instead of 12 h. 129600 × 6000 = 777,600,000 fits the driver's s32.
+const pmkCacheMinutes = "129600"
 
 // u6Defaults adds the settings a U6 applies whatever the controller says,
 // and the per-BSS group rekey the controller sends, to kv. Each is a
