@@ -122,7 +122,7 @@ key, so the AP has a single behaviour) and the AP claims wifi_caps2 0x400000.
 On the U6 Pro it is `/proc/ui_multicast/mc_suppressor/enable` in a closed
 kernel module; what it suppresses is not stated anywhere in the controller or
 the captures. Not claimed (the agent's wifi_caps2 word, sent for the Roaming
-Assistant in takeover, never has this bit); translate keeps noting
+Assistant and quick scan in takeover, never has this bit); translate keeps noting
 `multicast.suppressor` when it is on.
 
 The inspector itself (`internal/mcinspect`) is platform-independent and is

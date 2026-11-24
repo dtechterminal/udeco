@@ -379,7 +379,7 @@ func docsCapabilityWords(t *testing.T, takeover bool, inform map[string]any) {
 	if takeover {
 		claims = []docClaim{
 			{docDesign, fmt.Sprintf("Takeover: `wifi_caps %d` (%#x: WPA3 | RF_SCAN | BANDSTEER | WPA_PSK_FILE | LOCK_AP,", w("wifi_caps"), w("wifi_caps")), true},
-			{docDesign, fmt.Sprintf("`wifi_caps2 %#x` (Roaming Assistant), `fw_caps %#x` (+ RADIUS filter;", w("wifi_caps2"), w("fw_caps")), true},
+			{docDesign, fmt.Sprintf("`wifi_caps2 %#x` (Roaming Assistant, quick scan), `fw_caps %#x` (+ RADIUS filter;", w("wifi_caps2"), w("fw_caps")), true},
 			{docDesign, fmt.Sprintf("`fw2_caps %#x` (RadSec;", w("fw2_caps")), true},
 			{docDesign, fmt.Sprintf("`fw3_caps %#x` (+ multicast inspect)", w("fw3_caps")), inform["hw_caps"] == nil},
 		}

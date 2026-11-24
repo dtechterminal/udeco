@@ -51,6 +51,14 @@ const (
 	// GHz VAPs; the agent sends 802.11v BSS transition requests to weak
 	// stations (cmd/udeco-ap/roaming.go).
 	WifiCap2RoamAssist = 0x20
+	// WifiCap2QuickScan (wifi_caps2 0x80, QUICK_SCAN in the Network UI's
+	// wifi_caps2 enum): the AP runs `cmd quick-scan`. Radio AI's prescan
+	// (the interference-aware part of Nightly Channel Optimization) and
+	// the site's Quick Scan pick only APs with it: without it they log "no
+	// quick-scan-capable eligible AP" and place channels without any
+	// occupancy data (seen 2026-11-25). The real U6-Pro sets it. Claimed
+	// with DecoAgentFeatures.RFScan.
+	WifiCap2QuickScan = 0x80
 
 	// FWCapSyslogEncryption (fw_caps 0x1000000, supportSyslogEncryption):
 	// the agent forwards logread to the controller sealed with
@@ -116,7 +124,7 @@ const (
 	// DecoAgentTakeover* are the bits that need the agent to own Wi-Fi: a
 	// drop to observe mode clears them from the session at once.
 	DecoAgentTakeoverWifiCaps  = WifiCapRFScan | WifiCapMinRateCtrl | WifiCapWPAPSKFile | WifiCapLockAP
-	DecoAgentTakeoverWifiCaps2 = WifiCap2RoamAssist
+	DecoAgentTakeoverWifiCaps2 = WifiCap2RoamAssist | WifiCap2QuickScan
 	DecoAgentTakeoverFWCaps    = FWCapRadiusFilter | FWCapHotspot2 | FWCapQCASwitch | FWCapOWRTSwitch
 	DecoAgentTakeoverFW2Caps   = FW2CapRadSec | FW2CapMdnsSdBridge
 	DecoAgentTakeoverFW3Caps   = FW3CapMulticastInspect
@@ -393,6 +401,7 @@ func DecoAgentProfileWith(m Model, heAX map[string]bool, f DecoAgentFeatures) (i
 	}
 	set(f.BandSteer, &p.WifiCaps, WifiCapBandSteer)
 	set(f.RFScan, &p.WifiCaps, WifiCapRFScan)
+	set(f.RFScan, &p.WifiCaps2, WifiCap2QuickScan)
 	set(f.MinRate, &p.WifiCaps, WifiCapMinRateCtrl)
 	set(f.PPSK, &p.WifiCaps, WifiCapWPAPSKFile)
 	set(f.LockAP, &p.WifiCaps, WifiCapLockAP)

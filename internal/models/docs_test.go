@@ -233,7 +233,7 @@ func TestDocsCapabilityResult(t *testing.T) {
 		obs.FWCaps != inform.PlaceholderFWCaps|FWCapSHA512SSH|FWCapSNMPv3|FWCapWlanScheduleMultiBlock|FWCapWlanScheduleInvert|FWCapSyslogEncryption {
 		t.Errorf("observe: %+v: reword the Result paragraph and this test", obs)
 	}
-	if take.WifiCaps != WifiCapWPA3|WifiCapRFScan|WifiCapBandSteer|WifiCapWPAPSKFile|WifiCapLockAP || take.WifiCaps2 != WifiCap2RoamAssist ||
+	if take.WifiCaps != WifiCapWPA3|WifiCapRFScan|WifiCapBandSteer|WifiCapWPAPSKFile|WifiCapLockAP || take.WifiCaps2 != WifiCap2RoamAssist|WifiCap2QuickScan ||
 		take.FWCaps != obs.FWCaps|FWCapRadiusFilter || take.FW2Caps != FW2CapRadSec || take.FW3Caps != obs.FW3Caps|FW3CapMulticastInspect {
 		t.Errorf("takeover: %+v: reword the Result paragraph and this test", take)
 	}
@@ -244,7 +244,7 @@ func TestDocsCapabilityResult(t *testing.T) {
 	repotest.MustHave(t, agentDesign,
 		fmt.Sprintf("Observe mode: `wifi_caps %d` (WPA3), `fw_caps %#x` (placeholder bits, SHA-512 SSH, SNMPv3, the two schedule bits, encrypted syslog), `fw3_caps %#x` (path monitoring), no wifi_caps2/fw2_caps/hw_caps.",
 			obs.WifiCaps, obs.FWCaps, obs.FW3Caps),
-		fmt.Sprintf("Takeover: `wifi_caps %d` (%#x: WPA3 | RF_SCAN | BANDSTEER | WPA_PSK_FILE | LOCK_AP, plus MINRATE_CTRL %#x with `min_rates`), `wifi_caps2 %#x` (Roaming Assistant), `fw_caps %#x` (+ RADIUS filter; + Hotspot 2.0 %#x with `hotspot2`), `fw2_caps %#x` (RadSec; + mDNS bridge %#x with `apply` and `mdns_bridge`), `fw3_caps %#x` (+ multicast inspect), radio_caps2 %#x on both radios with `wpa3` (else 0).",
+		fmt.Sprintf("Takeover: `wifi_caps %d` (%#x: WPA3 | RF_SCAN | BANDSTEER | WPA_PSK_FILE | LOCK_AP, plus MINRATE_CTRL %#x with `min_rates`), `wifi_caps2 %#x` (Roaming Assistant, quick scan), `fw_caps %#x` (+ RADIUS filter; + Hotspot 2.0 %#x with `hotspot2`), `fw2_caps %#x` (RadSec; + mDNS bridge %#x with `apply` and `mdns_bridge`), `fw3_caps %#x` (+ multicast inspect), radio_caps2 %#x on both radios with `wpa3` (else 0).",
 			take.WifiCaps, take.WifiCaps, WifiCapMinRateCtrl, take.WifiCaps2, take.FWCaps, FWCapHotspot2, take.FW2Caps, FW2CapMdnsSdBridge, take.FW3Caps, wpa3.Radios["na"].RadioCaps2))
 }
 
@@ -284,8 +284,8 @@ func TestDocsFeatureNoteBits(t *testing.T) {
 		{notes + "multicast-inspect.md", fmt.Sprintf("| mDNS service bridge | fw2_caps | %#x | `supportsMdnsSdBridge` |", FW2CapMdnsSdBridge), true},
 		{notes + "multicast-inspect.md", fmt.Sprintf("Bit: fw3_caps %#x, claimed in takeover only (`models.FW3CapMulticastInspect`, one of `models.DecoAgentTakeoverFW3Caps`).", FW3CapMulticastInspect),
 			DecoAgentTakeoverFW3Caps&FW3CapMulticastInspect != 0 && obs.FW3Caps&FW3CapMulticastInspect == 0 && take.FW3Caps&FW3CapMulticastInspect != 0},
-		{notes + "multicast-inspect.md", "the agent's wifi_caps2 word, sent for the Roaming Assistant in takeover, never has this bit",
-			obs.WifiCaps2 == 0 && take.WifiCaps2 == WifiCap2RoamAssist && DecoAgentTakeoverWifiCaps2 == WifiCap2RoamAssist},
+		{notes + "multicast-inspect.md", "the agent's wifi_caps2 word, sent for the Roaming Assistant and quick scan in takeover, never has this bit",
+			obs.WifiCaps2 == 0 && take.WifiCaps2 == WifiCap2RoamAssist|WifiCap2QuickScan && DecoAgentTakeoverWifiCaps2&0x400000 == 0},
 		{notes + "pathmon.md", fmt.Sprintf("Covers fw3_caps %#x (path monitoring), fw_caps %#x (syslog encryption), fw_caps %#x (SNMPv3) and fw_caps %#x (RADIUS filter).",
 			FW3CapPathMonitoring, FWCapSyslogEncryption, FWCapSNMPv3, FWCapRadiusFilter), true},
 		{notes + "pathmon.md", fmt.Sprintf("Claim: fw_caps %#x in both modes.", FWCapSyslogEncryption), obs.FWCaps&FWCapSyslogEncryption != 0},

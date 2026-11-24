@@ -381,6 +381,7 @@ Bit names (hypothesis, consistent): docs/internals.md lists the 18 named bits of
 | | 29 | QCA_VAP_NOMENCLATURE_V2 | no | QCA naming (`<radio>ap<idx>`), used only for Atheros models; a U6-Lite is MediaTek, whose VAP names come from the radio names (§3.8) |
 | wifi_caps2 | 0x10 | ACS_DFS (`supportsAcsDfs`) | no | no ACS (acsd2 killed; channel 0 keeps the live one) |
 | | 0x20 | ROAMING_ASSISTANT (`supportsAssistedRoaming`) | **takeover only** (with a backend that implements `RoamAssist`) | the controller then sends `wireless.N.btm_disassoc.status=enabled` / `.threshold=<dBm>` on 5/6 GHz VAPs. The agent sends an 802.11v BSS transition request with a disassociation timer (`hostapd_cli bss_tm_req`, a candidate list of the SSID's BSSes on other APs that this unit's scans heard, never one of its own) to a BTM-capable station that stayed below the threshold for at least 3 readings in a row and 1 min; no candidate, no request (cmd/udeco-ap/roaming.go, docs/deco/features/roaming-assistant.md). The word is sent only when non-zero; the controller reads a missing word as 0 |
+| | 0x80 | QUICK_SCAN (the Network UI's wifi_caps2 enum) | **takeover only** (with RF scanning) | the AP runs `cmd quick-scan`. Radio AI's prescan (the interference-aware part of Nightly Channel Optimization) and the site's Quick Scan pick only APs with it; without it they log "no quick-scan-capable eligible AP" and place channels from activity and neighbour scans alone (seen 2026-11-25). The real U6-Pro sets it |
 | | 0x200 | NEIGHBOUR_IN_SCAN (`supportNeighbourInScan`) | no | promises UniFi neighbours in every inform's scan_table; the agent scans only on command, so Radio AI would plan from no data (docs/deco/features/roaming-assistant.md) |
 | | 0x400000 | MULTICAST_SUPPRESSOR (`supportsMulticastSuppressor`) | no | maps to a closed UAP kernel module; what it suppresses is not known (docs/deco/features/multicast-inspect.md) |
 | | others | | no | unknown or not implemented |
@@ -413,7 +414,7 @@ Bit names (hypothesis, consistent): docs/internals.md lists the 18 named bits of
 Result (2026-11-19). Observe mode: `wifi_caps 131072` (WPA3), `fw_caps 0x1405403` (placeholder bits, SHA-512 SSH,
 SNMPv3, the two schedule bits, encrypted syslog), `fw3_caps 0x40` (path monitoring), no wifi_caps2/fw2_caps/hw_caps. Takeover:
 `wifi_caps 17956884` (0x1120014: WPA3 | RF_SCAN | BANDSTEER | WPA_PSK_FILE | LOCK_AP, plus MINRATE_CTRL 0x200 with
-`min_rates`), `wifi_caps2 0x20` (Roaming Assistant), `fw_caps 0x21405403` (+ RADIUS filter; + Hotspot 2.0 0x800000
+`min_rates`), `wifi_caps2 0xa0` (Roaming Assistant, quick scan), `fw_caps 0x21405403` (+ RADIUS filter; + Hotspot 2.0 0x800000
 with `hotspot2`), `fw2_caps 0x80000` (RadSec; + mDNS bridge 0x10000000 with `apply` and `mdns_bridge`), `fw3_caps 0xc0`
 (+ multicast inspect), radio_caps2 0x1 on both radios with `wpa3` (else 0). Every word is sent as uint32 and only when non-zero (`device.Session`); the controller reads a
 missing word as 0 (payload `getInt` default), so clearing a word's last bit also clears it there. A drop to observe

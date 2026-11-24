@@ -706,7 +706,7 @@ func (e *e2e) checkFlow() map[string]any {
 	// keys. Encrypted syslog, SNMPv3 and path monitoring in both modes.
 	want := map[string]float64{"wifi_caps": 131072, "fw_caps": 0x1405403, "fw3_caps": 0x40}
 	if e.cfg.Takeover {
-		want = map[string]float64{"wifi_caps": 131092 | 1<<20 | 1<<24, "wifi_caps2": 0x20,
+		want = map[string]float64{"wifi_caps": 131092 | 1<<20 | 1<<24, "wifi_caps2": 0x20 | 0x80,
 			"fw_caps": 0x21405403, "fw2_caps": 0x80000, "fw3_caps": 0xc0}
 	}
 	for _, k := range []string{"wifi_caps", "wifi_caps2", "fw_caps", "fw2_caps", "fw3_caps"} {

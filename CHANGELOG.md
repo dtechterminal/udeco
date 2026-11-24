@@ -13,6 +13,36 @@ How sure each feature is:
 - **Partial:** works, with a named gap.
 - **Not possible:** this hardware or its software can't do it.
 
+## v0.3.6 (2026-11-25)
+
+Nightly Channel Optimization now plans with real interference data from
+every AP.
+
+- **Cause:** before it places channels, Radio AI runs a quick scan on
+  each AP that claims the quick-scan capability (`wifi_caps2` 0x80, the
+  bit the real U6-Pro sets). The agent never claimed it, so the
+  controller logged "no quick-scan-capable eligible AP" and fell back to
+  "legacy placement (no interference-aware occupancy)", even though the
+  agent runs `cmd quick-scan` fine.
+- **Fix:** the agent claims the bit whenever it runs the controller's
+  scans (takeover mode with RF scanning), like `RF_SCAN`.
+
+**Verified** with a forced Radio AI preview (`FULL_SCAN`, both bands,
+not applied) on 2026-11-25: all four APs (the Garage and three Decos)
+ran the quick scan and the per-band `scan_band` scan, and the controller
+"scanned 4/4 eligible AP(s) … captured occupancy" on both bands. With that
+data it kept every channel as it is (2.4 GHz fitness 11.05 -> 11.14, not
+worth a change; 5 GHz unchanged).
+
+### Downloads
+
+| File | For | Install with |
+|---|---|---|
+| `udeco-ap-deco-x20-linux-armv7` and `.gz` | TP-Link Deco X20 V2 (Broadcom, armv7) | `deploy/deco-ap.sh` |
+| `udeco-ap-jio-jcow414-linux-mipsle` and `.gz` | JioFiber JCOW414 (MediaTek, mipsle) | `deploy/jio-ap.sh` |
+| `mt7603roam-jio-jcow414.ko.gz` | optional: the JCOW414's 2.4 GHz driver with WPA3 and 802.11r/k/v | `deploy/jio-ap.sh --driver FILE` |
+| `udeco_rl-jio-jcow414.ko.gz` | optional: the JCOW414's speed-limit module (`"rate_limits": true`) | `deploy/jio-ap.sh --rate-limit-module FILE` |
+
 ## v0.3.5 (2026-11-25)
 
 The controller's Nightly Channel Optimization now gets scan data from
