@@ -13,6 +13,32 @@ How sure each feature is:
 - **Partial:** works, with a named gap.
 - **Not possible:** this hardware or its software can't do it.
 
+## v0.3.5 (2026-11-25)
+
+The controller's Nightly Channel Optimization now gets scan data from
+every AP (the Garage and the Decos).
+
+- **Cause:** at 03:00 the controller sends `cmd scan_band` (with `band`
+  `ng` or `na`) to each AP, one band at a time, and scores the APs about
+  a minute later. The agent didn't know that command and ignored it, so
+  the run had no fresh scan data and chose channels from client activity
+  alone. On 2026-11-25 it moved Hallway's 2.4 GHz from 1 to 11 and
+  Bedroom's from 6 to 1 that way.
+- **Fix:** `scan_band` now runs a neighbour scan of that band and informs
+  when it is done.
+
+**Built** (deployed on all four APs, no radio restarted; proven by the
+next 03:00 run).
+
+### Downloads
+
+| File | For | Install with |
+|---|---|---|
+| `udeco-ap-deco-x20-linux-armv7` and `.gz` | TP-Link Deco X20 V2 (Broadcom, armv7) | `deploy/deco-ap.sh` |
+| `udeco-ap-jio-jcow414-linux-mipsle` and `.gz` | JioFiber JCOW414 (MediaTek, mipsle) | `deploy/jio-ap.sh` |
+| `mt7603roam-jio-jcow414.ko.gz` | optional: the JCOW414's 2.4 GHz driver with WPA3 and 802.11r/k/v | `deploy/jio-ap.sh --driver FILE` |
+| `udeco_rl-jio-jcow414.ko.gz` | optional: the JCOW414's speed-limit module (`"rate_limits": true`) | `deploy/jio-ap.sh --rate-limit-module FILE` |
+
 ## v0.3.4 (2026-11-25)
 
 Fixes the cause of the Garage's 5 GHz radio getting stuck so that its
