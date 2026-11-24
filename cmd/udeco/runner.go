@@ -328,7 +328,7 @@ func (r *runner) action(a string) {
 		r.logf("LED %s from the controller: not supported yet (logged only)", arg)
 	case device.ActKick:
 		r.logf("kick %s: unsupported on Deco (no opcode); logged only", arg)
-	case device.ActScan, device.ActSpectrumScan:
+	case device.ActScan, device.ActScanBand, device.ActSpectrumScan:
 		r.logf("%s: unsupported on Deco; logged only", verb)
 	case device.ActGuestAuth, device.ActGuestUnauth:
 		r.logf("%s %s: a Deco guest network has no portal; ignored", verb, arg)

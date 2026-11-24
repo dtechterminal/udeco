@@ -131,7 +131,9 @@ controller shows it as connected.
 - `cmd`: `set-adopt`, `set-locate` / `unset-locate`, `kick-sta`,
   `block-sta` / `unblock-sta` (with `mac`), `authorize-guest` /
   `unauthorize-guest`, `scan`, `spectrum-scan`, `quick-scan` (one band of
-  the nightly channel optimisation: `scan-band`, `scan-bw`), `rate-update`
+  the nightly channel optimisation: `scan-band`, `scan-bw`), `scan_band`
+  (Radio AI's nightly neighbour scan of one radio: `band` `ng`/`na`; the
+  AP agent scans that band and informs), `rate-update`
   (a client's speed limit: `mac`, `dl_max`, `ul_max`), `reboot`,
   `setdefault`, `upgrade` (answered, never applied).
 - Top-level `_type` `reboot`, `setdefault`, `upgrade`.

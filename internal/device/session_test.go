@@ -235,6 +235,36 @@ func TestAdoptedPayloadKeepsExtraStats(t *testing.T) {
 	}
 }
 
+// Radio AI's nightly neighbour scan: cmd scan_band with band "ng"/"na"
+// (the controller's 03:00 run, 2026-11-25), one band per cmd. The band
+// field is read, not noted as unhandled.
+func TestScanBandCmd(t *testing.T) {
+	x := newSession(t)
+	x.Unhandled = OpenLedger(x.StateDir + "/unhandled.json")
+	for _, c := range []struct{ reply, want string }{
+		{`{"_type":"cmd","cmd":"scan_band","band":"ng","datetime":1795555802478}`, "scan-band:ng"},
+		{`{"_type":"cmd","cmd":"scan_band","band":"na"}`, "scan-band:na"},
+	} {
+		o := handle(t, x, c.reply)
+		if !slices.Equal(o.Actions, []string{c.want}) || !o.Immediate {
+			t.Errorf("%s: actions %v immediate %v, want %s", c.reply, o.Actions, o.Immediate, c.want)
+		}
+	}
+	for _, bad := range []string{
+		`{"_type":"cmd","cmd":"scan_band"}`,
+		`{"_type":"cmd","cmd":"scan_band","band":"5g"}`,
+	} {
+		if o := handle(t, x, bad); len(o.Actions) != 0 {
+			t.Errorf("%s: actions %v", bad, o.Actions)
+		}
+	}
+	for _, u := range x.Unhandled.Entries() {
+		if u.Kind == "field" && u.Name == "cmd.band" {
+			t.Errorf("band noted as unhandled: %+v", u)
+		}
+	}
+}
+
 // The nightly channel optimisation sends cmd quick-scan with scan-band and
 // scan-bw (numbers, or numeric strings).
 func TestQuickScanCmd(t *testing.T) {

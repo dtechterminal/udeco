@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,6 +60,12 @@ func (a *agent) action(ctx context.Context, act string) {
 		// the whole new list arrives with the "block" action
 	case device.ActScan:
 		a.startScan(ctx, rf.Bands())
+	case device.ActScanBand:
+		if !slices.Contains(rf.Bands(), arg) {
+			a.logf("scan_band %s: the unit has no such radio; nothing scanned", arg)
+			return
+		}
+		a.startScan(ctx, []string{arg})
 	case device.ActSpectrumScan:
 		a.spectrumScan(ctx)
 	case device.ActQuickScan:

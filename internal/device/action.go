@@ -17,6 +17,7 @@ const (
 	ActBlock        = "block"         // enforce the blocked list (State.Blocked)
 	ActUnblock      = "unblock"       // unblock:<mac>; the new list follows with ActBlock
 	ActScan         = "scan"          // neighbour scan
+	ActScanBand     = "scan-band"     // scan-band:<band>: neighbour scan of one band
 	ActSpectrumScan = "spectrum-scan" // RF scan
 	ActQuickScan    = "quick-scan"    // quick-scan:<band>:<width in MHz, 0 = not sent>
 	ActGuestAuth    = "guest-auth"    // guest-auth:<mac> (until State.Guests[mac])
@@ -32,7 +33,7 @@ const (
 
 // Actions are all the verbs. Each call returns a new slice.
 func Actions() []string {
-	return []string{ActReboot, ActLED, ActLocate, ActKick, ActBlock, ActUnblock, ActScan, ActSpectrumScan,
+	return []string{ActReboot, ActLED, ActLocate, ActKick, ActBlock, ActUnblock, ActScan, ActScanBand, ActSpectrumScan,
 		ActQuickScan, ActGuestAuth, ActGuestUnauth, ActRateUpdate}
 }
 

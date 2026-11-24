@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -292,6 +293,7 @@ type Reply struct {
 	Minutes    int     `json:"minutes"`     // authorize-guest: duration, if sent
 	End        int64   `json:"end"`         // authorize-guest: end time (unix s), if sent
 	ScanBand   *IntArg `json:"scan-band"`   // cmd quick-scan: 0 = 2.4 GHz, 1 = 5 GHz, 2 = 6 GHz
+	Band       string  `json:"band"`        // cmd scan_band: "ng", "na" (or "6e")
 	ScanBW     *IntArg `json:"scan-bw"`     // cmd quick-scan: channel width in MHz
 	// cmd rate-update: the client's limits in kbit/s, -1 = none that way
 	// (the _min ones, always 64, are read and not used)
@@ -324,6 +326,7 @@ var QuickScanBands = map[int]string{0: "ng", 1: "na", 2: "6e"}
 func init() {
 	// read by the quick-scan cmd below (replyFields lives in unhandled.go)
 	replyFields["scan-band"], replyFields["scan-bw"] = true, true
+	replyFields["band"] = true // cmd scan_band
 	for _, k := range []string{"dl_max", "ul_max", "dl_min", "ul_min"} {
 		replyFields[k] = true // cmd rate-update
 	}
@@ -687,6 +690,20 @@ func (x *Session) cmd(r Reply, js []byte, now time.Time, o *Outcome) {
 		o.Immediate = true
 		o.Actions = append(o.Actions, map[string]string{"scan": ActScan, "spectrum-scan": ActSpectrumScan}[r.Cmd])
 		o.Events = append(o.Events, "cmd "+r.Cmd)
+	case "scan_band":
+		// Radio AI's (Nightly Channel Optimization's) neighbour scan, one
+		// per band and AP, 5 s apart; it scores the APs about a minute
+		// after the last (seen 2026-11-25 03:00). mcad runs ath_scan on
+		// that band's radio and informs (study-actions-scans.md).
+		band := r.Band
+		if !slices.Contains([]string{"ng", "na", "6e"}, band) {
+			o.Events = append(o.Events, fmt.Sprintf("cmd scan_band: unknown band %q: ignored", band))
+			x.note("cmd", r.Cmd, redactReply(js), now, o)
+			break
+		}
+		o.Immediate = true
+		o.Actions = append(o.Actions, Action(ActScanBand, band))
+		o.Events = append(o.Events, "cmd scan_band band="+band)
 	case "quick-scan":
 		// The controller's nightly channel optimisation: one band per cmd,
 		// the next only after the AP reported the finished scan
