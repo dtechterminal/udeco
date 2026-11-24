@@ -86,6 +86,7 @@ const (
 	DrvHSTimeout                      // the 4-way handshake timed out (MT7663 system log 0x20B)
 	DrvMICDiff                        // a 4-way handshake message with a wrong MIC: a wrong passphrase (MT7663 0x207)
 	DrvFT                             // a roaming event: UDFT 0x0961, RRM 0x094D, BTM 0x093a/0x0929 (EventsOptions.FT)
+	DrvChanInfo                       // an off-channel visit's result (MT7663 0x955, offchan5.go; not the monitor's)
 )
 
 // The MT7663's system log event flags (IW_*_EVENT_FLAG, mt_wifi rtmp_def.h).
@@ -138,6 +139,8 @@ type DrvEvent struct {
 	// DrvFT: the IWEVCUSTOM flags and data (roam.go)
 	FTFlags uint16
 	FTData  []byte
+	// DrvChanInfo: the visit's result
+	ChanInfo *ChanInfo
 }
 
 // ProxyARPRequest is the MT7663's 0x93b event: an ARP request the driver
@@ -233,6 +236,12 @@ func customEvent(ifname string, flags uint16, d []byte) (DrvEvent, bool) {
 		e.Kind, e.MAC = DrvMboLeave, macStr(d[6:12])
 	case flags == mtkft.OIDUDFTEvents || flags == mtkft.EvRRM || flags == mtkft.EvBTMRsp || flags == mtkft.EvBTMQuery:
 		e.Kind, e.FTFlags, e.FTData = DrvFT, flags, append([]byte(nil), d...)
+	case flags == oidChanInfoMsg:
+		ci, ok := parseChanInfo(d)
+		if !ok {
+			return DrvEvent{}, false
+		}
+		e.Kind, e.ChanInfo = DrvChanInfo, &ci
 	case flags == 0x93b && len(d) >= 27:
 		r := &ProxyARPRequest{Ifindex: int(binary.LittleEndian.Uint32(d[0:])), IPv6: d[4] != 0, FromDS: d[5] != 0,
 			DAD: d[6] != 0, ReqMAC: append(net.HardwareAddr{}, d[7:13]...), StaMAC: append(net.HardwareAddr{}, d[13:19]...),
@@ -420,6 +429,9 @@ func (m *Events) setUp(up bool) {
 
 // handle takes one event as it arrives.
 func (m *Events) handle(e DrvEvent) {
+	if e.Kind == DrvChanInfo {
+		return // the spectrum backend's own socket reads it (offchan5.go)
+	}
 	if e.Kind == DrvProxyARP {
 		if m.o.ProxyARP != nil && e.ARP != nil {
 			m.o.ProxyARP(e.ARP)

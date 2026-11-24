@@ -4,9 +4,9 @@ package main
 
 // The controller's spectrum commands for a band without a spectrum runner
 // (platform jio-mtk: mtkwifi.Collector.SpectrumBySurvey; with site_survey
-// the MT7603's 2.4 GHz band has one, the off-channel sweep of mtkwifi
-// offchan.go, run as the Deco's in spectrum.go; the MT7663's 5 GHz band
-// has none, and without site_survey neither has).
+// both bands have one, run as the Deco's in spectrum.go: the MT7603's
+// off-channel sweep, mtkwifi offchan.go, and the MT7663's Channel_Info
+// visits, offchan5.go; without site_survey neither has).
 //
 // With site_survey on (mtkwifi FreshScan), `cmd quick-scan` (nightly, one
 // band per command) of a band without a runner runs the driver's site

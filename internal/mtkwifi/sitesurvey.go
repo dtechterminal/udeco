@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -45,7 +46,10 @@ type surveySeen struct {
 }
 
 // scanPoll: how often a fresh survey's table is read; scanSettle: how long
-// it must stay the same to count as finished. Not measured on the unit: a
+// its neighbours (surveyKey: BSSID, channel, SSID; not their levels) must
+// stay the same to count as finished. Live 2026-11-24 on the Garage's
+// MT7663 the whole 5 GHz table (11 BSSes) was there at the first read 2 s
+// after SiteSurvey=1. Not measured on the unit: a
 // driver that clears its table when the survey starts and refills it
 // channel by channel could hold a partial table for scanSettle on quiet
 // passive (DFS) channels, so Scan would end, and release the restart gate,
@@ -201,7 +205,7 @@ func (c *Collector) freshSurvey(ctx context.Context, band, main string) (*apstat
 	if _, err := c.o.Run.Run(ctx, "iwpriv", main, "set", "SiteSurvey=1"); err != nil {
 		return nil, fmt.Errorf("iwpriv %s set SiteSurvey=1: %w", main, err)
 	}
-	last, since := before, time.Time{}
+	last, lastKey, since := before, "", time.Time{}
 	for {
 		if err := c.o.sleep(ctx, scanPoll); err != nil {
 			if last != before {
@@ -215,8 +219,14 @@ func (c *Collector) freshSurvey(ctx context.Context, band, main string) (*apstat
 		}
 		now := c.o.now()
 		if t != last {
-			last, since = t, now
-			continue
+			// settled on the neighbours listed, not their levels: the
+			// MT7663 keeps updating a listed BSS's RSSI from the beacons it
+			// hears after its survey (live 2026-11-24: 11 BSSes, the table
+			// different at nearly every 500 ms read for over 50 s)
+			if k := surveyKey(t, band); since.IsZero() || k != lastKey {
+				lastKey, since = k, now
+			}
+			last = t
 		}
 		if last != before && now.Sub(since) >= scanSettle {
 			break
@@ -267,11 +277,11 @@ func (c *Collector) mibGap(main string) {
 
 // SpectrumBySurvey says how the controller's spectrum commands
 // (spectrum-scan, quick-scan) run for band: noRunner when Spectrum has no
-// runner for it (the MT7663, or no FreshScan); the agent then runs Scan of
+// runner for it (a radio with no spectrum backend, or no FreshScan); the agent then runs Scan of
 // the band instead when bySurvey (FreshScan), and nothing otherwise.
 func (c *Collector) SpectrumBySurvey(band string) (noRunner, bySurvey bool) {
 	rd, ok := c.radioDef(band)
-	noRunner = !c.o.FreshScan || !ok || rd.Spectrum != SpectrumOffChan
+	noRunner = !c.o.FreshScan || !ok || rd.Spectrum == ""
 	return noRunner, noRunner && c.o.FreshScan
 }
 
@@ -293,6 +303,17 @@ var surveyTail = regexp.MustCompile(`(?:^|\s)([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){
 // hidden network): it is the text from the SSID column to the row's last
 // BSSID-shaped field that the rest of the row follows. The width is the HT
 // one (ExtCH ABOVE/BELOW: 40 MHz); the survey does not print a VHT width.
+// surveyKey is what a survey table lists, without the levels: each BSS's
+// BSSID, channel and SSID, sorted.
+func surveyKey(table, band string) string {
+	var ks []string
+	for _, b := range parseSiteSurvey(table, band, time.Time{}) {
+		ks = append(ks, fmt.Sprintf("%s/%d/%q", strings.ToLower(b.BSSID), b.Channel, b.SSID))
+	}
+	slices.Sort(ks)
+	return strings.Join(ks, " ")
+}
+
 func parseSiteSurvey(table, band string, seen time.Time) []apstate.BSS {
 	var out []apstate.BSS
 	ssidCol := -1

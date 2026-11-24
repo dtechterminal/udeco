@@ -70,8 +70,9 @@ type RadioDef struct {
 	// MT7663; proxyarp.go)
 	HSFlag bool
 	// Spectrum is the radio's spectrum backend: SpectrumOffChan (the
-	// MT7603's ApOffChanScan sweep, offchan.go), or "" for none (the band's
-	// spectrum commands run the neighbour survey: SpectrumBySurvey)
+	// MT7603's ApOffChanScan sweep, offchan.go), SpectrumChanInfo (the
+	// MT7663's Channel_Info visits, offchan5.go), or "" for none (the
+	// band's spectrum commands run the neighbour survey: SpectrumBySurvey)
 	Spectrum string
 	// Dot1X: the driver serves WPA2/WPA3-Enterprise with Jio's rtdot1xd
 	// (802.1X authenticator in userland, the driver holding the keys and
@@ -108,7 +109,7 @@ var JCOW414 = []RadioDef{
 		Spectrum: SpectrumOffChan},
 	{Band: "na", Ifaces: []string{"rai0", "rai1", "rai2", "rai3"}, Dat: "/etc/Wireless/RT2860AP_AC/RT2860AP.dat",
 		MaxStaKey: "MbssMaxStaNum", MaxTxDBm: models.JCOW414MaxTx("na"), MinTxDBm: 5, NSS: 2, TxLive: "PowerDropCtrl", HWName: "MT7663",
-		SAE: true, UAPSD: true, HSFlag: true, Dot1X: true, FT: true},
+		SAE: true, UAPSD: true, HSFlag: true, Dot1X: true, FT: true, Spectrum: SpectrumChanInfo},
 }
 
 // SAEModule2G is the rebuilt 2.4 GHz module's name in /sys/module: the

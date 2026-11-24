@@ -71,7 +71,27 @@ type fakeMT7603 struct {
 	setErr      error
 
 	pendingSlow bool // a pre-clear the next set's slowShow applies to
+
+	// km: /dev/kmsg, when the test gives one: each line also as a record
+	// stamped with the fake clock's time it was printed
+	km  *chanSource
+	seq int
 }
+
+// emit prints s (one or more "<4>" lines) into the kernel log at time at,
+// and into km as records.
+func (f *fakeMT7603) emit(at time.Time, s string) {
+	f.d.log.WriteString(s)
+	if f.km == nil {
+		return
+	}
+	for _, l := range strings.Split(strings.TrimSuffix(s, "\n"), "\n") {
+		f.seq++
+		f.km.ch <- []byte(fmt.Sprintf("4,%d,%d,-;%s\n", f.seq, at.Sub(time.Unix(0, 0)).Microseconds(), strings.TrimPrefix(l, "<4>")))
+	}
+}
+
+func (f *fakeMT7603) emitf(format string, a ...any) { f.emit(f.ck.t, fmt.Sprintf(format, a...)) }
 
 func newFakeMT7603(d *klogDev, ck *clock) *fakeMT7603 {
 	f := &fakeMT7603{d: d, ck: ck, list: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, busy: map[int]int{}, stale: map[int]int{}, extra: map[int]int{},
@@ -129,7 +149,7 @@ func (f *fakeMT7603) Set(ifname string, b []byte) error {
 		f.silent[ch]--
 		return nil
 	}
-	fmt.Fprintf(&f.d.log, "<4>ApSiteSurveyNew_by_wdev channel_index:%d channel:%d time:%d\n", idx, ch, ms)
+	f.emitf("<4>ApSiteSurveyNew_by_wdev channel_index:%d channel:%d time:%d\n", idx, ch, ms)
 	if to, ok := f.moveTo[ch]; ok {
 		f.op = to
 	}
@@ -156,12 +176,12 @@ func (f *fakeMT7603) Set(ifname string, b []byte) error {
 	}
 	f.base = f.ck.t
 	if f.level >= 3 {
-		fmt.Fprintf(&f.d.log, "<4>[APMlmeScanReqAction][2098] start offchannel scan on %d : channel list index = 0\n", ch)
-		fmt.Fprintf(&f.d.log, "<4>[ScanNextChannel][696] stay time configured of channel index = 0 time = %d\n", ms)
+		f.emitf("<4>[APMlmeScanReqAction][2098] start offchannel scan on %d : channel list index = 0\n", ch)
+		f.emitf("<4>[ScanNextChannel][696] stay time configured of channel index = 0 time = %d\n", ms)
 	}
 	if f.extra[ch] > 0 {
 		f.extra[ch]--
-		fmt.Fprintf(&f.d.log, "<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:1 time:%d\n", ms)
+		f.emitf("<4>ApSiteSurveyNew_by_wdev channel_index:0 channel:1 time:%d\n", ms)
 	}
 	if f.stale[ch] > 0 {
 		f.stale[ch]--
@@ -218,7 +238,7 @@ func (f *fakeMT7603) flush() {
 		if l.at.After(f.ck.t) {
 			break
 		}
-		f.d.log.WriteString(l.s)
+		f.emit(l.at, l.s)
 		n++
 	}
 	f.pending = f.pending[n:]
@@ -729,10 +749,10 @@ func TestOffChanGates(t *testing.T) {
 func TestSpectrumPerBand(t *testing.T) {
 	ctx := context.Background()
 	c, _, _, _ := offChanUnit(t)
-	if _, err := c.Spectrum(ctx, "na"); !errors.Is(err, ErrUnsupported) {
+	if r, err := c.Spectrum(ctx, "na"); err != nil || r.Radio() != "rai0" {
 		t.Errorf("na runner: %v", err)
 	}
-	if no, by := c.SpectrumBySurvey("na"); !no || !by {
+	if no, by := c.SpectrumBySurvey("na"); no || by {
 		t.Errorf("na: no runner %v, by survey %v", no, by)
 	}
 	if no, _ := c.SpectrumBySurvey("ng"); no {
@@ -1256,5 +1276,82 @@ func TestOffChanHomeOwnUplink(t *testing.T) {
 		if row.Channel == 6 && row.Utilization != 20 {
 			t.Errorf("stale estimate used: home utilization %d", row.Utilization)
 		}
+	}
+}
+
+// withKmsg gives the unit /dev/kmsg: the sweep then tells a takeover by the
+// kernel's times of the start and end lines, and makes no early read.
+func withKmsg(c *Collector, f *fakeMT7603) {
+	f.km = newChanSource()
+	f.km.ch = make(chan []byte, 4096)
+	c.o.kmsg = func() (packetSource, error) { return f.km, nil }
+}
+
+// Live 2026-11-25: every kernel-log read took 21-135 ms on the unit, so an
+// early read never ended before the dwell could and every visit was
+// untrusted. With /dev/kmsg the sweep makes no early read and trusts the
+// visits by their lines' kernel times.
+func TestOffChanKmsgSlowReads(t *testing.T) {
+	c, f, d, ck := offChanUnit(t)
+	withKmsg(c, f)
+	f.busy = map[int]int{1: 24000, 6: 40000}
+	c.o.klog = func() ([]byte, error) {
+		ck.t = ck.t.Add(60 * time.Millisecond) // a slow read
+		f.flush()
+		return []byte(d.log.String()), nil
+	}
+	r, _ := c.Spectrum(context.Background(), "ng")
+	res, err := r.Run(context.Background(), wl.SpectrumRequest{})
+	if err != nil {
+		t.Fatalf("Run: %v (calls %+v)", err, res.Diag.Calls)
+	}
+	if got := f.sets(); !slices.Equal(got, f.list) {
+		t.Errorf("visited %v (retries?), want %v", got, f.list)
+	}
+	for _, row := range res.Rows[20] {
+		if row.Channel == 6 && row.Utilization != 20 {
+			t.Errorf("ch 6 %+v", row)
+		}
+	}
+	if !slices.Contains(res.Diag.Notes, "a takeover told by the kernel's times of the start and end lines (/dev/kmsg)") {
+		t.Errorf("notes %q", res.Diag.Notes)
+	}
+}
+
+// A visit taken over by a running scan (its end 60 ms after the request)
+// is told by the kernel's times, not trusted, and retried.
+func TestOffChanKmsgHijack(t *testing.T) {
+	c, f, _, _ := offChanUnit(t)
+	withKmsg(c, f)
+	f.hijack[4], f.hijackBusy, f.hijackAfter = 1, 20000, 60*time.Millisecond
+	f.timeDiff[4] = 196
+	r, _ := c.Spectrum(context.Background(), "ng")
+	res, err := r.Run(context.Background(), wl.SpectrumRequest{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if why := firstWhy(res, 4); !strings.Contains(why, "kernel times") {
+		t.Errorf("ch 4: %q", why)
+	}
+	if got := f.sets(); len(got) != len(f.list)+1 || got[len(got)-1] != 4 {
+		t.Errorf("visits %v: ch 4 not retried", got)
+	}
+}
+
+// /dev/kmsg records: the start and end lines with their kernel times.
+func TestParseStampRec(t *testing.T) {
+	r, ok := parseStampRec("4,1234,5001234,-;ApSiteSurveyNew_by_wdev channel_index:1 channel:2 time:200\n")
+	if !ok || !r.start || r.ch != 2 || r.ms != 200 || r.ts != 5001234*time.Microsecond {
+		t.Errorf("start %+v %v", r, ok)
+	}
+	r, ok = parseStampRec("4,1235,5197000,-;time_diff:196 Busytime:23557 AvgNF:-95\n")
+	if !ok || r.start || r.ts != 5197*time.Millisecond {
+		t.Errorf("end %+v %v", r, ok)
+	}
+	if _, ok := parseStampRec("4,1236,5197100,-;SHREYA something\n"); ok {
+		t.Error("another line kept")
+	}
+	if d, ok := findDwell([]stampRec{{ts: 1 * time.Second, start: true, ch: 2, ms: 200}, {ts: 1196 * time.Millisecond}}, 2, 200); !ok || d != 196*time.Millisecond {
+		t.Errorf("dwell %v %v", d, ok)
 	}
 }

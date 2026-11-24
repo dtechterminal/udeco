@@ -56,8 +56,9 @@ func TestSiteSurveyWiring(t *testing.T) {
 		if !ok {
 			t.Fatalf("jio-mtk collector %T", h.a.o.col)
 		}
-		// the MT7603 (ng) sweeps with site_survey; the MT7663 (na) surveys
-		if col.ScanSupported() != on || !noRunner(col, "na") || bySurvey(col, "na") != on || noRunner(col, "ng") == on {
+		// with site_survey the MT7603 (ng) sweeps and the MT7663 (na)
+		// visits (offchan5.go): neither band falls back to the survey
+		if col.ScanSupported() != on || noRunner(col, "na") == on || bySurvey(col, "na") || noRunner(col, "ng") == on {
 			t.Errorf("site_survey %v: ScanSupported %v, na no runner %v by survey %v, ng no runner %v",
 				on, col.ScanSupported(), noRunner(col, "na"), bySurvey(col, "na"), noRunner(col, "ng"))
 		}

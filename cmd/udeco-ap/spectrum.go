@@ -257,6 +257,16 @@ func (a *agent) spectrumBand(ctx context.Context, band string, req wl.SpectrumRe
 	case errors.Is(err, wl.ErrRadioSkipped):
 		a.logf("%s: %v (table left as it was)%s", what, err, extra)
 	default:
+		// why each visit that counted for nothing was not trusted
+		for _, cd := range d.Calls {
+			if cd.Err != "" {
+				retry := ""
+				if cd.Retry {
+					retry = " (retry)"
+				}
+				extra += fmt.Sprintf("; ch %d%s: %s", cd.Channel, retry, cd.Err)
+			}
+		}
 		a.logf("%s: %v after %s (the previous table stays; spectrum_scanning_abnormal)%s", what, err, took, extra)
 	}
 }

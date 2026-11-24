@@ -55,6 +55,14 @@ type CollectorOptions struct {
 	// defaultOffChanPlan)
 	priv    func() (privIO, error)
 	offChan *offChanPlan
+	// chanInfo is the MT7663 visits' timing (test hook; nil =
+	// defaultChanInfoPlan); rtnl opens their event socket (test hook; nil
+	// = openRTNLSocket)
+	chanInfo *chanInfoPlan
+	rtnl     func() (packetSource, error)
+	// kmsg opens /dev/kmsg for the MT7603 sweep's line times (test hook;
+	// nil = openKmsgFile; kmsgstamp.go)
+	kmsg func() (packetSource, error)
 	// now and sleep are test hooks.
 	now   func() time.Time
 	sleep func(context.Context, time.Duration) error
@@ -89,7 +97,7 @@ type Collector struct {
 	// (offchan.go), and their backends
 	specMu  sync.Mutex
 	spec    map[string]*wl.SpectrumRunner
-	offChan map[string]*offChan
+	offChan map[string]spectrumBackend
 }
 
 // ErrUnsupported: scans and spectrum runs are not implemented on this driver.
@@ -532,11 +540,7 @@ func (c *Collector) Caps(context.Context) (wl.Caps, error) {
 			b.Channels[20], b.Channels[40] = chans24, chans24
 		} else {
 			b.VHT = true
-			five := chans5
-			if c.o.DFS && rd.HSFlag {
-				five = append(append([]int(nil), chans5[:4]...), chansDFS...)
-				five = append(five, chans5[4:]...)
-			}
+			five := c.bandChannels(rd)
 			b.Channels[20] = five
 			// wider: all but the 20 MHz only channel (165)
 			wide := slices.DeleteFunc(slices.Clone(five), func(ch int) bool { return rf.Only20MHz(rd.Band, ch) })
@@ -552,27 +556,44 @@ func (c *Collector) Caps(context.Context) (wl.Caps, error) {
 func (c *Collector) ScanSupported() bool { return c.o.FreshScan }
 
 // Spectrum is the band's spectrum runner: the MT7603's off-channel sweep
-// (offchan.go) on a radio that has it (RadioDef.Spectrum), with FreshScan
-// only (site_survey: the controller's scans run on this unit). Others, and
+// (offchan.go) or the MT7663's Channel_Info visits (offchan5.go), on a
+// radio that has one (RadioDef.Spectrum), with FreshScan only (site_survey: the controller's scans run on this unit). Others, and
 // without FreshScan, ErrUnsupported (SpectrumBySurvey says what runs
 // instead). The same runner is returned on every call.
 func (c *Collector) Spectrum(_ context.Context, band string) (*wl.SpectrumRunner, error) {
 	rd, ok := c.radioDef(band)
-	if !c.o.FreshScan || !ok || rd.Spectrum != SpectrumOffChan {
+	if !c.o.FreshScan || !ok || (rd.Spectrum != SpectrumOffChan && rd.Spectrum != SpectrumChanInfo) {
 		return nil, ErrUnsupported
 	}
 	c.specMu.Lock()
 	defer c.specMu.Unlock()
 	if c.spec == nil {
-		c.spec, c.offChan = map[string]*wl.SpectrumRunner{}, map[string]*offChan{}
+		c.spec, c.offChan = map[string]*wl.SpectrumRunner{}, map[string]spectrumBackend{}
 	}
 	r := c.spec[band]
 	if r == nil {
-		b := newOffChan(c, rd)
+		var b spectrumBackend = newOffChan(c, rd)
+		if rd.Spectrum == SpectrumChanInfo {
+			b = newChanInfo(c, rd)
+		}
 		r = wl.NewSpectrumRunner(rd.Ifaces[0], band, b)
 		c.spec[band], c.offChan[band] = r, b
 	}
 	return r, nil
+}
+
+// bandChannels are the 20 MHz channels the agent serves on radio rd:
+// chans24, or chans5 with 52-64 when the applier may take the MT7663 there
+// (Options.DFS). A new slice.
+func (c *Collector) bandChannels(rd RadioDef) []int {
+	if rd.Band == "ng" {
+		return slices.Clone(chans24)
+	}
+	if c.o.DFS && rd.HSFlag {
+		five := append(append([]int(nil), chans5[:4]...), chansDFS...)
+		return append(five, chans5[4:]...)
+	}
+	return slices.Clone(chans5)
 }
 
 // radioDef is the layout's radio of band.

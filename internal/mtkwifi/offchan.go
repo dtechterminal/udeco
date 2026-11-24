@@ -177,9 +177,8 @@ import (
 // (§5): only 20 MHz visits are made.
 //
 // The MT7663 (5 GHz, rai0, in the kernel) has no ApOffChanScan: its band
-// has no runner (RadioDef.Spectrum ""), and its spectrum commands keep the
-// neighbour survey (SpectrumBySurvey). A 5 GHz backend would be another
-// spectrumBackend kind behind the same runner.
+// has the driver's Channel_Info visit instead (SpectrumChanInfo,
+// offchan5.go) behind the same runner.
 
 // SpectrumOffChan is RadioDef.Spectrum for the MT7603's off-channel sweep.
 const SpectrumOffChan = "offchan"
@@ -245,6 +244,9 @@ type offChan struct {
 	// only (Measure).
 	seen  string
 	dirty bool
+	// stamps: the kernel's times of the sweep's lines (kmsgstamp.go),
+	// while a band runs; nil without /dev/kmsg (the early read decides)
+	stamps *kmsgStamps
 }
 
 // newOffChan returns the radio's backend.
@@ -480,6 +482,10 @@ func dwellOK(t, ms int) bool {
 	return false
 }
 
+// stampWait: how long (real time) a visit waits for its /dev/kmsg records
+// once the kernel log shows its end (the reader runs beside the sweep).
+const stampWait = 500 * time.Millisecond
+
 // dwellLate: how much later than the asked dwell its end may be printed
 // (the timer's last jiffy and the MLME task's delay).
 const dwellLate = 60
@@ -608,6 +614,10 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 		b.seen, b.dirty = logTail(after), v.others > 0 || !anchored
 		return v, anchored, nil
 	}
+	mark := 0
+	if b.stamps != nil {
+		mark = b.stamps.mark()
+	}
 	t0 := c.o.now()
 	if err := p.Show(main, "mibinfo"); err != nil {
 		return visitResult{}, fmt.Errorf("mtkwifi: %s show mibinfo (pre-clear): %w", main, err)
@@ -644,7 +654,7 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 	var early time.Duration
 	hijacked := false
 	earliest := dwellEarliest(ms)
-	earlyRead := earliest > 2*pl.EarlyLead
+	earlyRead := earliest > 2*pl.EarlyLead && b.stamps == nil
 	if earlyRead {
 		if err := sleep(earliest - pl.EarlyLead - c.o.now().Sub(t0)); err != nil {
 			return visitResult{gap: gap}, err
@@ -720,6 +730,19 @@ func (b *offChan) visit(ctx context.Context, p privIO, ch, home, width int, pl o
 	}
 	unconfirmed := func(format string, a ...any) (visitResult, error) {
 		return visitResult{class: visitUnconfirmed, why: fmt.Sprintf(format, a...), gap: gap, early: early}, nil
+	}
+	if b.stamps != nil {
+		// the kernel's times: the end line no sooner after the start line
+		// than the dwell can end (kmsgstamp.go)
+		took, ok := b.stamps.dwell(mark, ch, ms, stampWait)
+		switch {
+		case !ok:
+			return unconfirmed("no start and end line for it in /dev/kmsg")
+		case took < earliest:
+			hijacked = true
+			return unconfirmed("the end line came %v after the start line (kernel times), before the dwell could end (%v): a scan already running took the request over",
+				took, earliest)
+		}
 	}
 	switch {
 	case hijacked:
@@ -853,6 +876,17 @@ func (b *offChan) Measure(ctx context.Context, req wl.SpectrumRequest, phase fun
 		return fail(err)
 	}
 	d.Notes = append(d.Notes, "channels from "+src)
+	openK := c.o.kmsg
+	if openK == nil {
+		openK = openKmsgFile
+	}
+	if src, err := openK(); err != nil {
+		d.Notes = append(d.Notes, fmt.Sprintf("no /dev/kmsg times (%v): the early log read decides a takeover", err))
+	} else {
+		b.stamps = newKmsgStamps(src)
+		defer func() { b.stamps.Close(); b.stamps = nil }()
+		d.Notes = append(d.Notes, "a takeover told by the kernel's times of the start and end lines (/dev/kmsg)")
+	}
 
 	// waits for a Collect reading the driver (its `show mibinfo` would
 	// clear the counter in a visit's dwell); none starts one after
@@ -988,11 +1022,13 @@ func (b *offChan) Measure(ctx context.Context, req wl.SpectrumRequest, phase fun
 		d.Channels = append(d.Channels, st)
 	}
 	d.Notes = append(d.Notes, fmt.Sprintf("busy ms of %d by channel %s", ms, strings.Join(busy, " ")),
-		fmt.Sprintf("pre-clear to request: longest %v", maxGap),
-		fmt.Sprintf("pre-clear to the early log read's end: longest %v (the dwell ends %v after its request at the earliest)", maxEarly, dwellEarliest(ms)))
+		fmt.Sprintf("pre-clear to request: longest %v", maxGap))
+	if maxEarly > 0 {
+		d.Notes = append(d.Notes, fmt.Sprintf("pre-clear to the early log read's end: longest %v (the dwell ends %v after its request at the earliest)", maxEarly, dwellEarliest(ms)))
+	}
 	rows := map[int][]wl.SpectrumRow{}
 	for _, w := range d.Widths {
-		rs, omitted, err := wl.BuildSpectrumRows(band, w, blockLows(chans, w), vals)
+		rs, omitted, err := wl.BuildSpectrumRows(band, w, blockLows(band, chans, w), vals)
 		if len(omitted) > 0 {
 			if d.Omitted == nil {
 				d.Omitted = map[int][]int{}
@@ -1012,6 +1048,10 @@ func (b *offChan) Measure(ctx context.Context, req wl.SpectrumRequest, phase fun
 // wl.ErrIncomplete when a requested row needs a missing channel, ErrNoRows
 // when none is left.
 func (b *offChan) rowsCheck(chans []int, res map[int]visitResult, widths []int) error {
+	return rowsCheck(b.rd.Band, chans, res, widths)
+}
+
+func rowsCheck(band string, chans []int, res map[int]visitResult, widths []int) error {
 	vals := map[int]wl.SpectrumChannel{}
 	for _, ch := range chans {
 		switch res[ch].class {
@@ -1024,7 +1064,7 @@ func (b *offChan) rowsCheck(chans []int, res map[int]visitResult, widths []int) 
 		}
 	}
 	for _, w := range widths {
-		if _, _, err := wl.BuildSpectrumRows(b.rd.Band, w, blockLows(chans, w), vals); err != nil {
+		if _, _, err := wl.BuildSpectrumRows(band, w, blockLows(band, chans, w), vals); err != nil {
 			return err
 		}
 	}
@@ -1032,22 +1072,49 @@ func (b *offChan) rowsCheck(chans []int, res map[int]visitResult, widths []int) 
 }
 
 // blockLows lists the lowest channels of the blocks of width w over chans:
-// every channel at 20 MHz; at 40 (2.4 GHz) every c whose c+4 is listed.
-// Wider blocks are not built from the list (no 5 GHz backend yet).
-func blockLows(chans []int, w int) []int {
-	switch w {
-	case 20:
+// every channel at 20 MHz; at 40 on 2.4 GHz every c whose c+4 is listed;
+// on 5 GHz the rf.Blocks5G blocks of w whose 20 MHz channels are all
+// listed.
+func blockLows(band string, chans []int, w int) []int {
+	if w == 20 {
 		return chans
-	case 40:
-		var out []int
-		for _, ch := range chans {
-			if slices.Contains(chans, ch+4) {
-				out = append(out, ch)
+	}
+	var out []int
+	if band == "ng" {
+		if w == 40 {
+			for _, ch := range chans {
+				if slices.Contains(chans, ch+4) {
+					out = append(out, ch)
+				}
 			}
 		}
 		return out
 	}
-	return nil
+	for _, lo := range rf.Blocks5G(w) {
+		all := true
+		for i := 0; i < w/20; i++ {
+			all = all && slices.Contains(chans, lo+4*i)
+		}
+		if all {
+			out = append(out, lo)
+		}
+	}
+	return out
+}
+
+// listedBlocks are the blocks of chans at each width.
+func listedBlocks(band string, chans, widths []int) []wl.SpectrumBlock {
+	var out []wl.SpectrumBlock
+	for _, w := range widths {
+		for _, lo := range blockLows(band, chans, w) {
+			centre := lo
+			if w > 20 {
+				centre = lo + (w/10 - 2)
+			}
+			out = append(out, wl.SpectrumBlock{Channel: lo, Width: w, CenterFreq: chanFreq24(centre, band)})
+		}
+	}
+	return out
 }
 
 // chanFreq24 is the 20 MHz channel's centre frequency.
@@ -1073,15 +1140,5 @@ func (b *offChan) Listed(context.Context) ([]wl.SpectrumBlock, error) {
 			return nil, err
 		}
 	}
-	var out []wl.SpectrumBlock
-	for _, w := range b.widths() {
-		for _, lo := range blockLows(chans, w) {
-			centre := lo
-			if w > 20 {
-				centre = lo + (w/10 - 2)
-			}
-			out = append(out, wl.SpectrumBlock{Channel: lo, Width: w, CenterFreq: chanFreq24(centre, b.rd.Band)})
-		}
-	}
-	return out, nil
+	return listedBlocks(b.rd.Band, chans, b.widths()), nil
 }

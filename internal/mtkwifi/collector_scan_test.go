@@ -196,7 +196,9 @@ func (c *clock) mono() time.Duration { return c.t.Sub(time.Unix(0, 0)) }
 func newTestCollector(d *klogDev, ck *clock, fresh bool) *Collector {
 	return NewCollector(CollectorOptions{Root: d.root, Run: d, FreshScan: fresh, now: ck.now,
 		klog:  func() ([]byte, error) { return []byte(d.log.String()), nil },
-		sleep: func(ctx context.Context, dt time.Duration) error { ck.t = ck.t.Add(dt); return ctx.Err() }})
+		sleep: func(ctx context.Context, dt time.Duration) error { ck.t = ck.t.Add(dt); return ctx.Err() },
+		// no /dev/kmsg unless a test gives one (the early read decides)
+		kmsg: func() (packetSource, error) { return nil, errors.New("no kmsg in the test") }})
 }
 
 func writeSys(t *testing.T, root, dev, file, v string) {
