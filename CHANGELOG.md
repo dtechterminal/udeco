@@ -13,6 +13,36 @@ How sure each feature is:
 - **Partial:** works, with a named gap.
 - **Not possible:** this hardware or its software can't do it.
 
+## v0.3.7 (2026-11-26)
+
+Locking a client to an access point no longer restarts Wi-Fi on the
+Decos.
+
+- **Cause:** a lock change reaches every AP as a new deny list, and the
+  Deco agent is meant to apply a change like that live, through hostapd's
+  control socket. On a radio serving WPA3 fast roaming (FT-SAE), every
+  plan also writes the RRB receive shim. The live-update check refused any
+  file it doesn't own before it checked whether that file had changed, so
+  the unchanged shim sent every lock change to a full restart. Hostapd
+  restarted on both radios of every Deco, and each lock dropped every
+  client on them.
+- **Fix:** unchanged files are skipped first, so only a real change
+  outside the station lists forces a restart.
+
+**Verified** on the three Decos: moving a lock between two APs updated
+both deny lists live (`DENY_ACL ADD_MAC` / `DEL_MAC`), with no hostapd
+restart and no clients dropped. The Garage applied lock changes live
+already.
+
+### Downloads
+
+| File | For | Install with |
+|---|---|---|
+| `udeco-ap-deco-x20-linux-armv7` and `.gz` | TP-Link Deco X20 V2 (Broadcom, armv7) | `deploy/deco-ap.sh` |
+| `udeco-ap-jio-jcow414-linux-mipsle` and `.gz` | JioFiber JCOW414 (MediaTek, mipsle) | `deploy/jio-ap.sh` |
+| `mt7603roam-jio-jcow414.ko.gz` | optional: the JCOW414's 2.4 GHz driver with WPA3 and 802.11r/k/v | `deploy/jio-ap.sh --driver FILE` |
+| `udeco_rl-jio-jcow414.ko.gz` | optional: the JCOW414's speed-limit module (`"rate_limits": true`) | `deploy/jio-ap.sh --rate-limit-module FILE` |
+
 ## v0.3.6 (2026-11-25)
 
 Nightly Channel Optimization now plans with real interference data from

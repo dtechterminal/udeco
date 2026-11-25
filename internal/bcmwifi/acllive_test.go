@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/dtechterminal/udeco/internal/ftpeer"
 )
 
 const (
@@ -430,5 +432,40 @@ func TestConfLiveDiff(t *testing.T) {
 		if ok != c.ok || !slices.Equal(got, c.want) {
 			t.Errorf("%s: got %v %v, want %v %v", c.name, got, ok, c.want, c.ok)
 		}
+	}
+}
+
+// A radio serving FT-SAE writes the RRB receive shim at every plan
+// (rrb.go). An unchanged shim must not stop a lock change from being
+// applied live: on the units (FT-SAE on the main WLAN) each lock change
+// restarted hostapd on both radios of every Deco, dropping all clients.
+func TestLockToAPLiveWithRRBShim(t *testing.T) {
+	ctx := context.Background()
+	f := newFakeDev(t)
+	a := newTestApplier(f, false)
+	a.o.WPA3, a.o.FTSAE = true, true
+	d := Desired{Country: "IN", Radios: map[string]Radio{"ng": {Enabled: true, Channel: 6}, "na": {Enabled: true, Channel: 44, Width: 80}}}
+	s := ftTransition()
+	s.Bands = []string{"ng", "na"}
+	d.SSIDs = []SSID{s}
+	a.SetFTPeers([]ftpeer.Peer{ftPeer("02:11:22:33:44:24", "ng", s.SSID, testFTKey, "br-lan")})
+	applyOK(t, a, d)
+	if _, err := os.Stat(f.path(rrbShimPath("/tmp/udeco"))); err != nil {
+		t.Fatalf("setup: no RRB shim: %v", err)
+	}
+	f.reset()
+
+	locked := d
+	locked.SSIDs = []SSID{s}
+	locked.SSIDs[0].MACFilter = &MACFilter{Policy: "deny", MACs: []string{lockedMAC}}
+	p := planApply(t, a, locked)
+	if p.disruptive || restarted(f) {
+		t.Fatalf("lock change on an FT-SAE radio restarted hostapd:\n%s", p)
+	}
+	if !f.called("DENY_ACL ADD_MAC " + lockedMAC) {
+		t.Errorf("lock entry not added to hostapd live:\n%s", p)
+	}
+	if p, _ := a.Plan(ctx, locked); !p.Empty() {
+		t.Errorf("plan after the live update not empty:\n%s", p)
 	}
 }

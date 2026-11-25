@@ -117,10 +117,14 @@ func (a *Applier) planACLLive(primary string, conf []byte, drv []vifDriver, file
 		switch {
 		case f.Kind == StepWrite && f.Path == ConfPath(run, primary) && len(sets) == 0:
 			// unchanged (checked above)
-		case !l.paths[f.Path]:
-			return nil // a file this update does not own: full reconcile
 		case f.Kind == StepWrite && a.sameFile(f.Path, f.Data):
+			// unchanged, owned or not: planRadio writes some files at
+			// every plan (the RRB shim of an FT-SAE radio), and checking
+			// ownership first sent every lock change on such a radio to a
+			// full reconcile
 		case f.Kind == StepRemove && !a.exists(f.Path):
+		case !l.paths[f.Path]:
+			return nil // a changed file this update does not own: full reconcile
 		case isPSKPath(f.Path):
 			return nil // hostapd reads its key file only at start (ppsk.go)
 		default:
